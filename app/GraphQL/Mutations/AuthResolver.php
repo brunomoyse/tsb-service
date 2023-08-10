@@ -2,23 +2,23 @@
 
 namespace App\GraphQL\Mutations;
 
+use GraphQL\Error\Error;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
-use GraphQL\Error\Error;
 
 class AuthResolver
 {
     public function login($rootValue, array $args): array
     {
         // Check the credentials first
-        if (!Auth::attempt(['email' => $args['email'], 'password' => $args['password']])) {
+        if (! Auth::attempt(['email' => $args['email'], 'password' => $args['password']])) {
             throw new Error('Invalid email or password.');
         }
 
         // To use in production
         // url('/oauth/token')
         // Try to get the OAuth token
-        $response = Http::asForm()->post(env('APP_URL') . '/oauth/token', [
+        $response = Http::asForm()->post(env('APP_URL').'/oauth/token', [
             'grant_type' => 'password',
             'client_id' => env('PASSPORT_PASSWORD_GRANT_CLIENT_ID'),  // from passport:install
             'client_secret' => env('PASSPORT_PASSWORD_GRANT_SECRET'),  // from passport:install
@@ -44,7 +44,7 @@ class AuthResolver
         // To use in production
         // url('/oauth/token')
         // Try to get the OAuth token
-        $response = Http::asForm()->post(env('APP_URL') . '/oauth/token', [
+        $response = Http::asForm()->post(env('APP_URL').'/oauth/token', [
             'grant_type' => 'refresh_token',
             'refresh_token' => $args['refresh_token'],
             'client_id' => env('PASSPORT_PASSWORD_GRANT_CLIENT_ID'),

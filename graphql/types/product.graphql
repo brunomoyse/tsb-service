@@ -3,16 +3,28 @@ type Product {
     createdAt: DateTime
     updatedAt: DateTime
     price: Float
-    attachments: [Attachment]
-    productTags: [ProductTag]
+    attachments: [Attachment] @hasMany
+    productTags: [ProductTag] @hasMany
+    productTranslations: [ProductTranslation] @hasMany
+    orders: [Order] @hasMany
+}
+
+type ProductTranslation {
+    id: ID!
+    createdAt: DateTime
+    updatedAt: DateTime
+    language: Language!
+    product: Product! @belongsTo
+    name: String
+    description: String
 }
 
 type ProductTag {
     id: ID!
     createdAt: DateTime
     updatedAt: DateTime
-    products: [Product]
-    productTagTranslations: [ProductTagTranslation]
+    products: [Product] @belongsToMany
+    productTagTranslations: [ProductTagTranslation] @hasMany
 }
 
 type ProductTagTranslation {
@@ -20,22 +32,18 @@ type ProductTagTranslation {
     createdAt: DateTime
     updatedAt: DateTime
     name: String
-    productTag: ProductTag
+    productTag: ProductTag @belongsTo
 }
 
 type Attachment {
+    id: ID!
+    createdAt: DateTime
+    updatedAt: DateTime
     path: String
-    product: Product
+    product: Product @belongsTo
 }
 
-model Food {
-id                   String   @id @unique @default(uuid()) @db.Uuid
-createdAt            DateTime @default(now()) @map("created_at")
-updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
-price                Float?
-attachments          Attachment[]
-foodTags             FoodTag[]
-foodTranslations     FoodTranslation[]
-orders               Order[]
-@@map("foods")
+enum Language {
+    EN
+    FR
 }

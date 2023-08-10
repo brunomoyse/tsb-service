@@ -1,0 +1,7 @@
+type Order {
+    id: ID!
+    createdAt: DateTime
+    updatedAt: DateTime
+    user: User! @hasOne
+    products: [Product!]! @hasMany
+}
