@@ -4,4 +4,8 @@ extend type Mutation {
         price: Float!,
         description: String!
     ): Product!
+
+    createProduct(
+        input: CreateProductInput! @spread
+    ): Product! @create
 }
