@@ -1,0 +1,11 @@
+extend type Mutation {
+    login(
+        email: String! @rules(apply: ["required", "email"])
+        password: String! @rules(apply: ["required"])
+    ): AuthPayload @field(resolver: "AuthResolver@login")
+
+    refreshToken(
+        refresh_token: String! @rules(apply: ["required"])
+    ): AuthPayload @field(resolver: "AuthResolver@refreshToken")
+
+}

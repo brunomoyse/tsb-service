@@ -1,0 +1,41 @@
+type Product {
+    id: ID!
+    createdAt: DateTime
+    updatedAt: DateTime
+    price: Float
+    attachments: [Attachment]
+    productTags: [ProductTag]
+}
+
+type ProductTag {
+    id: ID!
+    createdAt: DateTime
+    updatedAt: DateTime
+    products: [Product]
+    productTagTranslations: [ProductTagTranslation]
+}
+
+type ProductTagTranslation {
+    id: ID!
+    createdAt: DateTime
+    updatedAt: DateTime
+    name: String
+    productTag: ProductTag
+}
+
+type Attachment {
+    path: String
+    product: Product
+}
+
+model Food {
+id                   String   @id @unique @default(uuid()) @db.Uuid
+createdAt            DateTime @default(now()) @map("created_at")
+updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
+price                Float?
+attachments          Attachment[]
+foodTags             FoodTag[]
+foodTranslations     FoodTranslation[]
+orders               Order[]
+@@map("foods")
+}

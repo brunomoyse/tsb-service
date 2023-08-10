@@ -1,0 +1,23 @@
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/nunomaduro/larastan/extension.neon
+parameters:
+    paths:
+        - app
+        - bootstrap
+        - config
+        - public
+        - resources
+        - routes
+        - tests
+    fileExtensions:
+        - php
+        - dist
+    stubFiles:
+        - vendor/nuwave/lighthouse/_ide_helper.php
+    level: 8
+    checkGenericClassInNonGenericObjectType: false
+    checkMissingIterableValueType: false
+    checkModelProperties: true
+    reportMaybesInPropertyPhpDocTypes: false
+    reportStaticMethodSignatures: false

@@ -1,0 +1,7 @@
+extend type Mutation {
+    createProduct(
+        name: String!,
+        price: Float!,
+        description: String!
+    ): Product!
+}
