@@ -1,0 +1,15 @@
+input ProductTranslationInput {
+    language: Language!
+    name: String
+    description: String
+}
+
+input CreateProductInput {
+    price: Float!
+    productTranslations: CreateProductTranslationsHasMany!
+    # Add any other fields if necessary.
+}
+
+input CreateProductTranslationsHasMany {
+    create: [ProductTranslationInput!]!
+}
