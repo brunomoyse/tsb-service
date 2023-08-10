@@ -31,8 +31,9 @@ type ProductTagTranslation {
     id: ID!
     createdAt: DateTime
     updatedAt: DateTime
-    name: String
+    language: Language!
     productTag: ProductTag @belongsTo
+    name: String
 }
 
 type Attachment {
