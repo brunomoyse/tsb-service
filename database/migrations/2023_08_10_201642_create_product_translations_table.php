@@ -15,7 +15,7 @@ return new class extends Migration
         Schema::create('product_translations', function (Blueprint $table) {
             $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
             $table->timestamps();
-            $table->enum('language', ['en', 'fr']);
+            $table->enum('language', ['EN', 'FR']);
             $table->uuid('product_id');
             $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
             $table->string('name');

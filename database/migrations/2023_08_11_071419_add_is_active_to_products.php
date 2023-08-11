@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -12,10 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('products', function (Blueprint $table) {
-            $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
-            $table->timestamps();
-            $table->float('price')->nullable();
+        Schema::table('products', function (Blueprint $table) {
+            $table->boolean('is_active')->default(true);
         });
     }
 
@@ -24,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('table_products');
+        Schema::table('products', function (Blueprint $table) {
+            //
+        });
     }
 };

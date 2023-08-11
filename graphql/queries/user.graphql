@@ -1,5 +1,5 @@
 "Indicates what fields are available at the top level of a query operation."
-extend type Query @guard {
+type Query @guard {
     "Find a single user by an identifying attribute."
     user(
         "Search by primary key."

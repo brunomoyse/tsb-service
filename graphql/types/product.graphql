@@ -3,6 +3,7 @@ type Product {
     createdAt: DateTime
     updatedAt: DateTime
     price: Float
+    isActive: Boolean
     attachments: [Attachment] @hasMany
     productTags: [ProductTag] @hasMany
     productTranslations: [ProductTranslation] @hasMany

@@ -1,11 +1,41 @@
 extend type Mutation {
     createProduct(
-        name: String!,
-        price: Float!,
-        description: String!
-    ): Product!
-
-    createProduct(
         input: CreateProductInput! @spread
-    ): Product! @create
+    ): Product! @field(resolver: "App\\GraphQL\\Mutations\\ProductResolver@createProduct")
 }
+
+#mutation {
+#    createProduct(input: {
+#        price: 10.50
+#        is_active: true
+#        productTranslations: {
+#            create: [
+#                {
+#                    language: EN
+#                    name: "English Name"
+#                    description: "English Description"
+#                },
+#                {
+#                    language: FR
+#                    name: "French Name"
+#                    description: "French Description"
+#                }
+#            ]
+#        }
+#        productTags: {
+#            connect: [1, 2, 3]  # IDs of existing ProductTags
+#        }
+#    }) {
+#        id
+#        price
+#        productTranslations {
+#            id
+#            name
+#            description
+#        }
+#        productTags {
+#            id
+#            name
+#        }
+#    }
+#}
