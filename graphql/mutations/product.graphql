@@ -2,6 +2,12 @@ extend type Mutation {
     createProduct(
         input: CreateProductInput! @spread
     ): Product! @field(resolver: "App\\GraphQL\\Mutations\\ProductResolver@createProduct")
+
+    updateProduct(
+        id: ID!
+        input: UpdateProductInput! @spread
+    ): Product! @field(resolver: "App\\GraphQL\\Mutations\\ProductResolver@updateProduct")
+
 }
 
 #mutation {

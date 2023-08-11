@@ -6,13 +6,18 @@ input ProductTranslationInput {
 
 input CreateProductInput {
     price: Float!
-    isActive: Boolean = true
+    isActive: Boolean = true @rename(attribute: "is_active")
     productTranslations: CreateProductTranslationsHasMany!
-    productTags: CreateProductTagConnection!
-    # Add any other fields if necessary.
+    productTags: ProductTagConnection!
 }
 
-input CreateProductTagConnection {
+input UpdateProductInput {
+    price: Float
+    isActive: Boolean @rename(attribute: "is_active")
+    productTags: ProductTagConnection
+}
+
+input ProductTagConnection {
     connect: [ID]!
 }
 

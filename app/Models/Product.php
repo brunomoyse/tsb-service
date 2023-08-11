@@ -7,6 +7,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * Class Product
+ *
+ * @property string $id
+ * @property string $name
+ * @property string $description
+ * @property float $price
+ * @property string $created_at
+ * @property string $updated_at
+ * @property bool $is_active
+ * @property Attachment[] $attachments
+ * @property ProductTag[] $productTags
+ * @property ProductTranslation[] $productTranslations
+ * @property Order[] $orders
+ */
 class Product extends Model
 {
     use HasUuids;
@@ -20,7 +35,7 @@ class Product extends Model
         'price',
         'created_at',
         'updated_at',
-        'is_active'
+        'is_active',
     ];
 
     public function attachments(): HasMany
