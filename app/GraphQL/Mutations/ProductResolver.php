@@ -5,15 +5,18 @@ namespace App\GraphQL\Mutations;
 use App\Models\Product;
 use GraphQL\Type\Definition\ResolveInfo;
 use Nuwave\Lighthouse\Support\Contracts\GraphQLContext;
-use Illuminate\Support\Str;
+use Stripe\StripeClient;
 use Stripe\Product as StripeProduct;
 use Stripe\Stripe;
 
 class ProductResolver
 {
-    public function createProduct($rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo)
+    private StripeClient $stripe;
+
+    public function __construct()
     {
-        Stripe::setApiKey(env('STRIPE_SECRET_KEY'));
+        $this->stripe = new StripeClient(config('stripe.secret_key'));
+    }
 
         try {
             $newUuid = Str::uuid();
