@@ -37,17 +37,21 @@ class ProductResolver
             throw new \Exception('Erreur lors de la création du produit Stripe: '.$e->getMessage());
         }
 
-        // I fill the price directly from the request to avoid making a new request to get the price
-        // since the price is a separate object in Stripe
-        $product = Product::query()->create([
-            'id' => $stripeProduct->id,
-            'price' => $args['price'],
-            'is_active' => $stripeProduct->active,
-        ]);
+        try {
+            // I fill the price directly from the request to avoid making a new request to get the price
+            // since the price is a separate object in Stripe
+            $product = Product::query()->create([
+                'id' => $stripeProduct->id,
+                'price' => $args['price'],
+                'is_active' => $stripeProduct->active,
+            ]);
 
-        $product->productTranslations()->createMany($args['productTranslations']['create']);
-        $product->productTags()->sync($args['productTags']['connect']);
+            $product->productTranslations()->createMany($args['productTranslations']['create']);
+            $product->productTags()->sync($args['productTags']['connect']);
 
-        return $product->load('productTranslations', 'productTags');
+            return $product->load('productTranslations', 'productTags');
+        } catch (\Exception $e) {
+            throw new \Exception('Erreur lors de la création du produit: '.$e->getMessage());
+        }
     }
 }
