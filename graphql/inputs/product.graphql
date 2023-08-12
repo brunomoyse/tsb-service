@@ -6,14 +6,14 @@ input ProductTranslationInput {
 
 input CreateProductInput {
     price: Float!
-    isActive: Boolean = true @rename(attribute: "is_active")
+    is_active: Boolean = true
     productTranslations: CreateProductTranslationsHasMany!
     productTags: ProductTagConnection!
 }
 
 input UpdateProductInput {
     price: Float
-    isActive: Boolean @rename(attribute: "is_active")
+    is_active: Boolean
     productTags: ProductTagConnection
 }
 

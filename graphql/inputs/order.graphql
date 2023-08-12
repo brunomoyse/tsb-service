@@ -1,0 +1,4 @@
+input OrderProductInput {
+    product_id: ID!
+    quantity: Int!
+}
