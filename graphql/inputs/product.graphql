@@ -24,3 +24,7 @@ input ProductTagConnection {
 input CreateProductTranslationsHasMany {
     create: [ProductTranslationInput!]!
 }
+
+input ProductTranslationFilter {
+    language: Language
+}

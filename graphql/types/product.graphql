@@ -6,7 +6,7 @@ type Product {
     isActive: Boolean
     attachments: [Attachment] @hasMany
     productTags: [ProductTag] @hasMany
-    productTranslations: [ProductTranslation] @hasMany
+    productTranslations(language: Language @eq): [ProductTranslation] @hasMany
     orders: [Order] @hasMany
 }
 
