@@ -17,7 +17,7 @@ class ProductResolver
         $this->stripe = new StripeClient(config('stripe.secret_key'));
     }
 
-    public function createProduct($rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo)
+    public function createProduct(null $rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo): Product
     {
         try {
             $newUuid = Str::uuid();
@@ -29,8 +29,8 @@ class ProductResolver
             $stripeProduct = $this->stripe->products->create([
                 'id' => $newUuid,
                 'name' => $frenchData['name'],
-                'active' => $args['isActive'],
-                'description' => $frenchData['description'],
+                'active' => $args['is_active'] ?? true,
+                'description' => $frenchData['description'] ?? null,
                 'default_price_data' => [
                     'currency' => 'eur',
                     'unit_amount_decimal' => $args['price'] * 100,
@@ -38,7 +38,7 @@ class ProductResolver
                 ],
             ]);
         } catch (\Exception $e) {
-            throw new \Exception('Erreur lors de la création du produit Stripe: '.$e->getMessage());
+            throw new \Exception('Error creating Stripe product: '.$e->getMessage());
         }
 
         try {
@@ -53,21 +53,22 @@ class ProductResolver
             $product->productTranslations()->createMany($args['productTranslations']['create']);
             $product->productTags()->sync($args['productTags']['connect']);
 
+            /** @var Product $product */
             return $product->load('productTranslations', 'productTags');
         } catch (\Exception $e) {
-            throw new \Exception('Erreur lors de la création du produit: '.$e->getMessage());
+            throw new \Exception('Error creating product: '.$e->getMessage());
         }
     }
 
-    public function updateProduct($rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo)
+    public function updateProduct(null $rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo): Product
     {
         /** @var Product $product */
         $product = Product::query()->findOrFail($args['id']);
 
-        if (isset($args['isActive'])) {
+        if (isset($args['is_active'])) {
             try {
                 $this->stripe->products->update($args['id'], [
-                    'active' => $args['isActive'],
+                    'active' => $args['is_active'],
                 ]);
             } catch (\Exception $e) {
                 throw new \Exception('Error updating Stripe product: '.$e->getMessage());
@@ -105,6 +106,7 @@ class ProductResolver
                 $product->productTags()->sync($args['productTags']['connect']);
             }
 
+            /** @var Product $product */
             return $product->load('productTranslations', 'productTags');
         } catch (\Exception $e) {
             throw new \Exception('Error updating product: '.$e->getMessage());

@@ -3,12 +3,14 @@
 namespace App\GraphQL\Mutations;
 
 use GraphQL\Error\Error;
+use GraphQL\Type\Definition\ResolveInfo;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
+use Nuwave\Lighthouse\Support\Contracts\GraphQLContext;
 
 class AuthResolver
 {
-    public function login($rootValue, array $args): array
+    public function login(null $rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo): array
     {
         // Check the credentials first
         if (! Auth::attempt(['email' => $args['email'], 'password' => $args['password']])) {
@@ -39,7 +41,7 @@ class AuthResolver
         ];
     }
 
-    public function refreshToken($rootValue, array $args): array
+    public function refreshToken(null $rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo): array
     {
         // To use in production
         // url('/oauth/token')
