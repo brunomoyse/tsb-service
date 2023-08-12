@@ -2,6 +2,24 @@ type Order {
     id: ID!
     createdAt: DateTime
     updatedAt: DateTime
+    paymentMode: PaymentMode! @rename(attribute: "payment_mode")
+    status: OrderStatus
+    stripeSessionId: String @rename(attribute: "stripe_session_id")
+    stripeCheckoutUrl: String @rename(attribute: "stripe_checkout_url")
     user: User! @hasOne
     products: [Product!]! @hasMany
+}
+
+enum PaymentMode {
+    CASH
+    ONLINE
+    TERMINAL
+}
+
+enum OrderStatus {
+    PENDING
+    PAID
+    CANCELLED
+    REFUNDED
+    FAILED
 }
