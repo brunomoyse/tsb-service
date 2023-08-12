@@ -19,7 +19,7 @@ return new class extends Migration
             $table->uuid('product_id');
             $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
             $table->string('name');
-            $table->string('description');
+            $table->text('description');
             $table->unique(['product_id', 'language']);
         });
     }
