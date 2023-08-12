@@ -1,0 +1,5 @@
+extend type Mutation {
+    createOrder(
+        products: [OrderProductInput!]!
+    ): Order! @field(resolver: "App\\GraphQL\\Mutations\\OrderResolver@createOrder")
+}
