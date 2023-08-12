@@ -53,8 +53,8 @@ class Product extends Model
         return $this->hasMany(ProductTranslation::class);
     }
 
-    public function orders(): HasMany
+    public function orders(): BelongsToMany
     {
-        return $this->hasMany(Order::class);
+        return $this->belongsToMany(Order::class);
     }
 }

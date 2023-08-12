@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
@@ -13,9 +13,17 @@ class Order extends Model
 
     protected $table = 'orders';
 
-    public function products(): HasMany
+    protected $fillable = [
+        'status',
+        'payment_mode',
+        'stripe_session_id',
+        'stripe_checkout_url',
+        'user_id',
+    ];
+
+    public function products(): BelongsToMany
     {
-        return $this->hasMany(Product::class);
+        return $this->belongsToMany(Product::class);
     }
 
     public function user(): HasOne
