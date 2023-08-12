@@ -21,3 +21,7 @@ parameters:
     checkModelProperties: true
     reportMaybesInPropertyPhpDocTypes: false
     reportStaticMethodSignatures: false
+    ignoreErrors:
+        - '#Unable to resolve the template type TKey in call to function collect#'
+        - '#Unable to resolve the template type TValue in call to function collect#'
+
