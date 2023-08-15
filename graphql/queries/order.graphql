@@ -1,0 +1,3 @@
+extend type Query {
+    order(id: ID!): Order! @field(resolver: "App\\GraphQL\\Queries\\OrderResolver@find")
+}

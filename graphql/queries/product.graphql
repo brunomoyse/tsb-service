@@ -1,6 +1,6 @@
 extend type Query {
-    getProduct(id: ID!): Product!
-    getProducts(
+    product(id: ID!): Product! @find
+    products(
         first: Int
         page: Int
         lang: Language!

@@ -3,11 +3,28 @@ type Product {
     createdAt: DateTime
     updatedAt: DateTime
     price: Float
+    code: String
+    slug: String
     isActive: Boolean
     attachments: [Attachment] @hasMany
     productTags: [ProductTag] @hasMany
     productTranslations(language: Language @eq): [ProductTranslation] @hasMany
     orders: [Order] @hasMany
+}
+
+type ProductWithPivot {
+    id: ID!
+    createdAt: DateTime
+    updatedAt: DateTime
+    price: Float
+    code: String
+    slug: String
+    isActive: Boolean
+    attachments: [Attachment] @hasMany
+    productTags: [ProductTag] @hasMany
+    productTranslations(language: Language @eq): [ProductTranslation] @hasMany
+    orders: [Order] @hasMany
+    pivot: OrderProductPivot
 }
 
 type ProductTranslation {

@@ -1,5 +1,5 @@
 type Order {
-    id: ID!
+    id: ID
     createdAt: DateTime
     updatedAt: DateTime
     paymentMode: PaymentMode! @rename(attribute: "payment_mode")
@@ -7,7 +7,12 @@ type Order {
     stripeSessionId: String @rename(attribute: "stripe_session_id")
     stripeCheckoutUrl: String @rename(attribute: "stripe_checkout_url")
     user: User! @hasOne
-    products: [Product!]! @hasMany
+    products: [ProductWithPivot!]! @hasMany
+}
+
+type OrderProductPivot {
+    quantity: Int!
+    #totalPrice: Float
 }
 
 enum PaymentMode {

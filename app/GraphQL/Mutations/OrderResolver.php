@@ -4,6 +4,7 @@ namespace App\GraphQL\Mutations;
 
 use App\Models\Order;
 use GraphQL\Type\Definition\ResolveInfo;
+use Illuminate\Support\Str;
 use Nuwave\Lighthouse\Support\Contracts\GraphQLContext;
 use Stripe\Product as StripeProduct;
 use Stripe\StripeClient;
@@ -40,10 +41,12 @@ class OrderResolver
             ];
         })->toArray();
 
+        // Set UUID for the future Order now to be able to use it in the link
+        $generatedUuid = Str::uuid();
         try {
             $stripeSession = $this->stripe->checkout->sessions->create([
                 'mode' => 'payment',
-                'success_url' => url('/success'),
+                'success_url' => config('services.ui.endpoint').'order/'.$generatedUuid.'/success',
                 'line_items' => $transformedData,
                 'payment_method_types' => ['card', 'bancontact', 'wechat_pay'],
                 'payment_method_options' => [
@@ -65,6 +68,7 @@ class OrderResolver
         // Creating order in database
         /** @var Order $order */
         $order = Order::query()->create([
+            'id' => $generatedUuid,
             'payment_mode' => 'ONLINE',
             'status' => 'PENDING',
             'stripe_session_id' => $stripeSession->id,
