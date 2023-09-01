@@ -82,6 +82,7 @@ class TagSeeder extends Seeder
             ],
         ];
 
+        $index = 1;
         foreach ($tags as $translations) {
             $exists = false;
             foreach ($translations as $language => $translation) {
@@ -96,7 +97,9 @@ class TagSeeder extends Seeder
             }
 
             if (! $exists) {
-                $productTag = ProductTag::query()->create();
+                $productTag = ProductTag::query()->create([
+                    'order' => $index,
+                ]);
                 $transData = [];
                 foreach ($translations as $language => $translation) {
                     $transData[] = [
@@ -105,6 +108,7 @@ class TagSeeder extends Seeder
                     ];
                 }
                 $productTag->productTagTranslations()->createMany($transData);
+                $index++;
             }
         }
     }

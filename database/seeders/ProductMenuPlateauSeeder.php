@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 use Stripe\StripeClient;
 
-class ProductSeeder extends Seeder
+class ProductMenuPlateauSeeder extends Seeder
 {
     private StripeClient $stripe;
 
@@ -447,44 +447,42 @@ class ProductSeeder extends Seeder
             ],
         ];
 
-        if (Product::query()->count() === 0) {
-            foreach ($products as $args) {
-                try {
-                    $newUuid = Str::uuid();
+        foreach ($products as $args) {
+            try {
+                $newUuid = Str::uuid();
 
-                    $frenchData = current(array_filter($args['productTranslations']['create'], function ($item) {
-                        return $item['language'] === 'FR';
-                    }));
+                $frenchData = current(array_filter($args['productTranslations']['create'], function ($item) {
+                    return $item['language'] === 'FR';
+                }));
 
-                    $stripeProduct = $this->stripe->products->create([
-                        'id' => $newUuid,
-                        'name' => $frenchData['name'],
-                        'active' => $args['is_active'] ?? true,
-                        'description' => $frenchData['description'] ?? null,
-                        'default_price_data' => [
-                            'currency' => 'eur',
-                            'unit_amount_decimal' => $args['price'] * 100,
-                            'tax_behavior' => 'inclusive',
-                        ],
-                    ]);
-                } catch (\Exception $e) {
-                    throw new \Exception('Error creating Stripe product: '.$e->getMessage());
-                }
+                $stripeProduct = $this->stripe->products->create([
+                    'id' => $newUuid,
+                    'name' => $frenchData['name'],
+                    'active' => $args['is_active'] ?? true,
+                    'description' => $frenchData['description'] ?? null,
+                    'default_price_data' => [
+                        'currency' => 'eur',
+                        'unit_amount_decimal' => $args['price'] * 100,
+                        'tax_behavior' => 'inclusive',
+                    ],
+                ]);
+            } catch (\Exception $e) {
+                throw new \Exception('Error creating Stripe product: '.$e->getMessage());
+            }
 
-                try {
-                    // I fill the price directly from the request to avoid making a new request to get the price
-                    // since the price is a separate object in Stripe
-                    $product = Product::query()->create([
-                        'id' => $stripeProduct->id,
-                        'price' => $args['price'],
-                        'is_active' => $stripeProduct->active,
-                    ]);
+            try {
+                // I fill the price directly from the request to avoid making a new request to get the price
+                // since the price is a separate object in Stripe
+                $product = Product::query()->create([
+                    'id' => $stripeProduct->id,
+                    'price' => $args['price'],
+                    'is_active' => $stripeProduct->active,
+                ]);
 
-                    $product->productTranslations()->createMany($args['productTranslations']['create']);
-                    $product->productTags()->sync($args['productTags']['connect']);
-                } catch (\Exception $e) {
-                    throw new \Exception('Error creating product: '.$e->getMessage());
-                }
+                $product->productTranslations()->createMany($args['productTranslations']['create']);
+                $product->productTags()->sync($args['productTags']['connect']);
+            } catch (\Exception $e) {
+                throw new \Exception('Error creating product: '.$e->getMessage());
             }
         }
     }

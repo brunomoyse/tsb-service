@@ -42,7 +42,8 @@ type ProductTag {
     createdAt: DateTime
     updatedAt: DateTime
     products: [Product] @belongsToMany
-    productTagTranslations: [ProductTagTranslation] @hasMany
+    productTagTranslations(language: Language @eq): [ProductTagTranslation] @hasMany
+    order: Int!
 }
 
 type ProductTagTranslation {

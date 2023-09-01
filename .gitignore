@@ -20,3 +20,5 @@ yarn-error.log
 _lighthouse_ide_helper.php
 programmatic-types.graphql
 schema-directives.graphql
+
+.DS_Store

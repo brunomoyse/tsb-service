@@ -1,0 +1,3 @@
+extend type Query {
+    tags(orderBy: _ @orderBy(columns: ["order"])): [ProductTag!]! @all
+}
