@@ -29,8 +29,8 @@ class TagSeeder extends Seeder
                 'FR' => 'Maki',
             ],
             [
-                'EN' => 'Gukan and tulip',
-                'FR' => 'Gukans et tulipes',
+                'EN' => 'Gunkan',
+                'FR' => 'Gunkan',
             ],
             [
                 'EN' => 'Spring roll',

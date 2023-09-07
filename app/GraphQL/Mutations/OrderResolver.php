@@ -82,4 +82,16 @@ class OrderResolver
 
         return $order->load('products');
     }
+
+    public function updateOrderStatus(null $rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo): Order
+    {
+        /** @var Order $order */
+        $order = Order::query()->findOrFail($args['id']);
+
+        $order->update([
+            'status' => $args['status'],
+        ]);
+
+        return $order;
+    }
 }

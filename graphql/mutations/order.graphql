@@ -2,4 +2,10 @@ extend type Mutation {
     createOrder(
         products: [OrderProductInput!]!
     ): Order! @field(resolver: "App\\GraphQL\\Mutations\\OrderResolver@createOrder")
+
+    updateOrderStatus(
+        id: ID!
+        status: OrderStatus!
+    ): Order! @field(resolver: "App\\GraphQL\\Mutations\\OrderResolver@updateOrderStatus")
+
 }
