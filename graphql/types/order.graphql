@@ -22,9 +22,11 @@ enum PaymentMode {
 }
 
 enum OrderStatus {
+    OPEN
+    CANCELED
     PENDING
-    PAID
-    CANCELLED
-    REFUNDED
+    AUTHORIZED
+    EXPIRED
     FAILED
+    PAID
 }
