@@ -25,6 +25,8 @@ class Order extends Model
         'payment_mode',
         'stripe_session_id',
         'stripe_checkout_url',
+        'mollie_payment_id',
+        'mollie_payment_url',
         'user_id',
     ];
 

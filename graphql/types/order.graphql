@@ -4,8 +4,10 @@ type Order {
     updatedAt: DateTime
     paymentMode: PaymentMode! @rename(attribute: "payment_mode")
     status: OrderStatus
-    stripeSessionId: String @rename(attribute: "stripe_session_id")
-    stripeCheckoutUrl: String @rename(attribute: "stripe_checkout_url")
+    # stripeSessionId: String @rename(attribute: "stripe_session_id")
+    # stripeCheckoutUrl: String @rename(attribute: "stripe_checkout_url")
+    molliePaymentId: String @rename(attribute: "mollie_payment_id")
+    molliePaymentUrl: String @rename(attribute: "mollie_payment_url")
     user: User! @hasOne
     products: [ProductWithPivot!]! @hasMany
 }
