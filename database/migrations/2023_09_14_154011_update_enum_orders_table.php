@@ -22,7 +22,7 @@ return new class extends Migration
                 'AUTHORIZED',
                 'EXPIRED',
                 'FAILED',
-                'PAID'
+                'PAID',
             ])->default('OPEN');
         });
     }

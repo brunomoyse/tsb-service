@@ -8,10 +8,10 @@ use App\Models\User;
 use GraphQL\Type\Definition\ResolveInfo;
 use Illuminate\Support\Str;
 use Mollie\Api\Exceptions\ApiException;
-use Nuwave\Lighthouse\Support\Contracts\GraphQLContext;
+use Mollie\Api\MollieApiClient;
 // use Stripe\Product as StripeProduct;
 // use Stripe\StripeClient;
-use Mollie\Api\MollieApiClient;
+use Nuwave\Lighthouse\Support\Contracts\GraphQLContext;
 
 class OrderResolver
 {
@@ -29,26 +29,26 @@ class OrderResolver
     //public function createOrder(null $rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo): Order
     //{
     //    $productIds = array_column($args['products'], 'product_id');
-//
+    //
     //    try {
     //        // Fetch products from Stripe in a single call
     //        $stripeProducts = $this->stripe->products->all(['ids' => $productIds, 'expand' => ['data.prices']]);
     //    } catch (\Exception $e) {
     //        throw new \Exception('Error fetching Stripe products: '.$e->getMessage());
     //    }
-//
+    //
     //    // Map the products to desired format
     //    $transformedData = collect($args['products'])->map(function ($item) use ($stripeProducts) {
     //        /** @var StripeProduct $matchedProduct */
     //        $matchedProduct = collect($stripeProducts->data)->firstWhere('id', $item['product_id']);
     //        $priceId = $matchedProduct->default_price;
-//
+    //
     //        return [
     //            'price' => $priceId,
     //            'quantity' => $item['quantity'],
     //        ];
     //    })->toArray();
-//
+    //
     //    // Set UUID for the future Order now to be able to use it in the link
     //    $generatedUuid = Str::uuid();
     //    try {
@@ -72,7 +72,7 @@ class OrderResolver
     //    } catch (\Exception $e) {
     //        throw new \Exception('Error creating Stripe payment session: '.$e->getMessage());
     //    }
-//
+    //
     //    // Creating order in database
     //    /** @var Order $order */
     //    $order = Order::query()->create([
@@ -84,10 +84,10 @@ class OrderResolver
     //        // @todo Update by $context->user()->id in production
     //        'user_id' => '99d9e2ef-2853-4b7b-87bd-4a1540fed7b6',
     //    ]);
-//
+    //
     //    // fill the pivot table
     //    $order->products()->attach($args['products']);
-//
+    //
     //    return $order->load('products');
     //}
 
@@ -112,11 +112,11 @@ class OrderResolver
         // Generate a uuid for the order
         $generatedUuid = Str::uuid();
 
-        $description =  'Client: ' . $this->getUsername($userId) . ' | ' . 'Commande n°' . $generatedUuid;
+        $description = 'Client: '.$this->getUsername($userId).' | '.'Commande n°'.$generatedUuid;
 
         $payment = $this->mollie->payments->create([
             'amount' => [
-                'currency' => "EUR",
+                'currency' => 'EUR',
                 'value' => $totalAmount,
             ],
             'description' => $description,

@@ -9,18 +9,14 @@
         "ext-pdo_pgsql": "*",
         "guzzlehttp/guzzle": "^7.2",
         "laravel/framework": "^10.10",
-        "laravel/passport": "^11.8",
-        "laravel/sanctum": "^3.2",
         "laravel/tinker": "^2.8",
         "mll-lab/graphql-php-scalars": "^6.2",
         "mollie/mollie-api-php": "^2.61",
-        "nuwave/lighthouse": "^6.16",
-        "stripe/stripe-php": "^10.20"
+        "nuwave/lighthouse": "^6.16"
     },
     "require-dev": {
         "fakerphp/faker": "^1.9.1",
         "laravel/pint": "^1.0",
-        "laravel/sail": "^1.18",
         "mockery/mockery": "^1.4.4",
         "nunomaduro/collision": "^7.0",
         "nunomaduro/larastan": "^2.6",

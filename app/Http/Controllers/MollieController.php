@@ -15,6 +15,7 @@ class MollieController extends Controller
         $this->mollie = new MollieApiClient();
         $this->mollie->setApiKey(config('mollie.api_key'));
     }
+
     public function updateOrderStatus(Request $request): void
     {
         $request->validate([
@@ -43,7 +44,7 @@ class MollieController extends Controller
                  */
             }
         } catch (\Mollie\Api\Exceptions\ApiException $e) {
-            echo "API call failed: " . htmlspecialchars($e->getMessage());
+            echo 'API call failed: '.htmlspecialchars($e->getMessage());
         }
     }
 }
