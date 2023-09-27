@@ -15,7 +15,7 @@ return [
     */
 
     'ui' => [
-        'endpoint' => env('NEXT_APP_ENDPOINT') ?: 'http://localhost:3000/',
+        'endpoint' => env('NEXT_APP_ENDPOINT', 'http://localhost:3000/'),
     ],
 
 ];

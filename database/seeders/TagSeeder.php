@@ -97,6 +97,7 @@ class TagSeeder extends Seeder
             }
 
             if (! $exists) {
+                /** @var ProductTag $productTag */
                 $productTag = ProductTag::query()->create([
                     'order' => $index,
                 ]);

@@ -22,6 +22,5 @@ parameters:
     reportMaybesInPropertyPhpDocTypes: false
     reportStaticMethodSignatures: false
     ignoreErrors:
-        - '#Unable to resolve the template type TKey in call to function collect#'
-        - '#Unable to resolve the template type TValue in call to function collect#'
+        - '#Dynamic call to static method Illuminate\\Http\\Request::validate\(\)#'
 
