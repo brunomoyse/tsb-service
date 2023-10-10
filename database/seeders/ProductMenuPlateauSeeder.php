@@ -464,6 +464,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 $product = Product::query()->create([
                     'price' => $product['price'],
                     'is_active' => true,
+                    'slug' => $product['slug'],
                 ]);
 
                 $product->productTranslations()->createMany($product['productTranslations']['create']);
