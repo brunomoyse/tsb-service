@@ -33,6 +33,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 17.90,
                 'is_active' => true,
+                'slug' => 'menu-m1',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -54,6 +55,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 18.80,
                 'is_active' => true,
+                'slug' => 'menu-m2',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -75,6 +77,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 21.80,
                 'is_active' => true,
+                'slug' => 'menu-plateau-saumon',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -96,6 +99,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 24.80,
                 'is_active' => true,
+                'slug' => 'menu-plateau-california-24',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -117,6 +121,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 50.80,
                 'is_active' => true,
+                'slug' => 'menu-plateau-46',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -138,6 +143,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 42.80,
                 'is_active' => true,
+                'slug' => 'menu-plateau-36',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -159,6 +165,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 26.80,
                 'is_active' => true,
+                'slug' => 'menu-m4',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -180,6 +187,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 24.80,
                 'is_active' => true,
+                'slug' => 'menu-plateau-sushi-mix',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -201,6 +209,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 49.80,
                 'is_active' => true,
+                'slug' => 'menu-plateau-36',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -222,6 +231,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 17.00,
                 'is_active' => true,
+                'slug' => 'menu-plateau-saumon-time',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -243,6 +253,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 52.50,
                 'is_active' => true,
+                'slug' => 'menu-plateau-42',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -264,6 +275,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 21.80,
                 'is_active' => true,
+                'slug' => 'menu-m3',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -285,6 +297,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 56.80,
                 'is_active' => true,
+                'slug' => 'menu-m7',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -306,6 +319,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 30.80,
                 'is_active' => true,
+                'slug' => 'menu-m5',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -327,6 +341,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 14.80,
                 'is_active' => true,
+                'slug' => 'menu-plateau-sushi-saumon',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -348,6 +363,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 18.50,
                 'is_active' => true,
+                'slug' => 'menu-plateau-16',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -369,6 +385,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 98.00,
                 'is_active' => true,
+                'slug' => 'menu-plateau-tokyo',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -390,6 +407,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 92.80,
                 'is_active' => true,
+                'slug' => 'menu-plateau-80',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -411,6 +429,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 24.80,
                 'is_active' => true,
+                'slug' => 'menu-plateau-sushi-grille',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
@@ -432,6 +451,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 50.80,
                 'is_active' => true,
+                'slug' => 'menu-m6',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],
