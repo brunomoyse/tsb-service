@@ -209,7 +209,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 ],
                 'price' => 49.80,
                 'is_active' => true,
-                'slug' => 'menu-plateau-36',
+                'slug' => 'menu-plateau-38',
                 'productTags' => [
                     'connect' => [$productTagMenuPlateau],
                 ],

@@ -179,7 +179,7 @@ class ProductSushiSeeder extends Seeder
                 'price' => 2.00,
                 'code' => 'A8',
                 'is_active' => true,
-                'slug' => 'sushi-surimi',
+                'slug' => 'sushi-maquereau',
                 'productTags' => [
                     'connect' => [$productTagSushi],
                 ],
@@ -200,6 +200,7 @@ class ProductSushiSeeder extends Seeder
                 'price' => 1.80,
                 'code' => 'A9',
                 'is_active' => true,
+                'slug' => 'sushi-surimi',
                 'productTags' => [
                     'connect' => [$productTagSushi],
                 ],
@@ -367,6 +368,7 @@ class ProductSushiSeeder extends Seeder
                 'price' => 3.50,
                 'code' => 'A17',
                 'is_active' => true,
+                'slug' => 'sushi-foie-gras',
                 'productTags' => [
                     'connect' => [$productTagSushi],
                 ],
