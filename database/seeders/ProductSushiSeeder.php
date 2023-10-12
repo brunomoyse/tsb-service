@@ -447,8 +447,10 @@ class ProductSushiSeeder extends Seeder
                     'code' => $product['code'] ?? null,
                 ]);
 
-                $product->productTranslations()->createMany($product['productTranslations']['create']);
-                $product->productTags()->sync($product['productTags']['connect']);
+                if (isset($product['productTranslations']['create'])) {
+                    $product->productTranslations()->createMany($product['productTranslations']['create']);
+                    $product->productTags()->sync($product['productTags']['connect']);
+                }
             } catch (\Exception $e) {
                 throw new \Exception('Error creating product: '.$e->getMessage());
             }
