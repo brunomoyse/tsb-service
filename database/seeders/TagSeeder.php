@@ -85,10 +85,10 @@ class TagSeeder extends Seeder
         $index = 1;
         foreach ($tags as $translations) {
             $exists = false;
-            foreach ($translations as $language => $translation) {
+            foreach ($translations as $locale => $translation) {
                 // Check if a tag with the specific translation already exists
                 if (ProductTagTranslation::query()->where([
-                    ['language', '=', $language],
+                    ['locale', '=', $locale],
                     ['name', '=', $translation],
                 ])->exists()) {
                     $exists = true;
@@ -102,9 +102,9 @@ class TagSeeder extends Seeder
                     'order' => $index,
                 ]);
                 $transData = [];
-                foreach ($translations as $language => $translation) {
+                foreach ($translations as $locale => $translation) {
                     $transData[] = [
-                        'language' => $language,
+                        'locale' => $locale,
                         'name' => $translation,
                     ];
                 }

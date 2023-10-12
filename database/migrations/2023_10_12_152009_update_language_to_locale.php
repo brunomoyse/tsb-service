@@ -19,7 +19,7 @@ return new class extends Migration
         });
 
         Schema::table('product_translations', function (Blueprint $table) {
-            $table->dropUnique('product_tag_translations_product_tag_id_language_unique');
+            $table->dropUnique('product_translations_product_id_language_unique');
             $table->dropColumn('language');
             $table->enum('locale', ['EN', 'FR']);
             $table->unique(['product_id', 'locale']);

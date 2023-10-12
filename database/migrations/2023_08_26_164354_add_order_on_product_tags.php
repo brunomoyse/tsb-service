@@ -21,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        //
+        Schema::table('product_tags', function (Blueprint $table) {
+            $table->dropColumn('order');
+        });
     }
 };
