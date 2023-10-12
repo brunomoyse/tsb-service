@@ -27,12 +27,12 @@ class ProductResolver
                 $queryBuilder->whereHas('productTranslations', function ($query) use ($args) {
                     $query
                         ->where('name', 'ilike', '%'.$args['search'].'%')
-                        ->where('language', $args['lang']);
+                        ->where('locale', $args['locale']);
                 });
             }
 
             /** @phpstan-ignore-next-line  */
-            $queryBuilder->orderBy(DB::raw("(SELECT name FROM product_translations WHERE products.id = product_translations.product_id AND product_translations.language = '".strtoupper($args['lang'])."' LIMIT 1)"), 'ASC');
+            $queryBuilder->orderBy(DB::raw("(SELECT name FROM product_translations WHERE products.id = product_translations.product_id AND product_translations.locale = '".strtoupper($args['lang'])."' LIMIT 1)"), 'ASC');
 
             $perPage = $args['first'] ?? 10;
             $page = $args['page'] ?? 1;

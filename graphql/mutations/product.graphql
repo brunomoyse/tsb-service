@@ -17,12 +17,12 @@ extend type Mutation {
 #        productTranslations: {
 #            create: [
 #                {
-#                    language: EN
+#                    locale: EN
 #                    name: "English Name"
 #                    description: "English Description"
 #                },
 #                {
-#                    language: FR
+#                    locale: FR
 #                    name: "French Name"
 #                    description: "French Description"
 #                }

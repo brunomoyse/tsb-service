@@ -8,7 +8,7 @@ type Product {
     isActive: Boolean
     attachments: [Attachment] @hasMany
     productTags: [ProductTag] @hasMany
-    productTranslations(language: Language @eq): [ProductTranslation] @hasMany
+    productTranslations(locale: Locale @eq): [ProductTranslation] @hasMany
     orders: [Order] @hasMany
 }
 
@@ -22,7 +22,7 @@ type ProductWithPivot {
     isActive: Boolean
     attachments: [Attachment] @hasMany
     productTags: [ProductTag] @hasMany
-    productTranslations(language: Language @eq): [ProductTranslation] @hasMany
+    productTranslations(locale: Locale @eq): [ProductTranslation] @hasMany
     orders: [Order] @hasMany
     pivot: OrderProductPivot
 }
@@ -31,7 +31,7 @@ type ProductTranslation {
     id: ID!
     createdAt: DateTime
     updatedAt: DateTime
-    language: Language!
+    locale: Locale!
     product: Product! @belongsTo
     name: String
     description: String
@@ -42,7 +42,7 @@ type ProductTag {
     createdAt: DateTime
     updatedAt: DateTime
     products: [Product] @belongsToMany
-    productTagTranslations(language: Language @eq): [ProductTagTranslation] @hasMany
+    productTagTranslations(locale: Locale @eq): [ProductTagTranslation] @hasMany
     order: Int!
 }
 
@@ -50,7 +50,7 @@ type ProductTagTranslation {
     id: ID!
     createdAt: DateTime
     updatedAt: DateTime
-    language: Language!
+    locale: Locale!
     productTag: ProductTag @belongsTo
     name: String
 }
@@ -63,7 +63,7 @@ type Attachment {
     product: Product @belongsTo
 }
 
-enum Language {
+enum Locale {
     EN
     FR
 }

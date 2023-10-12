@@ -1,5 +1,5 @@
 input ProductTranslationInput {
-    language: Language!
+    locale: Locale!
     name: String
     description: String
 }
@@ -26,5 +26,5 @@ input CreateProductTranslationsHasMany {
 }
 
 input ProductTranslationFilter {
-    language: Language
+    locale: Locale
 }

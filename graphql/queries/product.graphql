@@ -3,7 +3,7 @@ extend type Query {
     products(
         first: Int
         page: Int
-        lang: Language!
+        locale: Locale!
         search: String
         tags: [ID!] @rules(apply: ["uuid", "exists:App\\Models\\ProductTag,id"])
     ): ProductPaginator @field(resolver: "App\\GraphQL\\Queries\\ProductResolver@all")
