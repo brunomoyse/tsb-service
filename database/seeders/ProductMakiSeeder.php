@@ -6,13 +6,13 @@ use App\Models\Product;
 use App\Models\ProductTagTranslation;
 use Illuminate\Database\Seeder;
 
-class ProductSushiSeeder extends Seeder
+class ProductMakiSeeder extends Seeder
 {
     public function run()
     {
-        $productTagSushi = ProductTagTranslation::query()
+        $productTag = ProductTagTranslation::query()
             ->where('locale', 'FR')
-            ->where('name', 'Sushi')
+            ->where('name', 'Maki')
             ->firstOrFail()->product_tag_id;
 
         $products = [
@@ -21,20 +21,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saumon',
+                            'name' => 'Maki concombre sésame',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon',
+                            'name' => 'Cucumber sesame maki',
                         ],
                     ],
                 ],
-                'price' => 2.00,
-                'code' => 'A1',
+                'price' => 4.20,
+                'code' => 'B1',
                 'is_active' => true,
-                'slug' => 'sushi-saumon',
+                'slug' => 'maki-concombre-sesame',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -42,20 +42,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Crevette',
+                            'name' => 'Maki avocat',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Shrimp',
+                            'name' => 'Avocado maki',
                         ],
                     ],
                 ],
-                'price' => 1.90,
-                'code' => 'A2',
+                'price' => 4.20,
+                'code' => 'B2',
                 'is_active' => true,
-                'slug' => 'sushi-crevette',
+                'slug' => 'maki-avocat',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -63,20 +63,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Thon',
+                            'name' => 'Maki surimi',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Tuna',
+                            'name' => 'Surimi maki',
                         ],
                     ],
                 ],
-                'price' => 2.20,
-                'code' => 'A3',
+                'price' => 4.30,
+                'code' => 'B3',
                 'is_active' => true,
-                'slug' => 'sushi-thon',
+                'slug' => 'maki-surimi',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -84,20 +84,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Dorade',
+                            'name' => 'Maki radis japonais',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Sea bream',
+                            'name' => 'Japanese radish maki',
                         ],
                     ],
                 ],
-                'price' => 2.00,
-                'code' => 'A4',
+                'price' => 4.20,
+                'code' => 'B4',
                 'is_active' => true,
-                'slug' => 'sushi-dorade',
+                'slug' => 'maki-radis-japonais',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -105,20 +105,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Omelette',
+                            'name' => 'Maki cheese concombre',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Omelette',
+                            'name' => 'Cucumber cheese maki',
                         ],
                     ],
                 ],
-                'price' => 1.80,
-                'code' => 'A5',
+                'price' => 4.50,
+                'code' => 'B5',
                 'is_active' => true,
-                'slug' => 'sushi-omelette',
+                'slug' => 'maki-cheese-concombre',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -126,20 +126,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Octopus',
+                            'name' => 'Maki cheese avocat',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Octopus',
+                            'name' => 'Avocado cheese maki',
                         ],
                     ],
                 ],
-                'price' => 2.00,
-                'code' => 'A6',
+                'price' => 4.80,
+                'code' => 'B6',
                 'is_active' => true,
-                'slug' => 'sushi-octopus',
+                'slug' => 'maki-cheese-avocat',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -147,20 +147,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Dorade grillée',
+                            'name' => 'Maki anguille',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Grilled sea bream',
+                            'name' => 'Eel maki',
                         ],
                     ],
                 ],
-                'price' => 2.50,
-                'code' => 'A7',
+                'price' => 5.60,
+                'code' => 'B7',
                 'is_active' => true,
-                'slug' => 'sushi-dorade-grillee',
+                'slug' => 'maki-anguille',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -168,20 +168,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maquereau',
+                            'name' => 'Maki saumon',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Mackerel',
+                            'name' => 'Salmon maki',
                         ],
                     ],
                 ],
-                'price' => 2.00,
-                'code' => 'A8',
+                'price' => 4.70,
+                'code' => 'B8',
                 'is_active' => true,
-                'slug' => 'sushi-maquereau',
+                'slug' => 'maki-saumon',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -189,20 +189,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Surimi',
+                            'name' => 'Maki thon',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Surimi',
+                            'name' => 'Tuna maki',
                         ],
                     ],
                 ],
-                'price' => 1.80,
-                'code' => 'A9',
+                'price' => 5.20,
+                'code' => 'B9',
                 'is_active' => true,
-                'slug' => 'sushi-surimi',
+                'slug' => 'maki-thon',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -210,20 +210,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Avocat',
+                            'name' => 'Maki tempura crevette',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Avodaco',
+                            'name' => 'Shrimp tempura maki',
                         ],
                     ],
                 ],
-                'price' => 1.80,
-                'code' => 'A10',
+                'price' => 5.50,
+                'code' => 'B10',
                 'is_active' => true,
-                'slug' => 'sushi-avocat',
+                'slug' => 'maki-tempura-crevette',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -231,20 +231,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Anguille',
+                            'name' => 'Maki saumon spicy',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Eel',
+                            'name' => 'Spicy salmon maki',
                         ],
                     ],
                 ],
-                'price' => 2.60,
-                'code' => 'A11',
+                'price' => 4.80,
+                'code' => 'B11',
                 'is_active' => true,
-                'slug' => 'sushi-anguille',
+                'slug' => 'maki-saumon-spicy',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -252,20 +252,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saumon mi-cuit',
+                            'name' => 'Maki dorade mangue',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Semi-cooked salmon',
+                            'name' => 'Sea bream mango maki',
                         ],
                     ],
                 ],
-                'price' => 2.30,
-                'code' => 'A12',
+                'price' => 5.50,
+                'code' => 'B12',
                 'is_active' => true,
-                'slug' => 'sushi-saumon-mi-cuit',
+                'slug' => 'maki-dorade-mangue',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -273,20 +273,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Thon mi-cuit',
+                            'name' => 'Maki thon cuit spicy',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Semi-cooked tuna',
+                            'name' => 'Spicy cooked tuna maki',
                         ],
                     ],
                 ],
-                'price' => 2.60,
-                'code' => 'A13',
+                'price' => 5.00,
+                'code' => 'B13',
                 'is_active' => true,
-                'slug' => 'sushi-thon-mi-cuit',
+                'slug' => 'maki-thon-cuit-spicy',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -294,20 +294,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saint-Jacques mi-cuit',
+                            'name' => 'Maki tartare thon ciboulette',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Semi-cooked Saint-Jacques',
+                            'name' => 'Tuna and chives tartare maki',
                         ],
                     ],
                 ],
-                'price' => 3.60,
-                'code' => 'A14',
+                'price' => 6.00,
+                'code' => 'B14',
                 'is_active' => true,
-                'slug' => 'sushi-saint-jacques-mi-cuit',
+                'slug' => 'maki-tartare-thon-ciboulette',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -315,20 +315,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Tofu',
+                            'name' => 'Maki mangue',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Tofu',
+                            'name' => 'Mango maki',
                         ],
                     ],
                 ],
-                'price' => 2.00,
-                'code' => 'A15',
+                'price' => 5.00,
+                'code' => 'B15',
                 'is_active' => true,
-                'slug' => 'sushi-tofu',
+                'slug' => 'maki-mangue',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -336,20 +336,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saumon cheese',
+                            'name' => 'Maki ciboulette cheese',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon cheese',
+                            'name' => 'Chives cheese maki',
                         ],
                     ],
                 ],
-                'price' => 2.30,
-                'code' => 'A16',
+                'price' => 5.00,
+                'code' => 'B16',
                 'is_active' => true,
-                'slug' => 'sushi-saumon-cheese',
+                'slug' => 'maki-ciboulette-cheese',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -357,20 +357,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Foie gras',
+                            'name' => 'Maki foie gras',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Foie gras',
+                            'name' => 'Foie gras maki',
                         ],
                     ],
                 ],
-                'price' => 3.50,
-                'code' => 'A17',
+                'price' => 7.50,
+                'code' => 'B17',
                 'is_active' => true,
-                'slug' => 'sushi-foie-gras',
+                'slug' => 'maki-foie-gras',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -378,68 +378,25 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maquereau grillé',
+                            'name' => 'Maki saumon roll cheese',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Grilled mackerel',
+                            'name' => 'Salmon roll cheese maki',
                         ],
                     ],
                 ],
-                'price' => 2.80,
-                'code' => 'A18',
+                'price' => 6.00,
+                'code' => 'B19',
                 'is_active' => true,
-                'slug' => 'sushi-maquereau-grille',
+                'slug' => 'maki-saumon-roll-cheese',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
-            [
-                'productTranslations' => [
-                    'create' => [
-                        [
-                            'locale' => 'FR',
-                            'name' => 'Saumon cuit caramélisé',
-                        ],
-                        [
-                            'locale' => 'EN',
-                            'name' => 'Caramelized cooked salmon',
-                        ],
-                    ],
-                ],
-                'price' => 2.50,
-                'code' => 'A19',
-                'is_active' => true,
-                'slug' => 'sushi-saumon-cuit-caramelise',
-                'productTags' => [
-                    'connect' => [$productTagSushi],
-                ],
-            ],
-            [
-                'productTranslations' => [
-                    'create' => [
-                        [
-                            'locale' => 'FR',
-                            'name' => 'Saumon avocat',
-                        ],
-                        [
-                            'locale' => 'EN',
-                            'name' => 'Salmon avocado',
-                        ],
-                    ],
-                ],
-                'price' => 2.50,
-                'code' => 'A20',
-                'is_active' => true,
-                'slug' => 'sushi-saumon-avocat',
-                'productTags' => [
-                    'connect' => [$productTagSushi],
-                ],
-            ],
-
         ];
 
-        if (Product::query()->where('slug', 'sushi-saumon')->exists()) {
+        if (Product::query()->where('slug', 'maki-saumon')->exists()) {
             return;
         }
 

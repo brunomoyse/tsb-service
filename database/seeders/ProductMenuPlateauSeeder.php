@@ -458,6 +458,10 @@ class ProductMenuPlateauSeeder extends Seeder
             ],
         ];
 
+        if (Product::query()->where('slug', 'menu-m1')->exists()) {
+            return;
+        }
+
         foreach ($products as $product) {
             try {
                 /* @var Product $productItem */
