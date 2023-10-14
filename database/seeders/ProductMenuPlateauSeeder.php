@@ -460,17 +460,15 @@ class ProductMenuPlateauSeeder extends Seeder
 
         foreach ($products as $product) {
             try {
-                /* @var Product $product */
-                $product = Product::query()->create([
+                /* @var Product $productItem */
+                $productItem = Product::query()->create([
                     'price' => $product['price'],
                     'is_active' => true,
                     'slug' => $product['slug'],
                 ]);
 
-                if (isset($product['productTranslations']['create'])) {
-                    $product->productTranslations()->createMany($product['productTranslations']['create']);
-                    $product->productTags()->sync($product['productTags']['connect']);
-                }
+                $productItem->productTranslations()->createMany($product['productTranslations']['create']);
+                $productItem->productTags()->sync($product['productTags']['connect']);
             } catch (\Exception $e) {
                 throw new \Exception('Error creating product: '.$e->getMessage());
             }
