@@ -10,7 +10,7 @@ class ProductMenuPlateauSeeder extends Seeder
 {
     public function run()
     {
-        $productTagMenuPlateau = ProductTagTranslation::query()
+        $productTag = ProductTagTranslation::query()
             ->where('locale', 'FR')
             ->where('name', 'Menu plateau')
             ->firstOrFail()->product_tag_id;
@@ -35,7 +35,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-m1',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -57,7 +57,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-m2',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -79,7 +79,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-saumon',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -101,7 +101,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-california-24',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -123,7 +123,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-46',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -145,7 +145,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-36',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -167,7 +167,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-m4',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -189,7 +189,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-sushi-mix',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -211,7 +211,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-38',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -233,7 +233,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-saumon-time',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -255,7 +255,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-42',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -277,7 +277,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-m3',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -299,7 +299,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-m7',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -321,7 +321,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-m5',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -343,7 +343,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-sushi-saumon',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -365,7 +365,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-16',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -387,7 +387,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-tokyo',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -409,7 +409,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-80',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -431,7 +431,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-plateau-sushi-grille',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -453,7 +453,7 @@ class ProductMenuPlateauSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-m6',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
         ];

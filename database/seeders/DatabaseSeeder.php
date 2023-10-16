@@ -17,5 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call(ProductSushiSeeder::class);
         $this->call(ProductMenuBentoSeeder::class);
         $this->call(ProductMakiSeeder::class);
+        $this->call(ProductGunkanSeeder::class);
+        $this->call(ProductSpringRollSeeder::class);
     }
 }

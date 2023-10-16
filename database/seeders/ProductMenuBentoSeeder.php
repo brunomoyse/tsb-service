@@ -10,7 +10,7 @@ class ProductMenuBentoSeeder extends Seeder
 {
     public function run()
     {
-        $productTagMenuPlateau = ProductTagTranslation::query()
+        $productTag = ProductTagTranslation::query()
             ->where('locale', 'FR')
             ->where('name', 'Menu bento box')
             ->firstOrFail()->product_tag_id;
@@ -35,7 +35,7 @@ class ProductMenuBentoSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-bento-box-1',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -57,7 +57,7 @@ class ProductMenuBentoSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-bento-box-2',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -79,7 +79,7 @@ class ProductMenuBentoSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-bento-royal',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -101,7 +101,7 @@ class ProductMenuBentoSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'menu-bento-vegetarien',
                 'productTags' => [
-                    'connect' => [$productTagMenuPlateau],
+                    'connect' => [$productTag],
                 ],
             ],
         ];

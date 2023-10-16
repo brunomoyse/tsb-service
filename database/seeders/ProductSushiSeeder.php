@@ -10,7 +10,7 @@ class ProductSushiSeeder extends Seeder
 {
     public function run()
     {
-        $productTagSushi = ProductTagTranslation::query()
+        $productTag = ProductTagTranslation::query()
             ->where('locale', 'FR')
             ->where('name', 'Sushi')
             ->firstOrFail()->product_tag_id;
@@ -21,11 +21,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saumon',
+                            'name' => 'Sushi saumon',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon',
+                            'name' => 'Salmon sushi',
                         ],
                     ],
                 ],
@@ -34,7 +34,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-saumon',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -42,11 +42,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Crevette',
+                            'name' => 'Sushi crevette',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Shrimp',
+                            'name' => 'Shrimp sushi',
                         ],
                     ],
                 ],
@@ -55,7 +55,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-crevette',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -63,11 +63,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Thon',
+                            'name' => 'Sushi thon',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Tuna',
+                            'name' => 'Tuna sushi',
                         ],
                     ],
                 ],
@@ -76,7 +76,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-thon',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -84,11 +84,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Dorade',
+                            'name' => 'Sushi dorade',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Sea bream',
+                            'name' => 'Sea bream sushi',
                         ],
                     ],
                 ],
@@ -97,7 +97,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-dorade',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -105,11 +105,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Omelette',
+                            'name' => 'Sushi omelette',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Omelette',
+                            'name' => 'Omelette sushi',
                         ],
                     ],
                 ],
@@ -118,7 +118,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-omelette',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -126,11 +126,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Octopus',
+                            'name' => 'Sushi octopus',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Octopus',
+                            'name' => 'Octopus sushi',
                         ],
                     ],
                 ],
@@ -139,7 +139,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-octopus',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -147,11 +147,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Dorade grillée',
+                            'name' => 'Sushi dorade grillée',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Grilled sea bream',
+                            'name' => 'Grilled sea bream sushi',
                         ],
                     ],
                 ],
@@ -160,7 +160,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-dorade-grillee',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -168,11 +168,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maquereau',
+                            'name' => 'Sushi maquereau',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Mackerel',
+                            'name' => 'Mackerel sushi',
                         ],
                     ],
                 ],
@@ -181,7 +181,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-maquereau',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -189,11 +189,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Surimi',
+                            'name' => 'Sushi surimi',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Surimi',
+                            'name' => 'Surimi sushi',
                         ],
                     ],
                 ],
@@ -202,7 +202,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-surimi',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -210,11 +210,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Avocat',
+                            'name' => 'Sushi avocat',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Avodaco',
+                            'name' => 'Avodaco sushi',
                         ],
                     ],
                 ],
@@ -223,7 +223,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-avocat',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -231,11 +231,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Anguille',
+                            'name' => 'Sushi anguille',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Eel',
+                            'name' => 'Eel sushi',
                         ],
                     ],
                 ],
@@ -244,7 +244,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-anguille',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -252,11 +252,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saumon mi-cuit',
+                            'name' => 'Sushi saumon mi-cuit',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Semi-cooked salmon',
+                            'name' => 'Semi-cooked salmon sushi',
                         ],
                     ],
                 ],
@@ -265,7 +265,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-saumon-mi-cuit',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -273,11 +273,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Thon mi-cuit',
+                            'name' => 'Sushi thon mi-cuit',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Semi-cooked tuna',
+                            'name' => 'Semi-cooked tuna sushi',
                         ],
                     ],
                 ],
@@ -286,7 +286,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-thon-mi-cuit',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -294,11 +294,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saint-Jacques mi-cuit',
+                            'name' => 'Sushi Saint-Jacques mi-cuit',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Semi-cooked Saint-Jacques',
+                            'name' => 'Semi-cooked Saint-Jacques sushi',
                         ],
                     ],
                 ],
@@ -307,7 +307,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-saint-jacques-mi-cuit',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -315,11 +315,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Tofu',
+                            'name' => 'Sushi tofu',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Tofu',
+                            'name' => 'Tofu sushi',
                         ],
                     ],
                 ],
@@ -328,7 +328,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-tofu',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -336,11 +336,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saumon cheese',
+                            'name' => 'Sushi saumon cheese',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon cheese',
+                            'name' => 'Salmon cheese sushi',
                         ],
                     ],
                 ],
@@ -349,7 +349,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-saumon-cheese',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -357,11 +357,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Foie gras',
+                            'name' => 'Sushi foie gras',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Foie gras',
+                            'name' => 'Foie gras sushi',
                         ],
                     ],
                 ],
@@ -370,7 +370,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-foie-gras',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -378,11 +378,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maquereau grillé',
+                            'name' => 'Sushi maquereau grillé',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Grilled mackerel',
+                            'name' => 'Grilled mackerel sushi',
                         ],
                     ],
                 ],
@@ -391,7 +391,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-maquereau-grille',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -399,11 +399,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saumon cuit caramélisé',
+                            'name' => 'Sushi saumon cuit caramélisé',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Caramelized cooked salmon',
+                            'name' => 'Caramelized cooked salmon sushi',
                         ],
                     ],
                 ],
@@ -412,7 +412,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-saumon-cuit-caramelise',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
             [
@@ -420,11 +420,11 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saumon avocat',
+                            'name' => 'Sushi saumon avocat',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon avocado',
+                            'name' => 'Salmon avocado sushi',
                         ],
                     ],
                 ],
@@ -433,7 +433,7 @@ class ProductSushiSeeder extends Seeder
                 'is_active' => true,
                 'slug' => 'sushi-saumon-avocat',
                 'productTags' => [
-                    'connect' => [$productTagSushi],
+                    'connect' => [$productTag],
                 ],
             ],
 
