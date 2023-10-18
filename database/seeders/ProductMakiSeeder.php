@@ -21,11 +21,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki concombre sésame',
+                            'name' => 'Concombre sésame',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Cucumber sesame maki',
+                            'name' => 'Cucumber sesame',
                         ],
                     ],
                 ],
@@ -42,11 +42,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki avocat',
+                            'name' => 'Avocat',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Avocado maki',
+                            'name' => 'Avocado',
                         ],
                     ],
                 ],
@@ -63,11 +63,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki surimi',
+                            'name' => 'Surimi',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Surimi maki',
+                            'name' => 'Surimi',
                         ],
                     ],
                 ],
@@ -84,11 +84,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki radis japonais',
+                            'name' => 'Radis japonais',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Japanese radish maki',
+                            'name' => 'Japanese radish',
                         ],
                     ],
                 ],
@@ -105,11 +105,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki cheese concombre',
+                            'name' => 'Cheese concombre',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Cucumber cheese maki',
+                            'name' => 'Cucumber cheese',
                         ],
                     ],
                 ],
@@ -126,11 +126,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki cheese avocat',
+                            'name' => 'Cheese avocat',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Avocado cheese maki',
+                            'name' => 'Avocado cheese',
                         ],
                     ],
                 ],
@@ -147,11 +147,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki anguille',
+                            'name' => 'Anguille',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Eel maki',
+                            'name' => 'Eel',
                         ],
                     ],
                 ],
@@ -168,11 +168,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki saumon',
+                            'name' => 'Saumon',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon maki',
+                            'name' => 'Salmon',
                         ],
                     ],
                 ],
@@ -189,11 +189,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki thon',
+                            'name' => 'Thon',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Tuna maki',
+                            'name' => 'Tuna',
                         ],
                     ],
                 ],
@@ -210,11 +210,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki tempura crevette',
+                            'name' => 'Tempura crevette',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Shrimp tempura maki',
+                            'name' => 'Shrimp tempura',
                         ],
                     ],
                 ],
@@ -231,11 +231,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki saumon spicy',
+                            'name' => 'Saumon spicy',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Spicy salmon maki',
+                            'name' => 'Spicy salmon',
                         ],
                     ],
                 ],
@@ -252,11 +252,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki dorade mangue',
+                            'name' => 'Dorade mangue',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Sea bream mango maki',
+                            'name' => 'Sea bream mango',
                         ],
                     ],
                 ],
@@ -273,11 +273,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki thon cuit spicy',
+                            'name' => 'Thon cuit spicy',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Spicy cooked tuna maki',
+                            'name' => 'Spicy cooked tuna',
                         ],
                     ],
                 ],
@@ -294,11 +294,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki tartare thon ciboulette',
+                            'name' => 'Tartare thon ciboulette',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Tuna and chives tartare maki',
+                            'name' => 'Tuna and chives tartare',
                         ],
                     ],
                 ],
@@ -315,11 +315,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki mangue',
+                            'name' => 'Mangue',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Mango maki',
+                            'name' => 'Mango',
                         ],
                     ],
                 ],
@@ -336,11 +336,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki ciboulette cheese',
+                            'name' => 'Ciboulette cheese',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Chives cheese maki',
+                            'name' => 'Chives cheese',
                         ],
                     ],
                 ],
@@ -357,11 +357,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki foie gras',
+                            'name' => 'Foie gras',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Foie gras maki',
+                            'name' => 'Foie gras',
                         ],
                     ],
                 ],
@@ -378,11 +378,11 @@ class ProductMakiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maki saumon roll cheese',
+                            'name' => 'Saumon roll cheese',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon roll cheese maki',
+                            'name' => 'Salmon roll cheese',
                         ],
                     ],
                 ],

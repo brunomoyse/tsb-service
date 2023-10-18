@@ -6,13 +6,13 @@ use App\Models\Product;
 use App\Models\ProductTagTranslation;
 use Illuminate\Database\Seeder;
 
-class ProductSushiSeeder extends Seeder
+class ProductSpecialRollSeeder extends Seeder
 {
     public function run()
     {
         $productTag = ProductTagTranslation::query()
             ->where('locale', 'FR')
-            ->where('name', 'Sushi')
+            ->where('name', 'Special roll')
             ->firstOrFail()->product_tag_id;
 
         $products = [
@@ -21,18 +21,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saumon',
+                            'name' => 'Saumon royal',
+                            'description' => 'Saumon, cheese, avocat, concombre',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon',
+                            'name' => 'Royal salmon',
+                            'description' => 'Salmon, cheese, avocado, cucumber',
                         ],
                     ],
                 ],
-                'price' => 2.00,
-                'code' => 'A1',
+                'price' => 10.00,
+                'code' => 'G1',
                 'is_active' => true,
-                'slug' => 'sushi-saumon',
+                'slug' => 'special-roll-saumon-royal',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -42,18 +44,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Crevette',
+                            'name' => 'Mangue rolls',
+                            'description' => 'Poulet pané, concombre, mangue, oeufs de poissons',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Shrimp',
+                            'name' => 'Mango rolls',
+                            'description' => 'Fried chicken, cuncumber, mango, fish eggs',
                         ],
                     ],
                 ],
-                'price' => 1.90,
-                'code' => 'A2',
+                'price' => 10.00,
+                'code' => 'G2',
                 'is_active' => true,
-                'slug' => 'sushi-crevette',
+                'slug' => 'special-roll-mangue-rolls',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -63,18 +67,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Thon',
+                            'name' => 'Avocat rolls',
+                            'description' => 'Tempura crevette , sésame , oeufs de poissons',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Tuna',
+                            'name' => 'Avocado rolls',
+                            'description' => 'Shrimp tempura, sesame, fish eggs',
                         ],
                     ],
                 ],
-                'price' => 2.20,
-                'code' => 'A3',
+                'price' => 10.80,
+                'code' => 'G3',
                 'is_active' => true,
-                'slug' => 'sushi-thon',
+                'slug' => 'special-roll-avocat-rolls',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -84,18 +90,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Dorade',
+                            'name' => 'Anguille rolls',
+                            'description' => 'Anguille, avocat, concombre, sésame',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Sea bream',
+                            'name' => 'Eel rolls',
+                            'description' => 'Eel, avocado, cuncumber, sesame',
                         ],
                     ],
                 ],
-                'price' => 2.00,
-                'code' => 'A4',
+                'price' => 10.80,
+                'code' => 'G4',
                 'is_active' => true,
-                'slug' => 'sushi-dorade',
+                'slug' => 'special-roll-anguille-rolls',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -105,18 +113,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Omelette',
+                            'name' => 'Oignon rolls',
+                            'description' => 'Surimi, avocat, concombre',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Omelette',
+                            'name' => 'Onion rolls',
+                            'description' => 'Surimi, avocado, cucumber',
                         ],
                     ],
                 ],
-                'price' => 1.80,
-                'code' => 'A5',
+                'price' => 8.00,
+                'code' => 'G5',
                 'is_active' => true,
-                'slug' => 'sushi-omelette',
+                'slug' => 'special-roll-oignon-rolls',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -126,18 +136,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Octopus',
+                            'name' => 'Miel rolls',
+                            'description' => 'Saumon, miel, roquette, mangue, sésame',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Octopus',
+                            'name' => 'Honey rolls',
+                            'description' => 'Salmon, honey, salad, mango, sesame',
                         ],
                     ],
                 ],
-                'price' => 2.00,
-                'code' => 'A6',
+                'price' => 9.80,
+                'code' => 'G6',
                 'is_active' => true,
-                'slug' => 'sushi-octopus',
+                'slug' => 'special-roll-miel-rolls',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -147,18 +159,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Dorade grillée',
+                            'name' => 'Assortiment rolls',
+                            'description' => 'Saumon, thon, tempura crevette, avocat, concombre',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Grilled sea bream',
+                            'name' => 'Mixed rolls',
+                            'description' => 'Salmon, tuna, shrimp tempura, avocado, cucumber',
                         ],
                     ],
                 ],
-                'price' => 2.50,
-                'code' => 'A7',
+                'price' => 10.80,
+                'code' => 'G7',
                 'is_active' => true,
-                'slug' => 'sushi-dorade-grillee',
+                'slug' => 'special-roll-assortiment-rolls',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -168,18 +182,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Maquereau',
+                            'name' => 'Spicy saumon',
+                            'description' => 'Saumon, concombre, avocat, oignons frits, mayo, épicé',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Mackerel',
+                            'name' => 'Spicy salmon',
+                            'description' => 'Salmon, cucumber, avocado, fried chicken, mayo, spicy',
                         ],
                     ],
                 ],
-                'price' => 2.00,
-                'code' => 'A8',
+                'price' => 11.80,
+                'code' => 'G8',
                 'is_active' => true,
-                'slug' => 'sushi-maquereau',
+                'slug' => 'special-roll-spicy-saumon',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -189,18 +205,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Surimi',
+                            'name' => 'Crispy saumon',
+                            'description' => 'Saumon, concombre, avocat, oignons frits, mayo, épicé',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Surimi',
+                            'name' => 'Crispy salmon',
+                            'description' => 'Salmon cucumber, avocado, fried chicken, mayo, spicy',
                         ],
                     ],
                 ],
-                'price' => 1.80,
-                'code' => 'A9',
+                'price' => 10.80,
+                'code' => 'G9',
                 'is_active' => true,
-                'slug' => 'sushi-surimi',
+                'slug' => 'special-roll-crispy-saumon',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -210,18 +228,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Avocat',
+                            'name' => 'Chips rolls',
+                            'description' => 'Chips, poulet pané',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Avodaco',
+                            'name' => 'Chips rolls',
+                            'description' => 'Chips, fried chicken',
                         ],
                     ],
                 ],
-                'price' => 1.80,
-                'code' => 'A10',
+                'price' => 9.80,
+                'code' => 'G10',
                 'is_active' => true,
-                'slug' => 'sushi-avocat',
+                'slug' => 'special-roll-chips-rolls',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -231,18 +251,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Anguille',
+                            'name' => 'Osaka rolls',
+                            'description' => 'Saumon mi-cuit, avocat, concombre, tempura crevette, oeufs de poissons, ciboulette',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Eel',
+                            'name' => 'Osaka rolls',
+                            'description' => 'Semi-cooked salmon, avocado, cucumber, shrimp tempura, fish eggs, chive',
                         ],
                     ],
                 ],
-                'price' => 2.60,
-                'code' => 'A11',
+                'price' => 12.80,
+                'code' => 'G11',
                 'is_active' => true,
-                'slug' => 'sushi-anguille',
+                'slug' => 'special-roll-osaka-rolls',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -252,18 +274,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saumon mi-cuit',
+                            'name' => 'Foie gras fraise rolls',
+                            'description' => 'Foie gras, fraise, avocat, oignons frits, miel',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Semi-cooked salmon',
+                            'name' => 'Foie gras strawberry rolls',
+                            'description' => 'Foie gras, strawberry, avocado, fried onions, honey',
                         ],
                     ],
                 ],
-                'price' => 2.30,
-                'code' => 'A12',
+                'price' => 14.80,
+                'code' => 'G12',
                 'is_active' => true,
-                'slug' => 'sushi-saumon-mi-cuit',
+                'slug' => 'special-roll-foie-gras-fraise-rolls',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -273,18 +297,20 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Thon mi-cuit',
+                            'name' => 'Spicy poulet',
+                            'description' => 'Poulet, concombre, roquette, oignons frits, sauce du chef',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Semi-cooked tuna',
+                            'name' => 'Spicy chicken',
+                            'description' => 'Chicken, cucumber, salad, fried onions, chef\'s sauce',
                         ],
                     ],
                 ],
-                'price' => 2.60,
-                'code' => 'A13',
+                'price' => 9.80,
+                'code' => 'G18',
                 'is_active' => true,
-                'slug' => 'sushi-thon-mi-cuit',
+                'slug' => 'special-roll-spicy-poulet',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
@@ -294,152 +320,27 @@ class ProductSushiSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Saint-Jacques mi-cuit',
+                            'name' => 'Délice mangue',
+                            'description' => 'Mangue, saumon, cheese, mayonnaise japonaise',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Semi-cooked Saint-Jacques',
+                            'name' => 'Mango delight',
+                            'description' => 'Mango, salmon, cheese, japanese mayo',
                         ],
                     ],
                 ],
-                'price' => 3.60,
-                'code' => 'A14',
+                'price' => 10.50,
+                'code' => 'G15',
                 'is_active' => true,
-                'slug' => 'sushi-saint-jacques-mi-cuit',
+                'slug' => 'special-roll-delice-mangue',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],
             ],
-            [
-                'productTranslations' => [
-                    'create' => [
-                        [
-                            'locale' => 'FR',
-                            'name' => 'Tofu',
-                        ],
-                        [
-                            'locale' => 'EN',
-                            'name' => 'Tofu',
-                        ],
-                    ],
-                ],
-                'price' => 2.00,
-                'code' => 'A15',
-                'is_active' => true,
-                'slug' => 'sushi-tofu',
-                'productTags' => [
-                    'connect' => [$productTag],
-                ],
-            ],
-            [
-                'productTranslations' => [
-                    'create' => [
-                        [
-                            'locale' => 'FR',
-                            'name' => 'Saumon cheese',
-                        ],
-                        [
-                            'locale' => 'EN',
-                            'name' => 'Salmon cheese',
-                        ],
-                    ],
-                ],
-                'price' => 2.30,
-                'code' => 'A16',
-                'is_active' => true,
-                'slug' => 'sushi-saumon-cheese',
-                'productTags' => [
-                    'connect' => [$productTag],
-                ],
-            ],
-            [
-                'productTranslations' => [
-                    'create' => [
-                        [
-                            'locale' => 'FR',
-                            'name' => 'Foie gras',
-                        ],
-                        [
-                            'locale' => 'EN',
-                            'name' => 'Foie gras',
-                        ],
-                    ],
-                ],
-                'price' => 3.50,
-                'code' => 'A17',
-                'is_active' => true,
-                'slug' => 'sushi-foie-gras',
-                'productTags' => [
-                    'connect' => [$productTag],
-                ],
-            ],
-            [
-                'productTranslations' => [
-                    'create' => [
-                        [
-                            'locale' => 'FR',
-                            'name' => 'Maquereau grillé',
-                        ],
-                        [
-                            'locale' => 'EN',
-                            'name' => 'Grilled mackerel',
-                        ],
-                    ],
-                ],
-                'price' => 2.80,
-                'code' => 'A18',
-                'is_active' => true,
-                'slug' => 'sushi-maquereau-grille',
-                'productTags' => [
-                    'connect' => [$productTag],
-                ],
-            ],
-            [
-                'productTranslations' => [
-                    'create' => [
-                        [
-                            'locale' => 'FR',
-                            'name' => 'Saumon cuit caramélisé',
-                        ],
-                        [
-                            'locale' => 'EN',
-                            'name' => 'Caramelized cooked salmon',
-                        ],
-                    ],
-                ],
-                'price' => 2.50,
-                'code' => 'A19',
-                'is_active' => true,
-                'slug' => 'sushi-saumon-cuit-caramelise',
-                'productTags' => [
-                    'connect' => [$productTag],
-                ],
-            ],
-            [
-                'productTranslations' => [
-                    'create' => [
-                        [
-                            'locale' => 'FR',
-                            'name' => 'Saumon avocat',
-                        ],
-                        [
-                            'locale' => 'EN',
-                            'name' => 'Salmon avocado',
-                        ],
-                    ],
-                ],
-                'price' => 2.50,
-                'code' => 'A20',
-                'is_active' => true,
-                'slug' => 'sushi-saumon-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
-                ],
-            ],
-
         ];
 
-        if (Product::query()->where('slug', 'sushi-saumon')->exists()) {
+        if (Product::query()->where('slug', 'special-roll-saumon-royal')->exists()) {
             return;
         }
 

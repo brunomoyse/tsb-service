@@ -21,11 +21,11 @@ class ProductGunkanSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Gunkan saumon avocat',
+                            'name' => 'Saumon avocat',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon avocado gunkan',
+                            'name' => 'Salmon avocado',
                         ],
                     ],
                 ],
@@ -42,11 +42,11 @@ class ProductGunkanSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Gunkan thon avocat',
+                            'name' => 'Thon avocat',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Tuna avocado gunkan',
+                            'name' => 'Tuna avocado',
                         ],
                     ],
                 ],
@@ -63,11 +63,11 @@ class ProductGunkanSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Gunkan avocat cheese',
+                            'name' => 'Avocat cheese',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Cheese avocado gunkan',
+                            'name' => 'Cheese avocado',
                         ],
                     ],
                 ],
@@ -84,11 +84,11 @@ class ProductGunkanSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Gunkan oeufs de saumon',
+                            'name' => 'Oeufs de saumon',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon eggs gunkan',
+                            'name' => 'Salmon eggs',
                         ],
                     ],
                 ],
@@ -105,11 +105,11 @@ class ProductGunkanSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Gunkan oeufs de poisson',
+                            'name' => 'Oeufs de poisson',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Fish eggs gunkan',
+                            'name' => 'Fish eggs',
                         ],
                     ],
                 ],
@@ -126,11 +126,11 @@ class ProductGunkanSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Gunkan tartare thon ciboulette',
+                            'name' => 'Tartare thon ciboulette',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Tuna-chives tartare gunkan',
+                            'name' => 'Tuna-chives tartare',
                         ],
                     ],
                 ],
@@ -147,11 +147,11 @@ class ProductGunkanSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Gunkan dorade mangue',
+                            'name' => 'Dorade mangue',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Mango bream gunkan',
+                            'name' => 'Mango bream',
                         ],
                     ],
                 ],
@@ -168,11 +168,11 @@ class ProductGunkanSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Gunkan tartare saumon cheese',
+                            'name' => 'Tartare saumon cheese',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon-cheese tartare gunkan',
+                            'name' => 'Salmon-cheese tartare',
                         ],
                     ],
                 ],

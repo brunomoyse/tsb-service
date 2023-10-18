@@ -19,5 +19,9 @@ class DatabaseSeeder extends Seeder
         $this->call(ProductMakiSeeder::class);
         $this->call(ProductGunkanSeeder::class);
         $this->call(ProductSpringRollSeeder::class);
+        $this->call(ProductCaliforniaRollSeeder::class);
+        $this->call(ProductTemakiSeeder::class);
+        $this->call(ProductMasagoRollSeeder::class);
+        $this->call(ProductSpecialRollSeeder::class);
     }
 }

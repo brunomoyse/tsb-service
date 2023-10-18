@@ -21,11 +21,11 @@ class ProductSpringRollSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Spring roll saumon avocat',
+                            'name' => 'Saumon avocat',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon avocado spring roll',
+                            'name' => 'Salmon avocado',
                         ],
                     ],
                 ],
@@ -42,11 +42,11 @@ class ProductSpringRollSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Spring roll thon avocat',
+                            'name' => 'Thon avocat',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Tuna avocado spring roll',
+                            'name' => 'Tuna avocado',
                         ],
                     ],
                 ],
@@ -63,11 +63,11 @@ class ProductSpringRollSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Spring roll saumon fumé cheese ciboulette',
+                            'name' => 'Saumon fumé cheese ciboulette',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Smoked salmon cheese chives spring roll',
+                            'name' => 'Smoked salmon cheese chives',
                         ],
                     ],
                 ],
@@ -84,11 +84,11 @@ class ProductSpringRollSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Spring roll poulet pané mayonnaise',
+                            'name' => 'Poulet pané mayonnaise',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Breaded chicken mayonnaise spring roll',
+                            'name' => 'Breaded chicken mayonnaise',
                         ],
                     ],
                 ],
@@ -105,11 +105,11 @@ class ProductSpringRollSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Spring roll saumon mangue',
+                            'name' => 'Saumon mangue',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon mango spring roll',
+                            'name' => 'Salmon mango',
                         ],
                     ],
                 ],
@@ -126,11 +126,11 @@ class ProductSpringRollSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Spring roll tempura crevette oignons frits',
+                            'name' => 'Tempura crevette oignons frits',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Tempura shrimp fried onions spring roll',
+                            'name' => 'Tempura shrimp fried onions',
                         ],
                     ],
                 ],
@@ -147,11 +147,11 @@ class ProductSpringRollSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Spring roll poulet mangue menthe',
+                            'name' => 'Poulet mangue menthe',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Chicken mango mint spring roll',
+                            'name' => 'Chicken mango mint',
                         ],
                     ],
                 ],
@@ -168,11 +168,11 @@ class ProductSpringRollSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Spring roll foie gras mangue',
+                            'name' => 'Foie gras mangue',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Foie gras mango spring roll',
+                            'name' => 'Foie gras mango',
                         ],
                     ],
                 ],
@@ -189,11 +189,11 @@ class ProductSpringRollSeeder extends Seeder
                     'create' => [
                         [
                             'locale' => 'FR',
-                            'name' => 'Spring roll saumon cheese',
+                            'name' => 'Saumon cheese',
                         ],
                         [
                             'locale' => 'EN',
-                            'name' => 'Salmon cheese spring roll',
+                            'name' => 'Salmon cheese',
                         ],
                     ],
                 ],
