@@ -23,5 +23,12 @@ class DatabaseSeeder extends Seeder
         $this->call(ProductTemakiSeeder::class);
         $this->call(ProductMasagoRollSeeder::class);
         $this->call(ProductSpecialRollSeeder::class);
+        $this->call(ProductChirashiSeeder::class);
+        $this->call(ProductSashimiSeeder::class);
+        $this->call(ProductPokeBowlSeeder::class);
+        // Tokyo hot
+        // Teppanyaki
+        // Accompagnement
+        // Boisson
     }
 }
