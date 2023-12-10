@@ -11,12 +11,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Class Product
  *
  * @property string $id
- * @property string $name
- * @property string $description
- * @property float $price
  * @property string $created_at
  * @property string $updated_at
+ * @property float $price
  * @property bool $is_active
+ * @property string|null $code
+ * @property string $slug
  * @property Attachment[] $attachments
  * @property ProductTag[] $productTags
  * @property ProductTranslation[] $productTranslations

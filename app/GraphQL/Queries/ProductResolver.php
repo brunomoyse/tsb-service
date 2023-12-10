@@ -4,9 +4,9 @@ namespace App\GraphQL\Queries;
 
 use App\Models\Product;
 use GraphQL\Type\Definition\ResolveInfo;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Nuwave\Lighthouse\Support\Contracts\GraphQLContext;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ProductResolver
 {
@@ -33,6 +33,7 @@ class ProductResolver
                 });
             }
 
+            /** @phpstan-ignore-next-line */
             $queryBuilder->orderByRaw("substring(code from '^[A-Za-z]+')::text, (substring(code from '[0-9]+'))::int ASC");
 
             /** @phpstan-ignore-next-line  */

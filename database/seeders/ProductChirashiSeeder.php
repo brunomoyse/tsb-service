@@ -64,7 +64,7 @@ class ProductChirashiSeeder extends Seeder
                         [
                             'locale' => 'FR',
                             'name' => 'Assortiment',
-                            'description' => 'Saumon, thon, dorade, crevette, oeufs de saumon, avocat, radis japonais'
+                            'description' => 'Saumon, thon, dorade, crevette, oeufs de saumon, avocat, radis japonais',
                         ],
                         [
                             'locale' => 'EN',

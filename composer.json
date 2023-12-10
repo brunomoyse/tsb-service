@@ -6,6 +6,7 @@
     "license": "proprietary",
     "require": {
         "php": "^8.2",
+        "ext-imagick": "*",
         "ext-pdo_pgsql": "*",
         "guzzlehttp/guzzle": "^7.2",
         "laravel/framework": "^10.10",

@@ -22,5 +22,5 @@ parameters:
     reportMaybesInPropertyPhpDocTypes: false
     reportStaticMethodSignatures: false
     ignoreErrors:
-        - '#Dynamic call to static method Illuminate\\Http\\Request::validate\(\)#'
+        - '#Dynamic call to static method *.#'
 

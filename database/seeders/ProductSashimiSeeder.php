@@ -85,12 +85,12 @@ class ProductSashimiSeeder extends Seeder
                         [
                             'locale' => 'FR',
                             'name' => 'Assortiment',
-                            'description' => 'Saumon, thon, dorade'
+                            'description' => 'Saumon, thon, dorade',
                         ],
                         [
                             'locale' => 'EN',
                             'name' => 'Mix',
-                            'description' => 'Salmon, tuna, sea bream'
+                            'description' => 'Salmon, tuna, sea bream',
                         ],
                     ],
                 ],
