@@ -4,7 +4,9 @@
 /public/hot
 /public/storage
 /public/images
-/public/images/*
+/public/*.avif
+/public/*.png
+/public/*.webp
 /storage/*.key
 /vendor
 .env
