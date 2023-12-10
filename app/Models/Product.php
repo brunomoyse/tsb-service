@@ -35,13 +35,10 @@ class Product extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'id',
-        'name',
-        'description',
         'price',
-        'created_at',
-        'updated_at',
         'is_active',
+        'code',
+        'slug',
     ];
 
     public function attachments(): HasMany

@@ -1,15 +1,8 @@
 extend type Query {
     product(id: ID!): Product! @find
     products(
-        first: Int
-        page: Int
-        locale: Locale!
+        locale: Locale
         search: String
         tags: [ID!] @rules(apply: ["uuid", "exists:App\\Models\\ProductTag,id"])
-    ): ProductPaginator @field(resolver: "App\\GraphQL\\Queries\\ProductResolver@all")
-}
-
-type ProductPaginator {
-    data: [Product!]!
-    paginatorInfo: PaginatorInfo!
+    ): [Product!]! @paginate(resolver: "App\\GraphQL\\Queries\\ProductResolver@all")
 }

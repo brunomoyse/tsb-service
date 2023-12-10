@@ -1,11 +1,11 @@
 type Product {
     id: ID!
-    createdAt: DateTime
-    updatedAt: DateTime
+    createdAt: DateTime @rename(attribute: "created_at")
+    updatedAt: DateTime @rename(attribute: "updated_at")
     price: Float
     code: String
     slug: String
-    isActive: Boolean
+    isActive: Boolean @rename(attribute: "is_active")
     attachments: [Attachment] @hasMany
     productTags: [ProductTag] @hasMany
     productTranslations(locale: Locale @eq): [ProductTranslation] @hasMany

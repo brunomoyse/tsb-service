@@ -12,7 +12,7 @@ class ProductSpecialRollSeeder extends Seeder
     {
         $productTag = ProductTagTranslation::query()
             ->where('locale', 'FR')
-            ->where('name', 'Special roll')
+            ->where('name', 'Spécial roll')
             ->firstOrFail()->product_tag_id;
 
         $products = [

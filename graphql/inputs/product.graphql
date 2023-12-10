@@ -5,15 +5,20 @@ input ProductTranslationInput {
 }
 
 input CreateProductInput {
+    image: Upload
+    code: String
     price: Float!
-    is_active: Boolean = true
+    isActive: Boolean = true @rename(attribute: "is_active")
     productTranslations: CreateProductTranslationsHasMany!
     productTags: ProductTagConnection!
 }
 
 input UpdateProductInput {
+    image: Upload
+    code: String
     price: Float
-    is_active: Boolean
+    isActive: Boolean @rename(attribute: "is_active")
+    productTranslations: UpdateProductTranslationsHasMany
     productTags: ProductTagConnection
 }
 
@@ -23,6 +28,10 @@ input ProductTagConnection {
 
 input CreateProductTranslationsHasMany {
     create: [ProductTranslationInput!]!
+}
+
+input UpdateProductTranslationsHasMany {
+    update: [ProductTranslationInput!]!
 }
 
 input ProductTranslationFilter {

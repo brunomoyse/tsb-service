@@ -12,7 +12,7 @@ class ProductCaliforniaRollSeeder extends Seeder
     {
         $productTag = ProductTagTranslation::query()
             ->where('locale', 'FR')
-            ->where('name', 'Calfifornia roll')
+            ->where('name', 'California roll')
             ->firstOrFail()->product_tag_id;
 
         $products = [

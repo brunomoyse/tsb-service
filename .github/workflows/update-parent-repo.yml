@@ -1,33 +1,34 @@
-name: Send submodule updates to parent repo
-
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  update:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          repository: brunomoyse/tsb
-          token: ${{ secrets.PRIVATE_TOKEN_GITHUB }}
-          submodules: true
-
-      - name: Pull & update submodules recursively
-        run: |
-          cd tsb-service
-          git submodule update --init
-          git fetch origin main
-          git reset --hard origin/main
-
-      - name: Commit
-        run: |
-          git config user.email "bruno.moyse@nccn.fgov.be"
-          git config user.name "brunomoyse"
-          git add --all
-          git commit -m "Update tsb-service submodule" || echo "No changes to commit"
-          git push
-
+#name: Send submodule updates to parent repo
+#
+#on:
+#  push:
+#    branches:
+#      - main
+#
+#jobs:
+#  update:
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - uses: actions/checkout@v2
+#        with:
+#          repository: brunomoyse/tsb
+#          token: ${{ secrets.PRIVATE_TOKEN_GITHUB }}
+#          submodules: true
+#
+#      - name: Pull & update submodules recursively
+#        run: |
+#          cd tsb-service
+#          git submodule update --init
+#          git fetch origin main
+#          git reset --hard origin/main
+#
+#      - name: Commit
+#        run: |
+#          git config user.email "bruno.moyse@nccn.fgov.be"
+#          git config user.name "brunomoyse"
+#          git add --all
+#          git commit -m "Update tsb-service submodule" || echo "No changes to commit"
+#          git push
+#
+#

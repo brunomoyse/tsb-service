@@ -6,10 +6,11 @@ use App\Models\Product;
 use GraphQL\Type\Definition\ResolveInfo;
 use Illuminate\Support\Facades\DB;
 use Nuwave\Lighthouse\Support\Contracts\GraphQLContext;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ProductResolver
 {
-    public function all(null $rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo): array
+    public function all(null $rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo): LengthAwarePaginator
     {
         try {
             $queryBuilder = Product::query()
@@ -27,32 +28,17 @@ class ProductResolver
                 $queryBuilder->whereHas('productTranslations', function ($query) use ($args) {
                     $query
                         ->where('name', 'ilike', '%'.$args['search'].'%')
+                        ->orWhere('code', 'ilike', '%'.$args['search'].'%')
                         ->where('locale', $args['locale']);
                 });
             }
 
+            $queryBuilder->orderByRaw("substring(code from '^[A-Za-z]+')::text, (substring(code from '[0-9]+'))::int ASC");
+
             /** @phpstan-ignore-next-line  */
-            $queryBuilder->orderBy(DB::raw("(SELECT name FROM product_translations WHERE products.id = product_translations.product_id AND product_translations.locale = '".strtoupper($args['lang'])."' LIMIT 1)"), 'ASC');
+            $queryBuilder->orderBy(DB::raw("(SELECT name FROM product_translations WHERE products.id = product_translations.product_id AND product_translations.locale = '".strtoupper($args['locale'])."' LIMIT 1)"), 'ASC');
 
-            $perPage = $args['first'] ?? 10;
-            $page = $args['page'] ?? 1;
-
-            $paginator = $queryBuilder->paginate($perPage, ['*'], 'page', $page);
-
-            return [
-                'data' => $paginator->items(),
-                'paginatorInfo' => [
-                    'count' => $paginator->count(),
-                    'currentPage' => $paginator->currentPage(),
-                    'firstItem' => $paginator->firstItem(),
-                    'hasMorePages' => $paginator->hasMorePages(),
-                    'lastItem' => $paginator->lastItem(),
-                    'lastPage' => $paginator->lastPage(),
-                    'perPage' => $paginator->perPage(),
-                    'total' => $paginator->total(),
-                ],
-            ];
-
+            return $queryBuilder->paginate($args['first'] ?? config('lighthouse.pagination.default_count'), ['*'], 'page', $args['page'] ?? null);
         } catch (\Exception $e) {
             throw new \Exception('Error trying to fetch products: '.$e->getMessage());
         }
