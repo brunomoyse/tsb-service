@@ -6,6 +6,7 @@ use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\App;
 use Imagick;
 use ImagickException;
 
@@ -32,18 +33,30 @@ class UploadController extends Controller
         $formats = ['avif', 'webp', 'png'];
         foreach ($formats as $format) {
             $fileName = $baseFileName.'.'.$format;
-            $originalPath = public_path('images').'/'.$fileName;
 
-            // Convert and save the original image in different formats
-            $imagick = new Imagick();
-            $imagick->readImageBlob(file_get_contents($originalImage->getPathname()));
-            $imagick->setImageFormat($format);
-            $imagick->writeImage($originalPath);
+            $s3 = App::make('aws')->createClient('s3');
+            /** @phpstan-ignore-next-line */
+            $s3->putObject([
+                'Bucket' => 'tsb-storage',
+                'Key' => 'images/'.$fileName,
+                'SourceFile' => $originalImage->getPathname(),
+            ]);
 
-            // Create and save the thumbnail in different formats
-            $thumbnailPath = public_path('images/thumbnails').'/'.$fileName;
-            $imagick->thumbnailImage(200, 0); // 200px width, maintain aspect ratio
-            $imagick->writeImage($thumbnailPath);
+            // Create and save the thumbnail using Imagick
+            $thumbnail = new Imagick();
+            /** @var string $image */
+            $image = file_get_contents($originalImage->getPathname());
+            $thumbnail->readImageBlob($image);
+            $thumbnail->thumbnailImage(200, 0); // 200px width, and maintain aspect ratio
+            $thumbnail->setImageFormat($format);
+
+            // Save the thumbnail to S3
+            /** @phpstan-ignore-next-line */
+            $s3->putObject([
+                'Bucket' => 'tsb-storage',
+                'Key' => 'images/thumbnails/'.$fileName,
+                'SourceFile' => $originalImage->getPathname(),
+            ]);
         }
 
         // Save only one record without the extension
@@ -56,5 +69,4 @@ class UploadController extends Controller
             'message' => 'Image and thumbnails saved in multiple formats, one attachment record created.',
         ]);
     }
-
 }

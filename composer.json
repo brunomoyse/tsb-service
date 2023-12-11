@@ -8,9 +8,11 @@
         "php": "^8.2",
         "ext-imagick": "*",
         "ext-pdo_pgsql": "*",
+        "aws/aws-sdk-php-laravel": "^3.8",
         "guzzlehttp/guzzle": "^7.2",
         "laravel/framework": "^10.10",
         "laravel/tinker": "^2.8",
+        "league/flysystem-aws-s3-v3": "^3.22",
         "mll-lab/graphql-php-scalars": "^6.2",
         "mollie/mollie-api-php": "^2.61",
         "nuwave/lighthouse": "^6.16"
