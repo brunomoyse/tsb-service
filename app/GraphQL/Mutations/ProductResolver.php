@@ -6,7 +6,9 @@ use App\Models\Product;
 use Exception;
 use GraphQL\Type\Definition\ResolveInfo;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Nuwave\Lighthouse\Support\Contracts\GraphQLContext;
 
 class ProductResolver
@@ -14,11 +16,16 @@ class ProductResolver
     public function createProduct(null $rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo): Product|JsonResponse
     {
         return DB::transaction(function () use ($args) {
+            $frLocaleItem = Arr::first($args['productTranslations']['create'], function ($localeItem) {
+                return $localeItem['locale'] === 'FR';
+            });
+
             /** @var Product $product */
             $product = Product::query()->create([
                 'code' => $args['code'],
                 'price' => $args['price'],
                 'is_active' => $args['is_active'] ?? true,
+                'slug' => Str::slug($frLocaleItem['name']),
             ]);
 
             // Create related translations

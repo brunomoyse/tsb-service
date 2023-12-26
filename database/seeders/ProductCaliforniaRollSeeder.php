@@ -263,7 +263,7 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'price' => 7.10,
                 'code' => 'E17',
                 'is_active' => true,
-                'slug' => 'california-roll-',
+                'slug' => 'california-roll-poulet-frit-roquette-miel',
                 'productTags' => [
                     'connect' => [$productTag],
                 ],

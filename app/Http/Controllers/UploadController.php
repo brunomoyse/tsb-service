@@ -27,7 +27,8 @@ class UploadController extends Controller
 
         /** @var UploadedFile $originalImage */
         $originalImage = $request->file('image');
-        $timeSuffix = '-'.time();
+        //$timeSuffix = '-'.time();
+        $timeSuffix = '';
         $baseFileName = $product->slug.$timeSuffix; // Name without extension
 
         $formats = ['avif', 'webp', 'png'];
@@ -35,11 +36,24 @@ class UploadController extends Controller
             $fileName = $baseFileName.'.'.$format;
 
             $s3 = App::make('aws')->createClient('s3');
+
+            // Create and save the normal size image using Imagick
+            $normalSize = new Imagick();
+            /** @var string $image */
+            $image = file_get_contents($originalImage->getPathname());
+            $normalSize->readImageBlob($image);
+            $normalSize->thumbnailImage(600, 0);
+            $normalSize->setImageFormat($format);
+
+            // Save the thumbnail to a temporary file
+            $normalSizePath = tempnam(sys_get_temp_dir(), 'normal-size').'.'.$format;
+            $normalSize->writeImage($normalSizePath);
+
             /** @phpstan-ignore-next-line */
             $s3->putObject([
                 'Bucket' => 'tsb-storage',
                 'Key' => 'images/'.$fileName,
-                'SourceFile' => $originalImage->getPathname(),
+                'SourceFile' => $normalSizePath,
             ]);
 
             // Create and save the thumbnail using Imagick
@@ -47,21 +61,30 @@ class UploadController extends Controller
             /** @var string $image */
             $image = file_get_contents($originalImage->getPathname());
             $thumbnail->readImageBlob($image);
-            $thumbnail->thumbnailImage(200, 0); // 200px width, and maintain aspect ratio
+            $thumbnail->thumbnailImage(350, 0); // 300px width, and maintain aspect ratio
             $thumbnail->setImageFormat($format);
+
+            // Save the thumbnail to a temporary file
+            $tempThumbnailPath = tempnam(sys_get_temp_dir(), 'thumb').'.'.$format;
+            $thumbnail->writeImage($tempThumbnailPath);
 
             // Save the thumbnail to S3
             /** @phpstan-ignore-next-line */
             $s3->putObject([
                 'Bucket' => 'tsb-storage',
                 'Key' => 'images/thumbnails/'.$fileName,
-                'SourceFile' => $originalImage->getPathname(),
+                'SourceFile' => $tempThumbnailPath,
             ]);
+
+            // Delete the temporary thumbnail file
+            unlink($normalSizePath);
+            unlink($tempThumbnailPath);
         }
 
         // Save only one record without the extension
         $product->attachments()->create([
             'path' => $baseFileName,
+            'preview' => true,
         ]);
 
         return response()->json([

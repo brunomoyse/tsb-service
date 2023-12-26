@@ -1,8 +1,12 @@
 extend type Query {
-    product(id: ID!): Product! @find
     products(
         locale: Locale
         search: String
         tags: [ID!] @rules(apply: ["uuid", "exists:App\\Models\\ProductTag,id"])
     ): [Product!]! @paginate(resolver: "App\\GraphQL\\Queries\\ProductResolver@all")
+
+    product(
+        id: ID!
+        locale: Locale
+    ): Product! @field(resolver: "App\\GraphQL\\Queries\\ProductResolver@find")
 }

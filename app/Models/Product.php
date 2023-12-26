@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Class Product
@@ -40,6 +41,11 @@ class Product extends Model
         'code',
         'slug',
     ];
+
+    public function preview(): HasOne
+    {
+        return $this->hasOne(Attachment::class)->where('preview', '=', true);
+    }
 
     public function attachments(): HasMany
     {

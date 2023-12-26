@@ -14,7 +14,7 @@ class ProductResolver
     {
         try {
             $queryBuilder = Product::query()
-                ->with(['productTags', 'productTranslations']);
+                ->with(['productTags', 'productTranslations', 'preview']);
 
             // Filter products by tags
             if (isset($args['tags'])) {
@@ -42,6 +42,20 @@ class ProductResolver
             return $queryBuilder->paginate($args['first'] ?? config('lighthouse.pagination.default_count'), ['*'], 'page', $args['page'] ?? null);
         } catch (\Exception $e) {
             throw new \Exception('Error trying to fetch products: '.$e->getMessage());
+        }
+    }
+
+    public function find(null $rootValue, array $args, GraphQLContext $context, ResolveInfo $resolveInfo): Product
+    {
+        try {
+            $queryBuilder = Product::query()
+                ->with(['productTags', 'productTranslations', 'preview']);
+
+            //dd($queryBuilder->findOrFail($args['id'])->toArray());
+            /** @var Product */
+            return $queryBuilder->findOrFail($args['id']);
+        } catch (\Exception $e) {
+            throw new \Exception('Error trying to fetch product: '.$e->getMessage());
         }
     }
 }
