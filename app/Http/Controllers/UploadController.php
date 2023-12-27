@@ -82,7 +82,7 @@ class UploadController extends Controller
         }
 
         // Save only one record without the extension
-        $product->attachments()->create([
+        $product->attachments()->createOrFirst([
             'path' => $baseFileName,
             'preview' => true,
         ]);
