@@ -3,28 +3,28 @@
 namespace Database\Seeders;
 
 use App\Models\Product;
-use App\Models\ProductTagTranslation;
+use App\Models\ProductCategoryTranslation;
 use Illuminate\Database\Seeder;
 
 class ProductSashimiSeeder extends Seeder
 {
     public function run()
     {
-        $productTag = ProductTagTranslation::query()
-            ->where('locale', 'FR')
+        $productCategory = ProductCategoryTranslation::query()
+            ->where('locale', 'fr')
             ->where('name', 'Sashimi')
-            ->firstOrFail()->product_tag_id;
+            ->firstOrFail()->product_category_id;
 
         $products = [
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon',
                         ],
                     ],
@@ -33,19 +33,19 @@ class ProductSashimiSeeder extends Seeder
                 'code' => 'I1',
                 'is_active' => true,
                 'slug' => 'sashimi-saumon',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Thon',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tuna',
                         ],
                     ],
@@ -54,19 +54,19 @@ class ProductSashimiSeeder extends Seeder
                 'code' => 'I2',
                 'is_active' => true,
                 'slug' => 'sashimi-thon',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon thon',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon tuna',
                         ],
                     ],
@@ -75,20 +75,20 @@ class ProductSashimiSeeder extends Seeder
                 'code' => 'I3',
                 'is_active' => true,
                 'slug' => 'sashimi-saumon-thon',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Assortiment',
                             'description' => 'Saumon, thon, dorade',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Mix',
                             'description' => 'Salmon, tuna, sea bream',
                         ],
@@ -98,8 +98,8 @@ class ProductSashimiSeeder extends Seeder
                 'code' => 'I4',
                 'is_active' => true,
                 'slug' => 'sashimi-assortiment',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
         ];
@@ -119,7 +119,7 @@ class ProductSashimiSeeder extends Seeder
                 ]);
 
                 $productItem->productTranslations()->createMany($product['productTranslations']['create']);
-                $productItem->productTags()->sync($product['productTags']['connect']);
+                $productItem->productCategories()->sync($product['productCategories']['connect']);
             } catch (\Exception $e) {
                 throw new \Exception('Error creating product: '.$e->getMessage());
             }

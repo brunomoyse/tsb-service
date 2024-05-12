@@ -3,28 +3,28 @@
 namespace Database\Seeders;
 
 use App\Models\Product;
-use App\Models\ProductTagTranslation;
+use App\Models\ProductCategoryTranslation;
 use Illuminate\Database\Seeder;
 
 class ProductCaliforniaRollSeeder extends Seeder
 {
     public function run(): void
     {
-        $productTag = ProductTagTranslation::query()
-            ->where('locale', 'FR')
+        $productCategory = ProductCategoryTranslation::query()
+            ->where('locale', 'fr')
             ->where('name', 'California roll')
-            ->firstOrFail()->product_tag_id;
+            ->firstOrFail()->product_category_id;
 
         $products = [
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon avocado',
                         ],
                     ],
@@ -33,19 +33,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E1',
                 'is_active' => true,
                 'slug' => 'california-roll-saumon-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Thon avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tuna avocado',
                         ],
                     ],
@@ -54,19 +54,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E2',
                 'is_active' => true,
                 'slug' => 'california-roll-thon-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Surimi avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Surimi avocado',
                         ],
                     ],
@@ -75,19 +75,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E3',
                 'is_active' => true,
                 'slug' => 'california-roll-surimi-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tempura crevette avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tempura shrimp avocado',
                         ],
                     ],
@@ -96,19 +96,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E4',
                 'is_active' => true,
                 'slug' => 'california-roll-tempura-crevette-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tempura crevette cheese',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tempura shrimp cheese',
                         ],
                     ],
@@ -117,19 +117,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E5',
                 'is_active' => true,
                 'slug' => 'california-roll-tempura-crevette-cheese',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon mangue',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon mango',
                         ],
                     ],
@@ -138,19 +138,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E6',
                 'is_active' => true,
                 'slug' => 'california-roll-saumon-mangue',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Crevette avocat cheese',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Shrimp avocado cheese',
                         ],
                     ],
@@ -159,19 +159,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E7',
                 'is_active' => true,
                 'slug' => 'california-roll-crevette-avocat-cheese',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Oignons frits poulet',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Fried onions chicken',
                         ],
                     ],
@@ -180,19 +180,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E8',
                 'is_active' => true,
                 'slug' => 'california-roll-oignons-frits-poulet',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Thon cuit pomme spicy',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Cooked tuna spicy apple',
                         ],
                     ],
@@ -201,19 +201,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E9',
                 'is_active' => true,
                 'slug' => 'california-roll-thon-cuit-pomme-spicy',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Végétarien',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Vegetarian',
                         ],
                     ],
@@ -222,19 +222,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E10',
                 'is_active' => true,
                 'slug' => 'california-roll-vegetarien',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon cheese',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon cheese',
                         ],
                     ],
@@ -243,19 +243,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E16',
                 'is_active' => true,
                 'slug' => 'california-roll-saumon-cheese',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Poulet frit roquette miel',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Fried chicken salad honey',
                         ],
                     ],
@@ -264,19 +264,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E17',
                 'is_active' => true,
                 'slug' => 'california-roll-poulet-frit-roquette-miel',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Oignons frits foie gras miel',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Fried onions foie gras honey',
                         ],
                     ],
@@ -285,19 +285,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E18',
                 'is_active' => true,
                 'slug' => 'california-roll-oignons-frits-foie-gras-miel',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tempura crevette coriandre piquant',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tempura shrimp coriander spicy',
                         ],
                     ],
@@ -306,19 +306,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E19',
                 'is_active' => true,
                 'slug' => 'california-roll-tempura-crevette-coriandre-piquant',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tempura crevette avocat cheese fraise',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tempura shrimp avocado cheese strawberry',
                         ],
                     ],
@@ -327,19 +327,19 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E20',
                 'is_active' => true,
                 'slug' => 'california-roll-tempura-crevette-avocat-cheese-fraise',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Poulet piquant',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Spicy chicken',
                         ],
                     ],
@@ -348,8 +348,8 @@ class ProductCaliforniaRollSeeder extends Seeder
                 'code' => 'E21',
                 'is_active' => true,
                 'slug' => 'california-roll-poulet-piquant',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
         ];
@@ -369,7 +369,7 @@ class ProductCaliforniaRollSeeder extends Seeder
                 ]);
 
                 $productItem->productTranslations()->createMany($product['productTranslations']['create']);
-                $productItem->productTags()->sync($product['productTags']['connect']);
+                $productItem->productCategories()->sync($product['productCategories']['connect']);
             } catch (\Exception $e) {
                 throw new \Exception('Error creating product: '.$e->getMessage());
             }

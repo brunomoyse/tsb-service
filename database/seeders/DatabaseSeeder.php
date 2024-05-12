@@ -12,7 +12,7 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(TagSeeder::class);
+        $this->call(CategorySeeder::class);
         $this->call(ProductMenuPlateauSeeder::class);
         $this->call(ProductSushiSeeder::class);
         $this->call(ProductMenuBentoSeeder::class);

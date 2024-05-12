@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string|null $code
  * @property string $slug
  * @property Attachment[] $attachments
- * @property ProductTag[] $productTags
+ * @property ProductCategory[] $productCategories
  * @property ProductTranslation[] $productTranslations
  * @property Order[] $orders
  */
@@ -52,9 +52,9 @@ class Product extends Model
         return $this->hasMany(Attachment::class);
     }
 
-    public function productTags(): BelongsToMany
+    public function productCategories(): BelongsToMany
     {
-        return $this->belongsToMany(ProductTag::class);
+        return $this->belongsToMany(ProductCategory::class);
     }
 
     public function productTranslations(): HasMany

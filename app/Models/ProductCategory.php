@@ -7,19 +7,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class ProductTag extends Model
+class ProductCategory extends Model
 {
     use HasUuids;
 
-    protected $table = 'product_tags';
+    protected $table = 'product_categories';
 
     public function products(): BelongsToMany
     {
         return $this->belongsToMany(Product::class);
     }
 
-    public function productTagTranslations(): HasMany
+    public function productCategoryTranslations(): HasMany
     {
-        return $this->hasMany(ProductTagTranslation::class);
+        return $this->hasMany(ProductCategoryTranslation::class);
     }
 }

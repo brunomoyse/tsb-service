@@ -11,11 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('product_tag_translations', function (Blueprint $table) {
-            $table->dropUnique('product_tag_translations_product_tag_id_language_unique');
+        Schema::table('product_category_translations', function (Blueprint $table) {
+            $table->dropUnique('product_category_translations_product_category_id_language_unique');
             $table->dropColumn('language');
             $table->enum('locale', ['EN', 'FR']);
-            $table->unique(['product_tag_id', 'locale']);
+            $table->unique(['product_category_id', 'locale']);
         });
 
         Schema::table('product_translations', function (Blueprint $table) {

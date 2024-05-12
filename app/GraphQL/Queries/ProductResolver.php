@@ -14,12 +14,12 @@ class ProductResolver
     {
         try {
             $queryBuilder = Product::query()
-                ->with(['productTags', 'productTranslations', 'preview']);
+                ->with(['productCategories', 'productTranslations', 'preview']);
 
-            // Filter products by tags
-            if (isset($args['tags'])) {
-                $queryBuilder->whereHas('productTags', function ($query) use ($args) {
-                    $query->whereIn('id', $args['tags']);
+            // Filter products by categories
+            if (isset($args['categories'])) {
+                $queryBuilder->whereHas('productCategories', function ($query) use ($args) {
+                    $query->whereIn('id', $args['categories']);
                 });
             }
 
@@ -49,7 +49,7 @@ class ProductResolver
     {
         try {
             $queryBuilder = Product::query()
-                ->with(['productTags', 'productTranslations', 'preview']);
+                ->with(['productCategories', 'productTranslations', 'preview']);
 
             //dd($queryBuilder->findOrFail($args['id'])->toArray());
             /** @var Product */

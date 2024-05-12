@@ -3,28 +3,28 @@
 namespace Database\Seeders;
 
 use App\Models\Product;
-use App\Models\ProductTagTranslation;
+use App\Models\ProductCategoryTranslation;
 use Illuminate\Database\Seeder;
 
 class ProductSpringRollSeeder extends Seeder
 {
     public function run()
     {
-        $productTag = ProductTagTranslation::query()
-            ->where('locale', 'FR')
+        $productCategory = ProductCategoryTranslation::query()
+            ->where('locale', 'fr')
             ->where('name', 'Spring roll')
-            ->firstOrFail()->product_tag_id;
+            ->firstOrFail()->product_category_id;
 
         $products = [
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon avocado',
                         ],
                     ],
@@ -33,19 +33,19 @@ class ProductSpringRollSeeder extends Seeder
                 'code' => 'D1',
                 'is_active' => true,
                 'slug' => 'spring-roll-saumon-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Thon avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tuna avocado',
                         ],
                     ],
@@ -54,19 +54,19 @@ class ProductSpringRollSeeder extends Seeder
                 'code' => 'D2',
                 'is_active' => true,
                 'slug' => 'spring-roll-thon-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon fumé cheese ciboulette',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Smoked salmon cheese chives',
                         ],
                     ],
@@ -75,19 +75,19 @@ class ProductSpringRollSeeder extends Seeder
                 'code' => 'D3',
                 'is_active' => true,
                 'slug' => 'spring-roll-saumon-fume-cheese-ciboulette',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Poulet pané mayonnaise',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Breaded chicken mayonnaise',
                         ],
                     ],
@@ -96,19 +96,19 @@ class ProductSpringRollSeeder extends Seeder
                 'code' => 'D4',
                 'is_active' => true,
                 'slug' => 'spring-roll-poulet-pane-mayonnaise',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon mangue',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon mango',
                         ],
                     ],
@@ -117,19 +117,19 @@ class ProductSpringRollSeeder extends Seeder
                 'code' => 'D5',
                 'is_active' => true,
                 'slug' => 'spring-roll-saumon-mangue',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tempura crevette oignons frits',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tempura shrimp fried onions',
                         ],
                     ],
@@ -138,19 +138,19 @@ class ProductSpringRollSeeder extends Seeder
                 'code' => 'D6',
                 'is_active' => true,
                 'slug' => 'spring-roll-tempura-crevette-oignons-frits',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Poulet mangue menthe',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Chicken mango mint',
                         ],
                     ],
@@ -159,19 +159,19 @@ class ProductSpringRollSeeder extends Seeder
                 'code' => 'D7',
                 'is_active' => true,
                 'slug' => 'spring-roll-poulet-mangue-menthe',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Foie gras mangue',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Foie gras mango',
                         ],
                     ],
@@ -180,19 +180,19 @@ class ProductSpringRollSeeder extends Seeder
                 'code' => 'D8',
                 'is_active' => true,
                 'slug' => 'spring-roll-foie-gras-mangue',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon cheese',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon cheese',
                         ],
                     ],
@@ -201,8 +201,8 @@ class ProductSpringRollSeeder extends Seeder
                 'code' => 'D9',
                 'is_active' => true,
                 'slug' => 'spring-roll-saumon-cheese',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
         ];
@@ -222,7 +222,7 @@ class ProductSpringRollSeeder extends Seeder
                 ]);
 
                 $productItem->productTranslations()->createMany($product['productTranslations']['create']);
-                $productItem->productTags()->sync($product['productTags']['connect']);
+                $productItem->productCategories()->sync($product['productCategories']['connect']);
             } catch (\Exception $e) {
                 throw new \Exception('Error creating product: '.$e->getMessage());
             }

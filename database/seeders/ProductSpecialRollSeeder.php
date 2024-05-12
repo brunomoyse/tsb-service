@@ -3,29 +3,29 @@
 namespace Database\Seeders;
 
 use App\Models\Product;
-use App\Models\ProductTagTranslation;
+use App\Models\ProductCategoryTranslation;
 use Illuminate\Database\Seeder;
 
 class ProductSpecialRollSeeder extends Seeder
 {
     public function run()
     {
-        $productTag = ProductTagTranslation::query()
-            ->where('locale', 'FR')
+        $productCategory = ProductCategoryTranslation::query()
+            ->where('locale', 'fr')
             ->where('name', 'Spécial roll')
-            ->firstOrFail()->product_tag_id;
+            ->firstOrFail()->product_category_id;
 
         $products = [
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon royal',
                             'description' => 'Saumon, cheese, avocat, concombre',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Royal salmon',
                             'description' => 'Salmon, cheese, avocado, cucumber',
                         ],
@@ -35,20 +35,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G1',
                 'is_active' => true,
                 'slug' => 'special-roll-saumon-royal',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Mangue rolls',
                             'description' => 'Poulet pané, concombre, mangue, oeufs de poissons',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Mango rolls',
                             'description' => 'Fried chicken, cuncumber, mango, fish eggs',
                         ],
@@ -58,20 +58,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G2',
                 'is_active' => true,
                 'slug' => 'special-roll-mangue-rolls',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Avocat rolls',
                             'description' => 'Tempura crevette , sésame , oeufs de poissons',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Avocado rolls',
                             'description' => 'Shrimp tempura, sesame, fish eggs',
                         ],
@@ -81,20 +81,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G3',
                 'is_active' => true,
                 'slug' => 'special-roll-avocat-rolls',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Anguille rolls',
                             'description' => 'Anguille, avocat, concombre, sésame',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Eel rolls',
                             'description' => 'Eel, avocado, cuncumber, sesame',
                         ],
@@ -104,20 +104,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G4',
                 'is_active' => true,
                 'slug' => 'special-roll-anguille-rolls',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Oignon rolls',
                             'description' => 'Surimi, avocat, concombre',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Onion rolls',
                             'description' => 'Surimi, avocado, cucumber',
                         ],
@@ -127,20 +127,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G5',
                 'is_active' => true,
                 'slug' => 'special-roll-oignon-rolls',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Miel rolls',
                             'description' => 'Saumon, miel, roquette, mangue, sésame',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Honey rolls',
                             'description' => 'Salmon, honey, salad, mango, sesame',
                         ],
@@ -150,20 +150,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G6',
                 'is_active' => true,
                 'slug' => 'special-roll-miel-rolls',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Assortiment rolls',
                             'description' => 'Saumon, thon, tempura crevette, avocat, concombre',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Mixed rolls',
                             'description' => 'Salmon, tuna, shrimp tempura, avocado, cucumber',
                         ],
@@ -173,20 +173,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G7',
                 'is_active' => true,
                 'slug' => 'special-roll-assortiment-rolls',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Spicy saumon',
                             'description' => 'Saumon, concombre, avocat, oignons frits, mayo, épicé',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Spicy salmon',
                             'description' => 'Salmon, cucumber, avocado, fried chicken, mayo, spicy',
                         ],
@@ -196,20 +196,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G8',
                 'is_active' => true,
                 'slug' => 'special-roll-spicy-saumon',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Crispy saumon',
                             'description' => 'Saumon, concombre, avocat, oignons frits, mayo, épicé',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Crispy salmon',
                             'description' => 'Salmon cucumber, avocado, fried chicken, mayo, spicy',
                         ],
@@ -219,20 +219,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G9',
                 'is_active' => true,
                 'slug' => 'special-roll-crispy-saumon',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Chips rolls',
                             'description' => 'Chips, poulet pané',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Chips rolls',
                             'description' => 'Chips, fried chicken',
                         ],
@@ -242,20 +242,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G10',
                 'is_active' => true,
                 'slug' => 'special-roll-chips-rolls',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Osaka rolls',
                             'description' => 'Saumon mi-cuit, avocat, concombre, tempura crevette, oeufs de poissons, ciboulette',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Osaka rolls',
                             'description' => 'Semi-cooked salmon, avocado, cucumber, shrimp tempura, fish eggs, chive',
                         ],
@@ -265,20 +265,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G11',
                 'is_active' => true,
                 'slug' => 'special-roll-osaka-rolls',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Foie gras fraise rolls',
                             'description' => 'Foie gras, fraise, avocat, oignons frits, miel',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Foie gras strawberry rolls',
                             'description' => 'Foie gras, strawberry, avocado, fried onions, honey',
                         ],
@@ -288,20 +288,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G12',
                 'is_active' => true,
                 'slug' => 'special-roll-foie-gras-fraise-rolls',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Spicy poulet',
                             'description' => 'Poulet, concombre, roquette, oignons frits, sauce du chef',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Spicy chicken',
                             'description' => 'Chicken, cucumber, salad, fried onions, chef\'s sauce',
                         ],
@@ -311,20 +311,20 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G18',
                 'is_active' => true,
                 'slug' => 'special-roll-spicy-poulet',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Délice mangue',
                             'description' => 'Mangue, saumon, cheese, mayonnaise japonaise',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Mango delight',
                             'description' => 'Mango, salmon, cheese, japanese mayo',
                         ],
@@ -334,8 +334,8 @@ class ProductSpecialRollSeeder extends Seeder
                 'code' => 'G15',
                 'is_active' => true,
                 'slug' => 'special-roll-delice-mangue',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
         ];
@@ -355,7 +355,7 @@ class ProductSpecialRollSeeder extends Seeder
                 ]);
 
                 $productItem->productTranslations()->createMany($product['productTranslations']['create']);
-                $productItem->productTags()->sync($product['productTags']['connect']);
+                $productItem->productCategories()->sync($product['productCategories']['connect']);
             } catch (\Exception $e) {
                 throw new \Exception('Error creating product: '.$e->getMessage());
             }

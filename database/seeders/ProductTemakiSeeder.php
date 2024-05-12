@@ -3,28 +3,28 @@
 namespace Database\Seeders;
 
 use App\Models\Product;
-use App\Models\ProductTagTranslation;
+use App\Models\ProductCategoryTranslation;
 use Illuminate\Database\Seeder;
 
 class ProductTemakiSeeder extends Seeder
 {
     public function run()
     {
-        $productTag = ProductTagTranslation::query()
-            ->where('locale', 'FR')
+        $productCategory = ProductCategoryTranslation::query()
+            ->where('locale', 'fr')
             ->where('name', 'Temaki')
-            ->firstOrFail()->product_tag_id;
+            ->firstOrFail()->product_category_id;
 
         $products = [
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon avocat cocombre',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon avocado cucumber',
                         ],
                     ],
@@ -33,19 +33,19 @@ class ProductTemakiSeeder extends Seeder
                 'code' => 'F1',
                 'is_active' => true,
                 'slug' => 'temaki-saumon-avocat-concombre',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Thon avocat concombre',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tuca avocado cucumber',
                         ],
                     ],
@@ -54,19 +54,19 @@ class ProductTemakiSeeder extends Seeder
                 'code' => 'F2',
                 'is_active' => true,
                 'slug' => 'temaki-thon-avocat-concombre',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tempura crevette avocat concombre',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Shrimp tempura avocado cucumber',
                         ],
                     ],
@@ -75,19 +75,19 @@ class ProductTemakiSeeder extends Seeder
                 'code' => 'F3',
                 'is_active' => true,
                 'slug' => 'temaki-tempura-crevette-avocat-concombre',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Oeufs de saumon avocat concombre',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon eggs avocado cucumber',
                         ],
                     ],
@@ -96,8 +96,8 @@ class ProductTemakiSeeder extends Seeder
                 'code' => 'F4',
                 'is_active' => true,
                 'slug' => 'temaki-oeufs-de-saumon-avocat-concombre',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
         ];
@@ -117,7 +117,7 @@ class ProductTemakiSeeder extends Seeder
                 ]);
 
                 $productItem->productTranslations()->createMany($product['productTranslations']['create']);
-                $productItem->productTags()->sync($product['productTags']['connect']);
+                $productItem->productCategories()->sync($product['productCategories']['connect']);
             } catch (\Exception $e) {
                 throw new \Exception('Error creating product: '.$e->getMessage());
             }

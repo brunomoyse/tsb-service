@@ -3,28 +3,28 @@
 namespace Database\Seeders;
 
 use App\Models\Product;
-use App\Models\ProductTagTranslation;
+use App\Models\ProductCategoryTranslation;
 use Illuminate\Database\Seeder;
 
 class ProductMakiSeeder extends Seeder
 {
     public function run()
     {
-        $productTag = ProductTagTranslation::query()
-            ->where('locale', 'FR')
+        $productCategory = ProductCategoryTranslation::query()
+            ->where('locale', 'fr')
             ->where('name', 'Maki')
-            ->firstOrFail()->product_tag_id;
+            ->firstOrFail()->product_category_id;
 
         $products = [
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Concombre sésame',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Cucumber sesame',
                         ],
                     ],
@@ -33,19 +33,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B1',
                 'is_active' => true,
                 'slug' => 'maki-concombre-sesame',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Avocado',
                         ],
                     ],
@@ -54,19 +54,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B2',
                 'is_active' => true,
                 'slug' => 'maki-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Surimi',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Surimi',
                         ],
                     ],
@@ -75,19 +75,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B3',
                 'is_active' => true,
                 'slug' => 'maki-surimi',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Radis japonais',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Japanese radish',
                         ],
                     ],
@@ -96,19 +96,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B4',
                 'is_active' => true,
                 'slug' => 'maki-radis-japonais',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Cheese concombre',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Cucumber cheese',
                         ],
                     ],
@@ -117,19 +117,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B5',
                 'is_active' => true,
                 'slug' => 'maki-cheese-concombre',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Cheese avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Avocado cheese',
                         ],
                     ],
@@ -138,19 +138,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B6',
                 'is_active' => true,
                 'slug' => 'maki-cheese-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Anguille',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Eel',
                         ],
                     ],
@@ -159,19 +159,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B7',
                 'is_active' => true,
                 'slug' => 'maki-anguille',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon',
                         ],
                     ],
@@ -180,19 +180,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B8',
                 'is_active' => true,
                 'slug' => 'maki-saumon',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Thon',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tuna',
                         ],
                     ],
@@ -201,19 +201,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B9',
                 'is_active' => true,
                 'slug' => 'maki-thon',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tempura crevette',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Shrimp tempura',
                         ],
                     ],
@@ -222,19 +222,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B10',
                 'is_active' => true,
                 'slug' => 'maki-tempura-crevette',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon spicy',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Spicy salmon',
                         ],
                     ],
@@ -243,19 +243,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B11',
                 'is_active' => true,
                 'slug' => 'maki-saumon-spicy',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Dorade mangue',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Sea bream mango',
                         ],
                     ],
@@ -264,19 +264,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B12',
                 'is_active' => true,
                 'slug' => 'maki-dorade-mangue',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Thon cuit spicy',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Spicy cooked tuna',
                         ],
                     ],
@@ -285,19 +285,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B13',
                 'is_active' => true,
                 'slug' => 'maki-thon-cuit-spicy',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tartare thon ciboulette',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tuna and chives tartare',
                         ],
                     ],
@@ -306,19 +306,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B14',
                 'is_active' => true,
                 'slug' => 'maki-tartare-thon-ciboulette',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Mangue',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Mango',
                         ],
                     ],
@@ -327,19 +327,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B15',
                 'is_active' => true,
                 'slug' => 'maki-mangue',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Ciboulette cheese',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Chives cheese',
                         ],
                     ],
@@ -348,19 +348,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B16',
                 'is_active' => true,
                 'slug' => 'maki-ciboulette-cheese',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Foie gras',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Foie gras',
                         ],
                     ],
@@ -369,19 +369,19 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B17',
                 'is_active' => true,
                 'slug' => 'maki-foie-gras',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon roll cheese',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon roll cheese',
                         ],
                     ],
@@ -390,8 +390,8 @@ class ProductMakiSeeder extends Seeder
                 'code' => 'B19',
                 'is_active' => true,
                 'slug' => 'maki-saumon-roll-cheese',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
         ];
@@ -411,7 +411,7 @@ class ProductMakiSeeder extends Seeder
                 ]);
 
                 $productItem->productTranslations()->createMany($product['productTranslations']['create']);
-                $productItem->productTags()->sync($product['productTags']['connect']);
+                $productItem->productCategories()->sync($product['productCategories']['connect']);
             } catch (\Exception $e) {
                 throw new \Exception('Error creating product: '.$e->getMessage());
             }

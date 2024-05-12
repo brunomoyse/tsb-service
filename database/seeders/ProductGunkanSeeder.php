@@ -3,28 +3,28 @@
 namespace Database\Seeders;
 
 use App\Models\Product;
-use App\Models\ProductTagTranslation;
+use App\Models\ProductCategoryTranslation;
 use Illuminate\Database\Seeder;
 
 class ProductGunkanSeeder extends Seeder
 {
     public function run()
     {
-        $productTag = ProductTagTranslation::query()
-            ->where('locale', 'FR')
+        $productCategory = ProductCategoryTranslation::query()
+            ->where('locale', 'fr')
             ->where('name', 'Gunkan')
-            ->firstOrFail()->product_tag_id;
+            ->firstOrFail()->product_category_id;
 
         $products = [
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon avocado',
                         ],
                     ],
@@ -33,19 +33,19 @@ class ProductGunkanSeeder extends Seeder
                 'code' => 'T1',
                 'is_active' => true,
                 'slug' => 'gunkan-saumon-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Thon avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tuna avocado',
                         ],
                     ],
@@ -54,19 +54,19 @@ class ProductGunkanSeeder extends Seeder
                 'code' => 'T2',
                 'is_active' => true,
                 'slug' => 'gunkan-thon-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Avocat cheese',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Cheese avocado',
                         ],
                     ],
@@ -75,19 +75,19 @@ class ProductGunkanSeeder extends Seeder
                 'code' => 'T3',
                 'is_active' => true,
                 'slug' => 'gunkan-avocat-cheese',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Oeufs de saumon',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon eggs',
                         ],
                     ],
@@ -96,19 +96,19 @@ class ProductGunkanSeeder extends Seeder
                 'code' => 'C1',
                 'is_active' => true,
                 'slug' => 'gunkan-oeufs-de-saumon',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Oeufs de poisson',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Fish eggs',
                         ],
                     ],
@@ -117,19 +117,19 @@ class ProductGunkanSeeder extends Seeder
                 'code' => 'C2',
                 'is_active' => true,
                 'slug' => 'gunkan-oeufs-de-poisson',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tartare thon ciboulette',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tuna-chives tartare',
                         ],
                     ],
@@ -138,19 +138,19 @@ class ProductGunkanSeeder extends Seeder
                 'code' => 'C3',
                 'is_active' => true,
                 'slug' => 'gunkan-tartare-thon-ciboulette',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Dorade mangue',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Mango bream',
                         ],
                     ],
@@ -159,19 +159,19 @@ class ProductGunkanSeeder extends Seeder
                 'code' => 'C4',
                 'is_active' => true,
                 'slug' => 'gunkan-dorade-mangue',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tartare saumon cheese',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon-cheese tartare',
                         ],
                     ],
@@ -180,8 +180,8 @@ class ProductGunkanSeeder extends Seeder
                 'code' => 'C5',
                 'is_active' => true,
                 'slug' => 'gunkan-tartare-saumon-cheese',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
         ];
@@ -201,7 +201,7 @@ class ProductGunkanSeeder extends Seeder
                 ]);
 
                 $productItem->productTranslations()->createMany($product['productTranslations']['create']);
-                $productItem->productTags()->sync($product['productTags']['connect']);
+                $productItem->productCategories()->sync($product['productCategories']['connect']);
             } catch (\Exception $e) {
                 throw new \Exception('Error creating product: '.$e->getMessage());
             }

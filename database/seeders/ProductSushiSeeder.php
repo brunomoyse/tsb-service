@@ -3,28 +3,28 @@
 namespace Database\Seeders;
 
 use App\Models\Product;
-use App\Models\ProductTagTranslation;
+use App\Models\ProductCategoryTranslation;
 use Illuminate\Database\Seeder;
 
 class ProductSushiSeeder extends Seeder
 {
     public function run()
     {
-        $productTag = ProductTagTranslation::query()
-            ->where('locale', 'FR')
+        $productCategory = ProductCategoryTranslation::query()
+            ->where('locale', 'fr')
             ->where('name', 'Sushi')
-            ->firstOrFail()->product_tag_id;
+            ->firstOrFail()->product_category_id;
 
         $products = [
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon',
                         ],
                     ],
@@ -33,19 +33,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A1',
                 'is_active' => true,
                 'slug' => 'sushi-saumon',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Crevette',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Shrimp',
                         ],
                     ],
@@ -54,19 +54,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A2',
                 'is_active' => true,
                 'slug' => 'sushi-crevette',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Thon',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tuna',
                         ],
                     ],
@@ -75,19 +75,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A3',
                 'is_active' => true,
                 'slug' => 'sushi-thon',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Dorade',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Sea bream',
                         ],
                     ],
@@ -96,19 +96,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A4',
                 'is_active' => true,
                 'slug' => 'sushi-dorade',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Omelette',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Omelette',
                         ],
                     ],
@@ -117,19 +117,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A5',
                 'is_active' => true,
                 'slug' => 'sushi-omelette',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Octopus',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Octopus',
                         ],
                     ],
@@ -138,19 +138,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A6',
                 'is_active' => true,
                 'slug' => 'sushi-octopus',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Dorade grillée',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Grilled sea bream',
                         ],
                     ],
@@ -159,19 +159,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A7',
                 'is_active' => true,
                 'slug' => 'sushi-dorade-grillee',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Maquereau',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Mackerel',
                         ],
                     ],
@@ -180,19 +180,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A8',
                 'is_active' => true,
                 'slug' => 'sushi-maquereau',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Surimi',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Surimi',
                         ],
                     ],
@@ -201,19 +201,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A9',
                 'is_active' => true,
                 'slug' => 'sushi-surimi',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Avodaco',
                         ],
                     ],
@@ -222,19 +222,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A10',
                 'is_active' => true,
                 'slug' => 'sushi-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Anguille',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Eel',
                         ],
                     ],
@@ -243,19 +243,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A11',
                 'is_active' => true,
                 'slug' => 'sushi-anguille',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon mi-cuit',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Semi-cooked salmon',
                         ],
                     ],
@@ -264,19 +264,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A12',
                 'is_active' => true,
                 'slug' => 'sushi-saumon-mi-cuit',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Thon mi-cuit',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Semi-cooked tuna',
                         ],
                     ],
@@ -285,19 +285,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A13',
                 'is_active' => true,
                 'slug' => 'sushi-thon-mi-cuit',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saint-Jacques mi-cuit',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Semi-cooked Saint-Jacques',
                         ],
                     ],
@@ -306,19 +306,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A14',
                 'is_active' => true,
                 'slug' => 'sushi-saint-jacques-mi-cuit',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tofu',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Tofu',
                         ],
                     ],
@@ -327,19 +327,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A15',
                 'is_active' => true,
                 'slug' => 'sushi-tofu',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon cheese',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon cheese',
                         ],
                     ],
@@ -348,19 +348,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A16',
                 'is_active' => true,
                 'slug' => 'sushi-saumon-cheese',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Foie gras',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Foie gras',
                         ],
                     ],
@@ -369,19 +369,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A17',
                 'is_active' => true,
                 'slug' => 'sushi-foie-gras',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Maquereau grillé',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Grilled mackerel',
                         ],
                     ],
@@ -390,19 +390,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A18',
                 'is_active' => true,
                 'slug' => 'sushi-maquereau-grille',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon cuit caramélisé',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Caramelized cooked salmon',
                         ],
                     ],
@@ -411,19 +411,19 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A19',
                 'is_active' => true,
                 'slug' => 'sushi-saumon-cuit-caramelise',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Saumon avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Salmon avocado',
                         ],
                     ],
@@ -432,8 +432,8 @@ class ProductSushiSeeder extends Seeder
                 'code' => 'A20',
                 'is_active' => true,
                 'slug' => 'sushi-saumon-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
 
@@ -454,7 +454,7 @@ class ProductSushiSeeder extends Seeder
                 ]);
 
                 $productItem->productTranslations()->createMany($product['productTranslations']['create']);
-                $productItem->productTags()->sync($product['productTags']['connect']);
+                $productItem->productCategories()->sync($product['productCategories']['connect']);
             } catch (\Exception $e) {
                 throw new \Exception('Error creating product: '.$e->getMessage());
             }

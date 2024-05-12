@@ -11,14 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('product_tag_translations', function (Blueprint $table) {
+        Schema::create('product_category_translations', function (Blueprint $table) {
             $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
             $table->timestamps();
             $table->enum('language', ['EN', 'FR']);
-            $table->uuid('product_tag_id');
-            $table->foreign('product_tag_id')->references('id')->on('product_tags')->onDelete('cascade');
+            $table->uuid('product_category_id');
+            $table->foreign('product_category_id')->references('id')->on('product_categories')->onDelete('cascade');
             $table->string('name');
-            $table->unique(['product_tag_id', 'language']);
+            $table->unique(['product_category_id', 'language']);
         });
     }
 
@@ -27,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('product_tag_translations');
+        Schema::dropIfExists('product_category_translations');
     }
 };

@@ -31,10 +31,10 @@ class ProductResolver
             // Create related translations
             $product->productTranslations()->createMany($args['productTranslations']['create']);
 
-            // Sync tags
-            $product->productTags()->sync($args['productTags']['connect']);
+            // Sync categories
+            $product->productCategories()->sync($args['productCategories']['connect']);
 
-            return $product->load('productTranslations', 'productTags');
+            return $product->load('productTranslations', 'productCategories');
         });
     }
 
@@ -59,11 +59,11 @@ class ProductResolver
                 }
             }
 
-            if (isset($args['productTags']['connect'])) {
-                $product->productTags()->sync($args['productTags']['connect']);
+            if (isset($args['productCategories']['connect'])) {
+                $product->productCategories()->sync($args['productCategories']['connect']);
             }
 
-            return $product->load('productTranslations', 'productTags');
+            return $product->load('productTranslations', 'productCategories');
         } catch (Exception $e) {
             throw new Exception('Error updating product: '.$e->getMessage());
         }

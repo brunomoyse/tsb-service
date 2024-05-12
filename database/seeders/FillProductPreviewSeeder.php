@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\ProductTag;
+use App\Models\ProductCategory;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -14,23 +14,23 @@ class FillProductPreviewSeeder extends Seeder
      */
     public function run(): void
     {
-        $productTags = ProductTag::query()->with(['products', 'productTagTranslations'])->get();
+        $productCategories = ProductCategory::query()->with(['products', 'productCategoryTranslations'])->get();
 
-        foreach ($productTags as $productTag) {
-            $tagName = $productTag->productTagTranslations->where('locale', '=', 'FR')->firstOrFail()->name;
-            $tagSlug = Str::slug($tagName);
-            if ($tagSlug === 'menu-plateau') {
-                $tagSlug = 'menu';
+        foreach ($productCategories as $productCategory) {
+            $categoryName = $productCategory->productCategoryTranslations->where('locale', '=', 'fr')->firstOrFail()->name;
+            $categorySlug = Str::slug($categoryName);
+            if ($categorySlug === 'menu-plateau') {
+                $categorySlug = 'menu';
             }
-            if ($tagSlug === 'menu-bento-box') {
-                $tagSlug = 'bento';
+            if ($categorySlug === 'menu-bento-box') {
+                $categorySlug = 'bento';
             }
-            foreach ($productTag->products as $product) {
+            foreach ($productCategory->products as $product) {
                 $product->load('preview');
                 if (isset($product->preview)) {
                     break;
                 }
-                $imagePath = storage_path('app/public/images/menu/'.$tagSlug.'/'.$product->slug.'.png');
+                $imagePath = storage_path('app/public/images/menu/'.$categorySlug.'/'.$product->slug.'.png');
 
                 // Make the HTTP request
                 $response = Http::attach(

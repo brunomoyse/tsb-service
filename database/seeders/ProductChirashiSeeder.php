@@ -3,28 +3,28 @@
 namespace Database\Seeders;
 
 use App\Models\Product;
-use App\Models\ProductTagTranslation;
+use App\Models\ProductCategoryTranslation;
 use Illuminate\Database\Seeder;
 
 class ProductChirashiSeeder extends Seeder
 {
     public function run()
     {
-        $productTag = ProductTagTranslation::query()
-            ->where('locale', 'FR')
+        $productCategory = ProductCategoryTranslation::query()
+            ->where('locale', 'fr')
             ->where('name', 'Chirashi')
-            ->firstOrFail()->product_tag_id;
+            ->firstOrFail()->product_category_id;
 
         $products = [
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tranches (ou tartare) de saumon avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Slices (or tartare) of salmon and avocado',
                         ],
                     ],
@@ -33,19 +33,19 @@ class ProductChirashiSeeder extends Seeder
                 'code' => 'H1',
                 'is_active' => true,
                 'slug' => 'chirashi-saumon-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Tranches (ou tartare) de thon avocat',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Slices (or tartare) of tuna and avocado',
                         ],
                     ],
@@ -54,20 +54,20 @@ class ProductChirashiSeeder extends Seeder
                 'code' => 'H2',
                 'is_active' => true,
                 'slug' => 'chirashi-thon-avocat',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
             [
                 'productTranslations' => [
                     'create' => [
                         [
-                            'locale' => 'FR',
+                            'locale' => 'fr',
                             'name' => 'Assortiment',
                             'description' => 'Saumon, thon, dorade, crevette, oeufs de saumon, avocat, radis japonais',
                         ],
                         [
-                            'locale' => 'EN',
+                            'locale' => 'en',
                             'name' => 'Mix',
                             'description' => 'Salmon, tuna, sea bream, shrimp, salmon eggs, avocado, Japanese radish.',
                         ],
@@ -77,8 +77,8 @@ class ProductChirashiSeeder extends Seeder
                 'code' => 'H4',
                 'is_active' => true,
                 'slug' => 'chirashi-assortiment',
-                'productTags' => [
-                    'connect' => [$productTag],
+                'productCategories' => [
+                    'connect' => [$productCategory],
                 ],
             ],
         ];
@@ -98,7 +98,7 @@ class ProductChirashiSeeder extends Seeder
                 ]);
 
                 $productItem->productTranslations()->createMany($product['productTranslations']['create']);
-                $productItem->productTags()->sync($product['productTags']['connect']);
+                $productItem->productCategories()->sync($product['productCategories']['connect']);
             } catch (\Exception $e) {
                 throw new \Exception('Error creating product: '.$e->getMessage());
             }
