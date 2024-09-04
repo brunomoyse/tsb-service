@@ -1,0 +1,51 @@
+name: Publish and Deploy Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  DOCKER_REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.actor }}/docker-image-github:latest
+
+jobs:
+  build_and_publish:
+    name: Build and Publish Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.PAT }}" | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ github.actor }} --password-stdin
+    
+    - name: Build and Push Docker Image
+      run: |
+        docker build . --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
+        docker push ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
+
+  deploy:
+    needs: build_and_publish
+    name: Deploy Docker Image to AWS
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Create SSH Directory and Install Key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.AWS_SSH_KEY }}" > ~/.ssh/aws_key.pem
+        chmod 600 ~/.ssh/aws_key.pem
+    
+    - name: Add AWS Host to Known Hosts
+      run: ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Connect to AWS and Deploy
+      run: ssh -i ~/.ssh/aws_key.pem ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }} && docker compose pull && docker compose up -d"
+    
+    - name: Clean Up SSH Key
+      run: rm ~/.ssh/aws_key.pem
