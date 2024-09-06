@@ -5,6 +5,7 @@ import (
 	"tsb-service/models"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // GetProducts returns all products grouped by category
@@ -20,4 +21,32 @@ func GetProducts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, products)
+}
+
+// UpdateProduct updates a product
+func UpdateProduct(c *gin.Context) {
+	var form models.ProductForm
+	var updatedProduct models.ProductFormResponse
+	var err error
+
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Cast the string to a UUID
+	productId, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	updatedProduct, err = models.UpdateProduct(productId, form)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, updatedProduct)
 }

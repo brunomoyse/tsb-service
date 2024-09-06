@@ -33,6 +33,7 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 
 	// Define routes that require authentication within the group
 	authorized.POST("/orders/", h.CreateOrder)
+	authorized.PUT("/product/:id", controllers.UpdateProduct)
 
 	return r
 }
