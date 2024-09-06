@@ -1,5 +1,5 @@
 
-# tsb-service - A RESTful API in Go for a restaurant product management
+# tsb-service
 
 **tsb-service**, a RESTful API built with **Go** (Golang) to serve as the backend of a **webshop** for a restaurant. The API provides essential functionalities for handling orders, managing products with multi-language support, and processing payments via **Mollie**.
 
