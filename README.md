@@ -1,7 +1,7 @@
 
-# 🍣 TSB Service - RESTful API in Go
+# tsb-service - A RESTful API in Go for a restaurant product management
 
-Welcome to **TSB Service**, a RESTful API built with **Go** (Golang) to serve as the backend of a **webshop** for a restaurant. The API provides essential functionalities for handling orders, managing products with multi-language support, and processing payments via **Mollie**.
+**tsb-service**, a RESTful API built with **Go** (Golang) to serve as the backend of a **webshop** for a restaurant. The API provides essential functionalities for handling orders, managing products with multi-language support, and processing payments via **Mollie**.
 
 ## 🎯 Features
 
@@ -32,7 +32,7 @@ Follow the steps below to get the API running locally.
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/tsb-service.git
+git clone https://github.com/brunomoyse/tsb-service.git
 cd tsb-service
 ```
 
@@ -54,7 +54,7 @@ DB_PASSWORD=your_database_password
 DB_DATABASE=your_database_name
 
 MOLLIE_API_TOKEN=your_mollie_api_token
-APP_BASE_URL=http://localhost:8080
+APP_BASE_URL=http://localhost:8080 # used for mollie redirects
 JWT_SECRET=your_jwt_secret
 ```
 
