@@ -147,9 +147,3 @@ tsb-service/
 ```bash
 docker build -t tsb-service .
 ```
-
-### Run Unit Tests
-
-```bash
-go test ./...
-```
