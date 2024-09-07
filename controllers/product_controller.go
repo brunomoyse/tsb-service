@@ -25,10 +25,11 @@ func GetProducts(c *gin.Context) {
 
 // UpdateProduct updates a product
 func UpdateProduct(c *gin.Context) {
-	var form models.ProductForm
+	var form models.UpdateProductForm
 	var updatedProduct models.ProductFormResponse
 	var err error
 
+	// Bind the request body to the form
 	if err := c.ShouldBindJSON(&form); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -49,4 +50,26 @@ func UpdateProduct(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, updatedProduct)
+}
+
+// CreateProduct creates a new product
+func CreateProduct(c *gin.Context) {
+	var form models.CreateProductForm
+	var newProduct models.ProductFormResponse
+	var err error
+
+	// Bind the request body to the form
+	if err := c.ShouldBindJSON(&form); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	newProduct, err = models.CreateProduct(form)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, newProduct)
 }

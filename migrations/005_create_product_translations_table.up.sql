@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS public.product_translations
 (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     created_at timestamp(0) without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp(0) without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp(0) without time zone,
     product_id uuid NOT NULL,
     name text NOT NULL,
     description text,
@@ -17,5 +17,3 @@ CREATE TABLE IF NOT EXISTS public.product_translations
         ON DELETE CASCADE,
     CONSTRAINT product_translations_locale_check CHECK (locale::text = ANY (ARRAY['en'::text, 'fr'::text, 'zh'::text]::text[]))
 );
-
-SELECT diesel_manage_updated_at('product_translations');
