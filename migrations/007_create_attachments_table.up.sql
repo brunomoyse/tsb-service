@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS public.attachments
 (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
     created_at timestamp(0) without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp(0) without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp(0) without time zone,
     product_id uuid NOT NULL,
     url text NOT NULL,
     is_primary boolean NOT NULL DEFAULT false,
@@ -20,5 +20,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS attachments_is__product_id_unique
     (product_id ASC NULLS LAST)
     TABLESPACE pg_default
     WHERE is_primary = true;
-
-SELECT diesel_manage_updated_at('attachments');
