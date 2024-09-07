@@ -226,7 +226,7 @@ func UpdateProduct(productId uuid.UUID, form UpdateProductForm) (ProductFormResp
 			Description: t.Description,
 		}
 	}
-	err = CreateUpdateProductTranslations(productId, translations, tx)
+	err = createUpdateProductTranslations(productId, translations, tx)
 	if err != nil {
 		return ProductFormResponse{}, err
 	}
@@ -323,7 +323,7 @@ func CreateProduct(form CreateProductForm) (ProductFormResponse, error) {
 	}
 
 	// Insert the translations
-	err = CreateUpdateProductTranslations(productId, form.Translations, tx)
+	err = createUpdateProductTranslations(productId, form.Translations, tx)
 	if err != nil {
 		return ProductFormResponse{}, err
 	}
@@ -389,7 +389,7 @@ func CreateProduct(form CreateProductForm) (ProductFormResponse, error) {
 	return createdProduct, nil
 }
 
-func CreateUpdateProductTranslations(productId uuid.UUID, translations []ProductTranslation, tx *sql.Tx) error {
+func createUpdateProductTranslations(productId uuid.UUID, translations []ProductTranslation, tx *sql.Tx) error {
 	// Build the base query with placeholders
 	query := `
 		INSERT INTO product_translations (product_id, locale, name, description)

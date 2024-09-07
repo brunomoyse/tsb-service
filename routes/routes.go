@@ -35,6 +35,7 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	authorized.POST("/orders/", h.CreateOrder)
 	authorized.PUT("/product/:id", controllers.UpdateProduct)
 	authorized.POST("/product/:id", controllers.CreateProduct)
+	authorized.POST("/product/upload-image/:id", controllers.UploadImage)
 
 	return r
 }
