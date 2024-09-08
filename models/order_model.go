@@ -158,7 +158,7 @@ func CreateMolliePayment(client *mollie.Client, form CreateOrderForm, orderId uu
 			Value:    amount,
 			Currency: "EUR",
 		},
-		Description: "Tokyo Sushi Bar - " + GenerateOrderReference(orderId),
+		Description: "Tokyo Sushi Bar - " + generateOrderReference(orderId),
 		RedirectURL: redirectEndpoint,
 		WebhookURL:  webhookEndpoint,
 		Locale:      locale,
@@ -304,8 +304,8 @@ func LinkOrderProduct(orderId uuid.UUID, productLines []ProductLine) error {
 	return nil
 }
 
-// GenerateOrderReference generates a user-friendly order reference
-func GenerateOrderReference(orderID uuid.UUID) string {
+// generateOrderReference generates a user-friendly order reference
+func generateOrderReference(orderID uuid.UUID) string {
 	// Get the current date in YYYY format
 	currentDate := time.Now().Format("20060102")
 
@@ -316,4 +316,51 @@ func GenerateOrderReference(orderID uuid.UUID) string {
 	orderReference := fmt.Sprintf("#%s-%s", currentDate, shortUUID)
 
 	return orderReference
+}
+
+func GetOrdersForUser(userId uuid.UUID) ([]Order, error) {
+	// Query the database for all orders for the user
+	query := `
+	SELECT 
+		id, user_id, payment_mode, mollie_payment_id, mollie_payment_url, status, created_at, updated_at
+	FROM 
+		orders
+	WHERE 
+		user_id = $1
+	ORDER BY 
+		created_at DESC;
+	`
+
+	// Execute the query
+	rows, err := config.DB.Query(query, userId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query orders: %v", err)
+	}
+	defer rows.Close()
+
+	// Create a slice of orders
+	var orders []Order
+
+	// Loop through the rows and scan the results into the Order struct
+	for rows.Next() {
+		var order Order
+		err := rows.Scan(
+			&order.ID,
+			&order.UserId,
+			&order.PaymentMode,
+			&order.MolliePaymentId,
+			&order.MolliePaymentUrl,
+			&order.Status,
+			&order.CreatedAt,
+			&order.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan order: %v", err)
+		}
+
+		// Append the order to the slice
+		orders = append(orders, order)
+	}
+
+	return orders, nil
 }

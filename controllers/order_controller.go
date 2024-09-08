@@ -49,3 +49,26 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 	// Return the order and payment details
 	c.JSON(http.StatusOK, order)
 }
+
+// GetMyOrders returns all orders for the current user
+func GetMyOrders(c *gin.Context) {
+	// Get the user ID from the context (as a string)
+	currentUserIdStr := c.GetString("user_id")
+
+	// Parse the string to UUID
+	currentUserId, err := uuid.Parse(currentUserIdStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	// Get the orders for the user
+	orders, err := models.GetOrdersForUser(currentUserId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Return the orders
+	c.JSON(http.StatusOK, orders)
+}
