@@ -28,7 +28,7 @@ WORKDIR /app
 # Step 10: Copy the binary from the build container
 COPY --from=builder /app/tsb-service .
 
-# Step 11: Expose the port your app listens on
+# Step 11: Expose the port the app listens on
 EXPOSE 8080
 
 # Step 12: Command to run the app

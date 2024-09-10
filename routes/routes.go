@@ -10,6 +10,8 @@ import (
 
 func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	r := gin.Default()
+	r.RedirectTrailingSlash = true
+	r.RedirectFixedPath = true
 
 	// Apply the language extractor middleware globally
 	r.Use(middleware.LanguageExtractor())
@@ -21,6 +23,7 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	r.GET("/products", controllers.GetProducts)
 	r.POST("/sign-up", controllers.SignUp)
 	r.POST("/sign-in", controllers.SignIn)
+	r.POST("payments/webhook", h.UpdatePaymentStatus)
 
 	// Define the refresh token route, passing the jwtSecret
 	r.POST("/refresh-token", func(c *gin.Context) {
@@ -32,10 +35,8 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	authorized.Use(middleware.AuthMiddleware(jwtSecret)) // Apply auth middleware only for this group
 
 	// Define routes that require authentication within the group
-	authorized.POST("/orders/", h.CreateOrder)
-	authorized.GET("/my-orders/", controllers.GetMyOrders)
-	authorized.POST("payments/webhook", h.UpdatePaymentStatus)
-
+	authorized.POST("/orders", h.CreateOrder)
+	authorized.GET("/my-orders", controllers.GetMyOrders)
 	authorized.PUT("/product/:id", controllers.UpdateProduct)
 	authorized.POST("/product/:id", controllers.CreateProduct)
 	authorized.POST("/product/upload-image/:id", controllers.UploadImage)
