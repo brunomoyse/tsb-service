@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"net/http"
 	"tsb-service/controllers"
 	"tsb-service/middleware"
 
@@ -18,6 +19,11 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 
 	// Create a new handler that holds the Mollie client
 	h := controllers.NewHandler(client)
+
+	// Health check for HEAD requests
+	r.HEAD("/", func(c *gin.Context) {
+		c.Status(http.StatusOK) // Respond with 200 OK
+	})
 
 	// Define public routes (no authentication required)
 	r.GET("/products", controllers.GetProducts)
