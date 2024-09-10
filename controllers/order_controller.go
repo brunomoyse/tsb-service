@@ -70,13 +70,14 @@ func (h *Handler) UpdatePaymentStatus(c *gin.Context) {
 	// Check if the payment is "paid"
 	if payment.Status == "paid" {
 		// Check if there are no refunds or chargebacks
-		if payment.AmountRefunded == nil && payment.AmountChargedBack == nil {
+		if (payment.AmountRefunded == nil || payment.AmountRefunded.Value == "0.00") &&
+			(payment.AmountChargedBack == nil || payment.AmountChargedBack.Value == "0.00") {
+
 			log.Printf("Payment is successful for Payment ID: %v", paymentID)
 
 			// Handle any fulfillment or next steps for a successful payment
 			// For example, update your order status in the database
-
-			err = models.UpdateOrderStatus(paymentID, "PAID")
+			err = models.UpdateOrderStatus(paymentID, payment.Status)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
 				return
