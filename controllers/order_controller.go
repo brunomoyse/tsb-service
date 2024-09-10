@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"log"
 	"net/http"
 	"tsb-service/models"
 
@@ -48,6 +49,43 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 
 	// Return the order and payment details
 	c.JSON(http.StatusOK, order)
+}
+
+func (h *Handler) UpdatePaymentStatus(c *gin.Context) {
+	// Retrieve the payment ID from the form data (since it's x-www-form-urlencoded)
+	paymentID := c.PostForm("id")
+	if paymentID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing payment ID"})
+		return
+	}
+
+	// Get the payment details from Mollie
+	_, payment, err := h.client.Payments.Get(c.Request.Context(), paymentID, nil)
+	if err != nil {
+		log.Printf("API call failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve payment"})
+		return
+	}
+
+	// Check if the payment is "paid"
+	if payment.Status == "paid" {
+		// Check if there are no refunds or chargebacks
+		if payment.AmountRefunded == nil && payment.AmountChargedBack == nil {
+			log.Printf("Payment is successful for Payment ID: %v", paymentID)
+
+			// Handle any fulfillment or next steps for a successful payment
+			// For example, update your order status in the database
+
+			err = models.UpdateOrderStatus(paymentID, "PAID")
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update order status"})
+				return
+			}
+		}
+	}
+
+	// Respond with success
+	c.JSON(http.StatusOK, gin.H{"message": "Order status updated successfully"})
 }
 
 // GetMyOrders returns all orders for the current user

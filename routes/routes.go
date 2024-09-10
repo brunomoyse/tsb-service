@@ -34,6 +34,8 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	// Define routes that require authentication within the group
 	authorized.POST("/orders/", h.CreateOrder)
 	authorized.GET("/my-orders/", controllers.GetMyOrders)
+	authorized.PUT("payments/webhook", h.UpdatePaymentStatus)
+
 	authorized.PUT("/product/:id", controllers.UpdateProduct)
 	authorized.POST("/product/:id", controllers.CreateProduct)
 	authorized.POST("/product/upload-image/:id", controllers.UploadImage)

@@ -143,8 +143,8 @@ func CreateMolliePayment(client *mollie.Client, form CreateOrderForm, orderId uu
 		return nil, fmt.Errorf("APP_BASE_URL is required")
 	}
 
-	webhookEndpoint := appBaseUrl + "webhook"
-	redirectEndpoint := appBaseUrl + "redirect"
+	webhookEndpoint := appBaseUrl + "payments/webhook"
+	redirectEndpoint := appBaseUrl + "order-completed/" + orderId.String()
 
 	locale := mollie.Locale("fr_FR")
 
@@ -363,4 +363,33 @@ func GetOrdersForUser(userId uuid.UUID) ([]Order, error) {
 	}
 
 	return orders, nil
+}
+
+func UpdateOrderStatus(paymentID string, paymentStatus string) error {
+	// Update the order status in the database
+	query := `
+	UPDATE orders
+	SET status = $1
+	WHERE mollie_payment_id = $2
+	RETURNING id;
+	`
+
+	// Init order status var
+	var orderStatus string
+
+	if paymentStatus == "paid" {
+		orderStatus = "PAID"
+	} else {
+		orderStatus = "FAILED"
+	}
+
+	// Execute the query
+	var orderID uuid.UUID
+
+	err := config.DB.QueryRow(query, orderStatus, paymentID).Scan(&orderID)
+	if err != nil {
+		return fmt.Errorf("failed to update order status: %v", err)
+	}
+
+	return nil
 }
