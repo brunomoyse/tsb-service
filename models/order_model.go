@@ -143,8 +143,13 @@ func CreateMolliePayment(client *mollie.Client, form CreateOrderForm, orderId uu
 		return nil, fmt.Errorf("APP_BASE_URL is required")
 	}
 
-	webhookEndpoint := appBaseUrl + "payments/webhook"
-	redirectEndpoint := appBaseUrl + "order-completed/" + orderId.String()
+	apiBaseUrl := os.Getenv("API_BASE_URL")
+	if apiBaseUrl == "" {
+		return nil, fmt.Errorf("APP_BASE_URL is required")
+	}
+
+	webhookEndpoint := apiBaseUrl + "/payments/webhook"
+	redirectEndpoint := appBaseUrl + "/order-completed/" + orderId.String()
 
 	locale := mollie.Locale("fr_FR")
 
