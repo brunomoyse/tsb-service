@@ -19,14 +19,17 @@ RUN go build -o tsb-service .
 # Step 7: Use an updated base image with GLIBC >= 2.34
 FROM debian:bullseye-slim
 
-# Step 8: Set the working directory and environment variables
+# Step 8: Install CA certificates to ensure TLS connections work properly
+RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
+
+# Step 9: Set the working directory and environment variables
 WORKDIR /app
 
-# Step 9: Copy the binary from the build container
+# Step 10: Copy the binary from the build container
 COPY --from=builder /app/tsb-service .
 
-# Step 10: Expose the port your app listens on
+# Step 11: Expose the port your app listens on
 EXPOSE 8080
 
-# Step 11: Command to run the app
+# Step 12: Command to run the app
 CMD ["./tsb-service"]
