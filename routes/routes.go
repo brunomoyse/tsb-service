@@ -26,7 +26,10 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	})
 
 	// Define public routes (no authentication required)
-	r.GET("/products", controllers.GetProducts)
+	r.GET("/admin/categories", controllers.GetDashboardCategories)
+	r.GET("/admin/products", controllers.GetDashboardProducts)
+	r.GET("/admin/product/:id", controllers.GetDashboardProductById)
+
 	r.GET("/products-by-categories", controllers.GetCategoriesWithProducts)
 	r.POST("/sign-up", controllers.SignUp)
 	r.POST("/sign-in", controllers.SignIn)

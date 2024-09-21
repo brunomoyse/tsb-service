@@ -8,12 +8,12 @@ import (
 	"github.com/google/uuid"
 )
 
-func GetProducts(c *gin.Context) {
+func GetDashboardProducts(c *gin.Context) {
 	// Directly retrieve the language from the context since the middleware guarantees it exists
 	currentUserLang := c.GetString("lang")
 
 	// Pass the language to the model
-	products, err := models.GetProducts(currentUserLang)
+	products, err := models.FetchDashboardProducts(currentUserLang)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -22,13 +22,41 @@ func GetProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, products)
 }
 
+func GetDashboardProductById(c *gin.Context) {
+	// Cast the string to a UUID
+	productId, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Pass the language to the model
+	product, err := models.FetchDashboardProductById(productId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, product)
+}
+
+func GetDashboardCategories(c *gin.Context) {
+	categories, err := models.FetchDashboardCategories()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, categories)
+}
+
 // GetProducts returns all products grouped by category
 func GetCategoriesWithProducts(c *gin.Context) {
 	// Directly retrieve the language from the context since the middleware guarantees it exists
 	currentUserLang := c.GetString("lang")
 
 	// Pass the language to the model
-	products, err := models.GetProductsGroupedByCategory(currentUserLang)
+	products, err := models.FetchProductsGroupedByCategory(currentUserLang)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

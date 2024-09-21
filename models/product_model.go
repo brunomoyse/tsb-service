@@ -20,15 +20,30 @@ type ProductInfo struct {
 	IsActive    bool      `json:"isActive"`
 }
 
-type ProductItemDashboard struct {
-	ID       uuid.UUID `json:"id"`
-	Name     string    `json:"name"`
-	Code     *string   `json:"code"`
-	IsActive bool      `json:"isActive"`
-	Category string    `json:"category"`
+type DashboardProductListItem struct {
+	ID           uuid.UUID `json:"id"`
+	Name         string    `json:"name"`
+	Code         *string   `json:"code"`
+	IsActive     bool      `json:"isActive"`
+	CategoryName string    `json:"category"`
 }
 
-type Category struct {
+type DashboardCategoryDetails struct {
+	ID           uuid.UUID              `json:"id"`
+	Translations []*CategoryTranslation `json:"translations"`
+}
+
+type DashboardProductDetails struct {
+	ID           uuid.UUID             `json:"id"`
+	Translations []*ProductTranslation `json:"translations"`
+	Price        float64               `json:"price"`
+	Code         *string               `json:"code"`
+	Slug         *string               `json:"slug"`
+	IsActive     bool                  `json:"isActive"`
+	CategoryId   uuid.UUID             `json:"categoryId"`
+}
+
+type CategoryWithProducts struct {
 	ID       uuid.UUID     `json:"id"`
 	Name     string        `json:"name"`
 	Order    int           `json:"order"`
@@ -50,6 +65,11 @@ type CreateProductForm struct {
 	Translations []ProductTranslation `json:"translations" binding:"required"`
 }
 
+type CategoryTranslation struct {
+	Locale string `json:"locale" binding:"required"`
+	Name   string `json:"name" binding:"required"`
+}
+
 type ProductTranslation struct {
 	Locale      string  `json:"locale" binding:"required"`
 	Name        string  `json:"name" binding:"required"`
@@ -66,7 +86,70 @@ type ProductFormResponse struct {
 	Translations []ProductTranslation `json:"translations"`
 }
 
-func GetProducts(currentUserLang string) ([]ProductItemDashboard, error) {
+func FetchDashboardCategories() ([]DashboardCategoryDetails, error) {
+	query := `
+	SELECT 
+	    pc.id,
+	    pct.name,
+	    pct.locale
+	FROM 
+	    product_categories pc
+	INNER JOIN
+	    product_category_translations pct
+		ON pc.id = pct.product_category_id
+	ORDER BY 
+		pc."order" ASC, -- Sort categories by "order"
+		pct.name ASC; -- Sort by name
+	`
+
+	rows, err := config.DB.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Create a map to hold categories temporarily, using category ID as the key
+	categoryMap := make(map[uuid.UUID]*DashboardCategoryDetails)
+
+	for rows.Next() {
+		var id uuid.UUID
+		var translation CategoryTranslation
+
+		// Scan the current row
+		err := rows.Scan(
+			&id,
+			&translation.Name,
+			&translation.Locale,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if the category already exists in the map
+		if category, exists := categoryMap[id]; exists {
+			// Append the new translation to the existing category
+			category.Translations = append(category.Translations, &translation)
+		} else {
+			// Create a new category and append the first translation
+			newCategory := DashboardCategoryDetails{
+				ID:           id,
+				Translations: []*CategoryTranslation{&translation}, // Initialize with the first translation
+			}
+			// Add the new category to the map
+			categoryMap[id] = &newCategory
+		}
+	}
+
+	// Convert the map back to a slice
+	var categories []DashboardCategoryDetails
+	for _, category := range categoryMap {
+		categories = append(categories, *category)
+	}
+
+	return categories, nil
+}
+
+func FetchDashboardProducts(currentUserLang string) ([]DashboardProductListItem, error) {
 	query := `
 	SELECT 
 	    p.id,
@@ -101,15 +184,15 @@ func GetProducts(currentUserLang string) ([]ProductItemDashboard, error) {
 	}
 	defer rows.Close()
 
-	var products []ProductItemDashboard
+	var products []DashboardProductListItem
 	for rows.Next() {
-		var product ProductItemDashboard
+		var product DashboardProductListItem
 		err := rows.Scan(
 			&product.ID,
 			&product.Name,
 			&product.Code,
 			&product.IsActive,
-			&product.Category,
+			&product.CategoryName,
 		)
 		if err != nil {
 			return nil, err
@@ -120,7 +203,7 @@ func GetProducts(currentUserLang string) ([]ProductItemDashboard, error) {
 	return products, nil
 }
 
-func GetProductsGroupedByCategory(currentUserLang string) ([]Category, error) {
+func FetchProductsGroupedByCategory(currentUserLang string) ([]CategoryWithProducts, error) {
 	query := `
 	SELECT 
 	    pc.id AS product_category_id,
@@ -161,11 +244,11 @@ func GetProductsGroupedByCategory(currentUserLang string) ([]Category, error) {
 	}
 	defer rows.Close()
 
-	var categories []Category
-	var currentCategory *Category
+	var categories []CategoryWithProducts
+	var currentCategory *CategoryWithProducts
 
 	for rows.Next() {
-		var category Category
+		var category CategoryWithProducts
 		var product ProductInfo
 
 		err := rows.Scan(
@@ -189,7 +272,7 @@ func GetProductsGroupedByCategory(currentUserLang string) ([]Category, error) {
 			if currentCategory != nil {
 				categories = append(categories, *currentCategory)
 			}
-			currentCategory = &Category{
+			currentCategory = &CategoryWithProducts{
 				ID:       category.ID,
 				Name:     category.Name,
 				Order:    category.Order,
@@ -207,6 +290,99 @@ func GetProductsGroupedByCategory(currentUserLang string) ([]Category, error) {
 	}
 
 	return categories, nil
+}
+
+func FetchDashboardProductById(productId uuid.UUID) (DashboardProductDetails, error) {
+	query := `
+	SELECT 
+	    p.id,
+	    p.price,
+	    p.code,
+	    p.slug,
+	    p.is_active,
+	    p.category_id,
+	    pt.name,
+	    pt.description,
+		pt.locale
+	FROM 
+	    products p
+	INNER JOIN
+		product_translations pt
+		ON p.id = pt.product_id
+	WHERE
+		p.id = $1
+	`
+
+	// Declare the product and initialize the translations slice
+	var product DashboardProductDetails
+	product.Translations = []*ProductTranslation{}
+
+	// Execute the query
+	rows, err := config.DB.Query(query, productId)
+	if err != nil {
+		return product, err
+	}
+	defer rows.Close()
+
+	// Flag to check if we have processed the first row
+	firstRow := true
+
+	// Iterate over the rows
+	for rows.Next() {
+		var translation ProductTranslation
+
+		// Declare temporary variables for product-specific fields
+		var id uuid.UUID
+		var price float64
+		var code, slug *string
+		var isActive bool
+		var categoryId uuid.UUID
+
+		if firstRow {
+			// Scan product-specific fields and translation fields in the first row
+			err := rows.Scan(
+				&product.ID,
+				&product.Price,
+				&product.Code,
+				&product.Slug,
+				&product.IsActive,
+				&product.CategoryId,
+				&translation.Name,
+				&translation.Description,
+				&translation.Locale,
+			)
+			if err != nil {
+				return product, err
+			}
+			firstRow = false
+		} else {
+			// Scan only the translation fields and use dummy variables for product fields
+			err := rows.Scan(
+				&id, // Ignore product-specific fields
+				&price,
+				&code,
+				&slug,
+				&isActive,
+				&categoryId,
+				&translation.Name,
+				&translation.Description,
+				&translation.Locale,
+			)
+			if err != nil {
+				return product, err
+			}
+		}
+
+		// Append the translation to the product's translations slice
+		product.Translations = append(product.Translations, &translation)
+	}
+
+	// Check for any errors during row iteration
+	if err = rows.Err(); err != nil {
+		return product, err
+	}
+
+	return product, nil
 }
 
 func UpdateProduct(productId uuid.UUID, form UpdateProductForm) (ProductFormResponse, error) {
