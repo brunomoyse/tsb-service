@@ -17,6 +17,15 @@ type ProductInfo struct {
 	Price       float64   `json:"price"`
 	Code        *string   `json:"code"`
 	Slug        *string   `json:"slug"`
+	IsActive    bool      `json:"isActive"`
+}
+
+type ProductItemDashboard struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	Code     *string   `json:"code"`
+	IsActive bool      `json:"isActive"`
+	Category string    `json:"category"`
 }
 
 type Category struct {
@@ -57,6 +66,60 @@ type ProductFormResponse struct {
 	Translations []ProductTranslation `json:"translations"`
 }
 
+func GetProducts(currentUserLang string) ([]ProductItemDashboard, error) {
+	query := `
+	SELECT 
+	    p.id,
+	    pt.name,
+	    p.code,
+	    p.is_active,
+		pct.name AS category
+	FROM 
+	    products p
+	INNER JOIN
+	    product_translations pt
+		ON p.id = pt.product_id
+	INNER JOIN
+	    product_categories pc
+		ON p.category_id = pc.id
+	INNER JOIN
+	    product_category_translations pct
+		ON pc.id = pct.product_category_id
+	WHERE
+		pt.locale = $1
+	    AND pct.locale = $1
+	ORDER BY 
+		pc."order" ASC, -- Sort categories by "order"
+		substring(p.code, '^[A-Za-z]+') ASC, -- Sort by the alphabetical part of the code (e.g., 'A')
+		NULLIF(substring(p.code, '[0-9]+')::int, 0) ASC, -- Sort by the numeric part as an integer
+		pt.name ASC; -- Sort by name if the codes are identical
+	`
+
+	rows, err := config.DB.Query(query, currentUserLang)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var products []ProductItemDashboard
+	for rows.Next() {
+		var product ProductItemDashboard
+		err := rows.Scan(
+			&product.ID,
+			&product.Name,
+			&product.Code,
+			&product.IsActive,
+			&product.Category,
+		)
+		if err != nil {
+			return nil, err
+		}
+		products = append(products, product)
+	}
+
+	return products, nil
+}
+
 func GetProductsGroupedByCategory(currentUserLang string) ([]Category, error) {
 	query := `
 	SELECT 
@@ -68,7 +131,8 @@ func GetProductsGroupedByCategory(currentUserLang string) ([]Category, error) {
 	    pt.description,
 	    p.price,
 	    p.code,
-	    p.slug
+	    p.slug,
+	    p.is_active
 	FROM 
 	    product_categories pc
 	INNER JOIN 
@@ -114,6 +178,7 @@ func GetProductsGroupedByCategory(currentUserLang string) ([]Category, error) {
 			&product.Price,
 			&product.Code,
 			&product.Slug,
+			&product.IsActive,
 		)
 		if err != nil {
 			return nil, err
