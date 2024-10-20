@@ -26,10 +26,6 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	})
 
 	// Define public routes (no authentication required)
-	r.GET("/admin/categories", controllers.GetDashboardCategories)
-	r.GET("/admin/products", controllers.GetDashboardProducts)
-	r.GET("/admin/product/:id", controllers.GetDashboardProductById)
-
 	r.GET("/products-by-categories", controllers.GetCategoriesWithProducts)
 	r.POST("/sign-up", controllers.SignUp)
 	r.POST("/sign-in", controllers.SignIn)
@@ -44,12 +40,27 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	authorized := r.Group("/")
 	authorized.Use(middleware.AuthMiddleware(jwtSecret)) // Apply auth middleware only for this group
 
-	// Define routes that require authentication within the group
-	authorized.POST("/orders", h.CreateOrder)
-	authorized.GET("/my-orders", controllers.GetMyOrders)
-	authorized.PUT("/product/:id", controllers.UpdateProduct)
-	authorized.POST("/product/:id", controllers.CreateProduct)
-	authorized.POST("/product/upload-image/:id", controllers.UploadImage)
+	// User routes
+	user := authorized.Group("/user")
+	{
+		user.POST("/orders", h.CreateOrder)
+		user.GET("/my-orders", controllers.GetMyOrders)
+	}
+
+	// Admin routes
+	admin := authorized.Group("/admin")
+	{
+		admin.GET("/categories", controllers.GetDashboardCategories)
+		admin.GET("/products", controllers.GetDashboardProducts)
+
+		product := admin.Group("/product")
+		{
+			product.GET("/:id", controllers.GetDashboardProductById)
+			product.PUT("/:id", controllers.UpdateProduct)
+			product.POST("/:id", controllers.CreateProduct)
+			product.POST("/upload-image/:id", controllers.UploadImage)
+		}
+	}
 
 	return r
 }
