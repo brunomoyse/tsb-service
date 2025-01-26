@@ -6,6 +6,7 @@ import (
 	"tsb-service/middleware"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,6 +14,15 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	r := gin.Default()
 	r.RedirectTrailingSlash = true
 	r.RedirectFixedPath = true
+
+	// Apply CORS middleware globally
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"HEAD", "GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept-Language"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 
 	// Apply the language extractor middleware globally
 	r.Use(middleware.LanguageExtractor())
