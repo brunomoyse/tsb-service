@@ -36,7 +36,7 @@ func main() {
 	// Set up router and pass the client
 	router := routes.SetupRouter(mollieClient, jwtSecret)
 
-	// Start the server on a specific port, e.g., 8080
+	// Start the server on a specific port
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
