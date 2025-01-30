@@ -7,7 +7,7 @@ on:
 
 env:
   DOCKER_REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.actor }}/docker-image-github:latest
+  IMAGE_NAME: ${{ github.actor }}/tsb-service:latest
 
 jobs:
   build_and_publish:
@@ -16,10 +16,10 @@ jobs:
 
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      uses: docker/setup-buildx-action@v3
     
     - name: Log in to GitHub Container Registry
       run: echo "${{ secrets.PAT }}" | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ github.actor }} --password-stdin
@@ -43,9 +43,31 @@ jobs:
     
     - name: Add AWS Host to Known Hosts
       run: ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
-    
-    - name: Connect to AWS and Deploy
-      run: ssh -i ~/.ssh/aws_key.pem ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.WORK_DIR }} && docker compose pull && docker compose up -d"
-    
+
+    - name: Deploy to AWS Server
+      run: |
+        ssh -i ~/.ssh/aws_key.pem ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          set -e  # Stop on first error
+          echo "*** Logging into Docker Registry ***"
+          echo "${{ secrets.PAT }}" | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ github.actor }} --password-stdin
+          
+          echo "*** Pulling the latest Docker image ***"
+          docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
+
+          echo "*** Checking if the target directory exists ***"
+          if [ ! -d "${{ secrets.WORK_DIR }}" ]; then
+            echo "Error: Directory ${{ secrets.WORK_DIR }} does not exist. Deployment aborted." >&2
+            exit 1
+          fi
+
+          echo "*** Changing to target directory ***"
+          cd ${{ secrets.WORK_DIR }}
+
+          echo "*** Running Docker Compose ***"
+          docker compose pull && docker compose up -d
+
+          echo "*** Deployment complete ***"
+        EOF
+
     - name: Clean Up SSH Key
-      run: rm ~/.ssh/aws_key.pem
+      run: rm -f ~/.ssh/aws_key.pem

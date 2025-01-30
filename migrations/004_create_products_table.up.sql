@@ -14,6 +14,6 @@ CREATE TABLE IF NOT EXISTS public.products
     CONSTRAINT products_category_id_foreign FOREIGN KEY (category_id)
         REFERENCES public.product_categories (id) MATCH SIMPLE
         ON UPDATE NO ACTION
-        ON DELETE NO ACTION
+        ON DELETE NO ACTION,
     CONSTRAINT products_slug_unique UNIQUE (slug)
 );
