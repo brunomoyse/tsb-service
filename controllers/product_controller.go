@@ -65,6 +65,41 @@ func GetCategoriesWithProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, products)
 }
 
+func GetCategories(c *gin.Context) {
+	currentUserLang := c.GetString("lang")
+
+	categories, err := models.FetchCategories(currentUserLang)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, categories)
+}
+
+// Get Products by Category returns all products for a specific category
+func GetProductsByCategory(c *gin.Context) {
+	// Directly retrieve the language from the context since the middleware guarantees it exists
+	currentUserLang := c.GetString("lang")
+
+	// Get the category from the URL
+	category, err := uuid.Parse(c.Param("category"))
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Pass the language to the model
+	products, err := models.FetchProductsByCategory(currentUserLang, category)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, products)
+}
+
 // UpdateProduct updates a product
 func UpdateProduct(c *gin.Context) {
 	var form models.UpdateProductForm
