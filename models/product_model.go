@@ -43,6 +43,12 @@ type DashboardProductDetails struct {
 	CategoryId   uuid.UUID             `json:"categoryId"`
 }
 
+type Category struct {
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Order int       `json:"order"`
+}
+
 type CategoryWithProducts struct {
 	ID       uuid.UUID     `json:"id"`
 	Name     string        `json:"name"`
@@ -383,6 +389,99 @@ func FetchDashboardProductById(productId uuid.UUID) (DashboardProductDetails, er
 	}
 
 	return product, nil
+}
+
+func FetchCategories(currentUserLang string) ([]Category, error) {
+	query := `
+	SELECT 
+	    pc.id,
+	    pct.name,
+	    pc."order"
+	FROM 
+	    product_categories pc
+	INNER JOIN
+	    product_category_translations pct
+		ON pc.id = pct.product_category_id
+	WHERE 
+		pct.locale = $1
+	ORDER BY 
+		pc."order" ASC, -- Sort categories by "order"
+		pct.name ASC; -- Sort by name
+	`
+
+	rows, err := config.DB.Query(query, currentUserLang)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var categories []Category
+	for rows.Next() {
+		var category Category
+		err := rows.Scan(
+			&category.ID,
+			&category.Name,
+			&category.Order,
+		)
+		if err != nil {
+			return nil, err
+		}
+		categories = append(categories, category)
+	}
+
+	return categories, nil
+}
+
+func FetchProductsByCategory(currentUserLang string, categoryId uuid.UUID) ([]ProductInfo, error) {
+	query := `
+	SELECT 
+	    p.id,
+	    pt.name,
+	    pt.description,
+	    p.price,
+	    p.code,
+	    p.slug,
+	    p.is_active
+	FROM 
+	    products p
+	INNER JOIN
+		product_translations pt
+		ON p.id = pt.product_id
+	WHERE
+		p.category_id = $1
+		AND pt.locale = $2
+		AND p.is_active = true
+	ORDER BY
+		substring(p.code, '^[A-Za-z]+') ASC, -- Sort by the alphabetical part of the code (e.g., 'A')
+		NULLIF(substring(p.code, '[0-9]+')::int, 0) ASC, -- Sort by the numeric part as an integer
+		pt.name ASC; -- Sort by name if the codes are identical
+	`
+
+	rows, err := config.DB.Query(query, categoryId, currentUserLang)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var products []ProductInfo
+	for rows.Next() {
+		var product ProductInfo
+		err := rows.Scan(
+			&product.ID,
+			&product.Name,
+			&product.Description,
+			&product.Price,
+			&product.Code,
+			&product.Slug,
+			&product.IsActive,
+		)
+		if err != nil {
+			return nil, err
+		}
+		products = append(products, product)
+	}
+
+	return products, nil
 }
 
 func UpdateProduct(productId uuid.UUID, form UpdateProductForm) (ProductFormResponse, error) {
