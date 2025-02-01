@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -8,22 +9,25 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// LanguageExtractor extracts the Accept-Language header and stores the best match in the context
+// LanguageExtractor extracts and normalizes the Accept-Language header
 func LanguageExtractor() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Extract the "Accept-Language" header
 		acceptLanguage := c.GetHeader("Accept-Language")
-		if acceptLanguage == "" {
-			// Default language if no "Accept-Language" header is provided
-			acceptLanguage = "fr"
-		}
+		fmt.Println("Accept-Language:", acceptLanguage)
 
 		// Supported languages
-		supportedLanguages := []string{"fr", "en"} // French, English
+		supportedLanguages := []string{"fr", "en"}
 
-		// Find the best match based on quality factors
+		// Find the best match
 		bestMatch := findBestLanguageMatch(acceptLanguage, supportedLanguages)
 
+		// Ensure only "fr" or "en" is returned
+		if bestMatch != "fr" {
+			bestMatch = "en" // Default to English if it's not French
+		}
+
+		fmt.Println("Best match:", bestMatch)
 		// Store the language in the context
 		c.Set("lang", bestMatch)
 
@@ -32,16 +36,20 @@ func LanguageExtractor() gin.HandlerFunc {
 	}
 }
 
-// findBestLanguageMatch processes the Accept-Language header and returns the best language match
+// findBestLanguageMatch extracts the base language (e.g., "en-GB" → "en") and finds the best match
 func findBestLanguageMatch(headerValue string, supportedLanguages []string) string {
 	languagesWithQuality := parseAcceptLanguage(headerValue)
 
-	// Filter the languages by supported languages
+	// Normalize and filter languages
 	var commonLanguages []languageQuality
 	for _, langQuality := range languagesWithQuality {
+		baseLang := strings.Split(langQuality.Language, "-")[0] // Normalize (e.g., en-GB → en)
 		for _, supportedLang := range supportedLanguages {
-			if strings.HasPrefix(langQuality.Language, supportedLang) {
-				commonLanguages = append(commonLanguages, langQuality)
+			if baseLang == supportedLang {
+				commonLanguages = append(commonLanguages, languageQuality{
+					Language: supportedLang, // Always store "fr" or "en"
+					Quality:  langQuality.Quality,
+				})
 				break
 			}
 		}
@@ -52,14 +60,17 @@ func findBestLanguageMatch(headerValue string, supportedLanguages []string) stri
 		return commonLanguages[i].Quality > commonLanguages[j].Quality
 	})
 
-	// Return the best match or default to "fr" if none found
-	if len(commonLanguages) > 0 {
-		return commonLanguages[0].Language
+	// If French exists, return "fr"; otherwise, return "en" (default)
+	for _, lang := range commonLanguages {
+		if lang.Language == "fr" {
+			return "fr"
+		}
 	}
-	return "fr"
+
+	return "en" // Default to English if no French match
 }
 
-// languageQuality struct to hold language and its quality factor
+// languageQuality struct holds language and its quality factor
 type languageQuality struct {
 	Language string
 	Quality  float64

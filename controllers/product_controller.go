@@ -74,6 +74,10 @@ func GetCategories(c *gin.Context) {
 		return
 	}
 
+	if categories == nil {
+		categories = []models.Category{}
+	}
+
 	c.JSON(http.StatusOK, categories)
 }
 
@@ -95,6 +99,10 @@ func GetProductsByCategory(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	if products == nil {
+		products = []models.ProductInfo{}
 	}
 
 	c.JSON(http.StatusOK, products)

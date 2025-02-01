@@ -15,16 +15,21 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	r.RedirectTrailingSlash = true
 	r.RedirectFixedPath = true
 
-	// Apply CORS middleware globally
+	// CORS Middleware (Allow Specific Origins)
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOrigins:     []string{"http://localhost:3000", "https://brunomoyse.be"},
 		AllowMethods:     []string{"HEAD", "GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept-Language"},
-		ExposeHeaders:    []string{"Content-Length"},
+		ExposeHeaders:    []string{"Content-Length", "Authorization"},
 		AllowCredentials: true,
 	}))
 
-	// Apply the language extractor middleware globally
+	// Handle CORS preflight requests (OPTIONS method)
+	r.OPTIONS("/*any", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	// Apply language extractor middleware
 	r.Use(middleware.LanguageExtractor())
 
 	// Create a new handler that holds the Mollie client
@@ -32,34 +37,33 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 
 	// Health check for HEAD requests
 	r.HEAD("/", func(c *gin.Context) {
-		c.Status(http.StatusOK) // Respond with 200 OK
+		c.Status(http.StatusOK)
 	})
 
-	// Define public routes (no authentication required)
+	// Define public routes
 	r.GET("/categories", controllers.GetCategories)
 	r.GET("/products-by-category/:category", controllers.GetProductsByCategory)
-	// r.GET("/products-by-categories", controllers.GetCategoriesWithProducts)
 	r.POST("/sign-up", controllers.SignUp)
 	r.POST("/sign-in", controllers.SignIn)
-	r.POST("payments/webhook", h.UpdatePaymentStatus)
+	r.POST("/payments/webhook", h.UpdatePaymentStatus)
 
-	// Define the refresh token route, passing the jwtSecret
+	// Refresh token route
 	r.POST("/refresh-token", func(c *gin.Context) {
 		controllers.RefreshToken(c, jwtSecret)
 	})
 
-	// Define routes that require authentication
+	// Protected Routes (Require Authentication)
 	authorized := r.Group("/")
-	authorized.Use(middleware.AuthMiddleware(jwtSecret)) // Apply auth middleware only for this group
+	authorized.Use(middleware.AuthMiddleware(jwtSecret))
 
-	// User routes
+	// User Routes
 	user := authorized.Group("/user")
 	{
 		user.POST("/orders", h.CreateOrder)
 		user.GET("/my-orders", controllers.GetMyOrders)
 	}
 
-	// Admin routes
+	// Admin Routes
 	admin := authorized.Group("/admin")
 	{
 		admin.GET("/categories", controllers.GetDashboardCategories)
@@ -69,7 +73,7 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 		{
 			product.GET("/:id", controllers.GetDashboardProductById)
 			product.PUT("/:id", controllers.UpdateProduct)
-			product.POST("/:id", controllers.CreateProduct)
+			product.POST("/", controllers.CreateProduct)
 			product.POST("/upload-image/:id", controllers.UploadImage)
 		}
 	}
