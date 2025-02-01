@@ -415,7 +415,7 @@ func FetchCategories(currentUserLang string) ([]Category, error) {
 	}
 	defer rows.Close()
 
-	var categories []Category
+	categories := []Category{}
 	for rows.Next() {
 		var category Category
 		err := rows.Scan(
@@ -463,7 +463,8 @@ func FetchProductsByCategory(currentUserLang string, categoryId uuid.UUID) ([]Pr
 	}
 	defer rows.Close()
 
-	var products []ProductInfo
+	products := []ProductInfo{}
+
 	for rows.Next() {
 		var product ProductInfo
 		err := rows.Scan(
