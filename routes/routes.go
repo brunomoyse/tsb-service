@@ -44,14 +44,17 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	r.GET("/categories", controllers.GetCategories)
 	r.GET("/products-by-category/:category", controllers.GetProductsByCategory)
 	r.GET("/categories-with-products", controllers.GetCategoriesWithProducts)
-	r.POST("/sign-up", controllers.SignUp)
-	r.POST("/sign-in", controllers.SignIn)
 	r.POST("/payments/webhook", h.UpdatePaymentStatus)
 
-	// Refresh token route
-	r.POST("/refresh-token", func(c *gin.Context) {
-		controllers.RefreshToken(c, jwtSecret)
-	})
+	// Group all `/auth` routes together
+	authGroup := r.Group("/auth")
+	{
+		authGroup.POST("/sign-up", controllers.SignUp)
+		authGroup.POST("/sign-in", controllers.SignIn)
+		authGroup.POST("/refresh", func(c *gin.Context) {
+			controllers.RefreshTokenHandler(c, jwtSecret)
+		})
+	}
 
 	// Protected Routes (Require Authentication)
 	authorized := r.Group("/")

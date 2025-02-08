@@ -159,7 +159,7 @@ func SignUp(u UserRegister) (UserResponse, error) {
 	}, nil
 }
 
-func SignIn(u UserLogin) (TokenResponse, error) {
+func AuthenticateUser(u UserLogin) (User, string, string, error) {
 	query := `
 	SELECT id, name, email, password_hash, salt FROM users WHERE email = $1
 	`
@@ -167,7 +167,7 @@ func SignIn(u UserLogin) (TokenResponse, error) {
 	var user User
 	err := config.DB.QueryRow(query, u.Email).Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash, &user.Salt)
 	if err != nil {
-		return TokenResponse{}, fmt.Errorf("failed to get user: %v", err)
+		return user, "", "", fmt.Errorf("failed to get user: %v", err)
 	}
 
 	// Hash the provided password with the stored salt
@@ -175,18 +175,14 @@ func SignIn(u UserLogin) (TokenResponse, error) {
 
 	// Compare the hashed password with the stored password
 	if hashedPassword != user.PasswordHash {
-		return TokenResponse{}, fmt.Errorf("invalid password")
+		return user, "", "", fmt.Errorf("invalid password")
 	}
 
-	// Generate the JWT tokens (access and refresh)
+	// Generate JWT tokens (access and refresh)
 	accessToken, refreshToken, err := GenerateJWT(user.ID.String())
 	if err != nil {
-		return TokenResponse{}, fmt.Errorf("failed to generate tokens: %v", err)
+		return user, "", "", fmt.Errorf("failed to generate tokens: %v", err)
 	}
 
-	// Return the tokens in the response
-	return TokenResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	}, nil
+	return user, accessToken, refreshToken, nil
 }
