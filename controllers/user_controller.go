@@ -29,7 +29,7 @@ func SignUp(c *gin.Context) {
 }
 
 func SignIn(c *gin.Context) {
-	// Get the JSON body
+	// Parse JSON request body
 	var json models.UserLogin
 
 	if err := c.ShouldBindJSON(&json); err != nil {
@@ -38,29 +38,37 @@ func SignIn(c *gin.Context) {
 	}
 
 	// Authenticate the user
-	user, err := models.SignIn(json)
+	user, accessToken, refreshToken, err := models.AuthenticateUser(json)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	// Set refresh token as an HTTP-only cookie
+	c.SetCookie("refresh_token", refreshToken, 7*24*3600, "/auth/refresh", "", true, true)
+
+	// Return access token and user info
+	c.JSON(http.StatusOK, gin.H{
+		"accessToken": accessToken,
+		"user": gin.H{
+			"id":    user.ID,
+			"name":  user.Name,
+			"email": user.Email,
+		},
+	})
 }
 
-// RefreshToken handles generating a new access token using the refresh token
-func RefreshToken(c *gin.Context, secretKey string) {
-	var req models.RefreshTokenRequest
-
-	// Bind the JSON request to the struct
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+// RefreshTokenHandler renews the access token using the refresh token from the HTTP-only cookie
+func RefreshTokenHandler(c *gin.Context, secretKey string) {
+	// Get refresh token from HTTP-only cookie
+	refreshToken, err := c.Cookie("refresh_token")
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No refresh token provided"})
 		return
 	}
 
-	refreshToken := req.RefreshToken
-
 	// Parse the refresh token
-	claims := &models.Claims{}
+	claims := &jwt.RegisteredClaims{}
 	token, err := jwt.ParseWithClaims(refreshToken, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(secretKey), nil
 	})
@@ -73,12 +81,10 @@ func RefreshToken(c *gin.Context, secretKey string) {
 	// Generate a new access token with a 15-minute expiration
 	newAccessTokenExpiration := time.Now().Add(15 * time.Minute).Unix()
 
-	newAccessClaims := models.Claims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Unix(newAccessTokenExpiration, 0)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Subject:   claims.Subject,
-		},
+	newAccessClaims := jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Unix(newAccessTokenExpiration, 0)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		Subject:   claims.Subject, // User ID from refresh token
 	}
 
 	// Create the new access token
@@ -89,9 +95,6 @@ func RefreshToken(c *gin.Context, secretKey string) {
 		return
 	}
 
-	// Return the new access token in the response
-	c.JSON(http.StatusOK, models.TokenResponse{
-		AccessToken:  newAccessTokenString,
-		RefreshToken: refreshToken,
-	})
+	// Return the new access token
+	c.JSON(http.StatusOK, gin.H{"accessToken": newAccessTokenString})
 }
