@@ -21,7 +21,7 @@ type User struct {
 	Name            string     `json:"name"`
 	Email           string     `json:"email"`
 	EmailVerifiedAt *time.Time `json:"emailVerifiedAt"`
-	Password        string     `json:"password"`
+	PasswordHash    string     `json:"passwordHash"`
 	Salt            string     `json:"salt"`
 	RememberToken   *string    `json:"rememberToken"`
 }
@@ -138,7 +138,7 @@ func SignUp(u UserRegister) (UserResponse, error) {
 	hashedPassword := HashPassword(u.Password, salt)
 
 	query := `
-	INSERT INTO users (name, email, password, salt)
+	INSERT INTO users (name, email, password_hash, salt)
 	VALUES ($1, $2, $3, $4) 
 	RETURNING id
 	`
@@ -161,11 +161,11 @@ func SignUp(u UserRegister) (UserResponse, error) {
 
 func SignIn(u UserLogin) (TokenResponse, error) {
 	query := `
-	SELECT id, name, email, password, salt FROM users WHERE email = $1
+	SELECT id, name, email, password_hash, salt FROM users WHERE email = $1
 	`
 
 	var user User
-	err := config.DB.QueryRow(query, u.Email).Scan(&user.ID, &user.Name, &user.Email, &user.Password, &user.Salt)
+	err := config.DB.QueryRow(query, u.Email).Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash, &user.Salt)
 	if err != nil {
 		return TokenResponse{}, fmt.Errorf("failed to get user: %v", err)
 	}
@@ -174,7 +174,7 @@ func SignIn(u UserLogin) (TokenResponse, error) {
 	hashedPassword := HashPassword(u.Password, user.Salt)
 
 	// Compare the hashed password with the stored password
-	if hashedPassword != user.Password {
+	if hashedPassword != user.PasswordHash {
 		return TokenResponse{}, fmt.Errorf("invalid password")
 	}
 
