@@ -17,7 +17,7 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 
 	// CORS Middleware (Allow Specific Origins)
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "https://brunomoyse.be"},
+		AllowOrigins:     []string{"http://localhost:3000", "https://nuagemagique.dev"},
 		AllowMethods:     []string{"HEAD", "GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept-Language"},
 		ExposeHeaders:    []string{"Content-Length", "Authorization"},
@@ -43,6 +43,7 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	// Define public routes
 	r.GET("/categories", controllers.GetCategories)
 	r.GET("/products-by-category/:category", controllers.GetProductsByCategory)
+	r.GET("/categories-with-products", controllers.GetCategoriesWithProducts)
 	r.POST("/sign-up", controllers.SignUp)
 	r.POST("/sign-in", controllers.SignIn)
 	r.POST("/payments/webhook", h.UpdatePaymentStatus)
