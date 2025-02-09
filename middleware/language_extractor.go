@@ -16,15 +16,16 @@ func LanguageExtractor() gin.HandlerFunc {
 		acceptLanguage := c.GetHeader("Accept-Language")
 		fmt.Println("Accept-Language:", acceptLanguage)
 
-		// Supported languages
-		supportedLanguages := []string{"fr", "en"}
+		// Supported languages: add "zh" for Chinese
+		supportedLanguages := []string{"fr", "en", "zh"}
 
 		// Find the best match
 		bestMatch := findBestLanguageMatch(acceptLanguage, supportedLanguages)
 
-		// Ensure only "fr" or "en" is returned
-		if bestMatch != "fr" {
-			bestMatch = "en" // Default to English if it's not French
+		// Ensure only "fr", "zh" or "en" is returned
+		// Default to English if best match is neither French nor Chinese
+		if bestMatch != "fr" && bestMatch != "zh" {
+			bestMatch = "en"
 		}
 
 		fmt.Println("Best match:", bestMatch)
@@ -47,7 +48,7 @@ func findBestLanguageMatch(headerValue string, supportedLanguages []string) stri
 		for _, supportedLang := range supportedLanguages {
 			if baseLang == supportedLang {
 				commonLanguages = append(commonLanguages, languageQuality{
-					Language: supportedLang, // Always store "fr" or "en"
+					Language: supportedLang, // Always store one of the supported languages
 					Quality:  langQuality.Quality,
 				})
 				break
@@ -60,14 +61,13 @@ func findBestLanguageMatch(headerValue string, supportedLanguages []string) stri
 		return commonLanguages[i].Quality > commonLanguages[j].Quality
 	})
 
-	// If French exists, return "fr"; otherwise, return "en" (default)
-	for _, lang := range commonLanguages {
-		if lang.Language == "fr" {
-			return "fr"
-		}
+	// Instead of always forcing French when present,
+	// simply return the best match from our supported list if available.
+	if len(commonLanguages) > 0 {
+		return commonLanguages[0].Language
 	}
 
-	return "en" // Default to English if no French match
+	return "" // If nothing matches, the default will be set in the middleware
 }
 
 // languageQuality struct holds language and its quality factor
