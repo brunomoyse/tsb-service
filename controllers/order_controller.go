@@ -111,3 +111,38 @@ func GetMyOrders(c *gin.Context) {
 	// Return the orders
 	c.JSON(http.StatusOK, orders)
 }
+
+func GetOrderById(c *gin.Context) {
+	// Get the order ID from the URL
+	orderID := c.Param("id")
+
+	// Parse the string to UUID
+	orderUUID, err := uuid.Parse(orderID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order ID"})
+		return
+	}
+
+	// Get the order by ID
+	order, err := models.GetOrderById(orderUUID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Check if order's user_id matches the current user
+	currentUserIdStr := c.GetString("user_id")
+	currentUserId, err := uuid.Parse(currentUserIdStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	if order.UserId != currentUserId {
+		c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to view this order"})
+		return
+	}
+
+	// Return the order
+	c.JSON(http.StatusOK, order)
+}
