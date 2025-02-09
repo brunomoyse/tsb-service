@@ -145,7 +145,7 @@ func CreateMolliePayment(client *mollie.Client, form CreateOrderForm, orderId uu
 
 	apiBaseUrl := os.Getenv("API_BASE_URL")
 	if apiBaseUrl == "" {
-		return nil, fmt.Errorf("APP_BASE_URL is required")
+		return nil, fmt.Errorf("API_BASE_URL is required")
 	}
 
 	webhookEndpoint := apiBaseUrl + "/payments/webhook"
