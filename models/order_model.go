@@ -54,8 +54,8 @@ type CreateOrderForm struct {
 }
 
 type ProductLine struct {
-	ProductId uuid.UUID `json:"productId"`
-	Quantity  int       `json:"quantity"`
+	Product  ProductInfo `json:"product"`
+	Quantity int         `json:"quantity"`
 }
 
 // CreateOrder creates a new order in the database and then updates it with Mollie payment details
@@ -185,8 +185,9 @@ func GetMolliePaymentLines(form CreateOrderForm, currentUserLang string) ([]moll
 
 	// Get all the product ids based on the product lines
 	productIds := make([]uuid.UUID, 0)
+
 	for _, productLine := range form.ProductsLines {
-		productIds = append(productIds, productLine.ProductId)
+		productIds = append(productIds, productLine.Product.ID)
 	}
 
 	// If no products, return an error
@@ -245,7 +246,7 @@ func GetMolliePaymentLines(form CreateOrderForm, currentUserLang string) ([]moll
 
 		// Find the matching product from the scanned products
 		for _, p := range products {
-			if p.ID == productLine.ProductId {
+			if p.ID == productLine.Product.ID {
 				product = p
 				break
 			}
@@ -294,7 +295,7 @@ func LinkOrderProduct(orderId uuid.UUID, productLines []ProductLine) error {
 	for i, productLine := range productLines {
 		// Placeholders like ($1, $2, $3), ($4, $5, $6), ...
 		valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d, $%d)", i*3+1, i*3+2, i*3+3))
-		values = append(values, orderId, productLine.ProductId, productLine.Quantity)
+		values = append(values, orderId, productLine.Product.ID, productLine.Quantity)
 	}
 
 	// Join all placeholders with commas
@@ -368,6 +369,36 @@ func GetOrdersForUser(userId uuid.UUID) ([]Order, error) {
 	}
 
 	return orders, nil
+}
+
+func GetOrderById(orderId uuid.UUID) (*Order, error) {
+	// Query the database for the order by ID
+	query := `
+	SELECT 
+		id, user_id, payment_mode, mollie_payment_id, mollie_payment_url, status, created_at, updated_at
+	FROM 
+		orders
+	WHERE 
+		id = $1;
+	`
+
+	// Execute the query
+	var order Order
+	err := config.DB.QueryRow(query, orderId).Scan(
+		&order.ID,
+		&order.UserId,
+		&order.PaymentMode,
+		&order.MolliePaymentId,
+		&order.MolliePaymentUrl,
+		&order.Status,
+		&order.CreatedAt,
+		&order.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query order: %v", err)
+	}
+
+	return &order, nil
 }
 
 func UpdateOrderStatus(paymentID string, paymentStatus string) error {

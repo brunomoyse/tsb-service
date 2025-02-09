@@ -65,6 +65,7 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	{
 		user.POST("/orders", h.CreateOrder)
 		user.GET("/my-orders", controllers.GetMyOrders)
+		user.GET("/order/:id", controllers.GetOrderById)
 	}
 
 	// Admin Routes
