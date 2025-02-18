@@ -51,6 +51,8 @@ func SetupRouter(client *mollie.Client, jwtSecret string) *gin.Engine {
 	{
 		authGroup.POST("/sign-up", controllers.SignUp)
 		authGroup.POST("/sign-in", controllers.SignIn)
+		authGroup.GET("/google/sign-in", controllers.HandleGoogleAuthLogin)
+		authGroup.GET("/google/callback", controllers.HandleGoogleAuthCallback)
 		authGroup.POST("/refresh", func(c *gin.Context) {
 			controllers.RefreshTokenHandler(c, jwtSecret)
 		})

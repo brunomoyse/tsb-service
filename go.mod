@@ -5,6 +5,7 @@ go 1.23
 require github.com/google/uuid v1.6.0
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.4 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.32 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.13 // indirect
@@ -22,6 +23,7 @@ require (
 	github.com/aws/smithy-go v1.20.4 // indirect
 	github.com/gin-contrib/cors v1.7.3 // indirect
 	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8 // indirect
+	golang.org/x/oauth2 v0.26.0 // indirect
 )
 
 require (
