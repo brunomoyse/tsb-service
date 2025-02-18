@@ -24,6 +24,9 @@ func main() {
 		log.Fatal("JWT_SECRET is required")
 	}
 
+	// Load Google OAuth credentials
+	config.LoadGoogleOAuth()
+
 	// Create a configuration object with idempotency enabled.
 	config := mollie.NewAPITestingConfig(true)
 
