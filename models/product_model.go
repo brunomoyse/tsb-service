@@ -3,7 +3,6 @@ package models
 import (
 	"database/sql"
 	"fmt"
-	"strconv"
 	"strings"
 	"tsb-service/config"
 
@@ -18,6 +17,8 @@ type ProductInfo struct {
 	Code        *string   `json:"code"`
 	Slug        *string   `json:"slug"`
 	IsActive    bool      `json:"isActive"`
+	IsHalal     bool      `json:"isHalal"`
+	IsVegan     bool      `json:"isVegan"`
 }
 
 type DashboardProductListItem struct {
@@ -25,6 +26,8 @@ type DashboardProductListItem struct {
 	Name         string    `json:"name"`
 	Code         *string   `json:"code"`
 	IsActive     bool      `json:"isActive"`
+	IsHalal      bool      `json:"isHalal"`
+	IsVegan      bool      `json:"isVegan"`
 	CategoryName string    `json:"category"`
 }
 
@@ -40,6 +43,8 @@ type DashboardProductDetails struct {
 	Code         *string               `json:"code"`
 	Slug         *string               `json:"slug"`
 	IsActive     bool                  `json:"isActive"`
+	IsHalal      bool                  `json:"isHalal"`
+	IsVegan      bool                  `json:"isVegan"`
 	CategoryId   uuid.UUID             `json:"categoryId"`
 }
 
@@ -60,7 +65,9 @@ type UpdateProductForm struct {
 	CategoryId   *uuid.UUID            `json:"categoryId"`
 	Price        *float64              `json:"price"`
 	Code         *string               `json:"code"`
-	IsActive     bool                  `json:"isActive"`
+	IsActive     *bool                 `json:"isActive"`
+	IsHalal      *bool                 `json:"isHalal"`
+	IsVegan      *bool                 `json:"isVegan"`
 	Translations []*ProductTranslation `json:"translations"`
 }
 
@@ -68,6 +75,9 @@ type CreateProductForm struct {
 	CategoryId   *uuid.UUID           `json:"categoryId" binding:"required"`
 	Price        float64              `json:"price" binding:"required"`
 	Code         *string              `json:"code"`
+	IsActive     bool                 `json:"isActive"`
+	IsHalal      bool                 `json:"isHalal"`
+	IsVegan      bool                 `json:"isVegan"`
 	Translations []ProductTranslation `json:"translations" binding:"required"`
 }
 
@@ -88,6 +98,8 @@ type ProductFormResponse struct {
 	Code         *string              `json:"code"`
 	Slug         *string              `json:"slug"`
 	IsActive     bool                 `json:"isActive"`
+	IsHalal      bool                 `json:"isHalal"`
+	IsVegan      bool                 `json:"isVegan"`
 	CategoryId   uuid.UUID            `json:"categoryId"`
 	Translations []ProductTranslation `json:"translations"`
 }
@@ -162,6 +174,8 @@ func FetchDashboardProducts(currentUserLang string) ([]DashboardProductListItem,
 	    pt.name,
 	    p.code,
 	    p.is_active,
+		p.is_halal,
+		p.is_vegan,
 		pct.name AS category
 	FROM 
 	    products p
@@ -198,6 +212,8 @@ func FetchDashboardProducts(currentUserLang string) ([]DashboardProductListItem,
 			&product.Name,
 			&product.Code,
 			&product.IsActive,
+			&product.IsHalal,
+			&product.IsVegan,
 			&product.CategoryName,
 		)
 		if err != nil {
@@ -221,7 +237,9 @@ func FetchProductsGroupedByCategory(currentUserLang string) ([]CategoryWithProdu
 	    p.price,
 	    p.code,
 	    p.slug,
-	    p.is_active
+	    p.is_active,
+		p.is_halal,
+		p.is_vegan
 	FROM 
 	    product_categories pc
 	INNER JOIN 
@@ -268,6 +286,8 @@ func FetchProductsGroupedByCategory(currentUserLang string) ([]CategoryWithProdu
 			&product.Code,
 			&product.Slug,
 			&product.IsActive,
+			&product.IsHalal,
+			&product.IsVegan,
 		)
 		if err != nil {
 			return nil, err
@@ -306,6 +326,8 @@ func FetchDashboardProductById(productId uuid.UUID) (DashboardProductDetails, er
 	    p.code,
 	    p.slug,
 	    p.is_active,
+		p.is_halal,
+		p.is_vegan,
 	    p.category_id,
 	    pt.name,
 	    pt.description,
@@ -342,6 +364,8 @@ func FetchDashboardProductById(productId uuid.UUID) (DashboardProductDetails, er
 		var price float64
 		var code, slug *string
 		var isActive bool
+		var isHalal bool
+		var isVegan bool
 		var categoryId uuid.UUID
 
 		if firstRow {
@@ -352,6 +376,8 @@ func FetchDashboardProductById(productId uuid.UUID) (DashboardProductDetails, er
 				&product.Code,
 				&product.Slug,
 				&product.IsActive,
+				&product.IsHalal,
+				&product.IsVegan,
 				&product.CategoryId,
 				&translation.Name,
 				&translation.Description,
@@ -369,6 +395,8 @@ func FetchDashboardProductById(productId uuid.UUID) (DashboardProductDetails, er
 				&code,
 				&slug,
 				&isActive,
+				&isHalal,
+				&isVegan,
 				&categoryId,
 				&translation.Name,
 				&translation.Description,
@@ -441,7 +469,9 @@ func FetchProductsByCategory(currentUserLang string, categoryId uuid.UUID) ([]Pr
 	    p.price,
 	    p.code,
 	    p.slug,
-	    p.is_active
+	    p.is_active,
+		p.is_halal,
+		p.is_vegan
 	FROM 
 	    products p
 	INNER JOIN
@@ -475,6 +505,8 @@ func FetchProductsByCategory(currentUserLang string, categoryId uuid.UUID) ([]Pr
 			&product.Code,
 			&product.Slug,
 			&product.IsActive,
+			&product.IsHalal,
+			&product.IsVegan,
 		)
 		if err != nil {
 			return nil, err
@@ -484,81 +516,58 @@ func FetchProductsByCategory(currentUserLang string, categoryId uuid.UUID) ([]Pr
 
 	return products, nil
 }
-
 func UpdateProduct(productId uuid.UUID, form UpdateProductForm) (ProductFormResponse, error) {
-	// Check if the product exists
-	var exists bool
-	err := config.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM products WHERE id = $1)`, productId).Scan(&exists)
-	if err != nil {
-		return ProductFormResponse{}, err
-	}
-	if !exists {
-		return ProductFormResponse{}, fmt.Errorf("product with ID %s does not exist", productId)
-	}
-
-	// Check if the category exists (if CategoryId is provided)
-	fmt.Println(form.CategoryId)
-	if form.CategoryId != nil {
-		err = config.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM product_categories WHERE id = $1)`, *form.CategoryId).Scan(&exists)
-		if err != nil {
-			return ProductFormResponse{}, err
-		}
-		if !exists {
-			return ProductFormResponse{}, fmt.Errorf("category with ID %s does not exist", *form.CategoryId)
-		}
-	}
-
-	// Start a transaction
+	// Start the transaction.
 	tx, err := config.DB.Begin()
 	if err != nil {
 		return ProductFormResponse{}, err
 	}
-	defer tx.Rollback()
-
-	// Update the product if fields are provided
-	if form.Price != nil || form.Code != nil || form.CategoryId != nil {
-		query := `UPDATE products SET `
-		args := []interface{}{productId}
-		argCount := 1
-
-		if form.Price != nil {
-			argCount++
-			query += `price = $` + strconv.Itoa(argCount) + `, `
-			args = append(args, *form.Price)
-		}
-
-		if form.Code != nil {
-			argCount++
-			query += `code = $` + strconv.Itoa(argCount) + `, `
-			args = append(args, *form.Code)
-		}
-
-		if form.IsActive {
-			argCount++
-			query += `is_active = $` + strconv.Itoa(argCount) + `, `
-			args = append(args, form.IsActive)
-		}
-
-		if form.CategoryId != nil {
-			argCount++
-			query += `category_id = $` + strconv.Itoa(argCount) + `, `
-			args = append(args, *form.CategoryId)
-		}
-
-		// Remove the trailing comma and space
-		query = strings.TrimSuffix(query, ", ")
-
-		// Add the WHERE clause
-		query += ` WHERE id = $1`
-
-		// Execute the update query
-		_, err = tx.Exec(query, args...)
+	// Rollback if any error occurs.
+	defer func() {
 		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Build the update query dynamically.
+	updateFields := []string{}
+	// args[0] is reserved for productId in the WHERE clause.
+	args := []interface{}{productId}
+
+	if form.Price != nil {
+		updateFields = append(updateFields, fmt.Sprintf("price = $%d", len(args)+1))
+		args = append(args, *form.Price)
+	}
+	if form.Code != nil {
+		updateFields = append(updateFields, fmt.Sprintf("code = $%d", len(args)+1))
+		args = append(args, *form.Code)
+	}
+	// Update booleans only if a value was provided.
+	if form.IsActive != nil {
+		updateFields = append(updateFields, fmt.Sprintf("is_active = $%d", len(args)+1))
+		args = append(args, *form.IsActive)
+	}
+	if form.IsHalal != nil {
+		updateFields = append(updateFields, fmt.Sprintf("is_halal = $%d", len(args)+1))
+		args = append(args, *form.IsHalal)
+	}
+	if form.IsVegan != nil {
+		updateFields = append(updateFields, fmt.Sprintf("is_vegan = $%d", len(args)+1))
+		args = append(args, *form.IsVegan)
+	}
+	if form.CategoryId != nil {
+		updateFields = append(updateFields, fmt.Sprintf("category_id = $%d", len(args)+1))
+		args = append(args, *form.CategoryId)
+	}
+
+	if len(updateFields) > 0 {
+		query := fmt.Sprintf("UPDATE products SET %s WHERE id = $1", strings.Join(updateFields, ", "))
+		if _, err = tx.Exec(query, args...); err != nil {
 			return ProductFormResponse{}, err
 		}
 	}
 
-	// Extract and transform the translations from the form
+	// Process and update translations.
 	translations := make([]ProductTranslation, len(form.Translations))
 	for i, t := range form.Translations {
 		translations[i] = ProductTranslation{
@@ -567,64 +576,57 @@ func UpdateProduct(productId uuid.UUID, form UpdateProductForm) (ProductFormResp
 			Description: t.Description,
 		}
 	}
-	err = createUpdateProductTranslations(productId, translations, tx)
-	if err != nil {
+	if err = createUpdateProductTranslations(productId, translations, tx); err != nil {
 		return ProductFormResponse{}, err
 	}
 
-	// Commit the transaction
-	err = tx.Commit()
-	if err != nil {
+	// Commit the transaction.
+	if err = tx.Commit(); err != nil {
 		return ProductFormResponse{}, err
 	}
 
-	// Query & return the updated product
+	// Now, query and return the updated product.
 	updatedProduct := ProductFormResponse{}
-	err = config.DB.QueryRow(`
+	query := `
 		SELECT
 			p.id,
 			p.price,
 			p.code,
 			p.slug,
 			p.is_active,
+			p.is_halal,
+			p.is_vegan,
 			p.category_id
-		FROM
-			products p
-		WHERE	
-			p.id = $1
-	`, productId).Scan(
+		FROM products p
+		WHERE p.id = $1
+	`
+	if err = config.DB.QueryRow(query, productId).Scan(
 		&updatedProduct.ID,
 		&updatedProduct.Price,
 		&updatedProduct.Code,
 		&updatedProduct.Slug,
 		&updatedProduct.IsActive,
+		&updatedProduct.IsHalal,
+		&updatedProduct.IsVegan,
 		&updatedProduct.CategoryId,
-	)
-	if err != nil {
+	); err != nil {
 		return ProductFormResponse{}, err
 	}
 
-	// Query the translations
-	rows, err := config.DB.Query(`	
-		SELECT
-			locale,
-			name,
-			description
-		FROM
-			product_translations
-		WHERE
-			product_id = $1
+	// Query the translations.
+	rows, err := config.DB.Query(`
+		SELECT locale, name, description
+		FROM product_translations
+		WHERE product_id = $1
 	`, productId)
 	if err != nil {
 		return ProductFormResponse{}, err
 	}
 	defer rows.Close()
 
-	// Iterate over the translations and append them to the response
 	for rows.Next() {
 		var t ProductTranslation
-		err = rows.Scan(&t.Locale, &t.Name, &t.Description)
-		if err != nil {
+		if err = rows.Scan(&t.Locale, &t.Name, &t.Description); err != nil {
 			return ProductFormResponse{}, err
 		}
 		updatedProduct.Translations = append(updatedProduct.Translations, t)
@@ -654,7 +656,7 @@ func CreateProduct(form CreateProductForm) (ProductFormResponse, error) {
 	// Insert the product
 	var productId uuid.UUID
 	err = tx.QueryRow(`
-		INSERT INTO products (category_id, price, code)
+		INSERT INTO products (category_id, price, code, is_active, is_halal, is_vegan)
 		VALUES ($1, $2, $3)
 		RETURNING id
 	`, form.CategoryId, form.Price, form.Code).Scan(&productId)
@@ -685,6 +687,8 @@ func CreateProduct(form CreateProductForm) (ProductFormResponse, error) {
 			p.code,
 			p.slug,
 			p.is_active,
+			p.is_halal,
+			p.is_vegan,
 			p.category_id
 		FROM
 			products p
@@ -695,6 +699,9 @@ func CreateProduct(form CreateProductForm) (ProductFormResponse, error) {
 		&createdProduct.Price,
 		&createdProduct.Code,
 		&createdProduct.Slug,
+		&createdProduct.IsActive,
+		&createdProduct.IsHalal,
+		&createdProduct.IsVegan,
 		&createdProduct.CategoryId,
 	)
 	if err != nil {
