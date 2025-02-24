@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,7 +13,6 @@ func LanguageExtractor() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Extract the "Accept-Language" header
 		acceptLanguage := c.GetHeader("Accept-Language")
-		fmt.Println("Accept-Language:", acceptLanguage)
 
 		// Supported languages: add "zh" for Chinese
 		supportedLanguages := []string{"fr", "en", "zh"}
@@ -28,7 +26,6 @@ func LanguageExtractor() gin.HandlerFunc {
 			bestMatch = "en"
 		}
 
-		fmt.Println("Best match:", bestMatch)
 		// Store the language in the context
 		c.Set("lang", bestMatch)
 
