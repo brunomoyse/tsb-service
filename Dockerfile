@@ -15,7 +15,7 @@ COPY . .
 
 # Step 6: Build the Go app
 ENV GIN_MODE=release
-RUN go build -o tsb-service .
+RUN go build -o tsb-service cmd/app/main.go
 
 # Step 7: Use base alpine image to create the final image
 FROM alpine:latest
