@@ -20,17 +20,16 @@ func NewProductHandler(service application.ProductService) *ProductHandler {
 }
 
 // CreateProductHandler handles the HTTP POST request for creating a product.
-func (h *ProductHandler) CreateProductHandler(w http.ResponseWriter, r *http.Request) {
+func (h *ProductHandler) CreateProductHandler(c *gin.Context) {
 	// Decode the incoming JSON payload into a CreateProductForm DTO.
 	var req CreateProductForm
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		return
+	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"invalid request payload": err.Error()})
 	}
 
 	// Call the application service to create a new product.
 	product, err := h.service.CreateProduct(
-		r.Context(),
+		c.Request.Context(),
 		req.CategoryID,
 		req.Price,
 		req.Code,
@@ -40,25 +39,25 @@ func (h *ProductHandler) CreateProductHandler(w http.ResponseWriter, r *http.Req
 		req.Translations,
 	)
 	if err != nil {
-		http.Error(w, "Failed to create product: "+err.Error(), http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"failed to create product": err.Error()})
 		return
 	}
 
 	// Create a response DTO from the product domain object.
 	res := NewAdminProductResponse(product)
 
-	// Write the response as JSON.
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(res)
+	c.JSON(http.StatusOK, res)
+
 }
 
 func (h *ProductHandler) GetProductHandler(c *gin.Context) {
 	// Retrieve product by ID (omitting error handling for brevity)
 	product, _ := h.service.GetProduct(c.Request.Context(), c.Param("id"))
 
-	// Assume you extract the user's preferred locale from the request header.
-	userLocale := c.GetHeader("Accept-Language")
+	userLocale := c.GetString("lang")
+	if userLocale == "" {
+		userLocale = "fr"
+	}
 
 	// Build your response DTO including only the chosen translation.
 	res := NewPublicProductResponse(product, userLocale)
