@@ -4,20 +4,13 @@ import (
 	"log"
 	"os"
 
-	orderHandler "tsb-service/internal/order/handler"
-	orderRepository "tsb-service/internal/order/repository"
-	orderService "tsb-service/internal/order/service"
-	productHandler "tsb-service/internal/product/handler"
-	productRepository "tsb-service/internal/product/repository"
-	productService "tsb-service/internal/product/service"
-	"tsb-service/internal/router"
-	userHandler "tsb-service/internal/user/handler"
-	userRepository "tsb-service/internal/user/repository"
-	userService "tsb-service/internal/user/service"
+	productApplication "tsb-service/internal/modules/product/application"
+	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
+	productInterfaces "tsb-service/internal/modules/product/interfaces"
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/oauth2"
 
-	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -42,41 +35,29 @@ func main() {
 	oauth2.LoadGoogleOAuth()
 
 	// 4) Initialize the Mollie client.
-	mollieConfig := mollie.NewAPITestingConfig(true)
-	mollieClient, err := mollie.NewClient(nil, mollieConfig)
-	if err != nil {
-		log.Fatalf("Failed to initialize Mollie client: %v", err)
+	// mollieConfig := mollie.NewAPITestingConfig(true)
+	// mollieClient, err := mollie.NewClient(nil, mollieConfig)
+	// if err != nil {
+	// 	log.Fatalf("Failed to initialize Mollie client: %v", err)
+	// }
+
+	productRepo := productInfrastructure.NewProductRepository(dbConn)
+	productService := productApplication.NewProductService(productRepo)
+	productHandler := productInterfaces.NewProductHandler(productService)
+
+	// Initialize Gin router
+	router := gin.Default()
+
+	// Setup routes (grouped by API version or module as needed)
+	api := router.Group("/api/v1")
+	{
+		api.GET("/products", productHandler.GetProductsHandler)
+		api.GET("/products/:id", productHandler.GetProductHandler)
+		api.GET("/categories", productHandler.GetCategoriesHandler)
+		api.GET("/categories/:categoryID/products", productHandler.GetProductsByCategoryHandler)
 	}
 
-	// 5) Set up user layers.
-	oRepo := orderRepository.NewOrderRepository(dbConn)
-	oSvc := orderService.NewOrderService(oRepo)
-
-	pRepo := productRepository.NewProductRepository(dbConn)
-	pSvc := productService.NewProductService(pRepo)
-
-	uRepo := userRepository.NewUserRepository(dbConn)
-	uSvc := userService.NewUserService(uRepo)
-
-	// 6) Initialize the new user, product, order, and admin handlers.
-	oHandler := orderHandler.NewHandler(oSvc, mollieClient)
-	pHandler := productHandler.NewHandler(pSvc)
-	uHandler := userHandler.NewHandler(uSvc)
-
-	// 7) Create route registrars.
-	publicRoutes := router.NewPublicRoutes(oHandler, pHandler, uHandler)
-	protectedRoutes := router.NewProtectedRoutes(oHandler, pHandler)
-
-	registrars := []router.RouteRegistrar{
-		publicRoutes,
-		protectedRoutes,
-	}
-
-	// 8) Setup the router with the registrars.
-	r := router.SetupRouter(jwtSecret, registrars)
-
-	// 9) Start the server.
-	if err := r.Run(":8080"); err != nil {
+	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
