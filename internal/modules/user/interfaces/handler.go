@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 
@@ -130,9 +131,11 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	// Try to find an existing user by Google ID.
 	user, err := h.service.GetUserByGoogleID(ctx, req.GoogleID)
 	if err != nil {
+		fmt.Println("Error: ", err)
 		// If not found by GoogleID, try by email.
 		user, err = h.service.GetUserByEmail(ctx, req.Email)
 		if err != nil {
+			fmt.Println("Error: ", err)
 			// If still not found, create a new user.
 			user, err = h.service.CreateUser(ctx, req.Email, req.Name, nil, &req.GoogleID)
 			if err != nil {
