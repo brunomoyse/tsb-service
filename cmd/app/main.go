@@ -90,14 +90,15 @@ func main() {
 		c.Status(http.StatusOK)
 	})
 
-	// Health check for HEAD requests
-	router.HEAD("/", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
 	// Setup routes (grouped by API version or module as needed)
 	// Setup routes for /api/v1.
 	api := router.Group("/api/v1")
+
+	// Health check for HEAD requests
+	api.HEAD("/up", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
 	api.Use(middleware.LanguageExtractor()) // applied to all routes under /api/v1
 
 	// Public routes
