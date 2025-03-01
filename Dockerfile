@@ -30,4 +30,5 @@ COPY --from=builder /app/tsb-service .
 EXPOSE 8080
 
 # Step 11: Command to run the app
+ENV GIN_MODE=release
 CMD ["./tsb-service"]

@@ -122,3 +122,10 @@ func (r *UserRepository) UpdateEmailVerifiedAt(ctx context.Context, userID strin
 	}
 	return r.FindByID(ctx, userID)
 }
+
+func (r *UserRepository) InvalidateRefreshToken(ctx context.Context, refreshToken string) error {
+	// @TODO: Implement refresh_tokens in DB + add check in RefreshTokenHandler.
+	// query := `DELETE FROM refresh_tokens WHERE token = $1`
+	// _, err := r.db.ExecContext(ctx, query, refreshToken)
+	return nil
+}

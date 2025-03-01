@@ -112,7 +112,8 @@ func main() {
 	api.GET("/oauth/google", userHandler.GoogleAuthHandler)
 	api.GET("/oauth/google/callback", userHandler.GoogleAuthCallbackHandler)
 
-	api.POST("/tokens:refresh", userHandler.RefreshTokenHandler)
+	api.POST("/tokens/refresh", userHandler.RefreshTokenHandler)
+	api.POST("/tokens/revoke", userHandler.LogoutHandler)
 
 	// Create a subgroup for routes that require authentication.
 	authGroup := api.Group("/me")
