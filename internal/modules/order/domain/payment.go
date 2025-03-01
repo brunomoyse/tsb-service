@@ -2,6 +2,8 @@ package domain
 
 import (
 	productDomain "tsb-service/internal/modules/product/domain"
+
+	"github.com/google/uuid"
 )
 
 type PaymentProductLine struct {
@@ -18,6 +20,12 @@ const (
 )
 
 type PaymentLine struct {
-	Product  productDomain.Product `json:"product"`
-	Quantity int                   `json:"quantity"`
+	Product  Product `json:"product"`
+	Quantity int     `json:"quantity"`
+}
+
+type Product struct {
+	ID    uuid.UUID
+	Name  string
+	Price float64
 }

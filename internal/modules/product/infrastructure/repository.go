@@ -16,12 +16,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// ProductRepositoryImpl implements domain.ProductRepository using a SQL database.
 type ProductRepository struct {
 	db *sqlx.DB
 }
 
-// NewProductRepository creates a new instance of ProductRepositoryImpl.
 func NewProductRepository(db *sqlx.DB) domain.ProductRepository {
 	return &ProductRepository{db: db}
 }
