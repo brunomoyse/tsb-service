@@ -24,6 +24,7 @@ type UserService interface {
 	UpdateGoogleID(ctx context.Context, userID string, googleID string) (*domain.User, error)
 	UpdateUserPassword(ctx context.Context, userID string, password string, salt string) (*domain.User, error)
 	UpdateEmailVerifiedAt(ctx context.Context, userID string) (*domain.User, error)
+	InvalidateRefreshToken(ctx context.Context, refreshToken string) error
 }
 
 type userService struct {
@@ -92,18 +93,11 @@ func (s *userService) Login(ctx context.Context, email string, password string, 
 		return nil, nil, nil, err
 	}
 
-	println(user.PasswordHash)
-	println(user.Salt)
-	println(user.GoogleID)
 	if (user.PasswordHash == nil || user.Salt == nil) && user.GoogleID != nil {
-		println("hello")
 		return nil, nil, nil, fmt.Errorf("user account was created via google")
 	}
 
-	fmt.Printf("user: %+v\n", *user)
-
 	if user.EmailVerifiedAt == nil {
-		fmt.Printf("user: %+v\n", *user)
 		return nil, nil, nil, fmt.Errorf("email not verified")
 	}
 
@@ -118,6 +112,18 @@ func (s *userService) Login(ctx context.Context, email string, password string, 
 	}
 
 	return user, &accessToken, &refreshToken, nil
+}
+
+func (s *userService) InvalidateRefreshToken(ctx context.Context, refreshToken string) error {
+	if refreshToken == "" {
+		return fmt.Errorf("refresh token is empty")
+	}
+
+	if err := s.repo.InvalidateRefreshToken(ctx, refreshToken); err != nil {
+		return fmt.Errorf("failed to invalidate refresh token: %w", err)
+	}
+
+	return nil
 }
 
 func (s *userService) GetUserByID(ctx context.Context, id string) (*domain.User, error) {
