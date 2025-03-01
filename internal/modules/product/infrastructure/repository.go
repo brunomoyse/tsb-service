@@ -2,12 +2,14 @@ package infrastructure
 
 import (
 	"context"
-	"database/sql"
 	"errors"
+	"fmt"
 	"regexp"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/jmoiron/sqlx"
 
 	"tsb-service/internal/modules/product/domain"
 
@@ -15,31 +17,35 @@ import (
 )
 
 // ProductRepositoryImpl implements domain.ProductRepository using a SQL database.
-type ProductRepositoryImpl struct {
-	db *sql.DB
+type ProductRepository struct {
+	db *sqlx.DB
 }
 
 // NewProductRepository creates a new instance of ProductRepositoryImpl.
-func NewProductRepository(db *sql.DB) domain.ProductRepository {
-	return &ProductRepositoryImpl{db: db}
+func NewProductRepository(db *sqlx.DB) domain.ProductRepository {
+	return &ProductRepository{db: db}
 }
 
 // Save inserts a product and its translations.
-func (r *ProductRepositoryImpl) Save(ctx context.Context, product *domain.Product) error {
+func (r *ProductRepository) Save(ctx context.Context, product *domain.Product) (err error) {
+	// Begin a transaction.
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
+	// Ensure rollback on error.
 	defer func() {
 		if err != nil {
 			tx.Rollback()
 		}
 	}()
 
-	_, err = tx.ExecContext(ctx, `
-        INSERT INTO products (id, price, code, slug, is_active, is_halal, is_vegan, category_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
+	// Insert the product.
+	query := `
+		INSERT INTO products (id, price, code, slug, is_active, is_halal, is_vegan, category_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`
+	_, err = tx.ExecContext(ctx, query,
 		product.ID.String(),
 		product.Price,
 		product.Code,
@@ -48,19 +54,19 @@ func (r *ProductRepositoryImpl) Save(ctx context.Context, product *domain.Produc
 		product.IsHalal,
 		product.IsVegan,
 		product.CategoryID.String(),
-		product.CreatedAt,
-		product.UpdatedAt,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to insert product: %w", err)
 	}
 
+	// Insert each translation.
+	translationQuery := `
+		INSERT INTO product_translations (id, product_id, language, name, description)
+		VALUES ($1, $2, $3, $4, $5)
+	`
 	for _, t := range product.Translations {
 		translationID := uuid.New().String()
-		_, err = tx.ExecContext(ctx, `
-            INSERT INTO product_translations (id, product_id, language, name, description)
-            VALUES (?, ?, ?, ?, ?)
-        `,
+		_, err = tx.ExecContext(ctx, translationQuery,
 			translationID,
 			product.ID.String(),
 			t.Language,
@@ -68,15 +74,16 @@ func (r *ProductRepositoryImpl) Save(ctx context.Context, product *domain.Produc
 			t.Description,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to insert product translation: %w", err)
 		}
 	}
 
+	// Commit the transaction.
 	return tx.Commit()
 }
 
 // FindByID retrieves a product by its ID.
-func (r *ProductRepositoryImpl) FindByID(ctx context.Context, id string) (*domain.Product, error) {
+func (r *ProductRepository) FindByID(ctx context.Context, id string) (*domain.Product, error) {
 	query := `
         SELECT 
             p.id,
@@ -107,7 +114,7 @@ func (r *ProductRepositoryImpl) FindByID(ctx context.Context, id string) (*domai
 }
 
 // FindAll retrieves all products.
-func (r *ProductRepositoryImpl) FindAll(ctx context.Context) ([]*domain.Product, error) {
+func (r *ProductRepository) FindAll(ctx context.Context) ([]*domain.Product, error) {
 	query := `
         SELECT 
             p.id,
@@ -130,7 +137,7 @@ func (r *ProductRepositoryImpl) FindAll(ctx context.Context) ([]*domain.Product,
 }
 
 // FindByCategoryID retrieves products filtered by a specific category ID.
-func (r *ProductRepositoryImpl) FindByCategoryID(ctx context.Context, categoryID string) ([]*domain.Product, error) {
+func (r *ProductRepository) FindByCategoryID(ctx context.Context, categoryID string) ([]*domain.Product, error) {
 	query := `
         SELECT 
             p.id,
@@ -154,7 +161,7 @@ func (r *ProductRepositoryImpl) FindByCategoryID(ctx context.Context, categoryID
 }
 
 // FindAllCategories retrieves all categories and their translations.
-func (r *ProductRepositoryImpl) FindAllCategories(ctx context.Context) ([]*domain.Category, error) {
+func (r *ProductRepository) FindAllCategories(ctx context.Context) ([]*domain.Category, error) {
 	query := `
         SELECT 
             c.id,
@@ -164,47 +171,49 @@ func (r *ProductRepositoryImpl) FindAllCategories(ctx context.Context) ([]*domai
         FROM product_categories c
         LEFT JOIN product_category_translations t ON c.id = t.product_category_id;
     `
-	rows, err := r.db.QueryContext(ctx, query)
+	// Use QueryxContext to get sqlx.Rows.
+	rows, err := r.db.QueryxContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
+	// Define a temporary struct that uses pointers for nullable columns.
+	type categoryRow struct {
+		ID     string  `db:"id"`
+		Order  int     `db:"order"`
+		Locale *string `db:"locale"`
+		Name   *string `db:"name"`
+	}
+
 	// Use a map to group rows by category ID.
 	categoriesMap := make(map[string]*domain.Category)
-
 	for rows.Next() {
-		var (
-			idStr    string
-			order    int
-			langNull sql.NullString
-			nameNull sql.NullString
-		)
-
-		if err := rows.Scan(&idStr, &order, &langNull, &nameNull); err != nil {
+		var row categoryRow
+		if err := rows.StructScan(&row); err != nil {
 			return nil, err
 		}
 
-		// Check if the category has been added already.
-		cat, exists := categoriesMap[idStr]
+		// Check if the category has already been added.
+		cat, exists := categoriesMap[row.ID]
 		if !exists {
-			categoryID, err := uuid.Parse(idStr)
+			categoryID, err := uuid.Parse(row.ID)
 			if err != nil {
 				return nil, err
 			}
 			cat = &domain.Category{
 				ID:           categoryID,
-				Order:        order,
+				Order:        row.Order,
 				Translations: []domain.Translation{},
 			}
-			categoriesMap[idStr] = cat
+			categoriesMap[row.ID] = cat
 		}
 
-		// If there's a valid translation row, add it.
-		if langNull.Valid && nameNull.Valid {
+		// Append a translation if both locale and name are non-nil.
+		if row.Locale != nil && row.Name != nil {
 			translation := domain.Translation{
-				Language: langNull.String,
-				Name:     nameNull.String,
+				Language: *row.Locale,
+				Name:     *row.Name,
 			}
 			cat.Translations = append(cat.Translations, translation)
 		}
@@ -229,72 +238,78 @@ func (r *ProductRepositoryImpl) FindAllCategories(ctx context.Context) ([]*domai
 
 // queryProducts is a helper method that executes the given query with optional arguments,
 // groups the rows by product, and sorts the final slice.
-func (r *ProductRepositoryImpl) queryProducts(ctx context.Context, query string, args ...any) ([]*domain.Product, error) {
-	rows, err := r.db.QueryContext(ctx, query, args...)
+func (r *ProductRepository) queryProducts(ctx context.Context, query string, args ...any) ([]*domain.Product, error) {
+	// Use QueryxContext from sqlx.
+	rows, err := r.db.QueryxContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
+	// Define a helper struct for scanning rows.
+	type productRow struct {
+		ID               string    `db:"id"`
+		Price            float64   `db:"price"`
+		Code             *string   `db:"code"`
+		Slug             *string   `db:"slug"`
+		IsActive         bool      `db:"is_active"`
+		IsHalal          bool      `db:"is_halal"`
+		IsVegan          bool      `db:"is_vegan"`
+		CategoryID       string    `db:"category_id"`
+		CreatedAt        time.Time `db:"created_at"`
+		UpdatedAt        time.Time `db:"updated_at"`
+		Locale           *string   `db:"locale"`
+		TransName        *string   `db:"name"`
+		TransDescription *string   `db:"description"`
+	}
+
 	// Group rows by product ID.
 	productsMap := make(map[string]*domain.Product)
-
 	for rows.Next() {
-		var (
-			idStr, categoryStr         string
-			price                      float64
-			code, slug                 sql.NullString
-			isActive, isHalal, isVegan bool
-			createdAt, updatedAt       time.Time
-			language, transName        sql.NullString
-			transDescription           sql.NullString
-		)
-
-		if err := rows.Scan(
-			&idStr, &price, &code, &slug, &isActive, &isHalal, &isVegan, &categoryStr, &createdAt, &updatedAt,
-			&language, &transName, &transDescription,
-		); err != nil {
+		var row productRow
+		if err := rows.StructScan(&row); err != nil {
 			return nil, err
 		}
 
-		prod, exists := productsMap[idStr]
+		prod, exists := productsMap[row.ID]
 		if !exists {
-			productID, err := uuid.Parse(idStr)
+			productID, err := uuid.Parse(row.ID)
 			if err != nil {
 				return nil, err
 			}
-			categoryID, err := uuid.Parse(categoryStr)
+			categoryID, err := uuid.Parse(row.CategoryID)
 			if err != nil {
 				return nil, err
 			}
 			prod = &domain.Product{
 				ID:           productID,
-				Price:        price,
-				IsActive:     isActive,
-				IsHalal:      isHalal,
-				IsVegan:      isVegan,
+				Price:        row.Price,
+				IsActive:     row.IsActive,
+				IsHalal:      row.IsHalal,
+				IsVegan:      row.IsVegan,
 				CategoryID:   categoryID,
-				CreatedAt:    createdAt,
-				UpdatedAt:    updatedAt,
+				CreatedAt:    row.CreatedAt,
+				UpdatedAt:    row.UpdatedAt,
 				Translations: []domain.Translation{},
 			}
-			if code.Valid {
-				prod.Code = &code.String
+			// Set Code and Slug if available.
+			if row.Code != nil {
+				prod.Code = row.Code
 			}
-			if slug.Valid {
-				prod.Slug = &slug.String
+			if row.Slug != nil {
+				prod.Slug = row.Slug
 			}
-			productsMap[idStr] = prod
+			productsMap[row.ID] = prod
 		}
 
 		// Append translation if available.
-		if language.Valid {
+		if row.Locale != nil && row.TransName != nil {
 			trans := domain.Translation{
-				Language: language.String,
-				Name:     transName.String,
+				Language: *row.Locale,
+				Name:     *row.TransName,
 			}
-			if transDescription.Valid {
-				trans.Description = &transDescription.String
+			if row.TransDescription != nil {
+				trans.Description = row.TransDescription
 			}
 			prod.Translations = append(prod.Translations, trans)
 		}
@@ -303,7 +318,7 @@ func (r *ProductRepositoryImpl) queryProducts(ctx context.Context, query string,
 		return nil, err
 	}
 
-	// Convert map to slice.
+	// Convert the map to a slice.
 	products := make([]*domain.Product, 0, len(productsMap))
 	for _, p := range productsMap {
 		products = append(products, p)
@@ -327,7 +342,7 @@ func (r *ProductRepositoryImpl) queryProducts(ctx context.Context, query string,
 	}
 
 	sort.Slice(products, func(i, j int) bool {
-		// Compare the alphabetical part of the code.
+		// Retrieve product codes, defaulting to empty string.
 		codeA := ""
 		if products[i].Code != nil {
 			codeA = *products[i].Code
@@ -337,13 +352,14 @@ func (r *ProductRepositoryImpl) queryProducts(ctx context.Context, query string,
 			codeB = *products[j].Code
 		}
 
+		// Extract the alphabetical parts.
 		alphaA := alphaRegexp.FindString(codeA)
 		alphaB := alphaRegexp.FindString(codeB)
 		if alphaA != alphaB {
 			return alphaA < alphaB
 		}
 
-		// Compare the numeric part.
+		// Extract numeric parts.
 		numAStr := numRegexp.FindString(codeA)
 		numBStr := numRegexp.FindString(codeB)
 		numA, numB := 0, 0
