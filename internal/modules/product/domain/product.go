@@ -36,15 +36,12 @@ func NewProduct(price float64, categoryID uuid.UUID, isActive bool, translations
 		}
 	}
 
-	now := time.Now()
 	return &Product{
 		ID:           uuid.New(),
 		Price:        price,
 		IsActive:     isActive,
 		CategoryID:   categoryID,
 		Translations: translations,
-		CreatedAt:    now,
-		UpdatedAt:    now,
 	}, nil
 }
 
