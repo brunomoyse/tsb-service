@@ -203,15 +203,15 @@ func generateJWT(userID string, jwtSecret string) (string, string, error) {
 	}
 
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	accessTokenString, err := accessToken.SignedString(jwtSecret)
+	accessTokenString, err := accessToken.SignedString([]byte(jwtSecret))
 	if err != nil {
-		return "", "", fmt.Errorf("failed to sign access token: %v", err)
+		return "", "", fmt.Errorf("failed to sign access token: %w", err)
 	}
 
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	refreshTokenString, err := refreshToken.SignedString(jwtSecret)
+	refreshTokenString, err := refreshToken.SignedString([]byte(jwtSecret))
 	if err != nil {
-		return "", "", fmt.Errorf("failed to sign refresh token: %v", err)
+		return "", "", fmt.Errorf("failed to sign refresh token: %w", err)
 	}
 
 	return accessTokenString, refreshTokenString, nil
