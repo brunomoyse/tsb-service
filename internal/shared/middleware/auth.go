@@ -70,10 +70,10 @@ func AuthMiddleware(secretKey string) gin.HandlerFunc {
 
 		// Store the user ID in the context for later use
 		type contextKey string
-		const userKey contextKey = "user_id"
+		const userKey contextKey = "userID"
 		ctx := context.WithValue(c.Request.Context(), userKey, userId)
 		c.Request = c.Request.WithContext(ctx)
-		c.Set("user_id", userId)
+		c.Set("userID", userId)
 
 		// Continue with the request
 		c.Next()

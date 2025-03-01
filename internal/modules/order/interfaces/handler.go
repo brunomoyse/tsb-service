@@ -56,7 +56,7 @@ func (h *OrderHandler) GetUserOrdersHandler(c *gin.Context) {
 	// Retrieve the logged-in user's ID from the Gin context.
 	userIDStr := c.GetString("userID")
 	if userIDStr == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "handler: user not authenticated"})
 		return
 	}
 

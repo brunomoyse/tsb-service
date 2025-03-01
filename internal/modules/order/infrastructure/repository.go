@@ -15,17 +15,17 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type orderRepository struct {
+type OrderRepository struct {
 	db *sqlx.DB
 }
 
 func NewOrderRepository(db *sqlx.DB) domain.OrderRepository {
-	return &orderRepository{db: db}
+	return &OrderRepository{db: db}
 }
 
 // CreateOrder inserts a new order, creates a Mollie payment, updates the order with payment details,
 // and links the order with its product lines.
-func (r *orderRepository) Save(ctx context.Context, client *mollie.Client, ord *domain.Order) (*domain.Order, error) {
+func (r *OrderRepository) Save(ctx context.Context, client *mollie.Client, ord *domain.Order) (*domain.Order, error) {
 	// Begin a transaction using sqlx.
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -90,7 +90,7 @@ func (r *orderRepository) Save(ctx context.Context, client *mollie.Client, ord *
 }
 
 // UpdateOrderStatus updates an order’s status based on the Mollie payment status.
-func (r *orderRepository) UpdateStatus(ctx context.Context, paymentID string, paymentStatus string) error {
+func (r *OrderRepository) UpdateStatus(ctx context.Context, paymentID string, paymentStatus string) error {
 	query := `
 		UPDATE orders
 		SET status = $1
@@ -112,31 +112,121 @@ func (r *orderRepository) UpdateStatus(ctx context.Context, paymentID string, pa
 }
 
 // GetOrdersForUser retrieves all orders for a given user.
-func (r *orderRepository) FindByUserID(ctx context.Context, userId uuid.UUID) ([]*domain.Order, error) {
+func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error) {
+	// Retrieve user language from context, default to "fr"
+	lang, ok := ctx.Value("lang").(string)
+	if !ok || lang == "" {
+		lang = "fr"
+	}
+
 	query := `
 		SELECT 
-			id, 
-			user_id, 
-			payment_mode, 
-			mollie_payment_id, 
-			mollie_payment_url, 
-			status, 
-			created_at, 
-			updated_at
-		FROM orders
-		WHERE user_id = $1
-		ORDER BY created_at DESC;
+			o.id AS order_id,
+			o.user_id,
+			o.payment_mode,
+			o.mollie_payment_id,
+			o.mollie_payment_url,
+			o.status,
+			o.created_at,
+			o.updated_at,
+			op.product_id,
+			op.quantity,
+			pt.name AS product_name,
+			p.price AS product_price
+		FROM orders o
+		LEFT JOIN order_product op ON o.id = op.order_id
+		LEFT JOIN products p ON op.product_id = p.id
+		LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = $2
+		WHERE o.user_id = $1
+		ORDER BY o.created_at DESC;
 	`
-	var orders []*domain.Order
-	err := r.db.SelectContext(ctx, &orders, query, userId)
+
+	// Define a helper struct for scanning rows.
+	type orderRow struct {
+		OrderID          string    `db:"order_id"`
+		UserID           string    `db:"user_id"`
+		PaymentMode      string    `db:"payment_mode"`
+		MolliePaymentId  *string   `db:"mollie_payment_id"`
+		MolliePaymentUrl *string   `db:"mollie_payment_url"`
+		Status           string    `db:"status"`
+		CreatedAt        time.Time `db:"created_at"`
+		UpdatedAt        time.Time `db:"updated_at"`
+		ProductID        *string   `db:"product_id"`
+		Quantity         *int64    `db:"quantity"`
+		ProductName      *string   `db:"product_name"`
+		ProductPrice     *float64  `db:"product_price"`
+	}
+
+	rows, err := r.db.QueryxContext(ctx, query, userID, lang)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query orders: %w", err)
+	}
+	defer rows.Close()
+
+	// Group rows by order ID.
+	ordersMap := make(map[string]*domain.Order)
+	for rows.Next() {
+		var row orderRow
+		if err := rows.StructScan(&row); err != nil {
+			return nil, fmt.Errorf("failed to scan order row: %w", err)
+		}
+
+		order, exists := ordersMap[row.OrderID]
+		if !exists {
+			ordID, err := uuid.Parse(row.OrderID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse order id: %w", err)
+			}
+			uID, err := uuid.Parse(row.UserID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse user id: %w", err)
+			}
+
+			order = &domain.Order{
+				ID:               ordID,
+				UserID:           uID,
+				PaymentMode:      (*domain.PaymentMode)(&row.PaymentMode), // adapt as needed
+				MolliePaymentId:  row.MolliePaymentId,
+				MolliePaymentUrl: row.MolliePaymentUrl,
+				Status:           domain.OrderStatus(row.Status),
+				CreatedAt:        row.CreatedAt,
+				UpdatedAt:        &row.UpdatedAt,
+				Products:         []domain.PaymentLine{},
+			}
+			ordersMap[row.OrderID] = order
+		}
+
+		// If product info exists, add it to the order.
+		if row.ProductID != nil && row.Quantity != nil && row.ProductName != nil && row.ProductPrice != nil {
+			prodID, err := uuid.Parse(*row.ProductID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse product id: %w", err)
+			}
+			line := domain.PaymentLine{
+				Product: domain.Product{
+					ID:    prodID,
+					Name:  *row.ProductName,
+					Price: *row.ProductPrice,
+				},
+				Quantity: int(*row.Quantity),
+			}
+			order.Products = append(order.Products, line)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	// Convert the map to a slice.
+	orders := make([]*domain.Order, 0, len(ordersMap))
+	for _, o := range ordersMap {
+		orders = append(orders, o)
 	}
 	return orders, nil
 }
 
 // GetOrderById retrieves an order by its ID.
-func (r *orderRepository) FindByID(ctx context.Context, orderId uuid.UUID) (*domain.Order, error) {
+func (r *OrderRepository) FindByID(ctx context.Context, orderId uuid.UUID) (*domain.Order, error) {
 	query := `
 		SELECT 
 			id, 

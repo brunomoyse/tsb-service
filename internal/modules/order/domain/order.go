@@ -7,16 +7,15 @@ import (
 )
 
 type Order struct {
-	ID               uuid.UUID     `json:"id"`
-	CreatedAt        time.Time     `json:"createdAt"`
-	UpdatedAt        *time.Time    `json:"updatedAt"`
-	UserID           uuid.UUID     `json:"userId"`
-	PaymentMode      *PaymentMode  `json:"paymentMode"`
-	MolliePaymentId  *string       `json:"molliePaymentId"`
-	MolliePaymentUrl *string       `json:"molliePaymentUrl"`
-	Status           OrderStatus   `json:"status"`
-	Products         []PaymentLine `json:"products"`
-	// ShippingAddress  *mollie.Address       `json:"shipping_address"`
+	ID               uuid.UUID     `db:"id" json:"id"`
+	CreatedAt        time.Time     `db:"created_at" json:"createdAt"`
+	UpdatedAt        *time.Time    `db:"updated_at" json:"updatedAt"`
+	UserID           uuid.UUID     `db:"user_id" json:"userId"`
+	PaymentMode      *PaymentMode  `db:"payment_mode" json:"paymentMode"`
+	MolliePaymentId  *string       `db:"mollie_payment_id" json:"molliePaymentId"`
+	MolliePaymentUrl *string       `db:"mollie_payment_url" json:"molliePaymentUrl"`
+	Status           OrderStatus   `db:"status" json:"status"`
+	Products         []PaymentLine `db:"-" json:"products"`
 }
 
 // OrderStatus represents the status of an order
@@ -32,11 +31,7 @@ const (
 	OrderStatusPaid       OrderStatus = "PAID"
 )
 
-type Product struct {
-	ID    uuid.UUID
-	Name  string
-	Price float64
-}
+
 
 func NewOrder(userId uuid.UUID, products []PaymentLine, paymentMode PaymentMode) Order {
 	return Order{
