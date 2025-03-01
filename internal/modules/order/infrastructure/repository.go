@@ -86,7 +86,7 @@ func (r *OrderRepository) Save(ctx context.Context, client *mollie.Client, ord *
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return ord, nil
+	return r.FindByID(ctx, ord.ID)
 }
 
 // UpdateOrderStatus updates an order’s status based on the Mollie payment status.
@@ -190,7 +190,7 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 				MolliePaymentUrl: row.MolliePaymentUrl,
 				Status:           domain.OrderStatus(row.Status),
 				CreatedAt:        row.CreatedAt,
-				UpdatedAt:        &row.UpdatedAt,
+				UpdatedAt:        row.UpdatedAt,
 				Products:         []domain.PaymentLine{},
 			}
 			ordersMap[row.OrderID] = order

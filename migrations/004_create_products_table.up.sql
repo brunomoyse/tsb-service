@@ -3,8 +3,8 @@
 CREATE TABLE IF NOT EXISTS public.products
 (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
-    created_at timestamp(0) without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp(0) without time zone,
+    created_at timestamp(0) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp(0) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     category_id uuid NOT NULL,
     price double precision,
     is_active boolean NOT NULL DEFAULT true,
