@@ -1,17 +1,17 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
-func ConnectDatabase() (*sql.DB, error) {
-	// Load .env
+func ConnectDatabase() (*sqlx.DB, error) {
+	// Load .env file
 	if err := godotenv.Load(); err != nil {
 		log.Printf("Warning: error loading .env file: %v", err)
 	}
@@ -28,17 +28,12 @@ func ConnectDatabase() (*sql.DB, error) {
 		dbHost, dbPort, dbUser, dbPassword, dbName,
 	)
 
-	// Connect
-	dbConn, err := sql.Open("postgres", connectionString)
+	// Connect using sqlx which opens and pings the DB.
+	db, err := sqlx.Connect("postgres", connectionString)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %v", err)
 	}
 
-	// Ping
-	if err = dbConn.Ping(); err != nil {
-		return nil, fmt.Errorf("error pinging database: %v", err)
-	}
-
 	log.Println("Database connection established")
-	return dbConn, nil
+	return db, nil
 }

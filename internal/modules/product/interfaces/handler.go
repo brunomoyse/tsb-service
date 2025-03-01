@@ -22,7 +22,7 @@ func NewProductHandler(service application.ProductService) *ProductHandler {
 // CreateProductHandler handles the HTTP POST request for creating a product.
 func (h *ProductHandler) CreateProductHandler(c *gin.Context) {
 	// Decode the incoming JSON payload into a CreateProductForm DTO.
-	var req CreateProductForm
+	var req CreateProductRequest
 	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"invalid request payload": err.Error()})
 	}

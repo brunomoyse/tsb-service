@@ -2,13 +2,14 @@ package interfaces
 
 import (
 	"time"
+
 	"tsb-service/internal/modules/product/domain"
 
 	"github.com/google/uuid"
 )
 
-// CreateProductForm is used when creating a new product.
-type CreateProductForm struct {
+// CreateProductRequest is used when creating a new product.
+type CreateProductRequest struct {
 	CategoryID   uuid.UUID            `json:"categoryId" binding:"required"`
 	Price        float64              `json:"price" binding:"required"`
 	Code         *string              `json:"code"`
@@ -18,8 +19,8 @@ type CreateProductForm struct {
 	Translations []domain.Translation `json:"translations" binding:"required"`
 }
 
-// UpdateProductForm is used when updating an existing product.
-type UpdateProductForm struct {
+// UpdateProductRequest is used when updating an existing product.
+type UpdateProductRequest struct {
 	CategoryID   *uuid.UUID            `json:"categoryId"`
 	Price        *float64              `json:"price"`
 	Code         *string               `json:"code"`
@@ -29,12 +30,15 @@ type UpdateProductForm struct {
 	Translations *[]domain.Translation `json:"translations"`
 }
 
+// AdminCategoryResponse represents a category for administrative views,
+// including all translations.
 type AdminCategoryResponse struct {
 	ID           uuid.UUID            `json:"id"`
 	Order        int                  `json:"order"`
 	Translations []domain.Translation `json:"translations"`
 }
 
+// AdminProductResponse is returned for admin endpoints, containing all product details.
 type AdminProductResponse struct {
 	ID           uuid.UUID            `json:"id"`
 	Price        float64              `json:"price"`
@@ -47,14 +51,14 @@ type AdminProductResponse struct {
 	Translations []domain.Translation `json:"translations"`
 }
 
-// CategoryResponse represents the flattened category details with its selected translation.
+// PublicCategoryResponse represents a flattened category with its selected translation.
 type PublicCategoryResponse struct {
 	ID    uuid.UUID `json:"id"`
 	Name  string    `json:"name"`
 	Order int       `json:"order"`
 }
 
-// ProductResponse contains product fields merged with its selected translation and the translated category.
+// PublicProductResponse is returned to public users, merging product data with the selected translation.
 type PublicProductResponse struct {
 	ID          uuid.UUID `json:"id"`
 	Price       float64   `json:"price"`
@@ -70,7 +74,8 @@ type PublicProductResponse struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
-// NewCategoryResponse builds a CategoryResponse from a domain.Category by selecting the translation for the user's language.
+// NewPublicCategoryResponse builds a PublicCategoryResponse from a domain.Category,
+// selecting the translation based on userLanguage.
 func NewPublicCategoryResponse(category *domain.Category, userLanguage string) *PublicCategoryResponse {
 	translation := category.GetTranslationFor(userLanguage)
 	var name string
@@ -84,7 +89,8 @@ func NewPublicCategoryResponse(category *domain.Category, userLanguage string) *
 	}
 }
 
-// NewProductResponse builds a ProductResponse from a domain.Product by selecting the translations based on userLanguage.
+// NewPublicProductResponse builds a PublicProductResponse from a domain.Product,
+// merging product fields with the selected translation based on userLanguage.
 func NewPublicProductResponse(product *domain.Product, userLanguage string) *PublicProductResponse {
 	translation := product.GetTranslationFor(userLanguage)
 	return &PublicProductResponse{
@@ -103,7 +109,7 @@ func NewPublicProductResponse(product *domain.Product, userLanguage string) *Pub
 	}
 }
 
-// NewAdminProductResponse builds a AdminProductResponse from a domain.Product
+// NewAdminProductResponse builds an AdminProductResponse from a domain.Product.
 func NewAdminProductResponse(product *domain.Product) *AdminProductResponse {
 	return &AdminProductResponse{
 		ID:           product.ID,
