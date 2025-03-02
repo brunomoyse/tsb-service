@@ -250,7 +250,7 @@ func (h *UserHandler) RefreshTokenHandler(c *gin.Context) {
 		return
 	}
 
-	newAccessToken, userDetails, err := h.service.RefreshToken(c.Request.Context(), refreshToken, h.jwtSecret)
+	userDetails, newAccessToken, err := h.service.RefreshToken(c.Request.Context(), refreshToken, h.jwtSecret)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
