@@ -2,10 +2,12 @@ package domain
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 type UserRepository interface {
-	Save(ctx context.Context, u *User) error
+	Save(ctx context.Context, u *User) (uuid.UUID, error)
 	FindByID(ctx context.Context, id string) (*User, error)
 	FindByGoogleID(ctx context.Context, googleID string) (*User, error)
 	FindByEmail(ctx context.Context, email string) (*User, error)

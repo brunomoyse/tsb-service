@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -14,7 +15,7 @@ import (
 )
 
 type UserService interface {
-	CreateUser(ctx context.Context, email string, name string, password *string, googleID *string) (*domain.User, error)
+	CreateUser(ctx context.Context, name string, email string, phone_number *string, address *string, password *string, googleID *string) (*domain.User, error)
 	Login(ctx context.Context, email string, password string, jwtToken string) (*domain.User, *string, *string, error)
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
@@ -37,7 +38,7 @@ func NewUserService(repo domain.UserRepository) UserService {
 	}
 }
 
-func (s *userService) CreateUser(ctx context.Context, email, name string, password, googleID *string) (*domain.User, error) {
+func (s *userService) CreateUser(ctx context.Context, name string, email string, phone_number *string, address *string, password *string, googleID *string) (*domain.User, error) {
 	// Ensure at least one credential is provided.
 	if password == nil && googleID == nil {
 		return nil, fmt.Errorf("password or googleID must be provided")
@@ -67,23 +68,27 @@ func (s *userService) CreateUser(ctx context.Context, email, name string, passwo
 			return updatedUser, nil
 		}
 		// If the error is something other than "user not found", return it.
-		if !errors.Is(err, domain.ErrNotFound) {
+		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("error checking existing user: %w", err)
 		}
 
 		// User does not exist; create a new user.
-		newUser := domain.NewUser(name, email, &hashedPassword, nil)
-		if err := s.repo.Save(ctx, &newUser); err != nil {
+		newUser := domain.NewUser(name, email, phone_number, address, &hashedPassword, &salt)
+		id, err := s.repo.Save(ctx, &newUser)
+		if err != nil {
 			return nil, fmt.Errorf("failed to create user: %w", err)
 		}
+		newUser.ID = id
 		return &newUser, nil
 	}
 
 	// Google flow.
-	newUser := domain.NewUser(name, email, nil, googleID)
-	if err := s.repo.Save(ctx, &newUser); err != nil {
+	newUser := domain.NewGoogleUser(name, email, *googleID)
+	id, err := s.repo.Save(ctx, &newUser)
+	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
+	newUser.ID = id
 	return &newUser, nil
 }
 

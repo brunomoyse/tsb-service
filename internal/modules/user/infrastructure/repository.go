@@ -2,9 +2,9 @@ package infrastructure
 
 import (
 	"context"
-	"fmt"
 	"tsb-service/internal/modules/user/domain"
 
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -16,18 +16,18 @@ func NewUserRepository(db *sqlx.DB) domain.UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (r *UserRepository) Save(ctx context.Context, user *domain.User) (err error) {
+func (r *UserRepository) Save(ctx context.Context, user *domain.User) (uuid.UUID, error) {
 	query := `
-		INSERT INTO users (name, email, password_hash, salt)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO users (name, email,  phone_number, address, password_hash, salt)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id;
 	`
-
-	_, err = r.db.ExecContext(ctx, query, user.Name, user.Email, user.PasswordHash, user.Salt)
-	if err != nil {
-		return fmt.Errorf("failed to insert user: %w", err)
+	var id uuid.UUID
+	if err := r.db.QueryRowContext(ctx, query, user.Name, user.Email, user.PhoneNumber, user.Address, user.PasswordHash, user.Salt).Scan(&id); err != nil {
+		return uuid.Nil, err
 	}
-
-	return nil
+	user.ID = id
+	return id, nil
 }
 
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
@@ -47,7 +47,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 		WHERE email = $1;
 	`
 	if err := r.db.GetContext(ctx, &u, query, email); err != nil {
-		return nil, fmt.Errorf("failed to get user by email: %w", err)
+		return nil, err
 	}
 	return &u, nil
 }
@@ -69,7 +69,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User,
 		WHERE id = $1;
 	`
 	if err := r.db.GetContext(ctx, &u, query, id); err != nil {
-		return nil, fmt.Errorf("failed to get user by ID: %w", err)
+		return nil, err
 	}
 	return &u, nil
 }
@@ -91,7 +91,7 @@ func (r *UserRepository) FindByGoogleID(ctx context.Context, googleID string) (*
 		WHERE google_id = $1;
 	`
 	if err := r.db.GetContext(ctx, &u, query, googleID); err != nil {
-		return nil, fmt.Errorf("failed to get user by Google ID: %w", err)
+		return nil, err
 	}
 	return &u, nil
 }
@@ -100,7 +100,7 @@ func (r *UserRepository) UpdateGoogleID(ctx context.Context, userID string, goog
 	query := `UPDATE users SET google_id = $1 WHERE id = $2`
 	_, err := r.db.ExecContext(ctx, query, googleID, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update Google ID: %v", err)
+		return nil, err
 	}
 	return r.FindByID(ctx, userID)
 }
@@ -109,7 +109,7 @@ func (r *UserRepository) UpdateUserPassword(ctx context.Context, userID string, 
 	query := `UPDATE users SET password_hash = $1, salt = $2 WHERE id = $3`
 	_, err := r.db.ExecContext(ctx, query, passwordHash, salt, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update user password: %v", err)
+		return nil, err
 	}
 	return r.FindByID(ctx, userID)
 }
@@ -118,7 +118,7 @@ func (r *UserRepository) UpdateEmailVerifiedAt(ctx context.Context, userID strin
 	query := `UPDATE users SET email_verified_at = NOW() WHERE id = $1`
 	_, err := r.db.ExecContext(ctx, query, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update email verified at: %v", err)
+		return nil, err
 	}
 	return r.FindByID(ctx, userID)
 }

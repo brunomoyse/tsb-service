@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS public.users
     name TEXT NOT NULL,
     email TEXT NOT NULL,
     email_verified_at timestamp(0) without time zone,
+    phone_number text,
+    address text,
     password_hash TEXT,
     salt TEXT,
     remember_token TEXT,
