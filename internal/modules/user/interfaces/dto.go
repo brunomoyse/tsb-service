@@ -14,9 +14,11 @@ type LoginRequest struct {
 
 // RegistrationRequest is used when a new user registers.
 type RegistrationRequest struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Name        string  `json:"name"`
+	Email       string  `json:"email"`
+	Password    string  `json:"password"`
+	PhoneNumber *string `json:"phoneNumber"`
+	Address     *string `json:"address"`
 }
 
 // GoogleAuthRequest is used when a user logs in via Google.

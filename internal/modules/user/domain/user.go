@@ -15,19 +15,32 @@ type User struct {
 	Name            string     `db:"name" json:"name"`
 	Email           string     `db:"email" json:"email"`
 	EmailVerifiedAt *time.Time `db:"email_verified_at" json:"emailVerifiedAt"`
+	PhoneNumber     *string    `db:"phone_number" json:"phoneNumber"`
+	Address         *string    `db:"address" json:"address"`
 	PasswordHash    *string    `db:"password_hash" json:"passwordHash"`
 	Salt            *string    `db:"salt" json:"salt"`
 	RememberToken   *string    `db:"remember_token" json:"rememberToken"`
 	GoogleID        *string    `db:"google_id" json:"googleId"`
 }
 
-func NewUser(name string, email string, passwordHash *string, googleID *string) User {
+func NewUser(name string, email string, phoneNumber *string, address *string, passwordHash *string, salt *string) User {
 	return User{
 		ID:           uuid.Nil,
 		Name:         name,
 		Email:        email,
+		PhoneNumber:  phoneNumber,
+		Address:      address,
 		PasswordHash: passwordHash,
-		GoogleID:     googleID,
+		Salt:         salt,
+	}
+}
+
+func NewGoogleUser(name string, email string, googleID string) User {
+	return User{
+		ID:       uuid.Nil,
+		Name:     name,
+		Email:    email,
+		GoogleID: &googleID,
 	}
 }
 

@@ -49,7 +49,7 @@ func (h *UserHandler) RegisterHandler(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.CreateUser(ctx, req.Email, req.Name, &req.Password, nil)
+	user, err := h.service.CreateUser(ctx, req.Name, req.Email, req.PhoneNumber, req.Address, &req.Password, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user", "details": err.Error()})
 		return
@@ -216,7 +216,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 		}
 		if err != nil && errors.Is(err, domain.ErrNotFound) {
 			// User not found by email – create new user.
-			user, err = h.service.CreateUser(ctx, req.Email, req.Name, nil, &req.GoogleID)
+			user, err = h.service.CreateUser(ctx, req.Name, req.Email, nil, nil, nil, &req.GoogleID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user", "details": err.Error()})
 				return
