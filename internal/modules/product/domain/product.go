@@ -13,6 +13,7 @@ type Product struct {
 	Price        float64
 	Code         *string
 	Slug         *string
+	PieceCount   *int
 	IsActive     bool
 	IsHalal      bool
 	IsVegan      bool
