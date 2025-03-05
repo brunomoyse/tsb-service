@@ -13,6 +13,7 @@ type CreateProductRequest struct {
 	CategoryID   uuid.UUID            `json:"categoryId" binding:"required"`
 	Price        float64              `json:"price" binding:"required"`
 	Code         *string              `json:"code"`
+	PieceCount   *int                 `json:"pieceCount"`
 	IsActive     bool                 `json:"isActive"`
 	IsHalal      bool                 `json:"isHalal"`
 	IsVegan      bool                 `json:"isVegan"`
@@ -24,6 +25,7 @@ type UpdateProductRequest struct {
 	CategoryID   *uuid.UUID            `json:"categoryId"`
 	Price        *float64              `json:"price"`
 	Code         *string               `json:"code"`
+	PieceCount   *int                  `json:"pieceCount"`
 	IsActive     *bool                 `json:"isActive"`
 	IsHalal      *bool                 `json:"isHalal"`
 	IsVegan      *bool                 `json:"isVegan"`
@@ -44,6 +46,7 @@ type AdminProductResponse struct {
 	Price        float64              `json:"price"`
 	Code         *string              `json:"code"`
 	Slug         *string              `json:"slug"`
+	PieceCount   *int                 `json:"pieceCount"`
 	IsActive     bool                 `json:"isActive"`
 	IsHalal      bool                 `json:"isHalal"`
 	IsVegan      bool                 `json:"isVegan"`
@@ -64,6 +67,7 @@ type PublicProductResponse struct {
 	Price       float64   `json:"price"`
 	Code        *string   `json:"code,omitempty"`
 	Slug        *string   `json:"slug,omitempty"`
+	PieceCount  *int      `json:"pieceCount"`
 	IsActive    bool      `json:"isActive"`
 	IsHalal     bool      `json:"isHalal"`
 	IsVegan     bool      `json:"isVegan"`
@@ -98,6 +102,7 @@ func NewPublicProductResponse(product *domain.Product, userLanguage string) *Pub
 		Price:       product.Price,
 		Code:        product.Code,
 		Slug:        product.Slug,
+		PieceCount:  product.PieceCount,
 		IsActive:    product.IsActive,
 		IsHalal:     product.IsHalal,
 		IsVegan:     product.IsVegan,
@@ -116,6 +121,7 @@ func NewAdminProductResponse(product *domain.Product) *AdminProductResponse {
 		Price:        product.Price,
 		Code:         product.Code,
 		Slug:         product.Slug,
+		PieceCount:   product.PieceCount,
 		IsActive:     product.IsActive,
 		IsHalal:      product.IsHalal,
 		IsVegan:      product.IsVegan,

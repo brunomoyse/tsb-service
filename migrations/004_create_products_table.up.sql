@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.products
     slug text,
     is_halal boolean NOT NULL DEFAULT false,
     is_vegan boolean NOT NULL DEFAULT false,
+    piece_count integer,
     CONSTRAINT products_pkey PRIMARY KEY (id),
     CONSTRAINT products_category_id_foreign FOREIGN KEY (category_id)
         REFERENCES public.product_categories (id) MATCH SIMPLE
