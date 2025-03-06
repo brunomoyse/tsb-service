@@ -45,6 +45,7 @@ func (r *OrderRepository) Save(ctx context.Context, client *mollie.Client, ord *
 		VALUES ($1, $2, $3)
 		RETURNING id;
 	`
+
 	var orderID string
 	if err = tx.GetContext(ctx, &orderID, insertQuery, ord.UserID, ord.PaymentMode, ord.Status); err != nil {
 		return nil, fmt.Errorf("failed to insert new order: %w", err)
@@ -293,6 +294,9 @@ func createMolliePayment(ctx context.Context, tx *sqlx.Tx, client *mollie.Client
 		Locale:      locale,
 		Lines:       paymentLines,
 	}
+
+	// Log the payment request.
+	fmt.Printf("Payment request: %+v\n", paymentRequest)
 
 	_, payment, err := client.Payments.Create(ctx, paymentRequest, nil)
 	if err != nil {

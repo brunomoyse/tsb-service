@@ -26,7 +26,7 @@ func NewOrderService(repo domain.OrderRepository, mollieClient *mollie.Client) O
 }
 
 func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, products []domain.PaymentLine, paymentMode domain.PaymentMode) (*domain.Order, error) {
-	order := domain.NewOrder(userID, products, paymentMode)
+	order := domain.NewOrder(userID, products)
 
 	return s.repo.Save(ctx, s.mollieClient, &order)
 }
