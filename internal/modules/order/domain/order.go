@@ -9,7 +9,7 @@ import (
 type Order struct {
 	ID               uuid.UUID     `db:"id" json:"id"`
 	CreatedAt        time.Time     `db:"created_at" json:"createdAt"`
-	UpdatedAt        time.Time    `db:"updated_at" json:"updatedAt"`
+	UpdatedAt        time.Time     `db:"updated_at" json:"updatedAt"`
 	UserID           uuid.UUID     `db:"user_id" json:"userId"`
 	PaymentMode      *PaymentMode  `db:"payment_mode" json:"paymentMode"`
 	MolliePaymentId  *string       `db:"mollie_payment_id" json:"molliePaymentId"`
@@ -31,9 +31,8 @@ const (
 	OrderStatusPaid       OrderStatus = "PAID"
 )
 
-
-
-func NewOrder(userId uuid.UUID, products []PaymentLine, paymentMode PaymentMode) Order {
+func NewOrder(userId uuid.UUID, products []PaymentLine) Order {
+	paymentMode := PaymentMode("ONLINE")
 	return Order{
 		ID:          uuid.New(),
 		UserID:      userId,

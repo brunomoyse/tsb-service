@@ -25,7 +25,7 @@ type PaymentLine struct {
 }
 
 type Product struct {
-	ID    uuid.UUID
-	Name  string
-	Price float64
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Price float64   `json:"price"`
 }
