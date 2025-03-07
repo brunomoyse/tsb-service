@@ -7,11 +7,14 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
+	"os"
 	"time"
 	"tsb-service/internal/modules/user/domain"
 
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/argon2"
+	emailService "tsb-service/templates/email"
 )
 
 type UserService interface {
@@ -72,13 +75,33 @@ func (s *userService) CreateUser(ctx context.Context, name string, email string,
 			return nil, fmt.Errorf("error checking existing user: %w", err)
 		}
 
-		// User does not exist; create a new user.
+		// 1. User does not exist; create a new user.
 		newUser := domain.NewUser(name, email, phone_number, address, &hashedPassword, &salt)
 		id, err := s.repo.Save(ctx, &newUser)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create user: %w", err)
 		}
 		newUser.ID = id
+
+		// 2. Build verification URL or token. @TODO: Implement VerificationToken generation.
+		appBaseUrl := os.Getenv("APP_BASE_URL")
+		verificationURL := fmt.Sprintf("%s/verify?token=%s", appBaseUrl, "newUser.VerificationToken")
+
+		// 3. Send verification email asynchronously in a goroutine.
+		go func() {
+			// Create a new background context for the asynchronous work.
+			bgCtx := context.Background()
+			es, err := emailService.NewEmailService(bgCtx)
+			if err != nil {
+				log.Printf("failed to initialize email service: %v", err)
+				return
+			}
+			if err := safeSendVerificationEmail(bgCtx, es, newUser.Email, newUser.Name, verificationURL); err != nil {
+				log.Printf("error sending verification email: %v", err)
+			}
+		}()
+
+		// 4. Return immediately.
 		return &newUser, nil
 	}
 
@@ -90,6 +113,18 @@ func (s *userService) CreateUser(ctx context.Context, name string, email string,
 	}
 	newUser.ID = id
 	return &newUser, nil
+}
+
+func safeSendVerificationEmail(ctx context.Context, es *emailService.EmailService, to, userName, link string) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Convert the panic to an error for easier logging
+			err = fmt.Errorf("panic recovered in safeSendVerificationEmail: %v", r)
+		}
+	}()
+
+	err = es.SendVerificationEmail(ctx, to, userName, link)
+	return err
 }
 
 func (s *userService) Login(ctx context.Context, email string, password string, jwtSecret string) (*domain.User, *string, *string, error) {
