@@ -265,24 +265,34 @@ func createMolliePayment(ctx context.Context, tx *sqlx.Tx, client *mollie.Client
 		return nil, fmt.Errorf("failed to get total payment amount: %w", err)
 	}
 
+	// Retrieve base URLs from environment variables.
 	appBaseUrl := os.Getenv("APP_BASE_URL")
 	if appBaseUrl == "" {
 		return nil, fmt.Errorf("APP_BASE_URL is required")
 	}
-	apiBaseUrl := os.Getenv("API_BASE_URL")
-	if apiBaseUrl == "" {
-		return nil, fmt.Errorf("API_BASE_URL is required")
-	}
+	// @TODO: Uncomment when in production.
+	//apiBaseUrl := os.Getenv("API_BASE_URL")
+	//if apiBaseUrl == "" {
+	//	return nil, fmt.Errorf("API_BASE_URL is required")
+	//}
 
-	webhookEndpoint := apiBaseUrl + "/payments/webhook"
-	redirectEndpoint := appBaseUrl + "/order-completed/" + ord.ID.String()
+	// Build webhook and redirect endpoints.
+	//webhookEndpoint := apiBaseUrl + "/payments/webhook"
+	//redirectEndpoint := appBaseUrl + "/order-completed/" + ord.ID.String()
 
-	// Determine locale based on userLanguage.
+	webhookEndpoint := "https://nuagemagique.dev/payments/webhook"
+	redirectEndpoint := "https://nuagemagique.dev/order-completed/" + ord.ID.String()
+
+	// Determine locale based on user language.
 	locale := mollie.Locale("fr_FR")
 	if lang == "en" || lang == "zh" {
-		locale = mollie.Locale("en_GB")
+		locale = "en_GB"
 	}
 
+	// Debug: Print payment lines (print contents, not the address).
+	fmt.Println(paymentLines)
+
+	// Construct the payment request.
 	paymentRequest := mollie.CreatePayment{
 		Amount: &mollie.Amount{
 			Value:    amount,
@@ -295,9 +305,7 @@ func createMolliePayment(ctx context.Context, tx *sqlx.Tx, client *mollie.Client
 		Lines:       paymentLines,
 	}
 
-	// Log the payment request.
-	fmt.Printf("Payment request: %+v\n", paymentRequest)
-
+	// Create the payment via the Mollie client.
 	_, payment, err := client.Payments.Create(ctx, paymentRequest, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Mollie payment: %w", err)
@@ -309,9 +317,10 @@ func createMolliePayment(ctx context.Context, tx *sqlx.Tx, client *mollie.Client
 // getMolliePaymentLines builds the Mollie payment lines based on the order form.
 func getMolliePaymentLines(ctx context.Context, tx *sqlx.Tx, ord *domain.Order) ([]mollie.PaymentLines, error) {
 	// Extract user language from context; default to "fr" if not set.
-	lang, _ := ctx.Value("lang").(string)
-
-	var paymentLines []mollie.PaymentLines
+	lang, ok := ctx.Value("lang").(string)
+	if !ok || lang == "" {
+		lang = "fr"
+	}
 
 	// Gather product IDs from the order's product lines.
 	productIDs := make([]uuid.UUID, 0, len(ord.Products))
@@ -323,18 +332,17 @@ func getMolliePaymentLines(ctx context.Context, tx *sqlx.Tx, ord *domain.Order) 
 	}
 
 	// Build placeholders and arguments for the IN clause.
-	placeholders := make([]string, 0, len(productIDs))
+	placeholders := make([]string, len(productIDs))
 	args := make([]interface{}, 0, len(productIDs)+1)
 	for i, id := range productIDs {
-		placeholders = append(placeholders, fmt.Sprintf("$%d", i+1))
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
 		args = append(args, id)
 	}
-	// Append the order language as the final argument.
+	// Append the language as the final argument.
 	args = append(args, lang)
 
 	// Build the query.
-	// Note: We assume the language column in product_translations matches the order's Language.
-	// Also, p.is_active must be true.
+	// Note: The final parameter (language) is at position len(args)
 	query := fmt.Sprintf(`
 		SELECT 
 			p.id, 
@@ -350,41 +358,34 @@ func getMolliePaymentLines(ctx context.Context, tx *sqlx.Tx, ord *domain.Order) 
 			AND p.is_active = true
 	`, strings.Join(placeholders, ","), len(args))
 
-	rows, err := tx.QueryContext(ctx, query, args...)
-	if err != nil {
+	// Use SQLX's SelectContext to retrieve products.
+	var products []domain.Product
+	if err := tx.SelectContext(ctx, &products, query, args...); err != nil {
 		return nil, fmt.Errorf("querying products for payment lines failed: %w", err)
 	}
-	defer rows.Close()
 
-	var products []domain.Product
-	for rows.Next() {
-		var product domain.Product
-		if err := rows.Scan(&product.ID, &product.Name, &product.Price); err != nil {
-			return nil, fmt.Errorf("failed to scan product: %w", err)
-		}
-		products = append(products, product)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating product rows: %w", err)
+	// Build a map for quick product lookup by ID.
+	prodMap := make(map[uuid.UUID]domain.Product, len(products))
+	for _, p := range products {
+		prodMap[p.ID] = p
 	}
 
-	// Build payment lines by matching each order product line with the retrieved product info.
+	// Construct payment lines by matching each order product with the retrieved product info.
+	paymentLines := make([]mollie.PaymentLines, 0, len(ord.Products))
 	for _, pl := range ord.Products {
-		var prod domain.Product
-		for _, p := range products {
-			if p.ID == pl.Product.ID {
-				prod = p
-				break
-			}
+		prod, found := prodMap[pl.Product.ID]
+		if !found {
+			return nil, fmt.Errorf("product %s not found", pl.Product.ID)
 		}
-		productUnitPrice := strconv.FormatFloat(prod.Price, 'f', 2, 64)
-		totalLineAmount := strconv.FormatFloat(prod.Price*float64(pl.Quantity), 'f', 2, 64)
+
+		unitPriceStr := strconv.FormatFloat(prod.Price, 'f', 2, 64)
+		totalAmountStr := strconv.FormatFloat(prod.Price*float64(pl.Quantity), 'f', 2, 64)
 		paymentLine := mollie.PaymentLines{
 			Description:  prod.Name,
 			Quantity:     pl.Quantity,
 			QuantityUnit: "pcs",
-			UnitPrice:    &mollie.Amount{Value: productUnitPrice, Currency: "EUR"},
-			TotalAmount:  &mollie.Amount{Value: totalLineAmount, Currency: "EUR"},
+			UnitPrice:    &mollie.Amount{Value: unitPriceStr, Currency: "EUR"},
+			TotalAmount:  &mollie.Amount{Value: totalAmountStr, Currency: "EUR"},
 		}
 		paymentLines = append(paymentLines, paymentLine)
 	}
