@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Order Confirmation | Tokyo Sushi Bar</title>
+    <style>
+        /* Base styling */
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background: #f2f2f2;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            overflow: hidden;
+            padding: 30px;
+        }
+        .container img {
+            display: block;
+            margin: 0 auto 20px;
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .content {
+            margin-bottom: 20px;
+        }
+        .content p {
+            line-height: 1.6;
+            margin: 16px 0;
+        }
+        .content p.lead {
+            font-size: 18px;
+            color: #444;
+        }
+        h3 {
+            margin: 20px 0 10px;
+            color: #333;
+        }
+        .order-summary {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .order-summary th, .order-summary td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        .order-summary th {
+            background-color: #f7f7f7;
+        }
+        .footer {
+            background-color: #fafafa;
+            padding: 20px 0;
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Restaurant Logo -->
+    <img alt="Logo" src="https://nuagemagique.dev/icons/tsb-logo.svg" />
+
+    <div class="content">
+        <p class="lead">Hello {{.UserName}},</p>
+        <p>Thank you for ordering at <strong>Tokyo Sushi Bar</strong>! We confirm that we have received your order and it is currently pending validation by the restaurant. You will receive another email shortly confirming your order along with an estimated delivery/takeaway time.</p>
+
+        <h3>Order Summary</h3>
+        <table class="order-summary">
+            <thead>
+            <tr>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Price</th>
+            </tr>
+            </thead>
+            <tbody>
+            {{range .OrderItems}}
+            <tr>
+                <td>{{.Name}}</td>
+                <td>{{.Quantity}}</td>
+                <td>{{.Price}}</td>
+            </tr>
+            {{end}}
+            </tbody>
+        </table>
+
+        <p><strong>Subtotal:</strong> {{.SubtotalPrice}}</p>
+        {{if eq .OrderType "delivery"}}
+        <p><strong>Delivery Fee:</strong> {{.DeliveryFee}}</p>
+        {{else if eq .OrderType "takeaway"}}
+        <p><strong>Takeaway Discount:</strong> -{{.TakeawayDiscount}}</p>
+        {{end}}
+        <p><strong>Total:</strong> {{.TotalPrice}}</p>
+
+        <p>If you have any questions about your order, please do not hesitate to contact us. We appreciate your trust in us and look forward to delighting you with our authentic sushi experience.</p>
+    </div>
+
+    <div class="footer">
+        <p>If you did not place this order, please disregard this email.</p>
+        <p>&copy; 2025 Tokyo Sushi Bar. All rights reserved.</p>
+    </div>
+</div>
+</body>
+</html>

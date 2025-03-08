@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"tsb-service/pkg/utils"
 
 	"tsb-service/internal/modules/order/domain"
 
@@ -90,7 +91,7 @@ func (r *OrderRepository) Save(ctx context.Context, client *mollie.Client, ord *
 	return r.FindByID(ctx, ord.ID)
 }
 
-// UpdateOrderStatus updates an order’s status based on the Mollie payment status.
+// UpdateStatus updates an order’s status based on the Mollie payment status.
 func (r *OrderRepository) UpdateStatus(ctx context.Context, paymentID string, paymentStatus string) error {
 	query := `
 		UPDATE orders
@@ -112,38 +113,33 @@ func (r *OrderRepository) UpdateStatus(ctx context.Context, paymentID string, pa
 	return nil
 }
 
-// GetOrdersForUser retrieves all orders for a given user.
+// FindByUserID retrieves all orders for a given user.
 func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error) {
-	// Retrieve user language from context, default to "fr"
-	lang, ok := ctx.Value("lang").(string)
-	if !ok || lang == "" {
-		lang = "fr"
-	}
+	lang := utils.GetLang(ctx)
 
 	query := `
-		SELECT 
-			o.id AS order_id,
-			o.user_id,
-			o.payment_mode,
-			o.mollie_payment_id,
-			o.mollie_payment_url,
-			o.status,
-			o.created_at,
-			o.updated_at,
-			op.product_id,
-			op.quantity,
-			pt.name AS product_name,
-			p.price AS product_price
-		FROM orders o
-		LEFT JOIN order_product op ON o.id = op.order_id
-		LEFT JOIN products p ON op.product_id = p.id
-		LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = $2
-		WHERE o.user_id = $1
-		ORDER BY o.created_at DESC;
-	`
+        SELECT 
+            o.id AS order_id,
+            o.user_id,
+            o.payment_mode,
+            o.mollie_payment_id,
+            o.mollie_payment_url,
+            o.status,
+            o.created_at,
+            o.updated_at,
+            op.product_id,
+            op.quantity,
+            pt.name AS product_name,
+            p.price AS product_price
+        FROM orders o
+        LEFT JOIN order_product op ON o.id = op.order_id
+        LEFT JOIN products p ON op.product_id = p.id
+        LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = $2
+        WHERE o.user_id = $1
+        ORDER BY o.created_at DESC
+    `
 
-	// Define a helper struct for scanning rows.
-	type orderRow struct {
+	var rows []struct {
 		OrderID          string    `db:"order_id"`
 		UserID           string    `db:"user_id"`
 		PaymentMode      string    `db:"payment_mode"`
@@ -158,35 +154,30 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 		ProductPrice     *float64  `db:"product_price"`
 	}
 
-	rows, err := r.db.QueryxContext(ctx, query, userID, lang)
-	if err != nil {
+	if err := r.db.SelectContext(ctx, &rows, query, userID, lang); err != nil {
 		return nil, fmt.Errorf("failed to query orders: %w", err)
 	}
-	defer rows.Close()
 
-	// Group rows by order ID.
-	ordersMap := make(map[string]*domain.Order)
-	for rows.Next() {
-		var row orderRow
-		if err := rows.StructScan(&row); err != nil {
-			return nil, fmt.Errorf("failed to scan order row: %w", err)
-		}
+	var orders []*domain.Order
+	var currentOrder *domain.Order
 
-		order, exists := ordersMap[row.OrderID]
-		if !exists {
+	for _, row := range rows {
+		// New order detected
+		if currentOrder == nil || currentOrder.ID.String() != row.OrderID {
 			ordID, err := uuid.Parse(row.OrderID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse order id: %w", err)
 			}
+
 			uID, err := uuid.Parse(row.UserID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse user id: %w", err)
 			}
 
-			order = &domain.Order{
+			currentOrder = &domain.Order{
 				ID:               ordID,
 				UserID:           uID,
-				PaymentMode:      (*domain.PaymentMode)(&row.PaymentMode), // adapt as needed
+				PaymentMode:      (*domain.PaymentMode)(&row.PaymentMode),
 				MolliePaymentId:  row.MolliePaymentId,
 				MolliePaymentUrl: row.MolliePaymentUrl,
 				Status:           domain.OrderStatus(row.Status),
@@ -194,39 +185,31 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 				UpdatedAt:        row.UpdatedAt,
 				Products:         []domain.PaymentLine{},
 			}
-			ordersMap[row.OrderID] = order
+			orders = append(orders, currentOrder)
 		}
 
-		// If product info exists, add it to the order.
+		// Add product if exists
 		if row.ProductID != nil && row.Quantity != nil && row.ProductName != nil && row.ProductPrice != nil {
 			prodID, err := uuid.Parse(*row.ProductID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse product id: %w", err)
 			}
-			line := domain.PaymentLine{
+
+			currentOrder.Products = append(currentOrder.Products, domain.PaymentLine{
 				Product: domain.Product{
 					ID:    prodID,
 					Name:  *row.ProductName,
 					Price: *row.ProductPrice,
 				},
 				Quantity: int(*row.Quantity),
-			}
-			order.Products = append(order.Products, line)
+			})
 		}
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating rows: %w", err)
-	}
 
-	// Convert the map to a slice.
-	orders := make([]*domain.Order, 0, len(ordersMap))
-	for _, o := range ordersMap {
-		orders = append(orders, o)
-	}
 	return orders, nil
 }
 
-// GetOrderById retrieves an order by its ID.
+// FindByID retrieves an order by its ID.
 func (r *OrderRepository) FindByID(ctx context.Context, orderId uuid.UUID) (*domain.Order, error) {
 	query := `
 		SELECT 
