@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>订单确认 | Tokyo Sushi Bar</title>
+    <style>
+        /* 基础样式 */
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background: #f2f2f2;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            overflow: hidden;
+            padding: 30px;
+        }
+        .container img {
+            display: block;
+            margin: 0 auto 20px;
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .content {
+            margin-bottom: 20px;
+        }
+        .content p {
+            line-height: 1.6;
+            margin: 16px 0;
+        }
+        .content p.lead {
+            font-size: 18px;
+            color: #444;
+        }
+        h3 {
+            margin: 20px 0 10px;
+            color: #333;
+        }
+        .order-summary {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .order-summary th, .order-summary td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        .order-summary th {
+            background-color: #f7f7f7;
+        }
+        .footer {
+            background-color: #fafafa;
+            padding: 20px 0;
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- 餐厅标志 -->
+    <img alt="Logo" src="https://nuagemagique.dev/icons/tsb-logo.svg" />
+
+    <div class="content">
+        <p class="lead">您好 {{.UserName}}，</p>
+        <p>感谢您在<strong>Tokyo Sushi Bar</strong>下单！我们已收到您的订单，目前正在等待餐厅确认。您将很快收到另一封电子邮件，确认您的订单以及预计的配送/取餐时间。</p>
+
+        <h3>订单摘要</h3>
+        <table class="order-summary">
+            <thead>
+            <tr>
+                <th>商品</th>
+                <th>数量</th>
+                <th>价格</th>
+            </tr>
+            </thead>
+            <tbody>
+            {{range .OrderItems}}
+            <tr>
+                <td>{{.Name}}</td>
+                <td>{{.Quantity}}</td>
+                <td>{{.Price}}</td>
+            </tr>
+            {{end}}
+            </tbody>
+        </table>
+
+        <p><strong>小计：</strong> {{.SubtotalPrice}}</p>
+        {{if eq .OrderType "delivery"}}
+        <p><strong>配送费：</strong> {{.DeliveryFee}}</p>
+        {{else if eq .OrderType "takeaway"}}
+        <p><strong>自取折扣：</strong> -{{.TakeawayDiscount}}</p>
+        {{end}}
+        <p><strong>总计：</strong> {{.TotalPrice}}</p>
+
+        <p>如果您对订单有任何疑问，请随时联系我们。我们感谢您的信任，并期待以我们正宗的寿司体验为您带来愉悦。</p>
+    </div>
+
+    <div class="footer">
+        <p>如果您未下此订单，请忽略此邮件。</p>
+        <p>&copy; 2025 Tokyo Sushi Bar。保留所有权利。</p>
+    </div>
+</div>
+</body>
+</html>
