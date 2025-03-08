@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <title>E-mailadres Verifiëren | Tokyo Sushi Bar</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background: #f2f2f2;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            overflow: hidden;
+            padding: 30px;
+        }
+        .container img {
+            display: block;
+            margin: 0 auto 20px;
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .content p {
+            line-height: 1.6;
+            margin: 16px 0;
+        }
+        .content p.lead {
+            font-size: 18px;
+            color: #444;
+        }
+        .footer {
+            background-color: #fafafa;
+            padding: 20px 0;
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <img alt="Logo" src="https://nuagemagique.dev/icons/tsb-logo.svg" />
+
+    <div class="content">
+        <p class="lead">Hallo {{.UserName}},</p>
+        <p>Bedankt voor uw aanmelding bij <strong>Tokyo Sushi Bar</strong>! Wij kunnen niet wachten om u te laten proeven van onze verse, smaakvolle creaties die geïnspireerd zijn op de Japanse traditie.</p>
+        <p>Om uw registratie af te ronden en uw account te activeren, vragen wij u uw e-mailadres te bevestigen door op onderstaande knop te klikken:</p>
+
+        <!-- Inline-styled button -->
+        <p style="text-align: center;">
+            <a href="{{.VerifyLink}}"
+               style="
+                   display: inline-block;
+                   background: #ed1c24;
+                   color: #ffffff;
+                   padding: 8px 16px;
+                   text-decoration: none;
+                   font-size: 14px;
+                   border-radius: 4px;
+                   margin: 20px 0;
+                   transition: transform 0.2s ease, box-shadow 0.2s ease;
+               "
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';"
+               onmouseout="this.style.transform='none'; this.style.boxShadow='none';"
+            >
+                Verifieer mijn e-mailadres
+            </a>
+        </p>
+
+        <p>Werkt de knop niet? Kopieer en plak dan de onderstaande link in uw browser:</p>
+        <p style="word-break: break-all;">{{.VerifyLink}}</p>
+
+        <p>Wij kijken ernaar uit u te verwelkomen en u te laten genieten van onze moderne kijk op traditionele sushi.<br/>
+            お待ちしております！ (We kijken uit naar uw komst!)</p>
+    </div>
+
+    <div class="footer">
+        <p>Als u deze aanvraag niet hebt gedaan, kunt u deze e-mail negeren.</p>
+        <p>&copy; 2025 Tokyo Sushi Bar. Alle rechten voorbehouden.</p>
+    </div>
+</div>
+</body>
+</html>

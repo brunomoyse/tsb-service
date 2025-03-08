@@ -11,14 +11,15 @@ import (
 	"os"
 	"time"
 	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/utils"
+	emailService "tsb-service/templates/email"
 
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/argon2"
-	emailService "tsb-service/templates/email"
 )
 
 type UserService interface {
-	CreateUser(ctx context.Context, name string, email string, phone_number *string, address *string, password *string, googleID *string) (*domain.User, error)
+	CreateUser(ctx context.Context, name string, email string, phoneNumber *string, address *string, password *string, googleID *string) (*domain.User, error)
 	Login(ctx context.Context, email string, password string, jwtToken string) (*domain.User, *string, *string, error)
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
@@ -41,7 +42,7 @@ func NewUserService(repo domain.UserRepository) UserService {
 	}
 }
 
-func (s *userService) CreateUser(ctx context.Context, name string, email string, phone_number *string, address *string, password *string, googleID *string) (*domain.User, error) {
+func (s *userService) CreateUser(ctx context.Context, name string, email string, phoneNumber *string, address *string, password *string, googleID *string) (*domain.User, error) {
 	// Ensure at least one credential is provided.
 	if password == nil && googleID == nil {
 		return nil, fmt.Errorf("password or googleID must be provided")
@@ -76,7 +77,7 @@ func (s *userService) CreateUser(ctx context.Context, name string, email string,
 		}
 
 		// 1. User does not exist; create a new user.
-		newUser := domain.NewUser(name, email, phone_number, address, &hashedPassword, &salt)
+		newUser := domain.NewUser(name, email, phoneNumber, address, &hashedPassword, &salt)
 		id, err := s.repo.Save(ctx, &newUser)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create user: %w", err)
@@ -91,13 +92,13 @@ func (s *userService) CreateUser(ctx context.Context, name string, email string,
 		go func() {
 			// Create a new background context for the asynchronous work.
 			bgCtx := context.Background()
+			bgCtx = utils.SetLang(bgCtx, utils.GetLang(ctx))
 			es, err := emailService.NewEmailService(bgCtx)
 			if err != nil {
 				log.Printf("failed to initialize email service: %v", err)
-				return
 			}
-			if err := safeSendVerificationEmail(bgCtx, es, newUser.Email, newUser.Name, verificationURL); err != nil {
-				log.Printf("error sending verification email: %v", err)
+			err = es.SendVerificationEmail(bgCtx, newUser.Email, newUser.Name, verificationURL)
+			if err != nil {
 			}
 		}()
 
@@ -113,18 +114,6 @@ func (s *userService) CreateUser(ctx context.Context, name string, email string,
 	}
 	newUser.ID = id
 	return &newUser, nil
-}
-
-func safeSendVerificationEmail(ctx context.Context, es *emailService.EmailService, to, userName, link string) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			// Convert the panic to an error for easier logging
-			err = fmt.Errorf("panic recovered in safeSendVerificationEmail: %v", r)
-		}
-	}()
-
-	err = es.SendVerificationEmail(ctx, to, userName, link)
-	return err
 }
 
 func (s *userService) Login(ctx context.Context, email string, password string, jwtSecret string) (*domain.User, *string, *string, error) {
