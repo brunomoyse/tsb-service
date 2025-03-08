@@ -1,10 +1,10 @@
 package middleware
 
 import (
-	"context"
 	"sort"
 	"strconv"
 	"strings"
+	"tsb-service/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -27,12 +27,9 @@ func LanguageExtractor() gin.HandlerFunc {
 			bestMatch = "en"
 		}
 
-		// Set the language value both in Gin's context and the underlying request context.
-		type contextKey string
-		const langKey contextKey = "lang"
-		ctx := context.WithValue(c.Request.Context(), langKey, bestMatch)
+		// Use the shared SetLang function.
+		ctx := utils.SetLang(c.Request.Context(), bestMatch)
 		c.Request = c.Request.WithContext(ctx)
-		c.Set("lang", bestMatch)
 
 		// Continue to the next handler
 		c.Next()
