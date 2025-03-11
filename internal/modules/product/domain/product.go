@@ -9,18 +9,18 @@ import (
 
 // Product represents the core product aggregate.
 type Product struct {
-	ID           uuid.UUID
-	Price        float64
-	Code         *string
-	Slug         *string
-	PieceCount   *int
-	IsActive     bool
-	IsHalal      bool
-	IsVegan      bool
-	CategoryID   uuid.UUID
-	Translations []Translation
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID           uuid.UUID     `json:"id"`
+	Price        float64       `json:"price"`
+	Code         *string       `json:"code"`
+	Slug         *string       `json:"slug"`
+	PieceCount   *int          `json:"pieceCount"`
+	IsActive     bool          `json:"isActive"`
+	IsHalal      bool          `json:"isHalal"`
+	IsVegan      bool          `json:"isVegan"`
+	CategoryID   uuid.UUID     `json:"categoryId"`
+	Translations []Translation `json:"translations"`
+	CreatedAt    time.Time     `json:"createdAt"`
+	UpdatedAt    time.Time     `json:"updatedAt"`
 }
 
 func NewProduct(price float64, categoryID uuid.UUID, isActive bool, translations []Translation) (*Product, error) {
