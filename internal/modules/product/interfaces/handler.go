@@ -86,6 +86,17 @@ func (h *ProductHandler) GetProductsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+func (h *ProductHandler) GetAdminProductsHandler(c *gin.Context) {
+	products, err := h.service.GetProducts(c.Request.Context())
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, products)
+}
+
 // GetCategories retrieves a list of categories.
 func (h *ProductHandler) GetCategoriesHandler(c *gin.Context) {
 	// Retrieve all categories (omitting error handling for brevity)
