@@ -40,8 +40,8 @@ func (r *ProductRepository) Save(ctx context.Context, product *domain.Product) (
 
 	// Insert the product.
 	query := `
-		INSERT INTO products (id, price, code, slug, piece_count, is_active, is_halal, is_vegan, category_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO products (id, price, code, slug, piece_count, is_visible, is_available, is_halal, is_vegan, category_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 	_, err = tx.ExecContext(ctx, query,
 		product.ID.String(),
@@ -49,7 +49,8 @@ func (r *ProductRepository) Save(ctx context.Context, product *domain.Product) (
 		product.Code,
 		product.Slug,
 		product.PieceCount,
-		product.IsActive,
+		product.IsVisible,
+		product.IsAvailable,
 		product.IsHalal,
 		product.IsVegan,
 		product.CategoryID.String(),
@@ -90,7 +91,8 @@ func (r *ProductRepository) FindByID(ctx context.Context, id string) (*domain.Pr
             p.code,
             p.slug,
 			p.piece_count,
-            p.is_active,
+            p.is_visible,
+            p.is_available,
             p.is_halal,
             p.is_vegan,
             p.category_id,
@@ -122,7 +124,8 @@ func (r *ProductRepository) FindAll(ctx context.Context) ([]*domain.Product, err
             p.code,
             p.slug,
 			p.piece_count,
-            p.is_active,
+            p.is_visible,
+            p.is_available,
             p.is_halal,
             p.is_vegan,
             p.category_id,
@@ -146,7 +149,8 @@ func (r *ProductRepository) FindByCategoryID(ctx context.Context, categoryID str
             p.code,
             p.slug,
 			p.piece_count,
-            p.is_active,
+            p.is_visible,
+            p.is_available,
             p.is_halal,
             p.is_vegan,
             p.category_id,
@@ -255,7 +259,8 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 		Code             *string   `db:"code"`
 		Slug             *string   `db:"slug"`
 		PieceCount       *int      `db:"piece_count"`
-		IsActive         bool      `db:"is_active"`
+		IsVisible        bool      `db:"is_visible"`
+		IsAvailable      bool      `db:"is_available"`
 		IsHalal          bool      `db:"is_halal"`
 		IsVegan          bool      `db:"is_vegan"`
 		CategoryID       string    `db:"category_id"`
@@ -288,7 +293,8 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 				ID:           productID,
 				Price:        row.Price,
 				PieceCount:   row.PieceCount,
-				IsActive:     row.IsActive,
+				IsVisible:    row.IsVisible,
+				IsAvailable:  row.IsAvailable,
 				IsHalal:      row.IsHalal,
 				IsVegan:      row.IsVegan,
 				CategoryID:   categoryID,

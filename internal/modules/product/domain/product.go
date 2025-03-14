@@ -14,7 +14,8 @@ type Product struct {
 	Code         *string       `json:"code"`
 	Slug         *string       `json:"slug"`
 	PieceCount   *int          `json:"pieceCount"`
-	IsActive     bool          `json:"isActive"`
+	IsVisible    bool          `json:"isVisible"`
+	IsAvailable  bool          `json:"isAvailable"`
 	IsHalal      bool          `json:"isHalal"`
 	IsVegan      bool          `json:"isVegan"`
 	CategoryID   uuid.UUID     `json:"categoryId"`
@@ -23,11 +24,11 @@ type Product struct {
 	UpdatedAt    time.Time     `json:"updatedAt"`
 }
 
-func NewProduct(price float64, categoryID uuid.UUID, isActive bool, translations []Translation) (*Product, error) {
-	if isActive {
-		// For active products, require at least 3 translations.
+func NewProduct(price float64, categoryID uuid.UUID, isVisible bool, isAvailable bool, translations []Translation) (*Product, error) {
+	if isVisible {
+		// For visible products, require at least 3 translations.
 		if len(translations) < 3 {
-			return nil, errors.New("active product must have at least 3 translations")
+			return nil, errors.New("visible product must have at least 3 translations")
 		}
 	} else {
 		// For inactive products, ensure at least one translation is French.
@@ -40,7 +41,8 @@ func NewProduct(price float64, categoryID uuid.UUID, isActive bool, translations
 	return &Product{
 		ID:           uuid.New(),
 		Price:        price,
-		IsActive:     isActive,
+		IsVisible:    isVisible,
+		IsAvailable:  isAvailable,
 		CategoryID:   categoryID,
 		Translations: translations,
 	}, nil

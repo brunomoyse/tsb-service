@@ -338,7 +338,7 @@ func getMolliePaymentLines(ctx context.Context, tx *sqlx.Tx, ord *domain.Order) 
 		WHERE 
 			p.id IN (%s)
 			AND pt.locale = $%d
-			AND p.is_active = true
+			AND p.is_available = true
 	`, strings.Join(placeholders, ","), len(args))
 
 	// Use SQLX's SelectContext to retrieve products.

@@ -11,7 +11,7 @@ import (
 
 // ProductService defines the application service interface for product operations.
 type ProductService interface {
-	CreateProduct(ctx context.Context, categoryID uuid.UUID, price float64, code *string, isActive bool, isHalal bool, isVegan bool, translations []domain.Translation) (*domain.Product, error)
+	CreateProduct(ctx context.Context, categoryID uuid.UUID, price float64, code *string, isVisible bool, isAvailable bool, isHalal bool, isVegan bool, translations []domain.Translation) (*domain.Product, error)
 	GetProduct(ctx context.Context, id string) (*domain.Product, error)
 	GetProducts(ctx context.Context) ([]*domain.Product, error)
 	GetProductsByCategory(ctx context.Context, categoryID string) ([]*domain.Product, error)
@@ -33,22 +33,24 @@ func (s *productService) CreateProduct(
 	categoryID uuid.UUID,
 	price float64,
 	code *string,
-	isActive bool,
+	isVisible bool,
+	isAvailable bool,
 	isHalal bool,
 	isVegan bool,
 	translations []domain.Translation,
 ) (*domain.Product, error) {
-	product, err := domain.NewProduct(price, categoryID, isActive, translations)
+	product, err := domain.NewProduct(price, categoryID, isVisible, isAvailable, translations)
 	if err != nil {
 		return nil, err
 	}
 
 	product.Code = code
-	product.IsActive = isActive
+	product.IsVisible = isVisible
+	product.IsAvailable = isAvailable
 	product.IsHalal = isHalal
 	product.IsVegan = isVegan
 	product.UpdatedAt = time.Now() // update the timestamp
-	
+
 	if err := s.repo.Save(ctx, product); err != nil {
 		return nil, err
 	}
@@ -75,4 +77,3 @@ func (s *productService) GetCategories(ctx context.Context) ([]*domain.Category,
 func (s *productService) GetProductsByCategory(ctx context.Context, categoryID string) ([]*domain.Product, error) {
 	return s.repo.FindByCategoryID(ctx, categoryID)
 }
-
