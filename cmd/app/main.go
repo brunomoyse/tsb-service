@@ -76,9 +76,14 @@ func main() {
 		log.Fatal("APP_BASE_URL is required")
 	}
 
+	appDashboardUrl := os.Getenv("APP_DASHBOARD_URL")
+	if appDashboardUrl == "" {
+		log.Fatal("APP_DASHBOARD_URL is required")
+	}
+
 	// CORS Middleware (Allow Specific Origins)
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{appBaseUrl},
+		AllowOrigins:     []string{appBaseUrl, appDashboardUrl},
 		AllowMethods:     []string{"HEAD", "GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept-Language"},
 		ExposeHeaders:    []string{"Content-Length", "Authorization"},
