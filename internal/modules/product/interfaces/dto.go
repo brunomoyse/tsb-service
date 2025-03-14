@@ -14,7 +14,8 @@ type CreateProductRequest struct {
 	Price        float64              `json:"price" binding:"required"`
 	Code         *string              `json:"code"`
 	PieceCount   *int                 `json:"pieceCount"`
-	IsActive     bool                 `json:"isActive"`
+	IsVisible    bool                 `json:"isVisible"`
+	IsAvailable  bool                 `json:"isAvailable"`
 	IsHalal      bool                 `json:"isHalal"`
 	IsVegan      bool                 `json:"isVegan"`
 	Translations []domain.Translation `json:"translations" binding:"required"`
@@ -26,7 +27,8 @@ type UpdateProductRequest struct {
 	Price        *float64              `json:"price"`
 	Code         *string               `json:"code"`
 	PieceCount   *int                  `json:"pieceCount"`
-	IsActive     *bool                 `json:"isActive"`
+	IsVisible    bool                  `json:"isVisible"`
+	IsAvailable  bool                  `json:"isAvailable"`
 	IsHalal      *bool                 `json:"isHalal"`
 	IsVegan      *bool                 `json:"isVegan"`
 	Translations *[]domain.Translation `json:"translations"`
@@ -47,7 +49,8 @@ type AdminProductResponse struct {
 	Code         *string              `json:"code"`
 	Slug         *string              `json:"slug"`
 	PieceCount   *int                 `json:"pieceCount"`
-	IsActive     bool                 `json:"isActive"`
+	IsVisible    bool                 `json:"isVisible"`
+	IsAvailable  bool                 `json:"isAvailable"`
 	IsHalal      bool                 `json:"isHalal"`
 	IsVegan      bool                 `json:"isVegan"`
 	CategoryID   uuid.UUID            `json:"categoryId"`
@@ -68,7 +71,8 @@ type PublicProductResponse struct {
 	Code        *string   `json:"code,omitempty"`
 	Slug        *string   `json:"slug,omitempty"`
 	PieceCount  *int      `json:"pieceCount"`
-	IsActive    bool      `json:"isActive"`
+	IsVisible   bool      `json:"isVisible"`
+	IsAvailable bool      `json:"isAvailable"`
 	IsHalal     bool      `json:"isHalal"`
 	IsVegan     bool      `json:"isVegan"`
 	CategoryID  uuid.UUID `json:"categoryId"`
@@ -103,7 +107,8 @@ func NewPublicProductResponse(product *domain.Product, userLanguage string) *Pub
 		Code:        product.Code,
 		Slug:        product.Slug,
 		PieceCount:  product.PieceCount,
-		IsActive:    product.IsActive,
+		IsVisible:   product.IsVisible,
+		IsAvailable: product.IsAvailable,
 		IsHalal:     product.IsHalal,
 		IsVegan:     product.IsVegan,
 		CategoryID:  product.CategoryID,
@@ -122,7 +127,8 @@ func NewAdminProductResponse(product *domain.Product) *AdminProductResponse {
 		Code:         product.Code,
 		Slug:         product.Slug,
 		PieceCount:   product.PieceCount,
-		IsActive:     product.IsActive,
+		IsVisible:    product.IsVisible,
+		IsAvailable:  product.IsAvailable,
 		IsHalal:      product.IsHalal,
 		IsVegan:      product.IsVegan,
 		CategoryID:   product.CategoryID,
