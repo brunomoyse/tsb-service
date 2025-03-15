@@ -23,15 +23,22 @@ type CreateProductRequest struct {
 
 // UpdateProductRequest is used when updating an existing product.
 type UpdateProductRequest struct {
-	CategoryID   *uuid.UUID            `json:"categoryId"`
-	Price        *float64              `json:"price"`
-	Code         *string               `json:"code"`
-	PieceCount   *int                  `json:"pieceCount"`
-	IsVisible    bool                  `json:"isVisible"`
-	IsAvailable  bool                  `json:"isAvailable"`
-	IsHalal      *bool                 `json:"isHalal"`
-	IsVegan      *bool                 `json:"isVegan"`
-	Translations *[]domain.Translation `json:"translations"`
+	Price        *float64                    `json:"price"`
+	Code         *string                     `json:"code"`
+	Slug         *string                     `json:"slug"`
+	PieceCount   *int                        `json:"pieceCount"`
+	IsVisible    *bool                       `json:"isVisible"`
+	IsAvailable  *bool                       `json:"isAvailable"`
+	IsHalal      *bool                       `json:"isHalal"`
+	IsVegan      *bool                       `json:"isVegan"`
+	CategoryID   *uuid.UUID                  `json:"categoryId"`
+	Translations *[]UpdateTranslationRequest `json:"translations"`
+}
+
+type UpdateTranslationRequest struct {
+	Language    string  `json:"locale"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
 }
 
 // AdminCategoryResponse represents a category for administrative views,

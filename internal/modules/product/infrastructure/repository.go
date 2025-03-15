@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"time"
+	"tsb-service/pkg/utils"
 
 	"github.com/jmoiron/sqlx"
 
@@ -24,8 +25,8 @@ func NewProductRepository(db *sqlx.DB) domain.ProductRepository {
 	return &ProductRepository{db: db}
 }
 
-// Save inserts a product and its translations.
-func (r *ProductRepository) Save(ctx context.Context, product *domain.Product) (err error) {
+// Create inserts a product and its translations.
+func (r *ProductRepository) Create(ctx context.Context, product *domain.Product) (err error) {
 	// Begin a transaction.
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -34,7 +35,10 @@ func (r *ProductRepository) Save(ctx context.Context, product *domain.Product) (
 	// Ensure rollback on error.
 	defer func() {
 		if err != nil {
-			tx.Rollback()
+			err := tx.Rollback()
+			if err != nil {
+				return
+			}
 		}
 	}()
 
@@ -61,7 +65,7 @@ func (r *ProductRepository) Save(ctx context.Context, product *domain.Product) (
 
 	// Insert each translation.
 	translationQuery := `
-		INSERT INTO product_translations (id, product_id, language, name, description)
+		INSERT INTO product_translations (id, product_id, locale, name, description)
 		VALUES ($1, $2, $3, $4, $5)
 	`
 	for _, t := range product.Translations {
@@ -80,6 +84,113 @@ func (r *ProductRepository) Save(ctx context.Context, product *domain.Product) (
 
 	// Commit the transaction.
 	return tx.Commit()
+}
+
+// Update modifies a product and its translations.
+func (r *ProductRepository) Update(ctx context.Context, product *domain.Product) error {
+	// Begin a transaction.
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	// Ensure a rollback happens if there's an error.
+	defer func() {
+		if err != nil {
+			err := tx.Rollback()
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	// Check if a French translation with a non-empty name is provided.
+	var frenchName string
+	for _, t := range product.Translations {
+		if t.Language == "fr" && t.Name != "" {
+			frenchName = t.Name
+			break
+		}
+	}
+
+	// If we have a French name, generate a new slug.
+	if frenchName != "" {
+		var frenchCategoryName string
+		// Query the product_category_translations table for the French name.
+		queryCategory := `
+		SELECT name 
+		FROM product_category_translations 
+		WHERE product_category_id = $1 
+		  AND locale = 'fr'
+	`
+		err = tx.QueryRowContext(ctx, queryCategory, product.CategoryID.String()).Scan(&frenchCategoryName)
+		if err != nil {
+			return fmt.Errorf("failed to fetch category translation name: %w", err)
+		}
+
+		// Create a slug by concatenating the French category name and the French product name.
+		newSlug := utils.Slugify(frenchCategoryName + " " + frenchName)
+		// Update the product slug.
+		product.Slug = &newSlug
+	}
+
+	// Update the main product fields.
+	updateQuery := `
+		UPDATE products
+		SET price = $2,
+		    code = $3,
+		    slug = $4,
+		    piece_count = $5,
+		    is_visible = $6,
+		    is_available = $7,
+		    is_halal = $8,
+		    is_vegan = $9,
+		    category_id = $10
+		WHERE id = $1
+	`
+	_, err = tx.ExecContext(ctx, updateQuery,
+		product.ID.String(),
+		product.Price,
+		product.Code,
+		product.Slug,
+		product.PieceCount,
+		product.IsVisible,
+		product.IsAvailable,
+		product.IsHalal,
+		product.IsVegan,
+		product.CategoryID.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update product: %w", err)
+	}
+
+	// Upsert translations for the provided locales.
+	// This query inserts a new translation, or if a conflict on (product_id, locale) occurs,
+	// updates the name and description.
+	upsertQuery := `
+		INSERT INTO product_translations (product_id, locale, name, description)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (product_id, locale)
+		DO UPDATE SET
+		    name = EXCLUDED.name,
+		    description = EXCLUDED.description
+	`
+	for _, t := range product.Translations {
+		_, err = tx.ExecContext(ctx, upsertQuery,
+			product.ID.String(),
+			t.Language,
+			t.Name,
+			t.Description,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to upsert translation for locale %s: %w", t.Language, err)
+		}
+	}
+
+	// Commit the transaction.
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
 }
 
 // FindByID retrieves a product by its ID.
@@ -182,7 +293,12 @@ func (r *ProductRepository) FindAllCategories(ctx context.Context) ([]*domain.Ca
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sqlx.Rows) {
+		err := rows.Close()
+		if err != nil {
+			return
+		}
+	}(rows)
 
 	// Define a temporary struct that uses pointers for nullable columns.
 	type categoryRow struct {
@@ -250,7 +366,12 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sqlx.Rows) {
+		err := rows.Close()
+		if err != nil {
+			
+		}
+	}(rows)
 
 	// Define a helper struct for scanning rows.
 	type productRow struct {
