@@ -2,8 +2,6 @@ package application
 
 import (
 	"context"
-	"time"
-
 	"tsb-service/internal/modules/product/domain"
 
 	"github.com/google/uuid"
@@ -16,6 +14,7 @@ type ProductService interface {
 	GetProducts(ctx context.Context) ([]*domain.Product, error)
 	GetProductsByCategory(ctx context.Context, categoryID string) ([]*domain.Product, error)
 	GetCategories(ctx context.Context) ([]*domain.Category, error)
+	UpdateProduct(ctx context.Context, product *domain.Product) error
 }
 
 type productService struct {
@@ -49,13 +48,17 @@ func (s *productService) CreateProduct(
 	product.IsAvailable = isAvailable
 	product.IsHalal = isHalal
 	product.IsVegan = isVegan
-	product.UpdatedAt = time.Now() // update the timestamp
 
-	if err := s.repo.Save(ctx, product); err != nil {
+	if err := s.repo.Create(ctx, product); err != nil {
 		return nil, err
 	}
 
 	return product, nil
+}
+
+// UpdateProduct updates an existing product.
+func (s *productService) UpdateProduct(ctx context.Context, product *domain.Product) error {
+	return s.repo.Update(ctx, product)
 }
 
 // GetProduct retrieves a product by its unique identifier.
