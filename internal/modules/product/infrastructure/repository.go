@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gosimple/slug"
 	"regexp"
 	"sort"
 	"strconv"
 	"time"
-	"tsb-service/pkg/utils"
 
 	"github.com/jmoiron/sqlx"
 
@@ -128,7 +128,7 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 		}
 
 		// Create a slug by concatenating the French category name and the French product name.
-		newSlug := utils.Slugify(frenchCategoryName + " " + frenchName)
+		newSlug := slug.MakeLang(frenchCategoryName+" "+frenchName, "fr")
 		// Update the product slug.
 		product.Slug = &newSlug
 	}
@@ -369,7 +369,7 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 	defer func(rows *sqlx.Rows) {
 		err := rows.Close()
 		if err != nil {
-			
+
 		}
 	}(rows)
 
