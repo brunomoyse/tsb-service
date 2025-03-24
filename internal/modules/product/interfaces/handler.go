@@ -1,9 +1,14 @@
 package interfaces
 
 import (
+	"bytes"
 	"encoding/json"
 	"github.com/google/uuid"
+	"io"
+	"log"
+	"mime/multipart"
 	"net/http"
+	"os"
 	"tsb-service/internal/modules/product/domain"
 
 	"tsb-service/internal/modules/product/application"
@@ -23,13 +28,21 @@ func NewProductHandler(service application.ProductService) *ProductHandler {
 
 // CreateProductHandler handles the HTTP POST request for creating a product.
 func (h *ProductHandler) CreateProductHandler(c *gin.Context) {
-	// Decode the incoming JSON payload into a CreateProductForm DTO.
-	var req CreateProductRequest
-	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"invalid request payload": err.Error()})
+	// Parse the multipart form (limit to 10 MB in memory).
+	if err := c.Request.ParseMultipartForm(10 << 20); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse multipart form: " + err.Error()})
+		return
 	}
 
-	// Call the application service to create a new product.
+	// Decode the JSON payload from the "data" field.
+	data := c.PostForm("data")
+	var req CreateProductRequest
+	if err := json.Unmarshal([]byte(data), &req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload: " + err.Error()})
+		return
+	}
+
+	// Create the product.
 	product, err := h.service.CreateProduct(
 		c.Request.Context(),
 		req.CategoryID,
@@ -41,16 +54,68 @@ func (h *ProductHandler) CreateProductHandler(c *gin.Context) {
 		req.IsVegan,
 		req.Translations,
 	)
+	// Print product properties for debugging
+	log.Printf("Created product: %+v", product)
+
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"failed to create product": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create product: " + err.Error()})
 		return
 	}
 
-	// Create a response DTO from the product domain object.
+	// If an image file is provided, handle the file upload.
+	file, fileHeader, err := c.Request.FormFile("image")
+	if err == nil { // file was provided
+		defer file.Close()
+
+		// Prepare a new multipart form request for the file service.
+		fileServiceUrl := os.Getenv("FILE_SERVICE_URL")
+		var b bytes.Buffer
+		writer := multipart.NewWriter(&b)
+
+		// Add the file field.
+		part, err := writer.CreateFormFile("image", fileHeader.Filename)
+		if err != nil {
+			log.Printf("failed to create form file part: %v", err)
+		} else {
+			if _, err := io.Copy(part, file); err != nil {
+				log.Printf("failed to copy file content: %v", err)
+			}
+		}
+
+		if product.Slug != nil {
+			// Add the product_slug field.
+			if err := writer.WriteField("product_slug", *product.Slug); err != nil {
+				log.Printf("failed to write product_slug field: %v", err)
+			}
+			writer.Close()
+
+			// Build and send the POST request to the file service.
+			uploadReq, err := http.NewRequest("POST", fileServiceUrl+"/upload", &b)
+			if err != nil {
+				log.Printf("failed to create file upload request: %v", err)
+			} else {
+				uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+				client := &http.Client{}
+				resp, err := client.Do(uploadReq)
+				if err != nil {
+					log.Printf("failed to upload file: %v", err)
+				} else {
+					defer resp.Body.Close()
+					// Optionally, check the response status code or response body here.
+					if resp.StatusCode != http.StatusOK {
+						log.Printf("file service responded with status: %s", resp.Status)
+					}
+				}
+			}
+		}
+	} else {
+		// No file provided; log the information.
+		log.Println("no image file provided in the request")
+	}
+
+	// Return the newly created product.
 	res := NewAdminProductResponse(product)
-
 	c.JSON(http.StatusOK, res)
-
 }
 
 func (h *ProductHandler) GetProductHandler(c *gin.Context) {

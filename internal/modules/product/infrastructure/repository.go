@@ -42,6 +42,35 @@ func (r *ProductRepository) Create(ctx context.Context, product *domain.Product)
 		}
 	}()
 
+	var frenchName string
+	for _, t := range product.Translations {
+		if t.Language == "fr" && t.Name != "" {
+			frenchName = t.Name
+			break
+		}
+	}
+
+	// If we have a French name, generate a new slug.
+	if frenchName != "" {
+		var frenchCategoryName string
+		// Query the product_category_translations table for the French name.
+		queryCategory := `
+		SELECT name 
+		FROM product_category_translations 
+		WHERE product_category_id = $1 
+		  AND locale = 'fr'
+	`
+		err = tx.QueryRowContext(ctx, queryCategory, product.CategoryID.String()).Scan(&frenchCategoryName)
+		if err != nil {
+			return fmt.Errorf("failed to fetch category translation name: %w", err)
+		}
+
+		// Create a slug by concatenating the French category name and the French product name.
+		newSlug := slug.MakeLang(frenchCategoryName+" "+frenchName, "fr")
+		// Update the product slug.
+		product.Slug = &newSlug
+	}
+
 	// Insert the product.
 	query := `
 		INSERT INTO products (id, price, code, slug, piece_count, is_visible, is_available, is_halal, is_vegan, category_id)
