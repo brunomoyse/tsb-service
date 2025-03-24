@@ -83,7 +83,9 @@ func (h *ProductHandler) GetProductsHandler(c *gin.Context) {
 	// Build your response DTOs including only the chosen translations.
 	var res []PublicProductResponse
 	for _, p := range products {
-		res = append(res, *NewPublicProductResponse(p, userLocale))
+		if p.IsVisible == true {
+			res = append(res, *NewPublicProductResponse(p, userLocale))
+		}
 	}
 
 	c.JSON(http.StatusOK, res)
