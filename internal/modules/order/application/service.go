@@ -11,6 +11,7 @@ import (
 type OrderService interface {
 	CreateOrder(ctx context.Context, userID uuid.UUID, products []domain.PaymentLine, paymentMode domain.PaymentMode) (*domain.Order, error)
 	GetOrdersByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error)
+	GetPaginatedOrders(ctx context.Context, page int, limit int) ([]*domain.Order, error)
 }
 
 type orderService struct {
@@ -33,4 +34,8 @@ func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, produc
 
 func (s *orderService) GetOrdersByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error) {
 	return s.repo.FindByUserID(ctx, userID)
+}
+
+func (s *orderService) GetPaginatedOrders(ctx context.Context, page int, limit int) ([]*domain.Order, error) {
+	return s.repo.FindPaginated(ctx, page, limit)
 }

@@ -135,6 +135,7 @@ func main() {
 	api.GET("/admin/products", middleware.AuthMiddleware(jwtSecret), productHandler.GetAdminProductsHandler)
 	api.POST("/admin/products", middleware.AuthMiddleware(jwtSecret), productHandler.CreateProductHandler)
 	api.PUT("/admin/products/:id", middleware.AuthMiddleware(jwtSecret), productHandler.UpdateProductHandler)
+	api.GET("admin/orders", middleware.AuthMiddleware(jwtSecret), orderHandler.GetAdminPaginatedOrdersHandler)
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

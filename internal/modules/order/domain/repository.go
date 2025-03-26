@@ -12,4 +12,5 @@ type OrderRepository interface {
 	UpdateStatus(ctx context.Context, paymentID string, paymentStatus string) error
 	FindByUserID(ctx context.Context, userID uuid.UUID) ([]*Order, error)
 	FindByID(ctx context.Context, orderID uuid.UUID) (*Order, error)
+	FindPaginated(ctx context.Context, page int, limit int) ([]*Order, error)
 }
