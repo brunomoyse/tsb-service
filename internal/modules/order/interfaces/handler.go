@@ -2,7 +2,9 @@ package interfaces
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"tsb-service/internal/modules/order/application"
 
 	"github.com/gin-gonic/gin"
@@ -74,5 +76,32 @@ func (h *OrderHandler) GetUserOrdersHandler(c *gin.Context) {
 	}
 
 	// Return the orders as JSON.
+	c.JSON(http.StatusOK, orders)
+}
+
+func (h *OrderHandler) GetAdminPaginatedOrdersHandler(c *gin.Context) {
+	pageStr := c.DefaultQuery("page", "1")
+	pageSizeStr := c.DefaultQuery("page_size", "20")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid page number"})
+		return
+	}
+
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid page size"})
+		return
+	}
+
+	orders, err := h.service.GetPaginatedOrders(c.Request.Context(), page, pageSize)
+	if err != nil {
+		// Log the error.
+		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve orders"})
+		return
+	}
+
 	c.JSON(http.StatusOK, orders)
 }
