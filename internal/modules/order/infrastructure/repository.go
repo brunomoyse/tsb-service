@@ -9,11 +9,10 @@ import (
 	"time"
 	"tsb-service/pkg/utils"
 
-	"tsb-service/internal/modules/order/domain"
-
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"tsb-service/internal/modules/order/domain"
 )
 
 type OrderRepository struct {
@@ -319,6 +318,34 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 	}
 
 	return orders, nil
+}
+
+func (r *OrderRepository) OrderFillPrices(ctx context.Context, order *domain.Order) (*domain.Order, error) {
+	for i, line := range order.Products {
+		query := `
+			SELECT 
+				id, 
+				price
+			FROM 
+				products
+			WHERE 
+				id = $1;
+		`
+
+		var product struct {
+			ID    uuid.UUID `db:"id"`
+			Price float64   `db:"price"`
+		}
+
+		if err := r.db.GetContext(ctx, &product, query, line.Product.ID); err != nil {
+			return nil, fmt.Errorf("failed to get product price: %w", err)
+		}
+
+		order.Products[i].UnitPrice = product.Price
+		order.Products[i].TotalPrice = product.Price * float64(line.Quantity)
+	}
+
+	return order, nil
 }
 
 func handleOnlinePayment(ctx context.Context, tx *sqlx.Tx, client *mollie.Client, ord *domain.Order) error {

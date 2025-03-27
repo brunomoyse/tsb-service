@@ -26,10 +26,17 @@ func NewOrderService(repo domain.OrderRepository, mollieClient *mollie.Client) O
 	}
 }
 
-func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, products []domain.PaymentLine, paymentMode domain.PaymentMode) (*domain.Order, error) {
-	order := domain.NewOrder(userID, products)
+func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, paymentLines []domain.PaymentLine, paymentMode domain.PaymentMode) (*domain.Order, error) {
+	order := domain.NewOrder(userID, paymentLines)
 
-	return s.repo.Save(ctx, s.mollieClient, &order)
+	// Load product prices from DB
+	updatedOrder, err := s.repo.OrderFillPrices(ctx, &order)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repo.Save(ctx, s.mollieClient, updatedOrder)
 }
 
 func (s *orderService) GetOrdersByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error) {
