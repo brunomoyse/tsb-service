@@ -24,9 +24,9 @@ func NewOrderRepository(db *sqlx.DB) domain.OrderRepository {
 	return &OrderRepository{db: db}
 }
 
-// CreateOrder inserts a new order, creates a Mollie payment, updates the order with payment details,
+// Save inserts a new order, creates a Mollie payment, updates the order with payment details,
 // and links the order with its product lines.
-func (r *OrderRepository) Save(ctx context.Context, client *mollie.Client, ord *domain.Order) (*domain.Order, error) {
+func (r *OrderRepository) Save(ctx context.Context, client *mollie.Client, order *domain.Order) (*domain.Order, error) {
 	// Begin a transaction using sqlx.
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -35,12 +35,14 @@ func (r *OrderRepository) Save(ctx context.Context, client *mollie.Client, ord *
 	// Ensure rollback on error.
 	defer func() {
 		if err != nil {
-			tx.Rollback()
+			err := tx.Rollback()
+			if err != nil {
+				return
+			}
 		}
 	}()
 
 	// Insert the order without payment details.
-	// Postgres will generate created_at and updated_at automatically.
 	const insertQuery = `
 		INSERT INTO orders (user_id, payment_mode, status)
 		VALUES ($1, $2, $3)
@@ -48,38 +50,23 @@ func (r *OrderRepository) Save(ctx context.Context, client *mollie.Client, ord *
 	`
 
 	var orderID string
-	if err = tx.GetContext(ctx, &orderID, insertQuery, ord.UserID, ord.PaymentMode, ord.Status); err != nil {
+	if err = tx.GetContext(ctx, &orderID, insertQuery, order.UserID, order.PaymentMode, order.Status); err != nil {
 		return nil, fmt.Errorf("failed to insert new order: %w", err)
 	}
-	ord.ID, err = uuid.Parse(orderID)
+	order.ID, err = uuid.Parse(orderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse order id: %w", err)
 	}
 
-	// Create the Mollie payment using the order details.
-	// Assumes createMolliePayment accepts a transaction and an order.
-	payment, err := createMolliePayment(ctx, tx, client, ord)
-	if err != nil || payment == nil {
-		return nil, fmt.Errorf("failed to create Mollie payment: %w", err)
-	}
-
-	// Update the order struct with Mollie payment details.
-	ord.MolliePaymentId = &payment.ID
-	ord.MolliePaymentUrl = &payment.Links.Checkout.Href
-
-	// Update the order record with payment details.
-	const updateQuery = `
-		UPDATE orders
-		SET mollie_payment_id = $1, mollie_payment_url = $2, updated_at = NOW()
-		WHERE id = $3;
-	`
-	if _, err = tx.ExecContext(ctx, updateQuery, ord.MolliePaymentId, ord.MolliePaymentUrl, orderID); err != nil {
-		return nil, fmt.Errorf("failed to update order with Mollie payment details: %w", err)
+	if order.PaymentMode != nil && *order.PaymentMode == domain.PaymentModeOnline {
+		err := handleOnlinePayment(ctx, tx, client, order)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Link the order with its product lines.
-	// Assumes ord.Products contains the necessary details.
-	if err = linkOrderProduct(ctx, tx, ord.ID, ord.Products); err != nil {
+	if err = linkOrderProduct(ctx, tx, order.ID, order.Products); err != nil {
 		return nil, fmt.Errorf("failed to link order with product lines: %w", err)
 	}
 
@@ -88,7 +75,7 @@ func (r *OrderRepository) Save(ctx context.Context, client *mollie.Client, ord *
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return r.FindByID(ctx, ord.ID)
+	return r.FindByID(ctx, order.ID)
 }
 
 // UpdateStatus updates an order’s status based on the Mollie payment status.
@@ -130,7 +117,8 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
             op.product_id,
             op.quantity,
             pt.name AS product_name,
-            p.price AS product_price
+            op.unit_price AS product_unit_price,
+            op.total_price AS product_total_price
         FROM orders o
         LEFT JOIN order_product op ON o.id = op.order_id
         LEFT JOIN products p ON op.product_id = p.id
@@ -140,18 +128,19 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
     `
 
 	var rows []struct {
-		OrderID          string    `db:"order_id"`
-		UserID           string    `db:"user_id"`
-		PaymentMode      string    `db:"payment_mode"`
-		MolliePaymentId  *string   `db:"mollie_payment_id"`
-		MolliePaymentUrl *string   `db:"mollie_payment_url"`
-		Status           string    `db:"status"`
-		CreatedAt        time.Time `db:"created_at"`
-		UpdatedAt        time.Time `db:"updated_at"`
-		ProductID        *string   `db:"product_id"`
-		Quantity         *int64    `db:"quantity"`
-		ProductName      *string   `db:"product_name"`
-		ProductPrice     *float64  `db:"product_price"`
+		OrderID           string    `db:"order_id"`
+		UserID            string    `db:"user_id"`
+		PaymentMode       string    `db:"payment_mode"`
+		MolliePaymentId   *string   `db:"mollie_payment_id"`
+		MolliePaymentUrl  *string   `db:"mollie_payment_url"`
+		Status            string    `db:"status"`
+		CreatedAt         time.Time `db:"created_at"`
+		UpdatedAt         time.Time `db:"updated_at"`
+		ProductID         *string   `db:"product_id"`
+		Quantity          *int64    `db:"quantity"`
+		ProductName       *string   `db:"product_name"`
+		ProductUnitPrice  *float64  `db:"product_unit_price"`
+		ProductTotalPrice *float64  `db:"product_total_price"`
 	}
 
 	if err := r.db.SelectContext(ctx, &rows, query, userID, lang); err != nil {
@@ -189,7 +178,7 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 		}
 
 		// Add product if exists
-		if row.ProductID != nil && row.Quantity != nil && row.ProductName != nil && row.ProductPrice != nil {
+		if row.ProductID != nil {
 			prodID, err := uuid.Parse(*row.ProductID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse product id: %w", err)
@@ -197,11 +186,12 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 
 			currentOrder.Products = append(currentOrder.Products, domain.PaymentLine{
 				Product: domain.Product{
-					ID:    prodID,
-					Name:  *row.ProductName,
-					Price: *row.ProductPrice,
+					ID:   prodID,
+					Name: *row.ProductName,
 				},
-				Quantity: int(*row.Quantity),
+				Quantity:   int(*row.Quantity),
+				UnitPrice:  *row.ProductUnitPrice,
+				TotalPrice: *row.ProductTotalPrice,
 			})
 		}
 	}
@@ -249,7 +239,8 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
             op.product_id,
             op.quantity,
             pt.name AS product_name,
-            p.price AS product_price
+            op.unit_price AS product_unit_price,
+            op.total_price AS product_total_price
         FROM orders o
         LEFT JOIN order_product op ON o.id = op.order_id
         LEFT JOIN products p ON op.product_id = p.id
@@ -259,18 +250,19 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 	`
 
 	var rows []struct {
-		OrderID          string    `db:"order_id"`
-		UserID           string    `db:"user_id"`
-		PaymentMode      string    `db:"payment_mode"`
-		MolliePaymentId  *string   `db:"mollie_payment_id"`
-		MolliePaymentUrl *string   `db:"mollie_payment_url"`
-		Status           string    `db:"status"`
-		CreatedAt        time.Time `db:"created_at"`
-		UpdatedAt        time.Time `db:"updated_at"`
-		ProductID        *string   `db:"product_id"`
-		Quantity         *int64    `db:"quantity"`
-		ProductName      *string   `db:"product_name"`
-		ProductPrice     *float64  `db:"product_price"`
+		OrderID           string    `db:"order_id"`
+		UserID            string    `db:"user_id"`
+		PaymentMode       string    `db:"payment_mode"`
+		MolliePaymentId   *string   `db:"mollie_payment_id"`
+		MolliePaymentUrl  *string   `db:"mollie_payment_url"`
+		Status            string    `db:"status"`
+		CreatedAt         time.Time `db:"created_at"`
+		UpdatedAt         time.Time `db:"updated_at"`
+		ProductID         *string   `db:"product_id"`
+		Quantity          *int64    `db:"quantity"`
+		ProductName       *string   `db:"product_name"`
+		ProductUnitPrice  *float64  `db:"product_unit_price"`
+		ProductTotalPrice *float64  `db:"product_total_price"`
 	}
 
 	if err := r.db.SelectContext(ctx, &rows, query, limit, lang, page); err != nil {
@@ -308,7 +300,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 		}
 
 		// Add product if exists
-		if row.ProductID != nil && row.Quantity != nil && row.ProductName != nil && row.ProductPrice != nil {
+		if row.ProductID != nil {
 			prodID, err := uuid.Parse(*row.ProductID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse product id: %w", err)
@@ -316,11 +308,12 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 
 			currentOrder.Products = append(currentOrder.Products, domain.PaymentLine{
 				Product: domain.Product{
-					ID:    prodID,
-					Name:  *row.ProductName,
-					Price: *row.ProductPrice,
+					ID:   prodID,
+					Name: *row.ProductName,
 				},
-				Quantity: int(*row.Quantity),
+				Quantity:   int(*row.Quantity),
+				UnitPrice:  *row.ProductUnitPrice,
+				TotalPrice: *row.ProductTotalPrice,
 			})
 		}
 	}
@@ -328,7 +321,31 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 	return orders, nil
 }
 
-// createMolliePayment creates a Mollie payment for an domain.
+func handleOnlinePayment(ctx context.Context, tx *sqlx.Tx, client *mollie.Client, ord *domain.Order) error {
+	// Create the Mollie payment using the order details.
+	payment, err := createMolliePayment(ctx, tx, client, ord)
+	if err != nil || payment == nil {
+		return fmt.Errorf("failed to create Mollie payment: %w", err)
+	}
+
+	// Update the order struct with Mollie payment details.
+	ord.MolliePaymentId = &payment.ID
+	ord.MolliePaymentUrl = &payment.Links.Checkout.Href
+
+	// Update the order record with payment details.
+	const updateQuery = `
+		UPDATE orders
+		SET mollie_payment_id = $1, mollie_payment_url = $2, updated_at = NOW()
+		WHERE id = $3;
+	`
+	if _, err = tx.ExecContext(ctx, updateQuery, ord.MolliePaymentId, ord.MolliePaymentUrl, ord.ID); err != nil {
+		return fmt.Errorf("failed to update order with Mollie payment details: %w", err)
+	}
+
+	return nil
+}
+
+// createMolliePayment creates a Mollie payment
 func createMolliePayment(ctx context.Context, tx *sqlx.Tx, client *mollie.Client, ord *domain.Order) (*mollie.Payment, error) {
 	// Extract user language from context; default to "fr" if not set.
 	lang, _ := ctx.Value("lang").(string)
@@ -349,27 +366,19 @@ func createMolliePayment(ctx context.Context, tx *sqlx.Tx, client *mollie.Client
 	if appBaseUrl == "" {
 		return nil, fmt.Errorf("APP_BASE_URL is required")
 	}
-	// @TODO: Uncomment when in production.
-	//apiBaseUrl := os.Getenv("API_BASE_URL")
-	//if apiBaseUrl == "" {
-	//	return nil, fmt.Errorf("API_BASE_URL is required")
-	//}
 
-	// Build webhook and redirect endpoints.
-	//webhookEndpoint := apiBaseUrl + "/payments/webhook"
-	//redirectEndpoint := appBaseUrl + "/order-completed/" + ord.ID.String()
+	webhookUrl := os.Getenv("MOLLIE_WEBHOOK_URL")
+	if webhookUrl == "" {
+		return nil, fmt.Errorf("MOLLIE_WEBHOOK_URL is required")
+	}
 
-	webhookEndpoint := "https://nuagemagique.dev/payments/webhook"
-	redirectEndpoint := "https://nuagemagique.dev/order-completed/" + ord.ID.String()
+	redirectEndpoint := appBaseUrl + "/order-completed/" + ord.ID.String()
 
 	// Determine locale based on user language.
 	locale := mollie.Locale("fr_FR")
 	if lang == "en" || lang == "zh" {
 		locale = "en_GB"
 	}
-
-	// Debug: Print payment lines (print contents, not the address).
-	fmt.Println(paymentLines)
 
 	// Construct the payment request.
 	paymentRequest := mollie.CreatePayment{
@@ -379,7 +388,7 @@ func createMolliePayment(ctx context.Context, tx *sqlx.Tx, client *mollie.Client
 		},
 		Description: "Tokyo Sushi Bar - " + generateOrderReference(ord.ID),
 		RedirectURL: redirectEndpoint,
-		WebhookURL:  webhookEndpoint,
+		WebhookURL:  webhookUrl,
 		Locale:      locale,
 		Lines:       paymentLines,
 	}
@@ -393,36 +402,25 @@ func createMolliePayment(ctx context.Context, tx *sqlx.Tx, client *mollie.Client
 	return payment, nil
 }
 
-// getMolliePaymentLines builds the Mollie payment lines based on the order form.
 func getMolliePaymentLines(ctx context.Context, tx *sqlx.Tx, ord *domain.Order) ([]mollie.PaymentLines, error) {
-	// Extract user language from context; default to "fr" if not set.
-	lang, ok := ctx.Value("lang").(string)
-	if !ok || lang == "" {
-		lang = "fr"
+	// Default language to "fr".
+	lang := "fr"
+	if l, ok := ctx.Value("lang").(string); ok && l != "" {
+		lang = l
 	}
 
-	// Gather product IDs from the order's product lines.
-	productIDs := make([]uuid.UUID, 0, len(ord.Products))
-	for _, pl := range ord.Products {
-		productIDs = append(productIDs, pl.Product.ID)
-	}
-	if len(productIDs) == 0 {
+	if len(ord.Products) == 0 {
 		return nil, fmt.Errorf("no products found in order")
 	}
 
-	// Build placeholders and arguments for the IN clause.
-	placeholders := make([]string, len(productIDs))
-	args := make([]interface{}, 0, len(productIDs)+1)
-	for i, id := range productIDs {
-		placeholders[i] = fmt.Sprintf("$%d", i+1)
-		args = append(args, id)
+	// Collect product IDs from the order.
+	productIDs := make([]uuid.UUID, len(ord.Products))
+	for i, line := range ord.Products {
+		productIDs[i] = line.Product.ID
 	}
-	// Append the language as the final argument.
-	args = append(args, lang)
 
-	// Build the query.
-	// Note: The final parameter (language) is at position len(args)
-	query := fmt.Sprintf(`
+	// Build the query using sqlx.In.
+	query := `
 		SELECT 
 			p.id, 
 			pt.name, 
@@ -432,43 +430,50 @@ func getMolliePaymentLines(ctx context.Context, tx *sqlx.Tx, ord *domain.Order) 
 		INNER JOIN 
 			product_translations pt ON p.id = pt.product_id
 		WHERE 
-			p.id IN (%s)
-			AND pt.locale = $%d
+			p.id IN (?)
+			AND pt.locale = ?
 			AND p.is_available = true
-	`, strings.Join(placeholders, ","), len(args))
+	`
+	query, args, err := sqlx.In(query, productIDs, lang)
+	if err != nil {
+		return nil, fmt.Errorf("preparing query: %w", err)
+	}
+	query = tx.Rebind(query)
 
-	// Use SQLX's SelectContext to retrieve products.
-	var products []domain.Product
-	if err := tx.SelectContext(ctx, &products, query, args...); err != nil {
+	// Define an inline type to match the query result.
+	type productRow struct {
+		ID    uuid.UUID `db:"id"`
+		Name  string    `db:"name"`
+		Price float64   `db:"price"`
+	}
+	var rows []productRow
+	if err := tx.SelectContext(ctx, &rows, query, args...); err != nil {
 		return nil, fmt.Errorf("querying products for payment lines failed: %w", err)
 	}
 
-	// Build a map for quick product lookup by ID.
-	prodMap := make(map[uuid.UUID]domain.Product, len(products))
-	for _, p := range products {
-		prodMap[p.ID] = p
+	// Build a lookup map.
+	productMap := make(map[uuid.UUID]productRow, len(rows))
+	for _, p := range rows {
+		productMap[p.ID] = p
 	}
 
-	// Construct payment lines by matching each order product with the retrieved product info.
-	paymentLines := make([]mollie.PaymentLines, 0, len(ord.Products))
-	for _, pl := range ord.Products {
-		prod, found := prodMap[pl.Product.ID]
-		if !found {
-			return nil, fmt.Errorf("product %s not found", pl.Product.ID)
+	// Construct the Mollie payment lines.
+	var paymentLines []mollie.PaymentLines
+	for _, line := range ord.Products {
+		prod, ok := productMap[line.Product.ID]
+		if !ok {
+			return nil, fmt.Errorf("product %s not found", line.Product.ID)
 		}
-
 		unitPriceStr := strconv.FormatFloat(prod.Price, 'f', 2, 64)
-		totalAmountStr := strconv.FormatFloat(prod.Price*float64(pl.Quantity), 'f', 2, 64)
-		paymentLine := mollie.PaymentLines{
+		totalAmountStr := strconv.FormatFloat(prod.Price*float64(line.Quantity), 'f', 2, 64)
+		paymentLines = append(paymentLines, mollie.PaymentLines{
 			Description:  prod.Name,
-			Quantity:     pl.Quantity,
+			Quantity:     line.Quantity,
 			QuantityUnit: "pcs",
 			UnitPrice:    &mollie.Amount{Value: unitPriceStr, Currency: "EUR"},
 			TotalAmount:  &mollie.Amount{Value: totalAmountStr, Currency: "EUR"},
-		}
-		paymentLines = append(paymentLines, paymentLine)
+		})
 	}
-
 	return paymentLines, nil
 }
 
@@ -488,17 +493,22 @@ func getTotalAmount(paymentLines []mollie.PaymentLines) (string, error) {
 // linkOrderProduct creates the order-product relationships in the DB.
 func linkOrderProduct(ctx context.Context, tx *sqlx.Tx, orderId uuid.UUID, productLines []domain.PaymentLine) error {
 	if len(productLines) == 0 {
-		return nil
+		return fmt.Errorf("no products found in order")
 	}
 
+	const fieldsPerRow = 5
 	placeholders := make([]string, len(productLines))
-	args := make([]interface{}, 0, len(productLines)*3)
-	for i, pl := range productLines {
-		placeholders[i] = fmt.Sprintf("($%d, $%d, $%d)", i*3+1, i*3+2, i*3+3)
-		args = append(args, orderId, pl.Product.ID, pl.Quantity)
+	args := make([]interface{}, 0, len(productLines)*fieldsPerRow)
+
+	for i, line := range productLines {
+		placeholders[i] = fmt.Sprintf("($%d, $%d, $%d, $%d, $%d)",
+			i*fieldsPerRow+1, i*fieldsPerRow+2, i*fieldsPerRow+3, i*fieldsPerRow+4, i*fieldsPerRow+5)
+		args = append(args, orderId, line.Product.ID, line.Quantity, line.UnitPrice, line.TotalPrice)
 	}
 
-	query := "INSERT INTO order_product (order_id, product_id, quantity) VALUES " + strings.Join(placeholders, ", ")
+	query := "INSERT INTO order_product (order_id, product_id, quantity, unit_price, total_price) VALUES " +
+		strings.Join(placeholders, ", ")
+
 	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 		return fmt.Errorf("failed to insert order products: %w", err)
 	}

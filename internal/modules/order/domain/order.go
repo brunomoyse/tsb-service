@@ -22,13 +22,15 @@ type Order struct {
 type OrderStatus string
 
 const (
-	OrderStatusOpen       OrderStatus = "OPEN"
-	OrderStatusCanceled   OrderStatus = "CANCELED"
-	OrderStatusPending    OrderStatus = "PENDING"
-	OrderStatusAuthorized OrderStatus = "AUTHORIZED"
-	OrderStatusExpired    OrderStatus = "EXPIRED"
-	OrderStatusFailed     OrderStatus = "FAILED"
-	OrderStatusPaid       OrderStatus = "PAID"
+	OrderStatusPending         OrderStatus = "PENDING"
+	OrderStatusConfirmed       OrderStatus = "CONFIRMED"
+	OrderStatusPreparing       OrderStatus = "PREPARING"
+	OrderStatusAwaitingPayment OrderStatus = "AWAITING_PAYMENT"
+	OrderStatusPickedUp        OrderStatus = "PICKED_UP"
+	OrderStatusOutForDelivery  OrderStatus = "OUT_FOR_DELIVERY"
+	OrderStatusDelivered       OrderStatus = "DELIVERED"
+	OrderStatusCancelled       OrderStatus = "CANCELLED"
+	OrderStatusFailed          OrderStatus = "FAILED"
 )
 
 func NewOrder(userId uuid.UUID, products []PaymentLine) Order {
@@ -37,7 +39,7 @@ func NewOrder(userId uuid.UUID, products []PaymentLine) Order {
 		ID:          uuid.New(),
 		UserID:      userId,
 		PaymentMode: &paymentMode,
-		Status:      OrderStatusOpen,
+		Status:      OrderStatusPending,
 		Products:    products,
 	}
 }
