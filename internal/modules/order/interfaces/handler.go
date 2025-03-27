@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"tsb-service/internal/modules/order/application"
+	"tsb-service/internal/modules/order/domain"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -38,10 +39,30 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 		return
 	}
 
+	paymentLines := make([]domain.PaymentLine, 0, len(req.ProductsLines))
+
+	for _, line := range req.ProductsLines {
+		productID, err := uuid.Parse(line.ProductID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product ID"})
+			return
+		}
+
+		paymentLines = append(paymentLines, domain.PaymentLine{
+			Product: domain.Product{
+				ID:   productID,
+				Name: "",
+			},
+			Quantity:   line.Quantity,
+			UnitPrice:  0.0,
+			TotalPrice: 0.0,
+		})
+	}
+
 	order, err := h.service.CreateOrder(
 		c.Request.Context(),
 		userID,
-		req.ProductsLines,
+		paymentLines,
 		req.PaymentMode,
 	)
 

@@ -13,4 +13,5 @@ type OrderRepository interface {
 	FindByUserID(ctx context.Context, userID uuid.UUID) ([]*Order, error)
 	FindByID(ctx context.Context, orderID uuid.UUID) (*Order, error)
 	FindPaginated(ctx context.Context, page int, limit int) ([]*Order, error)
+	OrderFillPrices(ctx context.Context, order *Order) (*Order, error)
 }
