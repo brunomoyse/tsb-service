@@ -16,5 +16,5 @@ CREATE TABLE IF NOT EXISTS public.orders
         ON UPDATE NO ACTION
         ON DELETE NO ACTION,
     CONSTRAINT orders_payment_mode_check CHECK (payment_mode::text = ANY (ARRAY['CASH'::text, 'ONLINE'::text, 'TERMINAL'::text]::text[])),
-    CONSTRAINT orders_status_check CHECK (status::text = ANY (ARRAY['PENDING'::text, 'CONFIRMED'::text, 'PREPARING'::text, 'AWAITING_PAYMENT'::text, 'PICKED_UP'::text, 'OUT_FOR_DELIVERY'::text, 'DELIVERED'::text, 'CANCELLED'::text, 'FAILED'::text]::text[]))
+    CONSTRAINT orders_status_check CHECK (status::text = ANY (ARRAY['PENDING'::text, 'CONFIRMED'::text, 'PREPARING'::text, 'AWAITING_PICK_UP'::text, 'PICKED_UP'::text, 'OUT_FOR_DELIVERY'::text, 'DELIVERED'::text, 'CANCELLED'::text, 'FAILED'::text]::text[]))
 );
