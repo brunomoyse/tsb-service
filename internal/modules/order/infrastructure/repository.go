@@ -43,13 +43,13 @@ func (r *OrderRepository) Save(ctx context.Context, client *mollie.Client, order
 
 	// Insert the order without payment details.
 	const insertQuery = `
-		INSERT INTO orders (user_id, payment_mode, status)
-		VALUES ($1, $2, $3)
+		INSERT INTO orders (user_id, payment_mode, status, delivery_option)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id;
 	`
 
 	var orderID string
-	if err = tx.GetContext(ctx, &orderID, insertQuery, order.UserID, order.PaymentMode, order.Status); err != nil {
+	if err = tx.GetContext(ctx, &orderID, insertQuery, order.UserID, order.PaymentMode, order.Status, order.DeliveryOption); err != nil {
 		return nil, fmt.Errorf("failed to insert new order: %w", err)
 	}
 	order.ID, err = uuid.Parse(orderID)
@@ -87,6 +87,7 @@ func (r *OrderRepository) UpdateStatus(ctx context.Context, paymentID string, pa
 	`
 	var orderID uuid.UUID
 	var newStatus string
+	// @TODO: Add payment status instead of updating the order status
 	if paymentStatus == "paid" {
 		newStatus = "PAID"
 	} else {
@@ -110,6 +111,7 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
             o.payment_mode,
             o.mollie_payment_id,
             o.mollie_payment_url,
+            o.delivery_option,
             o.status,
             o.created_at,
             o.updated_at,
@@ -207,6 +209,7 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderId uuid.UUID) (*dom
 			payment_mode, 
 			mollie_payment_id, 
 			mollie_payment_url, 
+			delivery_option,
 			status, 
 			created_at, 
 			updated_at
@@ -232,6 +235,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
             o.payment_mode,
             o.mollie_payment_id,
             o.mollie_payment_url,
+            o.delivery_option,
             o.status,
             o.created_at,
             o.updated_at,
@@ -254,6 +258,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 		PaymentMode       string    `db:"payment_mode"`
 		MolliePaymentId   *string   `db:"mollie_payment_id"`
 		MolliePaymentUrl  *string   `db:"mollie_payment_url"`
+		DeliveryOption    string    `db:"delivery_option"`
 		Status            string    `db:"status"`
 		CreatedAt         time.Time `db:"created_at"`
 		UpdatedAt         time.Time `db:"updated_at"`
@@ -290,6 +295,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 				PaymentMode:      (*domain.PaymentMode)(&row.PaymentMode),
 				MolliePaymentId:  row.MolliePaymentId,
 				MolliePaymentUrl: row.MolliePaymentUrl,
+				DeliveryOption:   domain.DeliveryOption(row.DeliveryOption),
 				Status:           domain.OrderStatus(row.Status),
 				CreatedAt:        row.CreatedAt,
 				UpdatedAt:        row.UpdatedAt,
