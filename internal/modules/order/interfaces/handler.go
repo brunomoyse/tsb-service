@@ -126,3 +126,26 @@ func (h *OrderHandler) GetAdminPaginatedOrdersHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, orders)
 }
+
+func (h *OrderHandler) UpdateOrderStatusHandler(c *gin.Context) {
+	var req UpdateOrderStatusForm
+	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"invalid request payload": err.Error()})
+		return
+	}
+
+	orderID, err := uuid.Parse(req.OrderID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID"})
+		return
+	}
+
+	err = h.service.UpdateOrderStatus(c.Request.Context(), orderID, req.Status)
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update order status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "order status updated successfully"})
+}

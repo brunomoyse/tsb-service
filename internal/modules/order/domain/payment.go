@@ -7,9 +7,8 @@ import (
 type PaymentMode string
 
 const (
-	PaymentModeCash     PaymentMode = "CASH"
-	PaymentModeOnline   PaymentMode = "ONLINE"
-	PaymentModeTerminal PaymentMode = "TERMINAL"
+	PaymentModeCash   PaymentMode = "CASH"
+	PaymentModeOnline PaymentMode = "ONLINE"
 )
 
 type PaymentLine struct {

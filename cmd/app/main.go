@@ -84,7 +84,7 @@ func main() {
 	// CORS Middleware (Allow Specific Origins)
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{appBaseUrl, appDashboardUrl},
-		AllowMethods:     []string{"HEAD", "GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"HEAD", "GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept-Language"},
 		ExposeHeaders:    []string{"Content-Length", "Authorization"},
 		AllowCredentials: true,
@@ -105,6 +105,8 @@ func main() {
 	})
 
 	api.Use(middleware.LanguageExtractor()) // applied to all routes under /api/v1
+
+	// @TODO: Implement payments/webhook
 
 	// Public routes
 	api.GET("/products", productHandler.GetProductsHandler)
@@ -128,14 +130,16 @@ func main() {
 		authGroup.GET("/orders", orderHandler.GetUserOrdersHandler)
 	}
 
-	// Create order route at /v1/orders (requires authentication).
+	// Create order route at /v1/orders (requires authentication). @TODO: Add prefix /admin
 	api.POST("/orders", middleware.AuthMiddleware(jwtSecret), orderHandler.CreateOrderHandler)
 
 	// Admin routes
 	api.GET("/admin/products", middleware.AuthMiddleware(jwtSecret), productHandler.GetAdminProductsHandler)
 	api.POST("/admin/products", middleware.AuthMiddleware(jwtSecret), productHandler.CreateProductHandler)
 	api.PUT("/admin/products/:id", middleware.AuthMiddleware(jwtSecret), productHandler.UpdateProductHandler)
+
 	api.GET("/admin/orders", middleware.AuthMiddleware(jwtSecret), orderHandler.GetAdminPaginatedOrdersHandler)
+	api.PATCH("/admin/orders/:id", middleware.AuthMiddleware(jwtSecret), orderHandler.UpdateOrderStatusHandler)
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

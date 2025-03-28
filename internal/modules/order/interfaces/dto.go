@@ -14,3 +14,8 @@ type CreateOrderForm struct {
 	PaymentMode   domain.PaymentMode    `json:"paymentMode"`
 	// ShippingAddress *mollie.Address `json:"shipping_address"`
 }
+
+type UpdateOrderStatusForm struct {
+	OrderID string             `json:"orderID"`
+	Status  domain.OrderStatus `json:"status"`
+}

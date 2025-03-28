@@ -77,8 +77,21 @@ func (r *OrderRepository) Save(ctx context.Context, client *mollie.Client, order
 	return r.FindByID(ctx, order.ID)
 }
 
+func (r *OrderRepository) Update(ctx context.Context, order *domain.Order) error {
+	query := `
+		UPDATE orders
+		SET status = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2;
+	`
+	if _, err := r.db.ExecContext(ctx, query, order.Status, order.ID); err != nil {
+		return fmt.Errorf("failed to update order: %w", err)
+	}
+	return nil
+}
+
 // UpdateStatus updates an order’s status based on the Mollie payment status.
-func (r *OrderRepository) UpdateStatus(ctx context.Context, paymentID string, paymentStatus string) error {
+/*
+func (r *OrderRepository) UpdatePaymentStatus(ctx context.Context, paymentID string, paymentStatus string) error {
 	query := `
 		UPDATE orders
 		SET status = $1
@@ -99,6 +112,7 @@ func (r *OrderRepository) UpdateStatus(ctx context.Context, paymentID string, pa
 	}
 	return nil
 }
+*/
 
 // FindByUserID retrieves all orders for a given user.
 func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error) {
