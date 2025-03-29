@@ -133,36 +133,43 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
             op.quantity,
             COALESCE(pt_user.name, pt_fr.name, pt_zh.name, pt_en.name) AS product_name,
             op.unit_price AS product_unit_price,
-            op.total_price AS product_total_price
+            op.total_price AS product_total_price,
+            p.code AS product_code,
+            COALESCE(pct_user.name, pct_fr.name, pct_zh.name, pct_en.name) AS product_category_name
         FROM orders o
         LEFT JOIN order_product op ON o.id = op.order_id
         LEFT JOIN products p ON op.product_id = p.id
-
-        -- Translation joins with fallback
+        -- Product name translations with fallback
         LEFT JOIN product_translations pt_user ON p.id = pt_user.product_id AND pt_user.locale = $2
         LEFT JOIN product_translations pt_fr   ON p.id = pt_fr.product_id AND pt_fr.locale = 'fr'
         LEFT JOIN product_translations pt_zh   ON p.id = pt_zh.product_id AND pt_zh.locale = 'zh'
         LEFT JOIN product_translations pt_en   ON p.id = pt_en.product_id AND pt_en.locale = 'en'
-
+        -- Product category translations with fallback
+        LEFT JOIN product_category_translations pct_user ON p.category_id = pct_user.product_category_id AND pct_user.locale = $2
+        LEFT JOIN product_category_translations pct_fr   ON p.category_id = pct_fr.product_category_id AND pct_fr.locale = 'fr'
+        LEFT JOIN product_category_translations pct_zh   ON p.category_id = pct_zh.product_category_id AND pct_zh.locale = 'zh'
+        LEFT JOIN product_category_translations pct_en   ON p.category_id = pct_en.product_category_id AND pct_en.locale = 'en'
         WHERE o.user_id = $1
         ORDER BY o.created_at DESC
     `
 
 	var rows []struct {
-		OrderID           string    `db:"order_id"`
-		UserID            string    `db:"user_id"`
-		PaymentMode       string    `db:"payment_mode"`
-		MolliePaymentId   *string   `db:"mollie_payment_id"`
-		MolliePaymentUrl  *string   `db:"mollie_payment_url"`
-		DeliveryOption    string    `db:"delivery_option"`
-		Status            string    `db:"status"`
-		CreatedAt         time.Time `db:"created_at"`
-		UpdatedAt         time.Time `db:"updated_at"`
-		ProductID         *string   `db:"product_id"`
-		Quantity          *int64    `db:"quantity"`
-		ProductName       *string   `db:"product_name"`
-		ProductUnitPrice  *float64  `db:"product_unit_price"`
-		ProductTotalPrice *float64  `db:"product_total_price"`
+		OrderID             string    `db:"order_id"`
+		UserID              string    `db:"user_id"`
+		PaymentMode         string    `db:"payment_mode"`
+		MolliePaymentId     *string   `db:"mollie_payment_id"`
+		MolliePaymentUrl    *string   `db:"mollie_payment_url"`
+		DeliveryOption      string    `db:"delivery_option"`
+		Status              string    `db:"status"`
+		CreatedAt           time.Time `db:"created_at"`
+		UpdatedAt           time.Time `db:"updated_at"`
+		ProductID           *string   `db:"product_id"`
+		Quantity            *int64    `db:"quantity"`
+		ProductName         *string   `db:"product_name"`
+		ProductUnitPrice    *float64  `db:"product_unit_price"`
+		ProductTotalPrice   *float64  `db:"product_total_price"`
+		ProductCode         *string   `db:"product_code"`
+		ProductCategoryName *string   `db:"product_category_name"`
 	}
 
 	if err := r.db.SelectContext(ctx, &rows, query, userID, lang); err != nil {
@@ -178,7 +185,6 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse order id: %w", err)
 			}
-
 			uID, err := uuid.Parse(row.UserID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse user id: %w", err)
@@ -207,8 +213,10 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 
 			currentOrder.Products = append(currentOrder.Products, domain.PaymentLine{
 				Product: domain.Product{
-					ID:   prodID,
-					Name: *row.ProductName,
+					ID:           prodID,
+					Code:         *row.ProductCode,
+					CategoryName: *row.ProductCategoryName,
+					Name:         *row.ProductName,
 				},
 				Quantity:   int(*row.Quantity),
 				UnitPrice:  *row.ProductUnitPrice,
@@ -244,55 +252,61 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderId uuid.UUID) (*dom
 	return &ord, nil
 }
 
-// FindPaginated retrieves a paginated list of orders.
 func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int) ([]*domain.Order, error) {
 	lang := utils.GetLang(ctx)
 
 	query := `
-		SELECT 
-			o.id AS order_id,
-			o.user_id,
-			o.payment_mode,
-			o.mollie_payment_id,
-			o.mollie_payment_url,
-			o.delivery_option,
-			o.status,
-			o.created_at,
-			o.updated_at,
-			op.product_id,
-			op.quantity,
-			COALESCE(pt_user.name, pt_fr.name, pt_zh.name, pt_en.name) AS product_name,
-			op.unit_price AS product_unit_price,
-			op.total_price AS product_total_price
-		FROM orders o
-		LEFT JOIN order_product op ON o.id = op.order_id
-		LEFT JOIN products p ON op.product_id = p.id
-		
-		-- Join translations for fallback languages
-		LEFT JOIN product_translations pt_user ON p.id = pt_user.product_id AND pt_user.locale = $2
-		LEFT JOIN product_translations pt_fr   ON p.id = pt_fr.product_id AND pt_fr.locale = 'fr'
-		LEFT JOIN product_translations pt_zh   ON p.id = pt_zh.product_id AND pt_zh.locale = 'zh'
-		LEFT JOIN product_translations pt_en   ON p.id = pt_en.product_id AND pt_en.locale = 'en'
-		
-		ORDER BY o.created_at DESC
-		LIMIT $1 OFFSET $1 * ($3 - 1)
-	`
+        SELECT 
+            o.id AS order_id,
+            o.user_id,
+            o.payment_mode,
+            o.mollie_payment_id,
+            o.mollie_payment_url,
+            o.delivery_option,
+            o.status,
+            o.created_at,
+            o.updated_at,
+            op.product_id,
+            op.quantity,
+            COALESCE(pt_user.name, pt_fr.name, pt_zh.name, pt_en.name) AS product_name,
+            op.unit_price AS product_unit_price,
+            op.total_price AS product_total_price,
+            p.code AS product_code,
+            COALESCE(pct_user.name, pct_fr.name, pct_zh.name, pct_en.name) AS product_category_name
+        FROM orders o
+        LEFT JOIN order_product op ON o.id = op.order_id
+        LEFT JOIN products p ON op.product_id = p.id
+        -- Product translations with fallback languages
+        LEFT JOIN product_translations pt_user ON p.id = pt_user.product_id AND pt_user.locale = $2
+        LEFT JOIN product_translations pt_fr   ON p.id = pt_fr.product_id AND pt_fr.locale = 'fr'
+        LEFT JOIN product_translations pt_zh   ON p.id = pt_zh.product_id AND pt_zh.locale = 'zh'
+        LEFT JOIN product_translations pt_en   ON p.id = pt_en.product_id AND pt_en.locale = 'en'
+        -- Category translations with fallback languages
+        LEFT JOIN product_category_translations pct_user ON p.category_id = pct_user.product_category_id AND pct_user.locale = $2
+        LEFT JOIN product_category_translations pct_fr   ON p.category_id = pct_fr.product_category_id AND pct_fr.locale = 'fr'
+        LEFT JOIN product_category_translations pct_zh   ON p.category_id = pct_zh.product_category_id AND pct_zh.locale = 'zh'
+        LEFT JOIN product_category_translations pct_en   ON p.category_id = pct_en.product_category_id AND pct_en.locale = 'en'
+        ORDER BY o.created_at DESC
+        LIMIT $1 OFFSET $1 * ($3 - 1)
+    `
 
 	var rows []struct {
-		OrderID           string    `db:"order_id"`
-		UserID            string    `db:"user_id"`
-		PaymentMode       string    `db:"payment_mode"`
-		MolliePaymentId   *string   `db:"mollie_payment_id"`
-		MolliePaymentUrl  *string   `db:"mollie_payment_url"`
-		DeliveryOption    string    `db:"delivery_option"`
-		Status            string    `db:"status"`
-		CreatedAt         time.Time `db:"created_at"`
-		UpdatedAt         time.Time `db:"updated_at"`
-		ProductID         *string   `db:"product_id"`
-		Quantity          *int64    `db:"quantity"`
-		ProductName       *string   `db:"product_name"`
-		ProductUnitPrice  *float64  `db:"product_unit_price"`
-		ProductTotalPrice *float64  `db:"product_total_price"`
+		OrderID             string    `db:"order_id"`
+		UserID              string    `db:"user_id"`
+		PaymentMode         string    `db:"payment_mode"`
+		MolliePaymentId     *string   `db:"mollie_payment_id"`
+		MolliePaymentUrl    *string   `db:"mollie_payment_url"`
+		DeliveryOption      string    `db:"delivery_option"`
+		Status              string    `db:"status"`
+		CreatedAt           time.Time `db:"created_at"`
+		UpdatedAt           time.Time `db:"updated_at"`
+		ProductID           *string   `db:"product_id"`
+		Quantity            *int64    `db:"quantity"`
+		ProductName         *string   `db:"product_name"`
+		ProductUnitPrice    *float64  `db:"product_unit_price"`
+		ProductTotalPrice   *float64  `db:"product_total_price"`
+		ProductCode         *string   `db:"product_code"`
+		ProductCategoryName *string   `db:"product_category_name"`
 	}
 
 	if err := r.db.SelectContext(ctx, &rows, query, limit, lang, page); err != nil {
@@ -303,13 +317,11 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 	var currentOrder *domain.Order
 
 	for _, row := range rows {
-		// New order detected
 		if currentOrder == nil || currentOrder.ID.String() != row.OrderID {
 			ordID, err := uuid.Parse(row.OrderID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse order id: %w", err)
 			}
-
 			uID, err := uuid.Parse(row.UserID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse user id: %w", err)
@@ -330,7 +342,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 			orders = append(orders, currentOrder)
 		}
 
-		// Add product if exists
+		// Append product if exists
 		if row.ProductID != nil {
 			prodID, err := uuid.Parse(*row.ProductID)
 			if err != nil {
@@ -339,8 +351,10 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 
 			currentOrder.Products = append(currentOrder.Products, domain.PaymentLine{
 				Product: domain.Product{
-					ID:   prodID,
-					Name: *row.ProductName,
+					ID:           prodID,
+					Code:         *row.ProductCode,
+					CategoryName: *row.ProductCategoryName,
+					Name:         *row.ProductName,
 				},
 				Quantity:   int(*row.Quantity),
 				UnitPrice:  *row.ProductUnitPrice,
