@@ -131,13 +131,19 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
             o.updated_at,
             op.product_id,
             op.quantity,
-            pt.name AS product_name,
+            COALESCE(pt_user.name, pt_fr.name, pt_zh.name, pt_en.name) AS product_name,
             op.unit_price AS product_unit_price,
             op.total_price AS product_total_price
         FROM orders o
         LEFT JOIN order_product op ON o.id = op.order_id
         LEFT JOIN products p ON op.product_id = p.id
-        LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = $2
+
+        -- Translation joins with fallback
+        LEFT JOIN product_translations pt_user ON p.id = pt_user.product_id AND pt_user.locale = $2
+        LEFT JOIN product_translations pt_fr   ON p.id = pt_fr.product_id AND pt_fr.locale = 'fr'
+        LEFT JOIN product_translations pt_zh   ON p.id = pt_zh.product_id AND pt_zh.locale = 'zh'
+        LEFT JOIN product_translations pt_en   ON p.id = pt_en.product_id AND pt_en.locale = 'en'
+
         WHERE o.user_id = $1
         ORDER BY o.created_at DESC
     `
@@ -148,6 +154,7 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 		PaymentMode       string    `db:"payment_mode"`
 		MolliePaymentId   *string   `db:"mollie_payment_id"`
 		MolliePaymentUrl  *string   `db:"mollie_payment_url"`
+		DeliveryOption    string    `db:"delivery_option"`
 		Status            string    `db:"status"`
 		CreatedAt         time.Time `db:"created_at"`
 		UpdatedAt         time.Time `db:"updated_at"`
@@ -166,7 +173,6 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 	var currentOrder *domain.Order
 
 	for _, row := range rows {
-		// New order detected
 		if currentOrder == nil || currentOrder.ID.String() != row.OrderID {
 			ordID, err := uuid.Parse(row.OrderID)
 			if err != nil {
@@ -184,6 +190,7 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 				PaymentMode:      (*domain.PaymentMode)(&row.PaymentMode),
 				MolliePaymentId:  row.MolliePaymentId,
 				MolliePaymentUrl: row.MolliePaymentUrl,
+				DeliveryOption:   domain.DeliveryOption(row.DeliveryOption),
 				Status:           domain.OrderStatus(row.Status),
 				CreatedAt:        row.CreatedAt,
 				UpdatedAt:        row.UpdatedAt,
@@ -192,7 +199,6 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 			orders = append(orders, currentOrder)
 		}
 
-		// Add product if exists
 		if row.ProductID != nil {
 			prodID, err := uuid.Parse(*row.ProductID)
 			if err != nil {
@@ -244,24 +250,30 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 
 	query := `
 		SELECT 
-            o.id AS order_id,
-            o.user_id,
-            o.payment_mode,
-            o.mollie_payment_id,
-            o.mollie_payment_url,
-            o.delivery_option,
-            o.status,
-            o.created_at,
-            o.updated_at,
-            op.product_id,
-            op.quantity,
-            pt.name AS product_name,
-            op.unit_price AS product_unit_price,
-            op.total_price AS product_total_price
-        FROM orders o
-        LEFT JOIN order_product op ON o.id = op.order_id
-        LEFT JOIN products p ON op.product_id = p.id
-        LEFT JOIN product_translations pt ON p.id = pt.product_id AND pt.locale = $2
+			o.id AS order_id,
+			o.user_id,
+			o.payment_mode,
+			o.mollie_payment_id,
+			o.mollie_payment_url,
+			o.delivery_option,
+			o.status,
+			o.created_at,
+			o.updated_at,
+			op.product_id,
+			op.quantity,
+			COALESCE(pt_user.name, pt_fr.name, pt_zh.name, pt_en.name) AS product_name,
+			op.unit_price AS product_unit_price,
+			op.total_price AS product_total_price
+		FROM orders o
+		LEFT JOIN order_product op ON o.id = op.order_id
+		LEFT JOIN products p ON op.product_id = p.id
+		
+		-- Join translations for fallback languages
+		LEFT JOIN product_translations pt_user ON p.id = pt_user.product_id AND pt_user.locale = $2
+		LEFT JOIN product_translations pt_fr   ON p.id = pt_fr.product_id AND pt_fr.locale = 'fr'
+		LEFT JOIN product_translations pt_zh   ON p.id = pt_zh.product_id AND pt_zh.locale = 'zh'
+		LEFT JOIN product_translations pt_en   ON p.id = pt_en.product_id AND pt_en.locale = 'en'
+		
 		ORDER BY o.created_at DESC
 		LIMIT $1 OFFSET $1 * ($3 - 1)
 	`
