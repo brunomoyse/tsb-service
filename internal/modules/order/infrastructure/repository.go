@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -223,6 +225,56 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 				TotalPrice: *row.ProductTotalPrice,
 			})
 		}
+	}
+
+	// Define a regex to capture the letter(s) and number.
+	var codeRegex = regexp.MustCompile(`^([A-Za-z]+)(\d+)$`)
+
+	// After building orders, sort each order's Products slice.
+	for _, order := range orders {
+		sort.Slice(order.Products, func(i, j int) bool {
+			a := order.Products[i].Product
+			b := order.Products[j].Product
+
+			// If one product's code is nil and the other's isn't, nil comes first.
+			if a.Code == nil && b.Code != nil {
+				return true
+			} else if a.Code != nil && b.Code == nil {
+				return false
+			}
+
+			// If both codes are non-nil, parse them.
+			if a.Code != nil && b.Code != nil {
+				aMatches := codeRegex.FindStringSubmatch(*a.Code)
+				bMatches := codeRegex.FindStringSubmatch(*b.Code)
+
+				if len(aMatches) == 3 && len(bMatches) == 3 {
+					// Compare the letter portions.
+					if aMatches[1] != bMatches[1] {
+						return aMatches[1] < bMatches[1]
+					}
+
+					// Convert the numeric portions to integers.
+					aNum, errA := strconv.Atoi(aMatches[2])
+					bNum, errB := strconv.Atoi(bMatches[2])
+					if errA == nil && errB == nil {
+						if aNum != bNum {
+							return aNum < bNum
+						}
+					}
+					// Fallback to string comparison if numeric parts are equal.
+					return *a.Code < *b.Code
+				}
+
+				// If the regex doesn't match for either code, fall back to string comparison.
+				if *a.Code != *b.Code {
+					return *a.Code < *b.Code
+				}
+			}
+
+			// If both codes are nil, fall back to sorting by product name.
+			return a.Name < b.Name
+		})
 	}
 
 	return orders, nil
