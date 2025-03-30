@@ -150,3 +150,20 @@ func (h *OrderHandler) UpdateOrderStatusHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "order status updated successfully"})
 }
+
+func (h *OrderHandler) GetAdminOrderHandler(c *gin.Context) {
+	orderIDStr := c.Param("id")
+	orderID, err := uuid.Parse(orderIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID"})
+		return
+	}
+
+	order, err := h.service.GetOrderByID(c.Request.Context(), orderID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
+		return
+	}
+
+	c.JSON(http.StatusOK, order)
+}

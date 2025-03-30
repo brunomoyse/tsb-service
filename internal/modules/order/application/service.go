@@ -16,6 +16,7 @@ type OrderService interface {
 	GetOrdersByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error)
 	GetPaginatedOrders(ctx context.Context, page int, limit int) ([]*domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) error
+	GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, error)
 }
 
 type orderService struct {
@@ -91,4 +92,8 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID,
 	sse.Hub.Broadcast(eventPayload)
 
 	return nil
+}
+
+func (s *orderService) GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, error) {
+	return s.repo.FindByID(ctx, orderID)
 }

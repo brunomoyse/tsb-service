@@ -229,27 +229,119 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 }
 
 // FindByID retrieves an order by its ID.
-func (r *OrderRepository) FindByID(ctx context.Context, orderId uuid.UUID) (*domain.Order, error) {
+func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, error) {
+	lang := utils.GetLang(ctx)
+
 	query := `
-		SELECT 
-			id, 
-			user_id, 
-			payment_mode, 
-			mollie_payment_id, 
-			mollie_payment_url, 
-			delivery_option,
-			status, 
-			created_at, 
-			updated_at
-		FROM orders
-		WHERE id = $1;
+        SELECT 
+            o.id AS order_id,
+            o.user_id,
+            o.payment_mode,
+            o.mollie_payment_id,
+            o.mollie_payment_url,
+            o.delivery_option,
+            o.status,
+            o.created_at,
+            o.updated_at,
+            op.product_id,
+            op.quantity,
+            COALESCE(pt_user.name, pt_fr.name, pt_zh.name, pt_en.name) AS product_name,
+            op.unit_price AS product_unit_price,
+            op.total_price AS product_total_price,
+            p.code AS product_code,
+            COALESCE(pct_user.name, pct_fr.name, pct_zh.name, pct_en.name) AS product_category_name
+        FROM orders o
+        LEFT JOIN order_product op ON o.id = op.order_id
+        LEFT JOIN products p ON op.product_id = p.id
+        -- Product translations with fallback
+        LEFT JOIN product_translations pt_user ON p.id = pt_user.product_id AND pt_user.locale = $2
+        LEFT JOIN product_translations pt_fr   ON p.id = pt_fr.product_id AND pt_fr.locale = 'fr'
+        LEFT JOIN product_translations pt_zh   ON p.id = pt_zh.product_id AND pt_zh.locale = 'zh'
+        LEFT JOIN product_translations pt_en   ON p.id = pt_en.product_id AND pt_en.locale = 'en'
+        -- Product category translations with fallback
+        LEFT JOIN product_category_translations pct_user ON p.category_id = pct_user.product_category_id AND pct_user.locale = $2
+        LEFT JOIN product_category_translations pct_fr   ON p.category_id = pct_fr.product_category_id AND pct_fr.locale = 'fr'
+        LEFT JOIN product_category_translations pct_zh   ON p.category_id = pct_zh.product_category_id AND pct_zh.locale = 'zh'
+        LEFT JOIN product_category_translations pct_en   ON p.category_id = pct_en.product_category_id AND pct_en.locale = 'en'
+        WHERE o.id = $1
+        ORDER BY o.created_at DESC
 	`
-	var ord domain.Order
-	err := r.db.GetContext(ctx, &ord, query, orderId)
-	if err != nil {
+
+	var rows []struct {
+		OrderID             string    `db:"order_id"`
+		UserID              string    `db:"user_id"`
+		PaymentMode         string    `db:"payment_mode"`
+		MolliePaymentId     *string   `db:"mollie_payment_id"`
+		MolliePaymentUrl    *string   `db:"mollie_payment_url"`
+		DeliveryOption      string    `db:"delivery_option"`
+		Status              string    `db:"status"`
+		CreatedAt           time.Time `db:"created_at"`
+		UpdatedAt           time.Time `db:"updated_at"`
+		ProductID           *string   `db:"product_id"`
+		Quantity            *int64    `db:"quantity"`
+		ProductName         *string   `db:"product_name"`
+		ProductUnitPrice    *float64  `db:"product_unit_price"`
+		ProductTotalPrice   *float64  `db:"product_total_price"`
+		ProductCode         *string   `db:"product_code"`
+		ProductCategoryName *string   `db:"product_category_name"`
+	}
+
+	if err := r.db.SelectContext(ctx, &rows, query, orderID, lang); err != nil {
 		return nil, fmt.Errorf("failed to query order: %w", err)
 	}
-	return &ord, nil
+
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("order not found")
+	}
+
+	var order *domain.Order
+	for _, row := range rows {
+		// Create the order once.
+		if order == nil {
+			ordID, err := uuid.Parse(row.OrderID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse order id: %w", err)
+			}
+			uID, err := uuid.Parse(row.UserID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse user id: %w", err)
+			}
+
+			order = &domain.Order{
+				ID:               ordID,
+				UserID:           uID,
+				PaymentMode:      (*domain.PaymentMode)(&row.PaymentMode),
+				MolliePaymentId:  row.MolliePaymentId,
+				MolliePaymentUrl: row.MolliePaymentUrl,
+				DeliveryOption:   domain.DeliveryOption(row.DeliveryOption),
+				Status:           domain.OrderStatus(row.Status),
+				CreatedAt:        row.CreatedAt,
+				UpdatedAt:        row.UpdatedAt,
+				Products:         []domain.PaymentLine{},
+			}
+		}
+
+		// Append product line if exists.
+		if row.ProductID != nil {
+			prodID, err := uuid.Parse(*row.ProductID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse product id: %w", err)
+			}
+			order.Products = append(order.Products, domain.PaymentLine{
+				Product: domain.Product{
+					ID:           prodID,
+					Code:         *row.ProductCode,
+					CategoryName: *row.ProductCategoryName,
+					Name:         *row.ProductName,
+				},
+				Quantity:   int(*row.Quantity),
+				UnitPrice:  *row.ProductUnitPrice,
+				TotalPrice: *row.ProductTotalPrice,
+			})
+		}
+	}
+
+	return order, nil
 }
 
 func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int) ([]*domain.Order, error) {
