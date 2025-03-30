@@ -2,7 +2,10 @@ package application
 
 import (
 	"context"
+	"fmt"
+	"time"
 	"tsb-service/internal/modules/order/domain"
+	"tsb-service/pkg/sse"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
@@ -32,12 +35,25 @@ func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, paymen
 
 	// Load product prices from DB
 	updatedOrder, err := s.repo.OrderFillPrices(ctx, &order)
-
 	if err != nil {
 		return nil, err
 	}
 
-	return s.repo.Save(ctx, s.mollieClient, updatedOrder)
+	savedOrder, err := s.repo.Save(ctx, s.mollieClient, updatedOrder)
+	if err != nil {
+		return nil, err
+	}
+
+	// Construct an event payload for the orderCreated event.
+	eventPayload := fmt.Sprintf(
+		`{"event": "orderCreated", "orderID": "%s", "timestamp": "%s"}`,
+		savedOrder.ID.String(),
+		time.Now().Format(time.RFC3339),
+	)
+	// Broadcast the event to all connected SSE clients.
+	sse.Hub.Broadcast(eventPayload)
+
+	return savedOrder, nil
 }
 
 func (s *orderService) GetOrdersByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error) {
@@ -48,13 +64,31 @@ func (s *orderService) GetPaginatedOrders(ctx context.Context, page int, limit i
 	return s.repo.FindPaginated(ctx, page, limit)
 }
 
-func (s *orderService) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) error {
+func (s *orderService) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, newStatus domain.OrderStatus) error {
+	// Retrieve the order
 	order, err := s.repo.FindByID(ctx, orderID)
 	if err != nil {
 		return err
 	}
 
-	order.Status = status
+	// Update the status in the order struct
+	order.Status = newStatus
 
-	return s.repo.Update(ctx, order)
+	// Update the order in the repository
+	if err := s.repo.Update(ctx, order); err != nil {
+		return err
+	}
+
+	// Construct an event payload (as JSON)
+	eventPayload := fmt.Sprintf(
+		`{"event": "orderStatusUpdated", "orderID": "%s", "newStatus": "%s", "timestamp": "%s"}`,
+		orderID.String(),
+		newStatus,
+		time.Now().Format(time.RFC3339),
+	)
+
+	// Trigger the event sending via the SSE hub.
+	sse.Hub.Broadcast(eventPayload)
+
+	return nil
 }
