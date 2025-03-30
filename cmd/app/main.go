@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"tsb-service/pkg/sse"
 
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
@@ -94,6 +95,10 @@ func main() {
 	router.OPTIONS("/*any", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
+
+	// Register the SSE endpoint.
+	// Since SSE is just HTTP, we can mount it using gin.WrapH.
+	router.GET("/sse", gin.WrapH(sse.Hub))
 
 	// Setup routes (grouped by API version or module as needed)
 	// Setup routes for /api/v1.

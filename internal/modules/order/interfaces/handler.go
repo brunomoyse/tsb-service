@@ -24,6 +24,7 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 	var req CreateOrderForm
 	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"invalid request payload": err.Error()})
+		return
 	}
 
 	// Retrieve the logged-in user's ID from the Gin context.
