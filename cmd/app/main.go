@@ -4,11 +4,10 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"tsb-service/pkg/sse"
-
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
 	productInterfaces "tsb-service/internal/modules/product/interfaces"
+	"tsb-service/pkg/sse"
 
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderInfrastructure "tsb-service/internal/modules/order/infrastructure"
@@ -96,10 +95,6 @@ func main() {
 		c.Status(http.StatusOK)
 	})
 
-	// Register the SSE endpoint.
-	// Since SSE is just HTTP, we can mount it using gin.WrapH.
-	router.GET("/sse", gin.WrapH(sse.Hub))
-
 	// Setup routes (grouped by API version or module as needed)
 	// Setup routes for /api/v1.
 	api := router.Group("/api/v1")
@@ -112,6 +107,10 @@ func main() {
 	api.Use(middleware.LanguageExtractor()) // applied to all routes under /api/v1
 
 	// @TODO: Implement payments/webhook
+
+	// Register the SSE endpoint.
+	// Since SSE is just HTTP, we can mount it using gin.WrapH.
+	api.GET("/sse", gin.WrapH(sse.Hub))
 
 	// Public routes
 	api.GET("/products", productHandler.GetProductsHandler)
@@ -144,6 +143,7 @@ func main() {
 	api.PUT("/admin/products/:id", middleware.AuthMiddleware(jwtSecret), productHandler.UpdateProductHandler)
 
 	api.GET("/admin/orders", middleware.AuthMiddleware(jwtSecret), orderHandler.GetAdminPaginatedOrdersHandler)
+	api.GET("/admin/orders/:id", middleware.AuthMiddleware(jwtSecret), orderHandler.GetAdminOrderHandler)
 	api.PATCH("/admin/orders/:id", middleware.AuthMiddleware(jwtSecret), orderHandler.UpdateOrderStatusHandler)
 
 	if err := router.Run(":8080"); err != nil {
