@@ -214,7 +214,7 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 			currentOrder.Products = append(currentOrder.Products, domain.PaymentLine{
 				Product: domain.Product{
 					ID:           prodID,
-					Code:         *row.ProductCode,
+					Code:         row.ProductCode,
 					CategoryName: *row.ProductCategoryName,
 					Name:         *row.ProductName,
 				},
@@ -330,7 +330,7 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 			order.Products = append(order.Products, domain.PaymentLine{
 				Product: domain.Product{
 					ID:           prodID,
-					Code:         *row.ProductCode,
+					Code:         row.ProductCode,
 					CategoryName: *row.ProductCategoryName,
 					Name:         *row.ProductName,
 				},
@@ -444,7 +444,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 			currentOrder.Products = append(currentOrder.Products, domain.PaymentLine{
 				Product: domain.Product{
 					ID:           prodID,
-					Code:         *row.ProductCode,
+					Code:         row.ProductCode,
 					CategoryName: *row.ProductCategoryName,
 					Name:         *row.ProductName,
 				},
