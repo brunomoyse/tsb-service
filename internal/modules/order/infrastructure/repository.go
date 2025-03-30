@@ -568,12 +568,6 @@ func createMolliePayment(ctx context.Context, tx *sqlx.Tx, client *mollie.Client
 }
 
 func getMolliePaymentLines(ctx context.Context, tx *sqlx.Tx, ord *domain.Order) ([]mollie.PaymentLines, error) {
-	// Default language to "fr".
-	lang := "fr"
-	if l, ok := ctx.Value("lang").(string); ok && l != "" {
-		lang = l
-	}
-
 	if len(ord.Products) == 0 {
 		return nil, fmt.Errorf("no products found in order")
 	}
@@ -589,17 +583,22 @@ func getMolliePaymentLines(ctx context.Context, tx *sqlx.Tx, ord *domain.Order) 
 		SELECT 
 			p.id, 
 			pt.name, 
-			p.price
+			p.price,
+			p.code,
+			pct.name AS category_name
 		FROM 
 			products p
 		INNER JOIN 
 			product_translations pt ON p.id = pt.product_id
-		WHERE 
+		INNER JOIN
+			product_category_translations pct ON p.category_id = pct.product_category_id
+		WHERE
 			p.id IN (?)
-			AND pt.locale = ?
+			AND pt.locale = 'fr'
+		  	AND pct.locale = 'fr'
 			AND p.is_available = true
 	`
-	query, args, err := sqlx.In(query, productIDs, lang)
+	query, args, err := sqlx.In(query, productIDs)
 	if err != nil {
 		return nil, fmt.Errorf("preparing query: %w", err)
 	}
@@ -607,9 +606,11 @@ func getMolliePaymentLines(ctx context.Context, tx *sqlx.Tx, ord *domain.Order) 
 
 	// Define an inline type to match the query result.
 	type productRow struct {
-		ID    uuid.UUID `db:"id"`
-		Name  string    `db:"name"`
-		Price float64   `db:"price"`
+		ID           uuid.UUID `db:"id"`
+		Name         string    `db:"name"`
+		Price        float64   `db:"price"`
+		Code         *string   `db:"code"`
+		CategoryName string    `db:"category_name"`
 	}
 	var rows []productRow
 	if err := tx.SelectContext(ctx, &rows, query, args...); err != nil {
@@ -631,8 +632,14 @@ func getMolliePaymentLines(ctx context.Context, tx *sqlx.Tx, ord *domain.Order) 
 		}
 		unitPriceStr := strconv.FormatFloat(prod.Price, 'f', 2, 64)
 		totalAmountStr := strconv.FormatFloat(prod.Price*float64(line.Quantity), 'f', 2, 64)
+		var description string
+		if prod.Code != nil && *prod.Code != "" {
+			description = fmt.Sprintf("%s - %s %s", *prod.Code, prod.CategoryName, prod.Name)
+		} else {
+			description = fmt.Sprintf("%s %s", prod.CategoryName, prod.Name)
+		}
 		paymentLines = append(paymentLines, mollie.PaymentLines{
-			Description:  prod.Name,
+			Description:  description,
 			Quantity:     line.Quantity,
 			QuantityUnit: "pcs",
 			UnitPrice:    &mollie.Amount{Value: unitPriceStr, Currency: "EUR"},
