@@ -55,7 +55,7 @@ func (r *ProductRepository) Create(ctx context.Context, product *domain.Product)
 		var frenchCategoryName string
 		// Query the product_category_translations table for the French name.
 		queryCategory := `
-		SELECT name 
+		SELECT name
 		FROM product_category_translations 
 		WHERE product_category_id = $1 
 		  AND locale = 'fr'
@@ -275,7 +275,8 @@ func (r *ProductRepository) FindAll(ctx context.Context) ([]*domain.Product, err
             t.name,
             t.description
         FROM products p
-        LEFT JOIN product_translations t ON p.id = t.product_id;
+        LEFT JOIN product_translations t ON p.id = t.product_id
+        ORDER BY p.code;
     `
 	return r.queryProducts(ctx, query)
 }
