@@ -133,6 +133,7 @@ func main() {
 	// AUTHENTICATED ROUTES
 	//
 	api.GET("/me/orders", middleware.AuthMiddleware(jwtSecret), orderHandler.GetUserOrdersHandler)
+	api.GET("/orders/:id", middleware.AuthMiddleware(jwtSecret), orderHandler.GetOrderHandler)
 	api.GET("/my-profile", middleware.AuthMiddleware(jwtSecret), userHandler.GetUserProfileHandler)
 	api.POST("/orders", middleware.AuthMiddleware(jwtSecret), orderHandler.CreateOrderHandler)
 
