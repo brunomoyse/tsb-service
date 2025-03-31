@@ -75,6 +75,41 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, order)
 }
 
+func (h *OrderHandler) GetOrderHandler(c *gin.Context) {
+	orderIDStr := c.Param("id")
+	orderID, err := uuid.Parse(orderIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID"})
+		return
+	}
+
+	order, err := h.service.GetOrderByID(c.Request.Context(), orderID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
+		return
+	}
+
+	// Check if the order belongs to the logged-in user.
+	userIDStr := c.GetString("userID")
+	if userIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	if order.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
+		return
+	}
+
+	c.JSON(http.StatusOK, order)
+}
+
 // GetUserOrders handles GET requests to retrieve orders for the logged-in user.
 func (h *OrderHandler) GetUserOrdersHandler(c *gin.Context) {
 	// Retrieve the logged-in user's ID from the Gin context.
