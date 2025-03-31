@@ -112,7 +112,9 @@ func main() {
 	// Since SSE is just HTTP, we can mount it using gin.WrapH.
 	api.GET("/sse", gin.WrapH(sse.Hub))
 
-	// Public routes
+	//
+	// PUBLIC ROUTES
+	//
 	api.GET("/products", productHandler.GetProductsHandler)
 	api.GET("/products/:id", productHandler.GetProductHandler)
 	api.GET("/categories", productHandler.GetCategoriesHandler)
@@ -125,16 +127,13 @@ func main() {
 	api.GET("/oauth/google/callback", userHandler.GoogleAuthCallbackHandler)
 
 	api.POST("/tokens/refresh", userHandler.RefreshTokenHandler)
-	api.POST("/tokens/revoke", userHandler.LogoutHandler)
+	api.GET("/tokens/revoke", userHandler.LogoutHandler)
 
-	// Create a subgroup for routes that require authentication.
-	authGroup := api.Group("/me")
-	authGroup.Use(middleware.AuthMiddleware(jwtSecret))
-	{
-		authGroup.GET("/orders", orderHandler.GetUserOrdersHandler)
-	}
-
-	// Create order route at /v1/orders (requires authentication). @TODO: Add prefix /admin
+	//
+	// AUTHENTICATED ROUTES
+	//
+	api.GET("/me/orders", middleware.AuthMiddleware(jwtSecret), orderHandler.GetUserOrdersHandler)
+	api.GET("/my-profile", middleware.AuthMiddleware(jwtSecret), userHandler.GetUserProfileHandler)
 	api.POST("/orders", middleware.AuthMiddleware(jwtSecret), orderHandler.CreateOrderHandler)
 
 	// Admin routes
