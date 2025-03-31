@@ -31,6 +31,30 @@ func NewUserHandler(service application.UserService, jwtSecret string) *UserHand
 	}
 }
 
+func (h *UserHandler) GetUserProfileHandler(c *gin.Context) {
+	// Retrieve the logged-in user's ID from the Gin context.
+	userID := c.GetString("userID")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "handler: user not authenticated"})
+		return
+	}
+
+	user, err := h.service.GetUserByID(c, userID)
+
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile", "details": err.Error()})
+		return
+	}
+
+	res := NewUserResponse(user)
+
+	c.JSON(http.StatusOK, res)
+}
+
 func (h *UserHandler) RegisterHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -66,6 +90,7 @@ func (h *UserHandler) LoginHandler(c *gin.Context) {
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"invalid request payload": err.Error()})
+		return
 	}
 
 	user, accessToken, refreshToken, err := h.service.Login(ctx, req.Email, req.Password, h.jwtSecret)
@@ -74,10 +99,11 @@ func (h *UserHandler) LoginHandler(c *gin.Context) {
 		return
 	}
 
-	res := NewLoginResponse(user, *accessToken)
-
+	c.SetCookie("access_token", *accessToken, 15*60, "/", "", true, true) // 15 minutes
 	c.SetCookie("refresh_token", *refreshToken, 7*24*3600, "/", "", true, true)
-	c.JSON(http.StatusOK, &res)
+	c.SetSameSite(http.SameSiteLaxMode)
+
+	c.JSON(http.StatusOK, NewLoginResponse(user))
 }
 
 func (h *UserHandler) LogoutHandler(c *gin.Context) {
@@ -232,33 +258,51 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	}
 
 	// Generate tokens.
-	_, refreshToken, err := h.service.GenerateTokens(ctx, user.ID.String(), h.jwtSecret)
+	accessToken, refreshToken, err := h.service.GenerateTokens(ctx, *user, h.jwtSecret)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token", "details": err.Error()})
 		return
 	}
 
 	// Set refresh token cookie and redirect.
+	c.SetCookie("access_token", accessToken, 15*60, "/", "", true, true) // 15 minutes
 	c.SetCookie("refresh_token", refreshToken, 7*24*3600, "/", "", true, true)
+	c.SetSameSite(http.SameSiteLaxMode)
+
 	c.Redirect(http.StatusFound, os.Getenv("REDIRECT_LOGIN_SUCCESSFUL"))
 }
 
 func (h *UserHandler) RefreshTokenHandler(c *gin.Context) {
+	// 1. Get refresh token from cookie
 	refreshToken, err := c.Cookie("refresh_token")
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No refresh token provided"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 		return
 	}
 
-	userDetails, newAccessToken, err := h.service.RefreshToken(c.Request.Context(), refreshToken, h.jwtSecret)
+	// 2. Process token refresh
+	newAccessToken, newRefreshToken, user, err := h.service.RefreshToken(
+		c.Request.Context(),
+		refreshToken,
+		h.jwtSecret,
+	)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Session expired"})
 		return
 	}
 
+	// 3. Set new cookies
+	c.SetCookie("access_token", newAccessToken, 15*60, "/", "", true, true)
+	c.SetCookie("refresh_token", newRefreshToken, 7*24*3600, "/", "", true, true)
+	c.SetSameSite(http.SameSiteLaxMode)
+
+	// 4. Return minimal user data
 	c.JSON(http.StatusOK, gin.H{
-		"accessToken": newAccessToken,
-		"user":        userDetails,
+		"user": gin.H{
+			"id":    user.ID,
+			"email": user.Email,
+			"name":  user.Name,
+		},
 	})
 }
 

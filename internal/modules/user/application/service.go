@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"log"
 	"os"
 	"time"
@@ -24,8 +25,8 @@ type UserService interface {
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	GetUserByGoogleID(ctx context.Context, googleID string) (*domain.User, error)
-	GenerateTokens(ctx context.Context, userID string, jwtToken string) (string, string, error)
-	RefreshToken(ctx context.Context, refreshToken string, jwtSecret string) (*domain.User, *string, error)
+	GenerateTokens(ctx context.Context, user domain.User, jwtToken string) (string, string, error)
+	RefreshToken(ctx context.Context, oldRefreshToken string, jwtSecret string) (string, string, *domain.User, error)
 	UpdateGoogleID(ctx context.Context, userID string, googleID string) (*domain.User, error)
 	UpdateUserPassword(ctx context.Context, userID string, password string, salt string) (*domain.User, error)
 	UpdateEmailVerifiedAt(ctx context.Context, userID string) (*domain.User, error)
@@ -135,7 +136,7 @@ func (s *userService) Login(ctx context.Context, email string, password string, 
 		return nil, nil, nil, fmt.Errorf("invalid password")
 	}
 
-	accessToken, refreshToken, err := generateJWT(user.ID.String(), jwtSecret)
+	accessToken, refreshToken, err := generateTokens(*user, jwtSecret)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -167,8 +168,8 @@ func (s *userService) GetUserByGoogleID(ctx context.Context, googleID string) (*
 	return s.repo.FindByGoogleID(ctx, googleID)
 }
 
-func (s *userService) GenerateTokens(ctx context.Context, userID string, jwtSecret string) (string, string, error) {
-	return generateJWT(userID, jwtSecret)
+func (s *userService) GenerateTokens(ctx context.Context, user domain.User, jwtSecret string) (string, string, error) {
+	return generateTokens(user, jwtSecret)
 }
 
 func (s *userService) UpdateGoogleID(ctx context.Context, userID string, googleID string) (*domain.User, error) {
@@ -183,28 +184,58 @@ func (s *userService) UpdateEmailVerifiedAt(ctx context.Context, userID string) 
 	return s.repo.UpdateEmailVerifiedAt(ctx, userID)
 }
 
-func (s *userService) RefreshToken(ctx context.Context, refreshToken string, jwtSecret string) (*domain.User, *string, error) {
-	claims := &jwt.RegisteredClaims{}
-	token, err := jwt.ParseWithClaims(refreshToken, claims, func(token *jwt.Token) (any, error) {
-		return []byte(jwtSecret), nil
+func (s *userService) RefreshToken(
+	ctx context.Context,
+	oldRefreshToken string,
+	jwtSecret string,
+) (string, string, *domain.User, error) {
+	// 1. Validate refresh token
+	claims, err := s.validateRefreshToken(oldRefreshToken, jwtSecret)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	// @TODO: 2. Check token revocation
+	//if s.isTokenRevoked(claims.ID) {
+	//	return "", "", nil, fmt.Errorf("token revoked")
+	//}
+
+	// 3. Get user
+	user, err := s.repo.FindByID(ctx, claims.Subject)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("user not found")
+	}
+
+	// 4. Generate new tokens
+	accessToken, refreshToken, err := generateTokens(*user, jwtSecret)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to generate tokens")
+	}
+
+	// @TODO: 5. Revoke old refresh token
+	// s.revokeToken(claims.ID)
+
+	// @TODO: 6. Store new refresh token
+	//s.storeRefreshToken(refreshToken)
+
+	return accessToken, refreshToken, user, nil
+}
+
+// Token validation
+func (s *userService) validateRefreshToken(tokenString, secret string) (*domain.JwtClaims, error) {
+	claims := &domain.JwtClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return []byte(secret), nil
 	})
-	if err != nil || !token.Valid {
-		return nil, nil, fmt.Errorf("invalid or expired refresh token")
+
+	if err != nil || !token.Valid || claims.Type != "refresh" {
+		return nil, fmt.Errorf("invalid token")
 	}
 
-	userID := claims.Subject
-	user, err := s.repo.FindByID(ctx, userID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch user: %w", err)
-	}
-
-	// Optionally, update generateJWT to use jwtSecret as needed.
-	newAccessToken, _, err := generateJWT(userID, jwtSecret)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate new access token: %w", err)
-	}
-
-	return user, &newAccessToken, nil
+	return claims, nil
 }
 
 func generateSalt() (string, error) {
@@ -221,20 +252,25 @@ func hashPassword(password string, salt string) string {
 	return base64.StdEncoding.EncodeToString(hashedPassword)
 }
 
-func generateJWT(userID string, jwtSecret string) (string, string, error) {
-	accessTokenExpiration := time.Now().Add(15 * time.Minute)
-	refreshTokenExpiration := time.Now().Add(7 * 24 * time.Hour)
-
-	accessClaims := jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(accessTokenExpiration),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		Subject:   userID,
+func generateTokens(user domain.User, jwtSecret string) (string, string, error) {
+	// Access Token
+	accessClaims := domain.JwtClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+			Subject:   user.ID.String(),
+		},
+		Type: "access",
+		ID:   uuid.NewString(),
 	}
 
-	refreshClaims := jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(refreshTokenExpiration),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		Subject:   userID,
+	// Refresh Token
+	refreshClaims := domain.JwtClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+			Subject:   user.ID.String(),
+		},
+		Type: "refresh",
+		ID:   uuid.NewString(),
 	}
 
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
@@ -251,3 +287,17 @@ func generateJWT(userID string, jwtSecret string) (string, string, error) {
 
 	return accessTokenString, refreshTokenString, nil
 }
+
+// @TODO
+//func (s *userService) storeRefreshToken(token string) error {
+//	claims, _ := parseTokenWithoutValidation(token) // Extract claims
+//	return s.repo.StoreToken(claims.ID, claims.Subject, claims.ExpiresAt)
+//}
+//
+//func (s *userService) isTokenRevoked(tokenID string) bool {
+//	return s.repo.IsTokenRevoked(tokenID)
+//}
+//
+//func (s *userService) revokeToken(tokenID string) {
+//	s.repo.RevokeToken(tokenID)
+//}

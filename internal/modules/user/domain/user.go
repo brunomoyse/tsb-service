@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"github.com/golang-jwt/jwt/v4"
 	"time"
 
 	"errors"
@@ -21,6 +22,12 @@ type User struct {
 	Salt            *string    `db:"salt" json:"salt"`
 	RememberToken   *string    `db:"remember_token" json:"rememberToken"`
 	GoogleID        *string    `db:"google_id" json:"googleId"`
+}
+
+type JwtClaims struct {
+	jwt.RegisteredClaims
+	Type string `json:"type"` // "access" or "refresh"
+	ID   string `json:"jti"`  // Unique token identifier
 }
 
 func NewUser(name string, email string, phoneNumber *string, address *string, passwordHash *string, salt *string) User {

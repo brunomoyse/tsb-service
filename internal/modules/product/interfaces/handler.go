@@ -54,8 +54,6 @@ func (h *ProductHandler) CreateProductHandler(c *gin.Context) {
 		req.IsVegan,
 		req.Translations,
 	)
-	// Print product properties for debugging
-	log.Printf("Created product: %+v", product)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create product: " + err.Error()})

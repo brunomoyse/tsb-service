@@ -48,9 +48,8 @@ func NewUserResponse(u *domain.User) *UserResponse {
 	}
 }
 
-func NewLoginResponse(u *domain.User, accessToken string) *LoginResponse {
+func NewLoginResponse(u *domain.User) *LoginResponse {
 	return &LoginResponse{
-		User:        NewUserResponse(u),
-		AccessToken: accessToken,
+		User: NewUserResponse(u),
 	}
 }
