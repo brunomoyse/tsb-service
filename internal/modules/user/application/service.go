@@ -21,6 +21,7 @@ import (
 
 type UserService interface {
 	CreateUser(ctx context.Context, name string, email string, phoneNumber *string, address *string, password *string, googleID *string) (*domain.User, error)
+	UpdateMe(ctx context.Context, userID string, name *string, email *string, phoneNumber *string, address *string) (*domain.User, error)
 	Login(ctx context.Context, email string, password string, jwtToken string) (*domain.User, *string, *string, error)
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
@@ -174,6 +175,28 @@ func (s *userService) GenerateTokens(ctx context.Context, user domain.User, jwtS
 
 func (s *userService) UpdateGoogleID(ctx context.Context, userID string, googleID string) (*domain.User, error) {
 	return s.repo.UpdateGoogleID(ctx, userID, googleID)
+}
+
+func (s *userService) UpdateMe(ctx context.Context, userID string, name *string, email *string, phoneNumber *string, address *string) (*domain.User, error) {
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if name != nil {
+		user.Name = *name
+	}
+	if email != nil {
+		user.Email = *email
+	}
+	if phoneNumber != nil {
+		user.PhoneNumber = phoneNumber
+	}
+	if address != nil {
+		user.Address = address
+	}
+
+	return s.repo.UpdateUser(ctx, user)
 }
 
 func (s *userService) UpdateUserPassword(ctx context.Context, userID string, password string, salt string) (*domain.User, error) {
