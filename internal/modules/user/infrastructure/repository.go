@@ -18,7 +18,7 @@ func NewUserRepository(db *sqlx.DB) domain.UserRepository {
 
 func (r *UserRepository) Save(ctx context.Context, user *domain.User) (uuid.UUID, error) {
 	query := `
-		INSERT INTO users (name, email,  phone_number, address, password_hash, salt)
+		INSERT INTO users (name, email, phone_number, address, password_hash, salt)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id;
 	`
@@ -33,16 +33,7 @@ func (r *UserRepository) Save(ctx context.Context, user *domain.User) (uuid.UUID
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	var u domain.User
 	query := `
-		SELECT 
-			id, 
-			created_at, 
-			updated_at, 
-			name, 
-			email, 
-			email_verified_at, 
-			password_hash, 
-			salt, 
-			google_id 
+		SELECT *
 		FROM users 
 		WHERE email = $1;
 	`
@@ -55,16 +46,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
 	var u domain.User
 	query := `
-		SELECT 
-			id, 
-			created_at, 
-			updated_at, 
-			name, 
-			email, 
-			email_verified_at, 
-			password_hash, 
-			salt, 
-			google_id 
+		SELECT *
 		FROM users 
 		WHERE id = $1;
 	`
@@ -103,6 +85,20 @@ func (r *UserRepository) UpdateGoogleID(ctx context.Context, userID string, goog
 		return nil, err
 	}
 	return r.FindByID(ctx, userID)
+}
+
+func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) (*domain.User, error) {
+	query := `
+		UPDATE users
+		SET name = $1, email = $2, phone_number = $3, address = $4 
+		WHERE id = $5
+	`
+	_, err := r.db.ExecContext(ctx, query, user.Name, user.Email, user.PhoneNumber, user.Address, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.FindByID(ctx, user.ID.String())
 }
 
 func (r *UserRepository) UpdateUserPassword(ctx context.Context, userID string, passwordHash string, salt string) (*domain.User, error) {

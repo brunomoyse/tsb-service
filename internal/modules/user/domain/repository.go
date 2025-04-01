@@ -15,4 +15,5 @@ type UserRepository interface {
 	UpdateUserPassword(ctx context.Context, userID string, password string, salt string) (*User, error)
 	UpdateEmailVerifiedAt(ctx context.Context, userID string) (*User, error)
 	InvalidateRefreshToken(ctx context.Context, refreshToken string) error
+	UpdateUser(ctx context.Context, user *User) (*User, error)
 }

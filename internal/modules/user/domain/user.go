@@ -22,6 +22,7 @@ type User struct {
 	Salt            *string    `db:"salt" json:"salt"`
 	RememberToken   *string    `db:"remember_token" json:"rememberToken"`
 	GoogleID        *string    `db:"google_id" json:"googleId"`
+	IsAdmin         bool       `db:"is_admin" json:"isAdmin"`
 }
 
 type JwtClaims struct {

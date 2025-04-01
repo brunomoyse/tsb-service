@@ -55,6 +55,31 @@ func (h *UserHandler) GetUserProfileHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+func (h *UserHandler) UpdateMeHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	userID := c.GetString("userID")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "handler: user not authenticated"})
+		return
+	}
+
+	var req UpdateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload", "details": err.Error()})
+		return
+	}
+
+	user, err := h.service.UpdateMe(ctx, userID, req.Name, req.Email, req.PhoneNumber, req.Address)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user profile", "details": err.Error()})
+		return
+	}
+
+	res := NewUserResponse(user)
+	c.JSON(http.StatusOK, res)
+}
+
 func (h *UserHandler) RegisterHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 
