@@ -3,8 +3,8 @@
 CREATE TABLE IF NOT EXISTS public.product_category_translations
 (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
-    created_at timestamp(0) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp(0) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at timestamp(0) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp(0) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     product_category_id uuid NOT NULL,
     name text NOT NULL,
     locale text NOT NULL,
