@@ -54,10 +54,10 @@ type OrderExtra struct {
 }
 
 type OrderProductRaw struct {
-	ProductID  uuid.UUID       `json:"productId"`
-	Quantity   int64           `json:"quantity"`
-	UnitPrice  decimal.Decimal `json:"unitPrice"`
-	TotalPrice decimal.Decimal `json:"totalPrice"`
+	ProductID  uuid.UUID       `db:"product_id" json:"productId"`
+	Quantity   int64           `db:"quantity" json:"quantity"`
+	UnitPrice  decimal.Decimal `db:"unit_price" json:"unitPrice"`
+	TotalPrice decimal.Decimal `db:"total_price" json:"totalPrice"`
 }
 
 type OrderProduct struct {
