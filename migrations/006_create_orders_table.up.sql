@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS public.orders
 (
     id uuid NOT NULL DEFAULT gen_random_uuid(),
-    created_at timestamp(0) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp(0) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at timestamp(0) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp(0) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     user_id uuid NOT NULL,
     order_status text NOT NULL DEFAULT 'PENDING'::text, -- 'PENDING', 'CONFIRMED', etc.
     order_type text NOT NULL,                           -- 'DELIVERY', 'PICKUP'
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS public.orders
     discount_amount numeric(10,2) NOT NULL DEFAULT 0,
     delivery_fee numeric(10,2),                     -- if order_type is DELIVERY
     total_price numeric(10,2) NOT NULL,
-    estimated_ready_time timestamp(0) without time zone, -- when order is ready or delivered
+    estimated_ready_time timestamp(0) with time zone, -- when order is ready or delivered
     address_id uuid,                                   -- if order_type is DELIVERY
     address_extra text,                                -- extra info about the address
     extra_comment text,                                -- general comments about the order
