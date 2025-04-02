@@ -220,6 +220,7 @@ func (h *OrderHandler) GetOrderHandler(c *gin.Context) {
 	// 3. Fetch the order and related products.
 	order, orderProducts, err := h.service.GetOrderByID(c.Request.Context(), orderID)
 	if err != nil {
+		fmt.Println(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
 		return
 	}

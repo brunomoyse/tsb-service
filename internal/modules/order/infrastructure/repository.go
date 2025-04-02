@@ -4,13 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
 	"log"
 	"time"
-	"tsb-service/pkg/utils"
-
-	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"tsb-service/internal/modules/order/domain"
 )
 
@@ -141,30 +139,26 @@ func (r *OrderRepository) Update(ctx context.Context, order *domain.Order) error
 
 // FindByID retrieves an order by its ID.
 func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error) {
-	lang := utils.GetLang(ctx)
-
 	query := `
-        SELECT 
-            o.*
-        FROM orders o
-        WHERE o.id = $1
-        ORDER BY o.created_at DESC
+		SELECT *
+		FROM orders
+		WHERE id = $1
+		LIMIT 1
 	`
 
-	var order *domain.Order
+	var order domain.Order
 
-	if err := r.db.SelectContext(ctx, &order, query, orderID, lang); err != nil {
+	if err := r.db.GetContext(ctx, &order, query, orderID); err != nil {
 		return nil, nil, fmt.Errorf("failed to query order: %w", err)
-	}
-
-	if order == nil {
-		return nil, nil, fmt.Errorf("order not found")
 	}
 
 	// Fetch order products
 	query = `
 		SELECT 
-			op.*
+			op.product_id,
+			op.quantity,
+			op.unit_price,
+			op.total_price
 		FROM order_product op
 		WHERE op.order_id = $1
 	`
@@ -175,7 +169,7 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 		return nil, nil, fmt.Errorf("failed to query order products: %w", err)
 	}
 
-	return order, &orderProducts, nil
+	return &order, &orderProducts, nil
 }
 
 func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*domain.Order, error) {
