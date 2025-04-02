@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/shopspring/decimal"
 	"net/http"
+	"sort"
 	"strconv"
 	"tsb-service/internal/modules/order/application"
 	"tsb-service/internal/modules/order/domain"
@@ -12,6 +13,7 @@ import (
 	paymentDomain "tsb-service/internal/modules/payment/domain"
 	productApplication "tsb-service/internal/modules/product/application"
 	productDomain "tsb-service/internal/modules/product/domain"
+	"tsb-service/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -196,67 +198,124 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 }
 
 func (h *OrderHandler) GetOrderHandler(c *gin.Context) {
-	orderIDStr := c.Param("id")
-	orderID, err := uuid.Parse(orderIDStr)
+	// 1. Parse order ID from URL param.
+	orderID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID"})
 		return
 	}
 
-	order, err := h.service.GetOrderByID(c.Request.Context(), orderID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
-		return
-	}
-
-	// Check if the order belongs to the logged-in user.
+	// 2. Retrieve the logged-in user.
 	userIDStr := c.GetString("userID")
 	if userIDStr == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
 		return
 	}
-
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
 		return
 	}
 
+	// 3. Fetch the order and related products.
+	order, orderProducts, err := h.service.GetOrderByID(c.Request.Context(), orderID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
+		return
+	}
+	if order == nil {
+		// If you consider "not found" a 404
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		return
+	}
+	if orderProducts == nil {
+		// or handle the case if order was found but no products
+		c.JSON(http.StatusNotFound, gin.H{"error": "no order products found"})
+		return
+	}
+
+	// 4. Validate ownership.
 	if order.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
 		return
 	}
 
-	c.JSON(http.StatusOK, order)
+	// 5. Load product details for the products in the order.
+	productIDs := make([]string, len(*orderProducts))
+	for i, op := range *orderProducts {
+		productIDs[i] = op.ProductID.String()
+	}
+
+	products, err := h.productService.GetProductsByIDs(c.Request.Context(), productIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve products"})
+		return
+	}
+
+	// Build a lookup map: productID -> product details.
+	productMap := make(map[uuid.UUID]productDomain.ProductOrderDetails, len(products))
+	for _, p := range products {
+		productMap[p.ID] = *p
+	}
+
+	// 6. Enrich order products with product details.
+	orderProductsResponse := make([]domain.OrderProduct, len(*orderProducts))
+	for i, op := range *orderProducts {
+		prod, ok := productMap[op.ProductID]
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("product %s not found", op.ProductID)})
+			return
+		}
+		orderProductsResponse[i] = domain.OrderProduct{
+			Product: domain.Product{
+				ID:           prod.ID,
+				Code:         prod.Code,
+				CategoryName: prod.CategoryName,
+				Name:         prod.Name,
+			},
+			Quantity:   op.Quantity,
+			UnitPrice:  op.UnitPrice,
+			TotalPrice: op.TotalPrice,
+		}
+	}
+
+	// 7. Construct a response with order + enriched products.
+	orderResponse := OrderResponse{
+		Order:         *order,
+		OrderProducts: orderProductsResponse,
+	}
+
+	// Optionally fetch payment info if it's an online payment.
+	if order.IsOnlinePayment {
+		molliePayment, err := h.paymentService.GetPaymentByOrderID(c.Request.Context(), order.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve payment"})
+			return
+		}
+		if molliePayment == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
+			return
+		}
+
+		// Populate the Mollie payment details in the response.
+		orderResponse.MolliePayment = &MolliePayment{
+			ID:        molliePayment.ID,
+			OrderID:   order.ID,
+			Status:    molliePayment.Status,
+			CreatedAt: molliePayment.CreatedAt,
+			PaidAt:    molliePayment.PaidAt,
+		}
+		var parsedLinks paymentDomain.PaymentLinks
+		if err := json.Unmarshal(molliePayment.Links, &parsedLinks); err == nil {
+			orderResponse.MolliePayment.PaymentURL = parsedLinks.Checkout.Href
+		}
+	}
+
+	// 8. Return the final OrderResponse.
+	c.JSON(http.StatusOK, orderResponse)
 }
 
-// GetUserOrdersHandler handles GET requests to retrieve orders for the logged-in user.
 func (h *OrderHandler) GetUserOrdersHandler(c *gin.Context) {
-	// Retrieve the logged-in user's ID from the Gin context.
-	userIDStr := c.GetString("userID")
-	if userIDStr == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "handler: user not authenticated"})
-		return
-	}
-
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
-		return
-	}
-
-	// Call the order service to fetch orders for this user.
-	orders, err := h.service.GetOrdersByUserID(c.Request.Context(), userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve orders"})
-		return
-	}
-
-	// Return the orders as JSON.
-	c.JSON(http.StatusOK, orders)
-}
-
-func (h *OrderHandler) GetAdminPaginatedOrdersHandler(c *gin.Context) {
 	pageStr := c.DefaultQuery("page", "1")
 	pageSizeStr := c.DefaultQuery("page_size", "20")
 
@@ -272,34 +331,431 @@ func (h *OrderHandler) GetAdminPaginatedOrdersHandler(c *gin.Context) {
 		return
 	}
 
-	orders, err := h.service.GetPaginatedOrders(c.Request.Context(), page, pageSize)
+	// 1) Parse the logged-in user
+	userIDStr := c.GetString("userID")
+	if userIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		return
+	}
+	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		// Log the error.
-		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
+		return
+	}
+
+	// 2) Get all orders for the user in a single query
+	orders, err := h.service.GetPaginatedOrders(c.Request.Context(), page, pageSize, &userID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve orders"})
 		return
 	}
 
-	c.JSON(http.StatusOK, orders)
+	// If no orders found, return an empty array
+	if len(orders) == 0 {
+		c.JSON(http.StatusOK, []OrderResponse{})
+		return
+	}
+
+	// 3) Gather all order IDs
+	var orderIDs []uuid.UUID
+	for _, o := range orders {
+		orderIDs = append(orderIDs, o.ID)
+	}
+
+	// 4) Fetch all order products (raw) in a single query
+	productsByOrder, err := h.service.GetOrderProductsByOrderIDs(c.Request.Context(), orderIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order products"})
+		return
+	}
+
+	// 5) Collect all unique product IDs across all orders
+	uniqueProductIDs := make(map[uuid.UUID]struct{})
+	for _, opList := range productsByOrder {
+		for _, op := range opList {
+			uniqueProductIDs[op.ProductID] = struct{}{}
+		}
+	}
+
+	// Convert set to slice of strings (your productService expects []string)
+	var productIDStrs []string
+	for pid := range uniqueProductIDs {
+		productIDStrs = append(productIDStrs, pid.String())
+	}
+
+	// 6) Fetch product details in one query
+	allProducts, err := h.productService.GetProductsByIDs(c.Request.Context(), productIDStrs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve products"})
+		return
+	}
+
+	// Build a lookup map: productID -> product details
+	productMap := make(map[uuid.UUID]productDomain.ProductOrderDetails, len(allProducts))
+	for _, p := range allProducts {
+		productMap[p.ID] = *p
+	}
+
+	// 7) Build responses in memory
+	responses := make([]OrderResponse, 0, len(orders))
+	for _, ord := range orders {
+		// a) Enrich the raw order products with product details
+		opList := productsByOrder[ord.ID] // slice of OrderProductRaw
+		enrichedOP := make([]domain.OrderProduct, len(opList))
+
+		for i, rawOP := range opList {
+			prodDetails, ok := productMap[rawOP.ProductID]
+			if !ok {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("product %s not found", rawOP.ProductID)})
+				return
+			}
+
+			// Build the final domain.OrderProduct with product details
+			enrichedOP[i] = domain.OrderProduct{
+				Product: domain.Product{
+					ID:           prodDetails.ID,
+					Code:         prodDetails.Code,
+					CategoryName: prodDetails.CategoryName,
+					Name:         prodDetails.Name,
+				},
+				Quantity:   rawOP.Quantity,
+				UnitPrice:  rawOP.UnitPrice,
+				TotalPrice: rawOP.TotalPrice,
+			}
+		}
+
+		// Sort the enrichedOP by code.
+		// Code is domainOrderProduct.Product.Code (a *string).
+		sort.Slice(enrichedOP, func(i, j int) bool {
+			alphaI, numI := utils.ParseCode(enrichedOP[i].Product.Code)
+			alphaJ, numJ := utils.ParseCode(enrichedOP[j].Product.Code)
+
+			if alphaI != alphaJ {
+				return alphaI < alphaJ
+			}
+			return numI < numJ
+		})
+
+		// b) Construct a single OrderResponse
+		orderResp := OrderResponse{
+			Order:         *ord,       // domain.Order
+			OrderProducts: enrichedOP, // []domain.OrderProduct
+		}
+
+		// c) If online payment, fetch Mollie payment info
+		if ord.IsOnlinePayment {
+			molliePayment, err := h.paymentService.GetPaymentByOrderID(c.Request.Context(), ord.ID)
+			if err != nil {
+				fmt.Println(err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve payment"})
+				return
+			}
+			if molliePayment != nil {
+				// Minimal example of building a MolliePayment for the response
+				mp := &MolliePayment{
+					ID:        molliePayment.ID,
+					OrderID:   ord.ID,
+					Status:    molliePayment.Status,
+					CreatedAt: molliePayment.CreatedAt,
+					PaidAt:    molliePayment.PaidAt,
+				}
+				// Optionally parse links to get PaymentURL
+				var parsedLinks paymentDomain.PaymentLinks
+				if err := json.Unmarshal(molliePayment.Links, &parsedLinks); err == nil {
+					mp.PaymentURL = parsedLinks.Checkout.Href
+				}
+				orderResp.MolliePayment = mp
+			}
+		}
+
+		responses = append(responses, orderResp)
+	}
+
+	// 8) Return the slice of OrderResponse
+	c.JSON(http.StatusOK, responses)
+}
+
+func (h *OrderHandler) GetAdminOrdersHandler(c *gin.Context) {
+	pageStr := c.DefaultQuery("page", "1")
+	pageSizeStr := c.DefaultQuery("page_size", "20")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid page number"})
+		return
+	}
+
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid page size"})
+		return
+	}
+
+	// 2) Get all orders for the user in a single query
+	orders, err := h.service.GetPaginatedOrders(c.Request.Context(), page, pageSize, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve orders"})
+		return
+	}
+
+	// If no orders found, return an empty array
+	if len(orders) == 0 {
+		c.JSON(http.StatusOK, []OrderResponse{})
+		return
+	}
+
+	// 3) Gather all order IDs
+	var orderIDs []uuid.UUID
+	for _, o := range orders {
+		orderIDs = append(orderIDs, o.ID)
+	}
+
+	// 4) Fetch all order products (raw) in a single query
+	productsByOrder, err := h.service.GetOrderProductsByOrderIDs(c.Request.Context(), orderIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order products"})
+		return
+	}
+
+	// 5) Collect all unique product IDs across all orders
+	uniqueProductIDs := make(map[uuid.UUID]struct{})
+	for _, opList := range productsByOrder {
+		for _, op := range opList {
+			uniqueProductIDs[op.ProductID] = struct{}{}
+		}
+	}
+
+	// Convert set to slice of strings (your productService expects []string)
+	var productIDStrs []string
+	for pid := range uniqueProductIDs {
+		productIDStrs = append(productIDStrs, pid.String())
+	}
+
+	// 6) Fetch product details in one query
+	allProducts, err := h.productService.GetProductsByIDs(c.Request.Context(), productIDStrs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve products"})
+		return
+	}
+
+	// Build a lookup map: productID -> product details
+	productMap := make(map[uuid.UUID]productDomain.ProductOrderDetails, len(allProducts))
+	for _, p := range allProducts {
+		productMap[p.ID] = *p
+	}
+
+	// 7) Build responses in memory
+	responses := make([]OrderResponse, 0, len(orders))
+	for _, ord := range orders {
+		// a) Enrich the raw order products with product details
+		opList := productsByOrder[ord.ID] // slice of OrderProductRaw
+		enrichedOP := make([]domain.OrderProduct, len(opList))
+
+		for i, rawOP := range opList {
+			prodDetails, ok := productMap[rawOP.ProductID]
+			if !ok {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("product %s not found", rawOP.ProductID)})
+				return
+			}
+
+			// Build the final domain.OrderProduct with product details
+			enrichedOP[i] = domain.OrderProduct{
+				Product: domain.Product{
+					ID:           prodDetails.ID,
+					Code:         prodDetails.Code,
+					CategoryName: prodDetails.CategoryName,
+					Name:         prodDetails.Name,
+				},
+				Quantity:   rawOP.Quantity,
+				UnitPrice:  rawOP.UnitPrice,
+				TotalPrice: rawOP.TotalPrice,
+			}
+		}
+
+		// Sort the enrichedOP by code.
+		// Code is domainOrderProduct.Product.Code (a *string).
+		sort.Slice(enrichedOP, func(i, j int) bool {
+			alphaI, numI := utils.ParseCode(enrichedOP[i].Product.Code)
+			alphaJ, numJ := utils.ParseCode(enrichedOP[j].Product.Code)
+
+			if alphaI != alphaJ {
+				return alphaI < alphaJ
+			}
+			return numI < numJ
+		})
+
+		// b) Construct a single OrderResponse
+		orderResp := OrderResponse{
+			Order:         *ord,       // domain.Order
+			OrderProducts: enrichedOP, // []domain.OrderProduct
+		}
+
+		// c) If online payment, fetch Mollie payment info
+		if ord.IsOnlinePayment {
+			molliePayment, err := h.paymentService.GetPaymentByOrderID(c.Request.Context(), ord.ID)
+			if err != nil {
+				fmt.Println(err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve payment"})
+				return
+			}
+			if molliePayment != nil {
+				// Minimal example of building a MolliePayment for the response
+				mp := &MolliePayment{
+					ID:        molliePayment.ID,
+					OrderID:   ord.ID,
+					Status:    molliePayment.Status,
+					CreatedAt: molliePayment.CreatedAt,
+					PaidAt:    molliePayment.PaidAt,
+				}
+				// Optionally parse links to get PaymentURL
+				var parsedLinks paymentDomain.PaymentLinks
+				if err := json.Unmarshal(molliePayment.Links, &parsedLinks); err == nil {
+					mp.PaymentURL = parsedLinks.Checkout.Href
+				}
+				orderResp.MolliePayment = mp
+			}
+		}
+
+		responses = append(responses, orderResp)
+	}
+
+	// 8) Return the slice of OrderResponse
+	c.JSON(http.StatusOK, responses)
 }
 
 func (h *OrderHandler) UpdateOrderStatusHandler(c *gin.Context) {
-	//
-}
-
-func (h *OrderHandler) GetAdminOrderHandler(c *gin.Context) {
-	orderIDStr := c.Param("id")
-	orderID, err := uuid.Parse(orderIDStr)
+	// 1. Parse order ID from URL param.
+	orderID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID"})
 		return
 	}
 
-	order, err := h.service.GetOrderByID(c.Request.Context(), orderID)
+	// 2. Parse new status from request body.
+	var req UpdateOrderRequest
+	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
+		return
+	}
+
+	// 3. Update the order status.
+	err = h.service.UpdateOrderStatus(c.Request.Context(), orderID, req.OrderStatus)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update order status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "order status updated successfully"})
+}
+
+func (h *OrderHandler) GetAdminOrderHandler(c *gin.Context) {
+	// 1. Parse order ID from URL param.
+	orderID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid order ID"})
+		return
+	}
+
+	// 2. Fetch the order and related products.
+	order, orderProducts, err := h.service.GetOrderByID(c.Request.Context(), orderID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
 		return
 	}
+	if order == nil {
+		// If you consider "not found" a 404
+		c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		return
+	}
+	if orderProducts == nil {
+		// or handle the case if order was found but no products
+		c.JSON(http.StatusNotFound, gin.H{"error": "no order products found"})
+		return
+	}
 
-	c.JSON(http.StatusOK, order)
+	// 3. Load product details for the products in the order.
+	productIDs := make([]string, len(*orderProducts))
+	for i, op := range *orderProducts {
+		productIDs[i] = op.ProductID.String()
+	}
+
+	products, err := h.productService.GetProductsByIDs(c.Request.Context(), productIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve products"})
+		return
+	}
+
+	// Build a lookup map: productID -> product details.
+	productMap := make(map[uuid.UUID]productDomain.ProductOrderDetails, len(products))
+	for _, p := range products {
+		productMap[p.ID] = *p
+	}
+
+	// 4. Enrich order products with product details.
+	orderProductsResponse := make([]domain.OrderProduct, len(*orderProducts))
+	for i, op := range *orderProducts {
+		prod, ok := productMap[op.ProductID]
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("product %s not found", op.ProductID)})
+			return
+		}
+		orderProductsResponse[i] = domain.OrderProduct{
+			Product: domain.Product{
+				ID:           prod.ID,
+				Code:         prod.Code,
+				CategoryName: prod.CategoryName,
+				Name:         prod.Name,
+			},
+			Quantity:   op.Quantity,
+			UnitPrice:  op.UnitPrice,
+			TotalPrice: op.TotalPrice,
+		}
+	}
+
+	// Sort the enrichedOP by code.
+	// Code is domainOrderProduct.Product.Code (a *string).
+	sort.Slice(orderProductsResponse, func(i, j int) bool {
+		alphaI, numI := utils.ParseCode(orderProductsResponse[i].Product.Code)
+		alphaJ, numJ := utils.ParseCode(orderProductsResponse[j].Product.Code)
+
+		if alphaI != alphaJ {
+			return alphaI < alphaJ
+		}
+		return numI < numJ
+	})
+
+	// 5. Construct a response with order + enriched products.
+	orderResponse := OrderResponse{
+		Order:         *order,
+		OrderProducts: orderProductsResponse,
+	}
+
+	// Optionally fetch payment info if it's an online payment.
+	if order.IsOnlinePayment {
+		molliePayment, err := h.paymentService.GetPaymentByOrderID(c.Request.Context(), order.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve payment"})
+			return
+		}
+		if molliePayment == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
+			return
+		}
+
+		// Populate the Mollie payment details in the response.
+		orderResponse.MolliePayment = &MolliePayment{
+			ID:        molliePayment.ID,
+			OrderID:   order.ID,
+			Status:    molliePayment.Status,
+			CreatedAt: molliePayment.CreatedAt,
+			PaidAt:    molliePayment.PaidAt,
+		}
+		var parsedLinks paymentDomain.PaymentLinks
+		if err := json.Unmarshal(molliePayment.Links, &parsedLinks); err == nil {
+			orderResponse.MolliePayment.PaymentURL = parsedLinks.Checkout.Href
+		}
+	}
+
+	// 6. Return the final OrderResponse.
+	c.JSON(http.StatusOK, orderResponse)
 }

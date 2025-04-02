@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
+	"github.com/google/uuid"
 	"os"
 	"time"
 	orderDomain "tsb-service/internal/modules/order/domain"
@@ -14,6 +15,7 @@ import (
 type PaymentService interface {
 	CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct) (*domain.MolliePayment, error)
 	UpdatePaymentStatus(ctx context.Context, externalMolliePaymentID string) error
+	GetPaymentByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error)
 }
 
 type paymentService struct {
@@ -111,9 +113,18 @@ func (s *paymentService) UpdatePaymentStatus(ctx context.Context, externalMollie
 		orderID,
 		time.Now().Format(time.RFC3339),
 	)
-	
+
 	// Broadcast the event to all connected SSE clients.
 	sse.Hub.Broadcast(eventPayload)
 
 	return nil
+}
+
+func (s *paymentService) GetPaymentByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error) {
+	payment, err := s.repo.FindByOrderID(ctx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find payment: %w", err)
+	}
+
+	return payment, nil
 }

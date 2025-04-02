@@ -3,7 +3,7 @@ package utils
 import (
 	"context"
 	"regexp"
-	"strings"
+	"strconv"
 )
 
 type contextKey string
@@ -24,24 +24,26 @@ func GetLang(ctx context.Context) string {
 	return lang
 }
 
-// Slugify converts a given string into a URL-friendly slug.
-func Slugify(s string) string {
-	// Convert the string to lowercase and trim any surrounding whitespace.
-	s = strings.ToLower(strings.TrimSpace(s))
-	// Replace spaces (and underscores) with hyphens.
-	s = strings.ReplaceAll(s, " ", "-")
-	s = strings.ReplaceAll(s, "_", "-")
+var (
+	alphaRegexp = regexp.MustCompile(`^[A-Za-z]+`)
+	numRegexp   = regexp.MustCompile(`\d+`)
+)
 
-	// Remove any character that is not a lowercase letter, number, or hyphen.
-	reg, _ := regexp.Compile("[^a-z0-9-]+")
-	s = reg.ReplaceAllString(s, "")
+// parseCode takes a pointer to a code (e.g., "A10")
+// and returns the alphabetical prefix (e.g., "A") and numeric part (10).
+func ParseCode(code *string) (string, int) {
+	if code == nil {
+		// No code? Return empty alpha and 0 for the numeric part
+		return "", 0
+	}
 
-	// Replace multiple hyphens with a single hyphen.
-	regHyphen, _ := regexp.Compile("-+")
-	s = regHyphen.ReplaceAllString(s, "-")
-
-	// Remove any leading or trailing hyphens.
-	s = strings.Trim(s, "-")
-
-	return s
+	alpha := alphaRegexp.FindString(*code)
+	numStr := numRegexp.FindString(*code)
+	num := 0
+	if numStr != "" {
+		if n, err := strconv.Atoi(numStr); err == nil {
+			num = n
+		}
+	}
+	return alpha, num
 }

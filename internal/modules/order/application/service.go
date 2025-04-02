@@ -14,10 +14,10 @@ import (
 
 type OrderService interface {
 	CreateOrder(ctx context.Context, order *domain.Order, orderProducts *[]domain.OrderProductRaw) (*domain.Order, *[]domain.OrderProductRaw, error)
-	GetOrdersByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error)
-	GetPaginatedOrders(ctx context.Context, page int, limit int) ([]*domain.Order, error)
+	GetPaginatedOrders(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) error
-	GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, error)
+	GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error)
+	GetOrderProductsByOrderIDs(ctx context.Context, orderIDs []uuid.UUID) (map[uuid.UUID][]domain.OrderProductRaw, error)
 }
 
 type orderService struct {
@@ -51,17 +51,13 @@ func (s *orderService) CreateOrder(ctx context.Context, o *domain.Order, op *[]d
 	return order, orderProducts, nil
 }
 
-func (s *orderService) GetOrdersByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error) {
-	return s.repo.FindByUserID(ctx, userID)
-}
-
-func (s *orderService) GetPaginatedOrders(ctx context.Context, page int, limit int) ([]*domain.Order, error) {
-	return s.repo.FindPaginated(ctx, page, limit)
+func (s *orderService) GetPaginatedOrders(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*domain.Order, error) {
+	return s.repo.FindPaginated(ctx, page, limit, userID)
 }
 
 func (s *orderService) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, newStatus domain.OrderStatus) error {
 	// Retrieve the order
-	order, err := s.repo.FindByID(ctx, orderID)
+	order, _, err := s.repo.FindByID(ctx, orderID)
 	if err != nil {
 		return err
 	}
@@ -76,9 +72,8 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID,
 
 	// Construct an event payload (as JSON)
 	eventPayload := fmt.Sprintf(
-		`{"event": "orderStatusUpdated", "orderID": "%s", "newStatus": "%s", "timestamp": "%s"}`,
-		orderID.String(),
-		newStatus,
+		`{"event": "orderUpdated", "orderID": "%s", "timestamp": "%s"}`,
+		orderID,
 		time.Now().Format(time.RFC3339),
 	)
 
@@ -88,6 +83,10 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID,
 	return nil
 }
 
-func (s *orderService) GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, error) {
+func (s *orderService) GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error) {
 	return s.repo.FindByID(ctx, orderID)
+}
+
+func (s *orderService) GetOrderProductsByOrderIDs(ctx context.Context, orderIDs []uuid.UUID) (map[uuid.UUID][]domain.OrderProductRaw, error) {
+	return s.repo.FindByOrderIDs(ctx, orderIDs)
 }
