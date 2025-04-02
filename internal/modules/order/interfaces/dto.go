@@ -2,6 +2,7 @@ package interfaces
 
 import (
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"time"
 	"tsb-service/internal/modules/order/domain"
 )
@@ -22,26 +23,17 @@ type CreateOrderRequest struct {
 	ExtraComment *string `json:"extraComment,omitempty"`
 
 	// Additional extras for the order (e.g., chopsticks, sauces, etc.).
-	OrderExtras []OrderExtraDTO `json:"orderExtras,omitempty"`
+	OrderExtra []domain.OrderExtra `json:"orderExtras,omitempty"`
 
 	// A list of products (by ID and quantity) that the customer is ordering.
 	OrderProducts []OrderProductDTO `json:"orderProducts"`
-}
-
-// OrderExtraDTO represents a specific extra the user can request for the order.
-// For example, "chopsticks" might simply be a flag, and "sauces" might include choices.
-type OrderExtraDTO struct {
-	// Name of the extra, e.g., "chopsticks" or "sauces".
-	Name string `json:"name"`
-	// Options for this extra, e.g., for sauces: ["salt", "sweet"].
-	Options []string `json:"options,omitempty"`
 }
 
 // OrderProductDTO represents an individual product in the order form.
 // Note: Price is not included because it should be retrieved from a trusted source.
 type OrderProductDTO struct {
 	ProductID uuid.UUID `json:"productId"`
-	Quantity  int       `json:"quantity"`
+	Quantity  int64     `json:"quantity"`
 }
 
 type UpdateOrderRequest struct {
@@ -50,11 +42,9 @@ type UpdateOrderRequest struct {
 
 // OrderResponse extends the domain.Order with additional response-specific details.
 type OrderResponse struct {
-	domain.Order
+	Order domain.Order `json:"order"`
 	// OrderProducts is a list of products in the order with pricing details.
 	OrderProducts []OrderProductResponse `json:"orderProducts"`
-	// OrderExtras are the additional extras requested for the order.
-	OrderExtras []OrderExtraDTO `json:"orderExtras,omitempty"`
 	// MolliePayment is the payment information associated with the order.
 	MolliePayment *MolliePayment `json:"molliePayment,omitempty"`
 }
@@ -63,9 +53,9 @@ type OrderResponse struct {
 // including the unit price and the total price (per line).
 type OrderProductResponse struct {
 	Product    ProductResponse `json:"product"`
-	Quantity   int             `json:"quantity"`
-	UnitPrice  float64         `json:"unitPrice"`
-	TotalPrice float64         `json:"totalPrice"`
+	Quantity   int64           `json:"quantity"`
+	UnitPrice  decimal.Decimal `json:"unitPrice"`
+	TotalPrice decimal.Decimal `json:"totalPrice"`
 }
 
 type ProductResponse struct {

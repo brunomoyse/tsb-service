@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"github.com/shopspring/decimal"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,22 +10,30 @@ import (
 
 // Product represents the core product aggregate.
 type Product struct {
-	ID           uuid.UUID     `json:"id"`
-	Price        float64       `json:"price"`
-	Code         *string       `json:"code"`
-	Slug         *string       `json:"slug"`
-	PieceCount   *int          `json:"pieceCount"`
-	IsVisible    bool          `json:"isVisible"`
-	IsAvailable  bool          `json:"isAvailable"`
-	IsHalal      bool          `json:"isHalal"`
-	IsVegan      bool          `json:"isVegan"`
-	CategoryID   uuid.UUID     `json:"categoryId"`
-	Translations []Translation `json:"translations"`
-	CreatedAt    time.Time     `json:"createdAt"`
-	UpdatedAt    time.Time     `json:"updatedAt"`
+	ID           uuid.UUID       `db:"id" json:"id"`
+	Price        decimal.Decimal `db:"price" json:"price"`
+	Code         *string         `db:"code" json:"code"`
+	Slug         *string         `db:"slug" json:"slug"`
+	PieceCount   *int            `db:"piece_count" json:"pieceCount"`
+	IsVisible    bool            `db:"is_visible" json:"isVisible"`
+	IsAvailable  bool            `db:"is_available" json:"isAvailable"`
+	IsHalal      bool            `db:"is_halal" json:"isHalal"`
+	IsVegan      bool            `db:"is_vegan" json:"isVegan"`
+	CategoryID   uuid.UUID       `db:"category_id" json:"categoryId"`
+	CreatedAt    time.Time       `db:"created_at" json:"createdAt"`
+	UpdatedAt    time.Time       `db:"updated_at" json:"updatedAt"`
+	Translations []Translation   `json:"translations"`
 }
 
-func NewProduct(price float64, categoryID uuid.UUID, isVisible bool, isAvailable bool, translations []Translation) (*Product, error) {
+type ProductOrderDetails struct {
+	ID           uuid.UUID       `db:"id" json:"id"`
+	Code         *string         `db:"code" json:"code"`
+	CategoryName string          `db:"category_name" json:"categoryName"`
+	Name         string          `db:"name" json:"name"`
+	Price        decimal.Decimal `db:"price" json:"price"`
+}
+
+func NewProduct(price decimal.Decimal, categoryID uuid.UUID, isVisible bool, isAvailable bool, translations []Translation) (*Product, error) {
 	if isVisible {
 		// For visible products, require at least 3 translations.
 		if len(translations) < 3 {

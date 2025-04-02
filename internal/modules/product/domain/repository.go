@@ -1,6 +1,8 @@
 package domain
 
-import "context"
+import (
+	"context"
+)
 
 // ProductRepository defines the contract for persisting Product aggregates.
 type ProductRepository interface {
@@ -10,4 +12,5 @@ type ProductRepository interface {
 	FindAll(ctx context.Context) ([]*Product, error)
 	FindByCategoryID(ctx context.Context, categoryID string) ([]*Product, error)
 	FindAllCategories(ctx context.Context) ([]*Category, error)
+	FindByIDs(ctx context.Context, productIDs []string) ([]*ProductOrderDetails, error)
 }

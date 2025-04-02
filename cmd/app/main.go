@@ -21,7 +21,7 @@ import (
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/oauth2"
 
-	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
+	// "github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -48,19 +48,19 @@ func main() {
 	oauth2.LoadGoogleOAuth()
 
 	// Initialize the Mollie client.
-	mollieConfig := mollie.NewAPITestingConfig(true)
-	mollieClient, err := mollie.NewClient(nil, mollieConfig)
-	if err != nil {
-		log.Fatalf("Failed to initialize Mollie client: %v", err)
-	}
-
-	orderRepo := orderInfrastructure.NewOrderRepository(dbConn)
-	orderService := orderApplication.NewOrderService(orderRepo, mollieClient)
-	orderHandler := orderInterfaces.NewOrderHandler(orderService)
+	// mollieConfig := mollie.NewAPITestingConfig(true)
+	// mollieClient, err := mollie.NewClient(nil, mollieConfig)
+	// if err != nil {
+	//	log.Fatalf("Failed to initialize Mollie client: %v", err)
+	// }
 
 	productRepo := productInfrastructure.NewProductRepository(dbConn)
 	productService := productApplication.NewProductService(productRepo)
 	productHandler := productInterfaces.NewProductHandler(productService)
+
+	orderRepo := orderInfrastructure.NewOrderRepository(dbConn)
+	orderService := orderApplication.NewOrderService(orderRepo)
+	orderHandler := orderInterfaces.NewOrderHandler(orderService, productService)
 
 	userRepo := userInfrastructure.NewUserRepository(dbConn)
 	userService := userApplication.NewUserService(userRepo)

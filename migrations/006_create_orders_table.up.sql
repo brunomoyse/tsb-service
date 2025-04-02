@@ -7,13 +7,14 @@ CREATE TABLE IF NOT EXISTS public.orders
     order_status text NOT NULL DEFAULT 'PENDING'::text, -- 'PENDING', 'CONFIRMED', etc.
     order_type text NOT NULL,                           -- 'DELIVERY', 'PICKUP'
     is_online_payment boolean NOT NULL DEFAULT false,
-    discount_amount double precision NOT NULL DEFAULT 0,
-    delivery_fee double precision,                     -- if order_type is DELIVERY
-    total_price double precision NOT NULL,
+    discount_amount numeric(10,2) NOT NULL DEFAULT 0,
+    delivery_fee numeric(10,2),                     -- if order_type is DELIVERY
+    total_price numeric(10,2) NOT NULL,
     estimated_ready_time timestamp(0) without time zone, -- when order is ready or delivered
     address_id uuid,                                   -- if order_type is DELIVERY
     address_extra text,                                -- extra info about the address
     extra_comment text,                                -- general comments about the order
+    order_extra jsonb,                                 -- extra info about the order
     CONSTRAINT orders_pkey PRIMARY KEY (id),
     CONSTRAINT orders_user_id_foreign FOREIGN KEY (user_id)
         REFERENCES public.users (id) MATCH SIMPLE
@@ -33,8 +34,7 @@ CREATE TABLE IF NOT EXISTS public.orders
 );
 
 ALTER TABLE orders
-ADD CONSTRAINT fk_orders_user
-FOREIGN KEY (user_id)
-REFERENCES users(id)
-ON DELETE RESTRICT;
-
+    ADD CONSTRAINT fk_orders_user
+        FOREIGN KEY (user_id)
+            REFERENCES users(id)
+            ON DELETE RESTRICT;

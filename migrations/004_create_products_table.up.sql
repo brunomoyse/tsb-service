@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS public.products
     created_at timestamp(0) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp(0) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
     category_id uuid NOT NULL,
-    price double precision,
+    price numeric(10,2),
     is_visible boolean NOT NULL DEFAULT true,
     is_available boolean NOT NULL DEFAULT true,
     code text,
