@@ -45,25 +45,18 @@ func (r *OrderRepository) Save(ctx context.Context, client *mollie.Client, order
 
 	// Insert the order without payment details.
 	const insertQuery = `
-		INSERT INTO orders (user_id, payment_mode, status, delivery_option)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO orders (user_id, status, delivery_option)
+		VALUES ($1, $2, $3)
 		RETURNING id;
 	`
 
 	var orderID string
-	if err = tx.GetContext(ctx, &orderID, insertQuery, order.UserID, order.PaymentMode, order.Status, order.DeliveryOption); err != nil {
+	if err = tx.GetContext(ctx, &orderID, insertQuery, order.UserID, order.Status, order.DeliveryOption); err != nil {
 		return nil, fmt.Errorf("failed to insert new order: %w", err)
 	}
 	order.ID, err = uuid.Parse(orderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse order id: %w", err)
-	}
-
-	if order.PaymentMode != nil && *order.PaymentMode == domain.PaymentModeOnline {
-		err := handleOnlinePayment(ctx, tx, client, order)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	// Link the order with its product lines.
@@ -195,7 +188,6 @@ func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([
 			currentOrder = &domain.Order{
 				ID:               ordID,
 				UserID:           uID,
-				PaymentMode:      (*domain.PaymentMode)(&row.PaymentMode),
 				MolliePaymentId:  row.MolliePaymentId,
 				MolliePaymentUrl: row.MolliePaymentUrl,
 				DeliveryOption:   domain.DeliveryOption(row.DeliveryOption),
@@ -362,7 +354,6 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 			order = &domain.Order{
 				ID:               ordID,
 				UserID:           uID,
-				PaymentMode:      (*domain.PaymentMode)(&row.PaymentMode),
 				MolliePaymentId:  row.MolliePaymentId,
 				MolliePaymentUrl: row.MolliePaymentUrl,
 				DeliveryOption:   domain.DeliveryOption(row.DeliveryOption),
@@ -474,7 +465,6 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 			currentOrder = &domain.Order{
 				ID:               ordID,
 				UserID:           uID,
-				PaymentMode:      (*domain.PaymentMode)(&row.PaymentMode),
 				MolliePaymentId:  row.MolliePaymentId,
 				MolliePaymentUrl: row.MolliePaymentUrl,
 				DeliveryOption:   domain.DeliveryOption(row.DeliveryOption),
