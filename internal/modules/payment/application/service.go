@@ -66,8 +66,6 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 	// Determine locale based on user language.
 	locale := mollie.Locale("fr_FR")
 
-	fmt.Println(o.TotalPrice.StringFixed(2))
-
 	// Construct the payment request.
 	paymentRequest := mollie.CreatePayment{
 		Amount: &mollie.Amount{

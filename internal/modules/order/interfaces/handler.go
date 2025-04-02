@@ -220,7 +220,6 @@ func (h *OrderHandler) GetOrderHandler(c *gin.Context) {
 	// 3. Fetch the order and related products.
 	order, orderProducts, err := h.service.GetOrderByID(c.Request.Context(), orderID)
 	if err != nil {
-		fmt.Println(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
 		return
 	}
@@ -447,7 +446,6 @@ func (h *OrderHandler) GetUserOrdersHandler(c *gin.Context) {
 		if ord.IsOnlinePayment {
 			molliePayment, err := h.paymentService.GetPaymentByOrderID(c.Request.Context(), ord.ID)
 			if err != nil {
-				fmt.Println(err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve payment"})
 				return
 			}
@@ -595,7 +593,6 @@ func (h *OrderHandler) GetAdminOrdersHandler(c *gin.Context) {
 		if ord.IsOnlinePayment {
 			molliePayment, err := h.paymentService.GetPaymentByOrderID(c.Request.Context(), ord.ID)
 			if err != nil {
-				fmt.Println(err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve payment"})
 				return
 			}

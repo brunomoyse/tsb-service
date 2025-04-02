@@ -128,7 +128,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 func (r *OrderRepository) Update(ctx context.Context, order *domain.Order) error {
 	query := `
 		UPDATE orders
-		SET status = $1, updated_at = CURRENT_TIMESTAMP
+		SET order_status = $1, updated_at = CURRENT_TIMESTAMP
 		WHERE id = $2;
 	`
 	if _, err := r.db.ExecContext(ctx, query, order.OrderStatus, order.ID); err != nil {
