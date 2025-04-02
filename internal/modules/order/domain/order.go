@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"time"
@@ -42,7 +43,7 @@ type Order struct {
 	AddressID          *uuid.UUID       `db:"address_id" json:"addressId,omitempty"`
 	AddressExtra       *string          `db:"address_extra" json:"addressExtra,omitempty"`
 	ExtraComment       *string          `db:"extra_comment" json:"extraComment,omitempty"`
-	OrderExtra         []OrderExtra     `db:"order_extra" json:"orderExtras,omitempty"`
+	OrderExtra         json.RawMessage  `db:"order_extra" json:"orderExtras,omitempty"`
 }
 
 type OrderExtra struct {
@@ -84,6 +85,8 @@ func NewOrder(
 	extraComment *string,
 	orderExtra []OrderExtra,
 ) *Order {
+	orderExtraJSON, _ := json.Marshal(orderExtra)
+
 	return &Order{
 		ID:              uuid.Nil,
 		UserID:          userID,
@@ -93,6 +96,6 @@ func NewOrder(
 		AddressID:       addressID,
 		AddressExtra:    addressExtra,
 		ExtraComment:    extraComment,
-		OrderExtra:      orderExtra,
+		OrderExtra:      orderExtraJSON,
 	}
 }

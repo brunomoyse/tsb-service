@@ -43,9 +43,9 @@ type UpdateOrderRequest struct {
 type OrderResponse struct {
 	Order domain.Order `json:"order"`
 	// OrderProducts is a list of products in the order with pricing details.
-	OrderProducts []domain.OrderProduct `json:"orderProducts"`
+	OrderProducts []domain.OrderProduct `json:"products"`
 	// MolliePayment is the payment information associated with the order.
-	MolliePayment *MolliePayment `json:"molliePayment,omitempty"`
+	MolliePayment *MolliePayment `json:"payment,omitempty"`
 }
 
 type MolliePayment struct {

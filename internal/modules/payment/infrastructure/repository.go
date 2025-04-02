@@ -228,3 +228,20 @@ func (r *PaymentRepository) RefreshStatus(ctx context.Context, externalPayment m
 
 	return &orderID, nil
 }
+
+func (r *PaymentRepository) FindByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error) {
+	const query = `
+		SELECT *
+		FROM mollie_payments
+		WHERE order_id = $1
+		LIMIT 1;
+	`
+
+	var payment domain.MolliePayment
+	err := r.db.GetContext(ctx, &payment, query, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find payment by order ID: %w", err)
+	}
+
+	return &payment, nil
+}

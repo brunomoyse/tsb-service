@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/shopspring/decimal"
+	"log"
 	"time"
 	"tsb-service/pkg/utils"
 
@@ -138,297 +139,145 @@ func (r *OrderRepository) Update(ctx context.Context, order *domain.Order) error
 	return nil
 }
 
-// UpdateStatus updates an order’s status based on the Mollie payment status.
-/*
-func (r *OrderRepository) UpdatePaymentStatus(ctx context.Context, paymentID string, paymentStatus string) error {
-	query := `
-		UPDATE orders
-		SET status = $1
-		WHERE mollie_payment_id = $2
-		RETURNING id;
-	`
-	var orderID uuid.UUID
-	var newStatus string
-	// @TODO: Add payment status instead of updating the order status
-	if paymentStatus == "paid" {
-		newStatus = "PAID"
-	} else {
-		newStatus = "FAILED"
-	}
-	err := r.db.QueryRowContext(ctx, query, newStatus, paymentID).Scan(&orderID)
-	if err != nil {
-		return fmt.Errorf("failed to update order status: %v", err)
-	}
-	return nil
-}
-*/
-
-// FindByUserID retrieves all orders for a given user.
-func (r *OrderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error) {
-	lang := utils.GetLang(ctx)
-
-	query := `
-        SELECT 
-            o.id AS order_id,
-            o.user_id,
-            o.payment_mode,
-            o.mollie_payment_id,
-            o.mollie_payment_url,
-            o.delivery_option,
-            o.status,
-            o.created_at,
-            o.updated_at,
-            op.product_id,
-            op.quantity,
-            COALESCE(pt_user.name, pt_fr.name, pt_zh.name, pt_en.name) AS product_name,
-            op.unit_price AS product_unit_price,
-            op.total_price AS product_total_price,
-            p.code AS product_code,
-            COALESCE(pct_user.name, pct_fr.name, pct_zh.name, pct_en.name) AS product_category_name
-        FROM orders o
-        LEFT JOIN order_product op ON o.id = op.order_id
-        LEFT JOIN products p ON op.product_id = p.id
-        -- Product name translations with fallback
-        LEFT JOIN product_translations pt_user ON p.id = pt_user.product_id AND pt_user.locale = $2
-        LEFT JOIN product_translations pt_fr   ON p.id = pt_fr.product_id AND pt_fr.locale = 'fr'
-        LEFT JOIN product_translations pt_zh   ON p.id = pt_zh.product_id AND pt_zh.locale = 'zh'
-        LEFT JOIN product_translations pt_en   ON p.id = pt_en.product_id AND pt_en.locale = 'en'
-        -- Product category translations with fallback
-        LEFT JOIN product_category_translations pct_user ON p.category_id = pct_user.product_category_id AND pct_user.locale = $2
-        LEFT JOIN product_category_translations pct_fr   ON p.category_id = pct_fr.product_category_id AND pct_fr.locale = 'fr'
-        LEFT JOIN product_category_translations pct_zh   ON p.category_id = pct_zh.product_category_id AND pct_zh.locale = 'zh'
-        LEFT JOIN product_category_translations pct_en   ON p.category_id = pct_en.product_category_id AND pct_en.locale = 'en'
-        WHERE o.user_id = $1
-        ORDER BY o.created_at DESC
-    `
-
-	var rows []struct {
-		OrderID             string           `db:"order_id"`
-		UserID              string           `db:"user_id"`
-		PaymentMode         string           `db:"payment_mode"`
-		MolliePaymentId     *string          `db:"mollie_payment_id"`
-		MolliePaymentUrl    *string          `db:"mollie_payment_url"`
-		DeliveryOption      string           `db:"delivery_option"`
-		Status              string           `db:"status"`
-		CreatedAt           time.Time        `db:"created_at"`
-		UpdatedAt           time.Time        `db:"updated_at"`
-		ProductID           *string          `db:"product_id"`
-		Quantity            *int64           `db:"quantity"`
-		ProductName         *string          `db:"product_name"`
-		ProductUnitPrice    *decimal.Decimal `db:"product_unit_price"`
-		ProductTotalPrice   *decimal.Decimal `db:"product_total_price"`
-		ProductCode         *string          `db:"product_code"`
-		ProductCategoryName *string          `db:"product_category_name"`
-	}
-
-	if err := r.db.SelectContext(ctx, &rows, query, userID, lang); err != nil {
-		return nil, fmt.Errorf("failed to query orders: %w", err)
-	}
-
-	var orders []*domain.Order
-	var currentOrder *domain.Order
-
-	for _, row := range rows {
-		if currentOrder == nil || currentOrder.ID.String() != row.OrderID {
-			ordID, err := uuid.Parse(row.OrderID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse order id: %w", err)
-			}
-			uID, err := uuid.Parse(row.UserID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse user id: %w", err)
-			}
-
-			currentOrder = &domain.Order{
-				ID:          ordID,
-				UserID:      uID,
-				OrderStatus: domain.OrderStatus(row.Status),
-				CreatedAt:   row.CreatedAt,
-				UpdatedAt:   row.UpdatedAt,
-			}
-			orders = append(orders, currentOrder)
-		}
-
-	}
-
-	return orders, nil
-}
-
 // FindByID retrieves an order by its ID.
-func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, error) {
+func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error) {
 	lang := utils.GetLang(ctx)
 
 	query := `
         SELECT 
-            o.id AS order_id,
-            o.user_id,
-            o.payment_mode,
-            o.mollie_payment_id,
-            o.mollie_payment_url,
-            o.delivery_option,
-            o.status,
-            o.created_at,
-            o.updated_at,
-            op.product_id,
-            op.quantity,
-            COALESCE(pt_user.name, pt_fr.name, pt_zh.name, pt_en.name) AS product_name,
-            op.unit_price AS product_unit_price,
-            op.total_price AS product_total_price,
-            p.code AS product_code,
-            COALESCE(pct_user.name, pct_fr.name, pct_zh.name, pct_en.name) AS product_category_name
+            o.*
         FROM orders o
-        LEFT JOIN order_product op ON o.id = op.order_id
-        LEFT JOIN products p ON op.product_id = p.id
-        -- Product translations with fallback
-        LEFT JOIN product_translations pt_user ON p.id = pt_user.product_id AND pt_user.locale = $2
-        LEFT JOIN product_translations pt_fr   ON p.id = pt_fr.product_id AND pt_fr.locale = 'fr'
-        LEFT JOIN product_translations pt_zh   ON p.id = pt_zh.product_id AND pt_zh.locale = 'zh'
-        LEFT JOIN product_translations pt_en   ON p.id = pt_en.product_id AND pt_en.locale = 'en'
-        -- Product category translations with fallback
-        LEFT JOIN product_category_translations pct_user ON p.category_id = pct_user.product_category_id AND pct_user.locale = $2
-        LEFT JOIN product_category_translations pct_fr   ON p.category_id = pct_fr.product_category_id AND pct_fr.locale = 'fr'
-        LEFT JOIN product_category_translations pct_zh   ON p.category_id = pct_zh.product_category_id AND pct_zh.locale = 'zh'
-        LEFT JOIN product_category_translations pct_en   ON p.category_id = pct_en.product_category_id AND pct_en.locale = 'en'
         WHERE o.id = $1
         ORDER BY o.created_at DESC
 	`
 
-	var rows []struct {
-		OrderID             string           `db:"order_id"`
-		UserID              string           `db:"user_id"`
-		PaymentMode         string           `db:"payment_mode"`
-		MolliePaymentId     *string          `db:"mollie_payment_id"`
-		MolliePaymentUrl    *string          `db:"mollie_payment_url"`
-		DeliveryOption      string           `db:"delivery_option"`
-		Status              string           `db:"status"`
-		CreatedAt           time.Time        `db:"created_at"`
-		UpdatedAt           time.Time        `db:"updated_at"`
-		ProductID           *string          `db:"product_id"`
-		Quantity            *int64           `db:"quantity"`
-		ProductName         *string          `db:"product_name"`
-		ProductUnitPrice    *decimal.Decimal `db:"product_unit_price"`
-		ProductTotalPrice   *decimal.Decimal `db:"product_total_price"`
-		ProductCode         *string          `db:"product_code"`
-		ProductCategoryName *string          `db:"product_category_name"`
-	}
-
-	if err := r.db.SelectContext(ctx, &rows, query, orderID, lang); err != nil {
-		return nil, fmt.Errorf("failed to query order: %w", err)
-	}
-
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("order not found")
-	}
-
 	var order *domain.Order
-	for _, row := range rows {
-		// Create the order once.
-		if order == nil {
-			ordID, err := uuid.Parse(row.OrderID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse order id: %w", err)
-			}
-			uID, err := uuid.Parse(row.UserID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse user id: %w", err)
-			}
 
-			order = &domain.Order{
-				ID:        ordID,
-				UserID:    uID,
-				CreatedAt: row.CreatedAt,
-				UpdatedAt: row.UpdatedAt,
-			}
-		}
+	if err := r.db.SelectContext(ctx, &order, query, orderID, lang); err != nil {
+		return nil, nil, fmt.Errorf("failed to query order: %w", err)
 	}
 
-	return order, nil
+	if order == nil {
+		return nil, nil, fmt.Errorf("order not found")
+	}
+
+	// Fetch order products
+	query = `
+		SELECT 
+			op.*
+		FROM order_product op
+		WHERE op.order_id = $1
+	`
+
+	var orderProducts []domain.OrderProductRaw
+
+	if err := r.db.SelectContext(ctx, &orderProducts, query, order.ID); err != nil {
+		return nil, nil, fmt.Errorf("failed to query order products: %w", err)
+	}
+
+	return order, &orderProducts, nil
 }
 
-func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int) ([]*domain.Order, error) {
-	lang := utils.GetLang(ctx)
-
-	query := `
-        SELECT 
-            o.id AS order_id,
-            o.user_id,
-            o.payment_mode,
-            o.mollie_payment_id,
-            o.mollie_payment_url,
-            o.delivery_option,
-            o.status,
-            o.created_at,
-            o.updated_at,
-            op.product_id,
-            op.quantity,
-            COALESCE(pt_user.name, pt_fr.name, pt_zh.name, pt_en.name) AS product_name,
-            op.unit_price AS product_unit_price,
-            op.total_price AS product_total_price,
-            p.code AS product_code,
-            COALESCE(pct_user.name, pct_fr.name, pct_zh.name, pct_en.name) AS product_category_name
-        FROM orders o
-        LEFT JOIN order_product op ON o.id = op.order_id
-        LEFT JOIN products p ON op.product_id = p.id
-        -- Product translations with fallback languages
-        LEFT JOIN product_translations pt_user ON p.id = pt_user.product_id AND pt_user.locale = $2
-        LEFT JOIN product_translations pt_fr   ON p.id = pt_fr.product_id AND pt_fr.locale = 'fr'
-        LEFT JOIN product_translations pt_zh   ON p.id = pt_zh.product_id AND pt_zh.locale = 'zh'
-        LEFT JOIN product_translations pt_en   ON p.id = pt_en.product_id AND pt_en.locale = 'en'
-        -- Category translations with fallback languages
-        LEFT JOIN product_category_translations pct_user ON p.category_id = pct_user.product_category_id AND pct_user.locale = $2
-        LEFT JOIN product_category_translations pct_fr   ON p.category_id = pct_fr.product_category_id AND pct_fr.locale = 'fr'
-        LEFT JOIN product_category_translations pct_zh   ON p.category_id = pct_zh.product_category_id AND pct_zh.locale = 'zh'
-        LEFT JOIN product_category_translations pct_en   ON p.category_id = pct_en.product_category_id AND pct_en.locale = 'en'
-        ORDER BY o.created_at DESC
-        LIMIT $1 OFFSET $1 * ($3 - 1)
-    `
-
-	var rows []struct {
-		OrderID             string           `db:"order_id"`
-		UserID              string           `db:"user_id"`
-		PaymentMode         string           `db:"payment_mode"`
-		MolliePaymentId     *string          `db:"mollie_payment_id"`
-		MolliePaymentUrl    *string          `db:"mollie_payment_url"`
-		DeliveryOption      string           `db:"delivery_option"`
-		Status              string           `db:"status"`
-		CreatedAt           time.Time        `db:"created_at"`
-		UpdatedAt           time.Time        `db:"updated_at"`
-		ProductID           *string          `db:"product_id"`
-		Quantity            *int64           `db:"quantity"`
-		ProductName         *string          `db:"product_name"`
-		ProductUnitPrice    *decimal.Decimal `db:"product_unit_price"`
-		ProductTotalPrice   *decimal.Decimal `db:"product_total_price"`
-		ProductCode         *string          `db:"product_code"`
-		ProductCategoryName *string          `db:"product_category_name"`
+func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*domain.Order, error) {
+	// Basic pagination safety: ensure page & limit are > 0
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
 	}
 
-	if err := r.db.SelectContext(ctx, &rows, query, limit, lang, page); err != nil {
+	offset := (page - 1) * limit
+
+	var whereClause string
+	var args []interface{}
+	placeholderIndex := 1
+
+	// If userID is not nil, add a WHERE condition
+	if userID != nil {
+		whereClause = fmt.Sprintf("WHERE o.user_id = $%d", placeholderIndex)
+		args = append(args, *userID)
+		placeholderIndex++
+	}
+
+	// Next placeholders for LIMIT and OFFSET
+	limitPlaceholder := placeholderIndex
+	offsetPlaceholder := placeholderIndex + 1
+
+	// Build the final query
+	query := fmt.Sprintf(`
+        SELECT 
+            o.*
+        FROM orders o
+        %s
+        ORDER BY o.created_at DESC
+        LIMIT $%d OFFSET $%d
+    `, whereClause, limitPlaceholder, offsetPlaceholder)
+
+	// Append the limit and offset arguments
+	args = append(args, limit, offset)
+
+	// Execute the query
+	var orders []*domain.Order
+	if err := r.db.SelectContext(ctx, &orders, query, args...); err != nil {
+		log.Printf("Error querying orders (page=%d, limit=%d, userID=%v): %v", page, limit, userID, err)
 		return nil, fmt.Errorf("failed to query orders: %w", err)
 	}
 
-	var orders []*domain.Order
-	var currentOrder *domain.Order
+	return orders, nil
+}
 
-	for _, row := range rows {
-		if currentOrder == nil || currentOrder.ID.String() != row.OrderID {
-			ordID, err := uuid.Parse(row.OrderID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse order id: %w", err)
-			}
-			uID, err := uuid.Parse(row.UserID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse user id: %w", err)
-			}
-
-			currentOrder = &domain.Order{
-				ID:        ordID,
-				UserID:    uID,
-				CreatedAt: row.CreatedAt,
-				UpdatedAt: row.UpdatedAt,
-			}
-			orders = append(orders, currentOrder)
-		}
+func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []uuid.UUID) (map[uuid.UUID][]domain.OrderProductRaw, error) {
+	if len(orderIDs) == 0 {
+		// Return an empty map if nothing was requested
+		return make(map[uuid.UUID][]domain.OrderProductRaw), nil
 	}
 
-	return orders, nil
+	// Build a query with an IN clause using sqlx.In for parameter expansion
+	query, args, err := sqlx.In(`
+        SELECT 
+            order_id,
+            product_id,
+            quantity,
+            unit_price,
+            total_price
+        FROM order_product
+        WHERE order_id IN (?)
+    `, orderIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build IN query: %w", err)
+	}
+
+	// Rebind the query for the current driver
+	query = r.db.Rebind(query)
+
+	// Define a struct that matches the selected columns
+	var rows []struct {
+		OrderID    uuid.UUID       `db:"order_id"`
+		ProductID  uuid.UUID       `db:"product_id"`
+		Quantity   int64           `db:"quantity"`
+		UnitPrice  decimal.Decimal `db:"unit_price"`
+		TotalPrice decimal.Decimal `db:"total_price"`
+	}
+
+	// Execute the query
+	if err := r.db.SelectContext(ctx, &rows, query, args...); err != nil {
+		return nil, fmt.Errorf("failed to select order products: %w", err)
+	}
+
+	// Initialize the result map
+	productsByOrder := make(map[uuid.UUID][]domain.OrderProductRaw)
+
+	// Populate the map: orderID -> slice of OrderProductRaw
+	for _, row := range rows {
+		op := domain.OrderProductRaw{
+			ProductID:  row.ProductID,
+			Quantity:   row.Quantity,
+			UnitPrice:  row.UnitPrice,
+			TotalPrice: row.TotalPrice,
+		}
+		productsByOrder[row.OrderID] = append(productsByOrder[row.OrderID], op)
+	}
+
+	return productsByOrder, nil
 }
