@@ -5,10 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gosimple/slug"
+	"github.com/lib/pq"
+	"github.com/shopspring/decimal"
 	"regexp"
 	"sort"
 	"strconv"
 	"time"
+	"tsb-service/pkg/utils"
 
 	"github.com/jmoiron/sqlx"
 
@@ -281,6 +284,32 @@ func (r *ProductRepository) FindAll(ctx context.Context) ([]*domain.Product, err
 	return r.queryProducts(ctx, query)
 }
 
+func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error) {
+	lang := utils.GetLang(ctx)
+
+	query := `
+		SELECT 
+			p.id,
+			p.code,
+			p.price,
+			pct.name AS category_name,
+			pt.name AS name
+		FROM products p
+		LEFT JOIN product_translations pt ON p.id = pt.product_id
+		LEFT JOIN product_category_translations pct ON p.category_id = pct.product_category_id
+		WHERE p.id = ANY($1)
+		AND pt.locale = $2
+		AND pct.locale = $2
+		ORDER BY p.code;
+	`
+	var products []*domain.ProductOrderDetails
+	err := r.db.SelectContext(ctx, &products, query, pq.Array(productIDs), lang)
+	if err != nil {
+		return nil, err
+	}
+	return products, nil
+}
+
 // FindByCategoryID retrieves products filtered by a specific category ID.
 func (r *ProductRepository) FindByCategoryID(ctx context.Context, categoryID string) ([]*domain.Product, error) {
 	query := `
@@ -405,21 +434,21 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 
 	// Define a helper struct for scanning rows.
 	type productRow struct {
-		ID               string    `db:"id"`
-		Price            float64   `db:"price"`
-		Code             *string   `db:"code"`
-		Slug             *string   `db:"slug"`
-		PieceCount       *int      `db:"piece_count"`
-		IsVisible        bool      `db:"is_visible"`
-		IsAvailable      bool      `db:"is_available"`
-		IsHalal          bool      `db:"is_halal"`
-		IsVegan          bool      `db:"is_vegan"`
-		CategoryID       string    `db:"category_id"`
-		CreatedAt        time.Time `db:"created_at"`
-		UpdatedAt        time.Time `db:"updated_at"`
-		Locale           *string   `db:"locale"`
-		TransName        *string   `db:"name"`
-		TransDescription *string   `db:"description"`
+		ID               string          `db:"id"`
+		Price            decimal.Decimal `db:"price"`
+		Code             *string         `db:"code"`
+		Slug             *string         `db:"slug"`
+		PieceCount       *int            `db:"piece_count"`
+		IsVisible        bool            `db:"is_visible"`
+		IsAvailable      bool            `db:"is_available"`
+		IsHalal          bool            `db:"is_halal"`
+		IsVegan          bool            `db:"is_vegan"`
+		CategoryID       string          `db:"category_id"`
+		CreatedAt        time.Time       `db:"created_at"`
+		UpdatedAt        time.Time       `db:"updated_at"`
+		Locale           *string         `db:"locale"`
+		TransName        *string         `db:"name"`
+		TransDescription *string         `db:"description"`
 	}
 
 	// Group rows by product ID.

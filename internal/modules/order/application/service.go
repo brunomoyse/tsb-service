@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 	"tsb-service/internal/modules/order/domain"
+	productDomain "tsb-service/internal/modules/product/domain"
 	"tsb-service/pkg/sse"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
@@ -12,7 +13,7 @@ import (
 )
 
 type OrderService interface {
-	CreateOrder(ctx context.Context, userID uuid.UUID, products []domain.PaymentLine) (*domain.Order, error)
+	CreateOrder(ctx context.Context, order *domain.Order, orderProducts *[]domain.OrderProduct) (*domain.Order, *[]domain.OrderProduct, error)
 	GetOrdersByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error)
 	GetPaginatedOrders(ctx context.Context, page int, limit int) ([]*domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) error
@@ -21,40 +22,33 @@ type OrderService interface {
 
 type orderService struct {
 	repo         domain.OrderRepository
+	productRepo  productDomain.ProductRepository
 	mollieClient *mollie.Client
 }
 
-func NewOrderService(repo domain.OrderRepository, mollieClient *mollie.Client) OrderService {
+func NewOrderService(repo domain.OrderRepository) OrderService {
 	return &orderService{
-		repo:         repo,
-		mollieClient: mollieClient,
+		repo: repo,
 	}
 }
 
-func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, paymentLines []domain.PaymentLine) (*domain.Order, error) {
-	order := domain.NewOrder(userID, paymentLines)
+func (s *orderService) CreateOrder(ctx context.Context, o *domain.Order, op *[]domain.OrderProduct) (*domain.Order, *[]domain.OrderProduct, error) {
 
-	// Load product prices from DB
-	updatedOrder, err := s.repo.OrderFillPrices(ctx, &order)
+	order, orderProducts, err := s.repo.Save(ctx, o, op)
 	if err != nil {
-		return nil, err
-	}
-
-	savedOrder, err := s.repo.Save(ctx, s.mollieClient, updatedOrder)
-	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to save order: %w", err)
 	}
 
 	// Construct an event payload for the orderCreated event.
 	eventPayload := fmt.Sprintf(
 		`{"event": "orderCreated", "orderID": "%s", "timestamp": "%s"}`,
-		savedOrder.ID.String(),
+		order.ID.String(),
 		time.Now().Format(time.RFC3339),
 	)
 	// Broadcast the event to all connected SSE clients.
 	sse.Hub.Broadcast(eventPayload)
 
-	return savedOrder, nil
+	return order, orderProducts, nil
 }
 
 func (s *orderService) GetOrdersByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error) {

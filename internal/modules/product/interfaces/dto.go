@@ -1,6 +1,7 @@
 package interfaces
 
 import (
+	"github.com/shopspring/decimal"
 	"time"
 
 	"tsb-service/internal/modules/product/domain"
@@ -11,7 +12,7 @@ import (
 // CreateProductRequest is used when creating a new product.
 type CreateProductRequest struct {
 	CategoryID   uuid.UUID            `json:"categoryId" binding:"required"`
-	Price        float64              `json:"price" binding:"required"`
+	Price        decimal.Decimal      `json:"price" binding:"required"`
 	Code         *string              `json:"code"`
 	PieceCount   *int                 `json:"pieceCount"`
 	IsVisible    bool                 `json:"isVisible"`
@@ -23,7 +24,7 @@ type CreateProductRequest struct {
 
 // UpdateProductRequest is used when updating an existing product.
 type UpdateProductRequest struct {
-	Price        *float64                    `json:"price"`
+	Price        *decimal.Decimal            `json:"price"`
 	Code         *string                     `json:"code"`
 	Slug         *string                     `json:"slug"`
 	PieceCount   *int                        `json:"pieceCount"`
@@ -52,7 +53,7 @@ type AdminCategoryResponse struct {
 // AdminProductResponse is returned for admin endpoints, containing all product details.
 type AdminProductResponse struct {
 	ID           uuid.UUID            `json:"id"`
-	Price        float64              `json:"price"`
+	Price        decimal.Decimal      `json:"price"`
 	Code         *string              `json:"code"`
 	Slug         *string              `json:"slug"`
 	PieceCount   *int                 `json:"pieceCount"`
@@ -73,20 +74,20 @@ type PublicCategoryResponse struct {
 
 // PublicProductResponse is returned to public users, merging product data with the selected translation.
 type PublicProductResponse struct {
-	ID          uuid.UUID `json:"id"`
-	Price       float64   `json:"price"`
-	Code        *string   `json:"code,omitempty"`
-	Slug        *string   `json:"slug,omitempty"`
-	PieceCount  *int      `json:"pieceCount"`
-	IsVisible   bool      `json:"isVisible"`
-	IsAvailable bool      `json:"isAvailable"`
-	IsHalal     bool      `json:"isHalal"`
-	IsVegan     bool      `json:"isVegan"`
-	CategoryID  uuid.UUID `json:"categoryId"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitempty"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          uuid.UUID       `json:"id"`
+	Price       decimal.Decimal `json:"price"`
+	Code        *string         `json:"code,omitempty"`
+	Slug        *string         `json:"slug,omitempty"`
+	PieceCount  *int            `json:"pieceCount"`
+	IsVisible   bool            `json:"isVisible"`
+	IsAvailable bool            `json:"isAvailable"`
+	IsHalal     bool            `json:"isHalal"`
+	IsVegan     bool            `json:"isVegan"`
+	CategoryID  uuid.UUID       `json:"categoryId"`
+	Name        string          `json:"name"`
+	Description *string         `json:"description,omitempty"`
+	CreatedAt   time.Time       `json:"createdAt"`
+	UpdatedAt   time.Time       `json:"updatedAt"`
 }
 
 // NewPublicCategoryResponse builds a PublicCategoryResponse from a domain.Category,

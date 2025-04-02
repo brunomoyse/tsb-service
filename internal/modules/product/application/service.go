@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"github.com/shopspring/decimal"
 	"tsb-service/internal/modules/product/domain"
 
 	"github.com/google/uuid"
@@ -9,9 +10,10 @@ import (
 
 // ProductService defines the application service interface for product operations.
 type ProductService interface {
-	CreateProduct(ctx context.Context, categoryID uuid.UUID, price float64, code *string, isVisible bool, isAvailable bool, isHalal bool, isVegan bool, translations []domain.Translation) (*domain.Product, error)
+	CreateProduct(ctx context.Context, categoryID uuid.UUID, price decimal.Decimal, code *string, isVisible bool, isAvailable bool, isHalal bool, isVegan bool, translations []domain.Translation) (*domain.Product, error)
 	GetProduct(ctx context.Context, id string) (*domain.Product, error)
 	GetProducts(ctx context.Context) ([]*domain.Product, error)
+	GetProductsByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error)
 	GetProductsByCategory(ctx context.Context, categoryID string) ([]*domain.Product, error)
 	GetCategories(ctx context.Context) ([]*domain.Category, error)
 	UpdateProduct(ctx context.Context, product *domain.Product) error
@@ -30,7 +32,7 @@ func NewProductService(repo domain.ProductRepository) ProductService {
 func (s *productService) CreateProduct(
 	ctx context.Context,
 	categoryID uuid.UUID,
-	price float64,
+	price decimal.Decimal,
 	code *string,
 	isVisible bool,
 	isAvailable bool,
@@ -69,6 +71,10 @@ func (s *productService) GetProduct(ctx context.Context, id string) (*domain.Pro
 // GetProducts retrieves a list of products.
 func (s *productService) GetProducts(ctx context.Context) ([]*domain.Product, error) {
 	return s.repo.FindAll(ctx)
+}
+
+func (s *productService) GetProductsByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error) {
+	return s.repo.FindByIDs(ctx, productIDs)
 }
 
 // GetCategories retrieves a list of categories.

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"github.com/shopspring/decimal"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,10 +34,10 @@ type MolliePayment struct {
 	ExpiresAt                       *time.Time      `db:"expires_at" json:"expiresAt,omitempty"`
 	ExpiredAt                       *time.Time      `db:"expired_at" json:"expiredAt,omitempty"`
 	FailedAt                        *time.Time      `db:"failed_at" json:"failedAt,omitempty"`
-	Amount                          float64         `db:"amount" json:"amount"`
-	AmountRefunded                  float64         `db:"amount_refunded" json:"amountRefunded"`
-	AmountRemaining                 float64         `db:"amount_remaining" json:"amountRemaining"`
-	AmountCaptured                  float64         `db:"amount_captured" json:"amountCaptured"`
-	AmountChargedBack               float64         `db:"amount_charged_back" json:"amountChargedBack"`
-	SettlementAmount                float64         `db:"settlement_amount" json:"settlementAmount"`
+	Amount                          decimal.Decimal `db:"amount" json:"amount"`
+	AmountRefunded                  decimal.Decimal `db:"amount_refunded" json:"amountRefunded"`
+	AmountRemaining                 decimal.Decimal `db:"amount_remaining" json:"amountRemaining"`
+	AmountCaptured                  decimal.Decimal `db:"amount_captured" json:"amountCaptured"`
+	AmountChargedBack               decimal.Decimal `db:"amount_charged_back" json:"amountChargedBack"`
+	SettlementAmount                decimal.Decimal `db:"settlement_amount" json:"settlementAmount"`
 }
