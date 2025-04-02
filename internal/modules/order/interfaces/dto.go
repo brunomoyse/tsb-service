@@ -52,6 +52,9 @@ type MolliePayment struct {
 	// The unique identifier returned by Mollie.
 	ID uuid.UUID `json:"id"`
 
+	// PaymentURL is the URL where the customer can complete the payment.
+	PaymentURL string `json:"paymentUrl"`
+
 	// The ID of the order this payment is associated with.
 	OrderID uuid.UUID `json:"orderId"`
 

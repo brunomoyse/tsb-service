@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"os"
+	"time"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	"tsb-service/internal/modules/payment/domain"
+	"tsb-service/pkg/sse"
 )
 
 type PaymentService interface {
 	CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct) (*domain.MolliePayment, error)
+	UpdatePaymentStatus(ctx context.Context, externalMolliePaymentID string) error
 }
 
 type paymentService struct {
@@ -88,4 +91,29 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 		return nil, err
 	}
 	return payment, nil
+}
+
+func (s *paymentService) UpdatePaymentStatus(ctx context.Context, externalMolliePaymentID string) error {
+	// Fetch the payment from Mollie
+	_, externalPayment, err := s.mollieClient.Payments.Get(ctx, externalMolliePaymentID, nil)
+
+	if err != nil {
+		return fmt.Errorf("failed to fetch payment from Mollie: %w", err)
+	}
+
+	orderID, err := s.repo.RefreshStatus(ctx, *externalPayment)
+	if err != nil {
+		return fmt.Errorf("failed to update payment status: %w", err)
+	}
+
+	eventPayload := fmt.Sprintf(
+		`{"event": "orderUpdated", "orderID": "%s", "timestamp": "%s"}`,
+		orderID,
+		time.Now().Format(time.RFC3339),
+	)
+	
+	// Broadcast the event to all connected SSE clients.
+	sse.Hub.Broadcast(eventPayload)
+
+	return nil
 }

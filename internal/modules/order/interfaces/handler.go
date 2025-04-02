@@ -9,6 +9,7 @@ import (
 	"tsb-service/internal/modules/order/application"
 	"tsb-service/internal/modules/order/domain"
 	paymentApplication "tsb-service/internal/modules/payment/application"
+	paymentDomain "tsb-service/internal/modules/payment/domain"
 	productApplication "tsb-service/internal/modules/product/application"
 	productDomain "tsb-service/internal/modules/product/domain"
 
@@ -184,6 +185,10 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 			Status:    molliePayment.Status,
 			CreatedAt: molliePayment.CreatedAt,
 			PaidAt:    molliePayment.PaidAt,
+		}
+		var parsedLinks paymentDomain.PaymentLinks
+		if err := json.Unmarshal(molliePayment.Links, &parsedLinks); err == nil {
+			orderResponse.MolliePayment.PaymentURL = parsedLinks.Checkout.Href
 		}
 	}
 

@@ -41,3 +41,15 @@ type MolliePayment struct {
 	AmountChargedBack               decimal.Decimal `db:"amount_charged_back" json:"amountChargedBack"`
 	SettlementAmount                decimal.Decimal `db:"settlement_amount" json:"settlementAmount"`
 }
+
+type PaymentLinks struct {
+	Checkout struct {
+		Href string `json:"href"`
+		Type string `json:"type"`
+	} `json:"checkout,omitempty"`
+
+	Self struct {
+		Href string `json:"href"`
+		Type string `json:"type"`
+	} `json:"self,omitempty"`
+}

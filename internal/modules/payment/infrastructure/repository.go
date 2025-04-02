@@ -111,7 +111,7 @@ func (r *PaymentRepository) Save(ctx context.Context, external mollie.Payment, o
 		// We store the JSON strings as []byte if your columns are JSONB in DB
 		Metadata:          []byte(metadataJSON),
 		Links:             []byte(linksJSON),
-		CreatedAt:         time.Now(), // or external.CreatedAt if you want Mollie's creation date
+		CreatedAt:         *external.CreatedAt,
 		AuthorizedAt:      external.AuthorizedAt,
 		PaidAt:            external.PaidAt,
 		CanceledAt:        external.CanceledAt,
@@ -206,4 +206,25 @@ func (r *PaymentRepository) Save(ctx context.Context, external mollie.Payment, o
 	}
 
 	return domainPayment, nil
+}
+
+func (r *PaymentRepository) RefreshStatus(ctx context.Context, externalPayment mollie.Payment) (*uuid.UUID, error) {
+	const query = `
+		UPDATE mollie_payments
+		SET status = $1
+		WHERE mollie_payment_id = $2
+		RETURNING order_id;
+	`
+
+	var orderID uuid.UUID
+	err := r.db.GetContext(ctx, &orderID, query,
+		externalPayment.Status,
+		externalPayment.ID,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to update payment status: %w", err)
+	}
+
+	return &orderID, nil
 }
