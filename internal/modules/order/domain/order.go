@@ -52,11 +52,25 @@ type OrderExtra struct {
 	Options []string `json:"options,omitempty"`
 }
 
-type OrderProduct struct {
+type OrderProductRaw struct {
 	ProductID  uuid.UUID       `json:"productId"`
 	Quantity   int64           `json:"quantity"`
 	UnitPrice  decimal.Decimal `json:"unitPrice"`
 	TotalPrice decimal.Decimal `json:"totalPrice"`
+}
+
+type OrderProduct struct {
+	Product    Product         `json:"product"`
+	Quantity   int64           `json:"quantity"`
+	UnitPrice  decimal.Decimal `json:"unitPrice"`
+	TotalPrice decimal.Decimal `json:"totalPrice"`
+}
+
+type Product struct {
+	ID           uuid.UUID `json:"id"`
+	Code         *string   `json:"code"`
+	CategoryName string    `json:"categoryName"`
+	Name         string    `json:"name"`
 }
 
 // NewOrder is a constructor function that creates a new Order domain object.

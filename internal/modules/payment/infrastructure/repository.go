@@ -1,142 +1,209 @@
 package infrastructure
 
-/*
-// createMolliePayment creates a Mollie payment
-func createMolliePayment(ctx context.Context, tx *sqlx.Tx, client *mollie.Client, ord *domain.Order) (*mollie.Payment, error) {
-	// Extract user language from context; default to "fr" if not set.
-	lang, _ := ctx.Value("lang").(string)
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
+	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
+	"github.com/shopspring/decimal"
+	"time"
+	"tsb-service/internal/modules/payment/domain"
+)
 
-	// Generate payment lines using the order's product lines.
-	paymentLines, err := getMolliePaymentLines(ctx, tx, ord)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get payment lines: %w", err)
-	}
-
-	amount, err := getTotalAmount(paymentLines)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get total payment amount: %w", err)
-	}
-
-	// Retrieve base URLs from environment variables.
-	appBaseUrl := os.Getenv("APP_BASE_URL")
-	if appBaseUrl == "" {
-		return nil, fmt.Errorf("APP_BASE_URL is required")
-	}
-
-	webhookUrl := os.Getenv("MOLLIE_WEBHOOK_URL")
-	if webhookUrl == "" {
-		return nil, fmt.Errorf("MOLLIE_WEBHOOK_URL is required")
-	}
-
-	redirectEndpoint := appBaseUrl + "/order-completed/" + ord.ID.String()
-
-	// Determine locale based on user language.
-	locale := mollie.Locale("fr_FR")
-	if lang == "en" || lang == "zh" {
-		locale = "en_GB"
-	}
-
-	// Construct the payment request.
-	paymentRequest := mollie.CreatePayment{
-		Amount: &mollie.Amount{
-			Value:    amount,
-			Currency: "EUR",
-		},
-		Description: "Tokyo Sushi Bar - " + generateOrderReference(ord.ID),
-		RedirectURL: redirectEndpoint,
-		WebhookURL:  webhookUrl,
-		Locale:      locale,
-		Lines:       paymentLines,
-	}
-
-	// Create the payment via the Mollie client.
-	_, payment, err := client.Payments.Create(ctx, paymentRequest, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Mollie payment: %w", err)
-	}
-
-	return payment, nil
+type PaymentRepository struct {
+	db *sqlx.DB
 }
 
-func getMolliePaymentLines(ctx context.Context, tx *sqlx.Tx, ord *domain.Order) ([]mollie.PaymentLines, error) {
-	if len(ord.Products) == 0 {
-		return nil, fmt.Errorf("no products found in order")
+func NewPaymentRepository(db *sqlx.DB) domain.PaymentRepository {
+	return &PaymentRepository{
+		db: db,
 	}
-
-	// Collect product IDs from the order.
-	productIDs := make([]uuid.UUID, len(ord.Products))
-	for i, line := range ord.Products {
-		productIDs[i] = line.Product.ID
-	}
-
-	// Build the query using sqlx.In.
-	query := `
-		SELECT
-			p.id,
-			pt.name,
-			p.price,
-			p.code,
-			pct.name AS category_name
-		FROM
-			products p
-		INNER JOIN
-			product_translations pt ON p.id = pt.product_id
-		INNER JOIN
-			product_category_translations pct ON p.category_id = pct.product_category_id
-		WHERE
-			p.id IN (?)
-			AND pt.locale = 'fr'
-		  	AND pct.locale = 'fr'
-			AND p.is_available = true
-	`
-	query, args, err := sqlx.In(query, productIDs)
-	if err != nil {
-		return nil, fmt.Errorf("preparing query: %w", err)
-	}
-	query = tx.Rebind(query)
-
-	// Define an inline type to match the query result.
-	type productRow struct {
-		ID           uuid.UUID `db:"id"`
-		Name         string    `db:"name"`
-		Price        decimal.Decimal   `db:"price"`
-		Code         *string   `db:"code"`
-		CategoryName string    `db:"category_name"`
-	}
-	var rows []productRow
-	if err := tx.SelectContext(ctx, &rows, query, args...); err != nil {
-		return nil, fmt.Errorf("querying products for payment lines failed: %w", err)
-	}
-
-	// Build a lookup map.
-	productMap := make(map[uuid.UUID]productRow, len(rows))
-	for _, p := range rows {
-		productMap[p.ID] = p
-	}
-
-	// Construct the Mollie payment lines.
-	var paymentLines []mollie.PaymentLines
-	for _, line := range ord.Products {
-		prod, ok := productMap[line.Product.ID]
-		if !ok {
-			return nil, fmt.Errorf("product %s not found", line.Product.ID)
-		}
-		unitPriceStr := strconv.FormatFloat(prod.Price, 'f', 2, 64)
-		totalAmountStr := strconv.FormatFloat(prod.Price*decimal.Decimal(line.Quantity), 'f', 2, 64)
-		var description string
-		if prod.Code != nil && *prod.Code != "" {
-			description = fmt.Sprintf("%s - %s %s", *prod.Code, prod.CategoryName, prod.Name)
-		} else {
-			description = fmt.Sprintf("%s %s", prod.CategoryName, prod.Name)
-		}
-		paymentLines = append(paymentLines, mollie.PaymentLines{
-			Description:  description,
-			Quantity:     line.Quantity,
-			QuantityUnit: "pcs",
-			UnitPrice:    &mollie.Amount{Value: unitPriceStr, Currency: "EUR"},
-			TotalAmount:  &mollie.Amount{Value: totalAmountStr, Currency: "EUR"},
-		})
-	}
-	return paymentLines, nil
 }
-*/
+
+// Save converts a Mollie payment object to your domain type and inserts it into the mollie_payments table.
+func (r *PaymentRepository) Save(ctx context.Context, external mollie.Payment, orderID uuid.UUID) (*domain.MolliePayment, error) {
+	var err error
+
+	// Convert external monetary fields (which are strings) into decimals.
+	amount, err := decimal.NewFromString(external.Amount.Value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert amount: %w", err)
+	}
+
+	amountRefunded := decimal.Zero
+	if external.AmountRefunded != nil {
+		amountRefunded, err = decimal.NewFromString(external.AmountRefunded.Value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert amountRefunded: %w", err)
+		}
+	}
+
+	amountRemaining := decimal.Zero
+	if external.AmountRemaining != nil {
+		amountRemaining, err = decimal.NewFromString(external.AmountRemaining.Value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert amountRemaining: %w", err)
+		}
+	}
+
+	amountCaptured := decimal.Zero
+	if external.AmountCaptured != nil {
+		amountCaptured, err = decimal.NewFromString(external.AmountCaptured.Value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert amountCaptured: %w", err)
+		}
+	}
+
+	amountChargedBack := decimal.Zero
+	if external.AmountChargedBack != nil {
+		amountChargedBack, err = decimal.NewFromString(external.AmountChargedBack.Value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert amountChargedBack: %w", err)
+		}
+	}
+
+	settlementAmount := decimal.Zero
+	if external.SettlementAmount != nil {
+		settlementAmount, err = decimal.NewFromString(external.SettlementAmount.Value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert settlementAmount: %w", err)
+		}
+	}
+
+	// Marshal Metadata into a JSON string.
+	var metadataJSON string
+	if external.Metadata != nil {
+		raw, err := json.Marshal(external.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal metadata: %w", err)
+		}
+		metadataJSON = string(raw)
+	} else {
+		metadataJSON = "null"
+	}
+
+	// Marshal Links into a JSON string.
+	raw, err := json.Marshal(external.Links)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal links: %w", err)
+	}
+	linksJSON := string(raw)
+
+	// Build the domain MolliePayment object.
+	domainPayment := &domain.MolliePayment{
+		Resource:                        &external.Resource,
+		MolliePaymentID:                 external.ID,
+		Status:                          external.Status,
+		Description:                     &external.Description,
+		CancelURL:                       &external.CancelURL,
+		WebhookURL:                      &external.WebhookURL,
+		CountryCode:                     &external.CountryCode,
+		RestrictPaymentMethodsToCountry: &external.RestrictPaymentMethodsToCountry,
+		ProfileID:                       &external.ProfileID,
+		SettlementID:                    &external.SettlementID,
+		OrderID:                         orderID,
+		IsCancelable:                    external.IsCancelable,
+		Mode:                            nil, // fill in if needed
+		Locale:                          nil, // fill in if needed
+		Method:                          nil, // fill in if needed
+		// We store the JSON strings as []byte if your columns are JSONB in DB
+		Metadata:          []byte(metadataJSON),
+		Links:             []byte(linksJSON),
+		CreatedAt:         time.Now(), // or external.CreatedAt if you want Mollie's creation date
+		AuthorizedAt:      external.AuthorizedAt,
+		PaidAt:            external.PaidAt,
+		CanceledAt:        external.CanceledAt,
+		ExpiresAt:         external.ExpiresAt,
+		ExpiredAt:         external.ExpiredAt,
+		FailedAt:          external.FailedAt,
+		Amount:            amount,
+		AmountRefunded:    amountRefunded,
+		AmountRemaining:   amountRemaining,
+		AmountCaptured:    amountCaptured,
+		AmountChargedBack: amountChargedBack,
+		SettlementAmount:  settlementAmount,
+	}
+
+	// Begin a transaction.
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	// Insert the domainPayment into the database.
+	// Ensure the columns match your DB schema exactly.
+	const query = `
+        INSERT INTO mollie_payments (
+            resource, mollie_payment_id, status, description, cancel_url,
+            webhook_url, country_code, restrict_payment_methods_to_country,
+            profile_id, settlement_id, order_id, is_cancelable, mode, locale, method,
+            metadata, links, created_at, authorized_at, paid_at, canceled_at, expires_at,
+            expired_at, failed_at, amount, amount_refunded, amount_remaining, amount_captured,
+            amount_charged_back, settlement_amount
+        ) VALUES (
+            $1, $2, $3, $4, $5,
+            $6, $7, $8,
+            $9, $10, $11, $12, $13, $14, $15,
+            $16, $17, $18, $19, $20, $21, $22,
+            $23, $24, $25, $26, $27, $28, $29, $30
+        )
+        RETURNING id, created_at;
+    `
+
+	var inserted struct {
+		ID        uuid.UUID `db:"id"`
+		CreatedAt time.Time `db:"created_at"`
+	}
+	err = tx.GetContext(ctx, &inserted, query,
+		domainPayment.Resource,
+		domainPayment.MolliePaymentID,
+		domainPayment.Status,
+		domainPayment.Description,
+		domainPayment.CancelURL,
+		domainPayment.WebhookURL,
+		domainPayment.CountryCode,
+		domainPayment.RestrictPaymentMethodsToCountry,
+		domainPayment.ProfileID,
+		domainPayment.SettlementID,
+		domainPayment.OrderID,
+		domainPayment.IsCancelable,
+		domainPayment.Mode,
+		domainPayment.Locale,
+		domainPayment.Method,
+		string(domainPayment.Metadata), // pass JSON strings to JSONB columns
+		string(domainPayment.Links),
+		domainPayment.CreatedAt,
+		domainPayment.AuthorizedAt,
+		domainPayment.PaidAt,
+		domainPayment.CanceledAt,
+		domainPayment.ExpiresAt,
+		domainPayment.ExpiredAt,
+		domainPayment.FailedAt,
+		domainPayment.Amount,
+		domainPayment.AmountRefunded,
+		domainPayment.AmountRemaining,
+		domainPayment.AmountCaptured,
+		domainPayment.AmountChargedBack,
+		domainPayment.SettlementAmount,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert mollie payment: %w", err)
+	}
+
+	// Assign the auto-generated values back to the domain object.
+	domainPayment.ID = inserted.ID
+	domainPayment.CreatedAt = inserted.CreatedAt
+
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return domainPayment, nil
+}

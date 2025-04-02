@@ -13,7 +13,7 @@ import (
 )
 
 type OrderService interface {
-	CreateOrder(ctx context.Context, order *domain.Order, orderProducts *[]domain.OrderProduct) (*domain.Order, *[]domain.OrderProduct, error)
+	CreateOrder(ctx context.Context, order *domain.Order, orderProducts *[]domain.OrderProductRaw) (*domain.Order, *[]domain.OrderProductRaw, error)
 	GetOrdersByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error)
 	GetPaginatedOrders(ctx context.Context, page int, limit int) ([]*domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) error
@@ -32,7 +32,7 @@ func NewOrderService(repo domain.OrderRepository) OrderService {
 	}
 }
 
-func (s *orderService) CreateOrder(ctx context.Context, o *domain.Order, op *[]domain.OrderProduct) (*domain.Order, *[]domain.OrderProduct, error) {
+func (s *orderService) CreateOrder(ctx context.Context, o *domain.Order, op *[]domain.OrderProductRaw) (*domain.Order, *[]domain.OrderProductRaw, error) {
 
 	order, orderProducts, err := s.repo.Save(ctx, o, op)
 	if err != nil {
