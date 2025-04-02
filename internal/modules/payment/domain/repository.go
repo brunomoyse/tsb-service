@@ -8,4 +8,5 @@ import (
 
 type PaymentRepository interface {
 	Save(ctx context.Context, payment mollie.Payment, orderID uuid.UUID) (*MolliePayment, error)
+	RefreshStatus(ctx context.Context, externalPayment mollie.Payment) (*uuid.UUID, error)
 }
