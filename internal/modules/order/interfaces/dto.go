@@ -36,7 +36,7 @@ type OrderProductDTO struct {
 }
 
 type UpdateOrderRequest struct {
-	OrderStatus domain.OrderStatus `json:"orderStatus"` // Expected values: "PENDING", "CONFIRMED", "PREPARING", "AWAITING_PICK_UP", "PICKED_UP", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED", "FAILED"
+	OrderStatus domain.OrderStatus `json:"status"` // Expected values: "PENDING", "CONFIRMED", "PREPARING", "AWAITING_PICK_UP", "PICKED_UP", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED", "FAILED"
 }
 
 // OrderResponse extends the domain.Order with additional response-specific details.
