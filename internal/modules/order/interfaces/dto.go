@@ -2,7 +2,6 @@ package interfaces
 
 import (
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 	"time"
 	"tsb-service/internal/modules/order/domain"
 )
@@ -44,30 +43,14 @@ type UpdateOrderRequest struct {
 type OrderResponse struct {
 	Order domain.Order `json:"order"`
 	// OrderProducts is a list of products in the order with pricing details.
-	OrderProducts []OrderProductResponse `json:"orderProducts"`
+	OrderProducts []domain.OrderProduct `json:"orderProducts"`
 	// MolliePayment is the payment information associated with the order.
 	MolliePayment *MolliePayment `json:"molliePayment,omitempty"`
 }
 
-// OrderProductResponse represents an individual product in the order response,
-// including the unit price and the total price (per line).
-type OrderProductResponse struct {
-	Product    ProductResponse `json:"product"`
-	Quantity   int64           `json:"quantity"`
-	UnitPrice  decimal.Decimal `json:"unitPrice"`
-	TotalPrice decimal.Decimal `json:"totalPrice"`
-}
-
-type ProductResponse struct {
-	ID           uuid.UUID `json:"id"`
-	Code         *string   `json:"code"`
-	CategoryName string    `json:"categoryName"`
-	Name         string    `json:"name"`
-}
-
 type MolliePayment struct {
 	// The unique identifier returned by Mollie.
-	ID string `json:"id"`
+	ID uuid.UUID `json:"id"`
 
 	// The ID of the order this payment is associated with.
 	OrderID uuid.UUID `json:"orderId"`

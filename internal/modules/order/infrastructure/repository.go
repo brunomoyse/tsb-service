@@ -23,7 +23,7 @@ func NewOrderRepository(db *sqlx.DB) domain.OrderRepository {
 
 // Save inserts a new order, creates a Mollie payment, updates the order with payment details,
 // and links the order with its product lines.
-func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domain.OrderProduct) (*domain.Order, *[]domain.OrderProduct, error) {
+func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domain.OrderProductRaw) (*domain.Order, *[]domain.OrderProductRaw, error) {
 	// Begin a transaction.
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +13,10 @@ import (
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderInfrastructure "tsb-service/internal/modules/order/infrastructure"
 	orderInterfaces "tsb-service/internal/modules/order/interfaces"
+
+	paymentApplication "tsb-service/internal/modules/payment/application"
+	paymentInfrastructure "tsb-service/internal/modules/payment/infrastructure"
+	paymentInterfaces "tsb-service/internal/modules/payment/interfaces"
 
 	userApplication "tsb-service/internal/modules/user/application"
 	userInfrastructure "tsb-service/internal/modules/user/infrastructure"
@@ -48,19 +53,23 @@ func main() {
 	oauth2.LoadGoogleOAuth()
 
 	// Initialize the Mollie client.
-	// mollieConfig := mollie.NewAPITestingConfig(true)
-	// mollieClient, err := mollie.NewClient(nil, mollieConfig)
-	// if err != nil {
-	//	log.Fatalf("Failed to initialize Mollie client: %v", err)
-	// }
+	mollieConfig := mollie.NewAPITestingConfig(true)
+	mollieClient, err := mollie.NewClient(nil, mollieConfig)
+	if err != nil {
+		log.Fatalf("Failed to initialize Mollie client: %v", err)
+	}
 
 	productRepo := productInfrastructure.NewProductRepository(dbConn)
 	productService := productApplication.NewProductService(productRepo)
 	productHandler := productInterfaces.NewProductHandler(productService)
 
+	paymentRepo := paymentInfrastructure.NewPaymentRepository(dbConn)
+	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient)
+	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService)
+
 	orderRepo := orderInfrastructure.NewOrderRepository(dbConn)
 	orderService := orderApplication.NewOrderService(orderRepo)
-	orderHandler := orderInterfaces.NewOrderHandler(orderService, productService)
+	orderHandler := orderInterfaces.NewOrderHandler(orderService, productService, paymentService)
 
 	userRepo := userInfrastructure.NewUserRepository(dbConn)
 	userService := userApplication.NewUserService(userRepo)
@@ -106,7 +115,7 @@ func main() {
 
 	api.Use(middleware.LanguageExtractor()) // applied to all routes under /api/v1
 
-	// @TODO: Implement payments/webhook
+	api.POST("payments/webhook", paymentHandler.UpdatePaymentStatusHandler)
 
 	// Register the SSE endpoint.
 	// Since SSE is just HTTP, we can mount it using gin.WrapH.

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"tsb-service/internal/modules/order/application"
 	"tsb-service/internal/modules/order/domain"
+	paymentApplication "tsb-service/internal/modules/payment/application"
 	productApplication "tsb-service/internal/modules/product/application"
 	productDomain "tsb-service/internal/modules/product/domain"
 
@@ -18,10 +19,15 @@ import (
 type OrderHandler struct {
 	service        application.OrderService
 	productService productApplication.ProductService
+	paymentService paymentApplication.PaymentService
 }
 
-func NewOrderHandler(service application.OrderService, productService productApplication.ProductService) *OrderHandler {
-	return &OrderHandler{service: service, productService: productService}
+func NewOrderHandler(
+	service application.OrderService,
+	productService productApplication.ProductService,
+	paymentService paymentApplication.PaymentService,
+) *OrderHandler {
+	return &OrderHandler{service: service, productService: productService, paymentService: paymentService}
 }
 
 func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
@@ -64,7 +70,7 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 	}
 
 	// Enrich order products with pricing details.
-	orderProductsPricing := make([]domain.OrderProduct, 0, len(req.OrderProducts))
+	orderProductsPricing := make([]domain.OrderProductRaw, 0, len(req.OrderProducts))
 	var computedOrderTotal = decimal.NewFromInt(0)
 
 	for _, item := range req.OrderProducts {
@@ -76,7 +82,7 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 		totalPrice := unitPrice.Mul(decimal.NewFromInt(item.Quantity))
 		computedOrderTotal = computedOrderTotal.Add(totalPrice)
 
-		orderProductsPricing = append(orderProductsPricing, domain.OrderProduct{
+		orderProductsPricing = append(orderProductsPricing, domain.OrderProductRaw{
 			ProductID:  item.ProductID,
 			Quantity:   item.Quantity,
 			UnitPrice:  unitPrice,
@@ -124,7 +130,7 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 		return
 	}
 
-	orderProductsResponse := make([]OrderProductResponse, len(*orderProducts))
+	orderProductsResponse := make([]domain.OrderProduct, len(*orderProducts))
 
 	// Build a lookup map: productID -> product details.
 	productMap := make(map[uuid.UUID]productDomain.ProductOrderDetails, len(products))
@@ -141,8 +147,8 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 			return
 		}
 
-		orderProductsResponse[i] = OrderProductResponse{
-			Product: ProductResponse{
+		orderProductsResponse[i] = domain.OrderProduct{
+			Product: domain.Product{
 				ID:           prod.ID,
 				Code:         prod.Code,
 				CategoryName: prod.CategoryName,
@@ -160,22 +166,26 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 	}
 
 	// Handle payment creation if needed.
-	/*
-		if req.IsOnlinePayment {
-			molliePayment, err := h.paymentService.CreatePayment(c.Request.Context(), order)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"failed to create payment": err.Error()})
-				return
-			}
-
-			if molliePayment == nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "payment is nil"})
-				return
-			}
-
-			orderResponse.MolliePayment = &molliePayment
+	if req.IsOnlinePayment {
+		molliePayment, err := h.paymentService.CreatePayment(c.Request.Context(), *order, orderProductsResponse)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"failed to create payment": err.Error()})
+			return
 		}
-	*/
+
+		if molliePayment == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "payment is nil"})
+			return
+		}
+
+		orderResponse.MolliePayment = &MolliePayment{
+			ID:        molliePayment.ID,
+			OrderID:   order.ID,
+			Status:    molliePayment.Status,
+			CreatedAt: molliePayment.CreatedAt,
+			PaidAt:    molliePayment.PaidAt,
+		}
+	}
 
 	c.JSON(http.StatusOK, orderResponse)
 }
