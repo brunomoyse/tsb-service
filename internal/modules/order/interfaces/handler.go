@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"tsb-service/internal/modules/order/application"
-	"tsb-service/internal/modules/order/domain"
+	"tsb-service/internal/modules/payment/domain"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

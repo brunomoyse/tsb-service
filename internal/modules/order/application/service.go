@@ -12,7 +12,7 @@ import (
 )
 
 type OrderService interface {
-	CreateOrder(ctx context.Context, userID uuid.UUID, products []domain.PaymentLine, paymentMode domain.PaymentMode) (*domain.Order, error)
+	CreateOrder(ctx context.Context, userID uuid.UUID, products []domain.PaymentLine) (*domain.Order, error)
 	GetOrdersByUserID(ctx context.Context, userID uuid.UUID) ([]*domain.Order, error)
 	GetPaginatedOrders(ctx context.Context, page int, limit int) ([]*domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) error
@@ -31,7 +31,7 @@ func NewOrderService(repo domain.OrderRepository, mollieClient *mollie.Client) O
 	}
 }
 
-func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, paymentLines []domain.PaymentLine, paymentMode domain.PaymentMode) (*domain.Order, error) {
+func (s *orderService) CreateOrder(ctx context.Context, userID uuid.UUID, paymentLines []domain.PaymentLine) (*domain.Order, error) {
 	order := domain.NewOrder(userID, paymentLines)
 
 	// Load product prices from DB
@@ -73,7 +73,7 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID,
 	}
 
 	// Update the status in the order struct
-	order.Status = newStatus
+	order.OrderStatus = newStatus
 
 	// Update the order in the repository
 	if err := s.repo.Update(ctx, order); err != nil {
