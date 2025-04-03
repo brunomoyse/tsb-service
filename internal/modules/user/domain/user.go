@@ -4,8 +4,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"time"
 
-	"errors"
-
 	"github.com/google/uuid"
 )
 
@@ -51,6 +49,3 @@ func NewGoogleUser(name string, email string, googleID string) User {
 		GoogleID: &googleID,
 	}
 }
-
-// ErrNotFound is returned when a requested resource is not found.
-var ErrNotFound = errors.New("resource not found")
