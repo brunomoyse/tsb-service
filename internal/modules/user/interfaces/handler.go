@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 	"net/url"
@@ -42,10 +41,6 @@ func (h *UserHandler) GetUserProfileHandler(c *gin.Context) {
 	user, err := h.service.GetUserByID(c, userID)
 
 	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-			return
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile", "details": err.Error()})
 		return
 	}
@@ -243,41 +238,45 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 		return
 	}
 
-	// Build DTO.
+	// Prepare the auth request DTO.
 	req := GoogleAuthRequest{
 		GoogleID: googleUser.Sub,
 		Email:    googleUser.Email,
 		Name:     googleUser.Name,
 	}
 
-	// Look up the user.
+	var user *domain.User
 
-	user, err := h.service.GetUserByGoogleID(ctx, req.GoogleID)
-	if err == nil {
-		// User found by Google ID – continue.
-	} else if !errors.Is(err, domain.ErrNotFound) {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find user by Google ID", "details": err.Error()})
+	// 1. Try to find the user by Google ID.
+	user, err = h.service.GetUserByGoogleID(ctx, req.GoogleID)
+	if err != nil && err.Error() != "sql: no rows in result set" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding user by Google ID", "details": err.Error()})
 		return
-	} else {
-		// Not found by Google ID – try finding by email.
+	}
+
+	// 2. If not found by Google ID, try to find by email.
+	if user == nil {
 		user, err = h.service.GetUserByEmail(ctx, req.Email)
-		if err != nil && !errors.Is(err, domain.ErrNotFound) {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find user by email", "details": err.Error()})
+		if err != nil && err.Error() != "sql: no rows in result set" {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding user by email", "details": err.Error()})
 			return
 		}
-		if err != nil && errors.Is(err, domain.ErrNotFound) {
-			// User not found by email – create new user.
+
+		// 3a. If still not found, create a new user.
+		if user == nil {
 			user, err = h.service.CreateUser(ctx, req.Name, req.Email, nil, nil, nil, &req.GoogleID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user", "details": err.Error()})
 				return
 			}
 		} else {
-			// User found by email – update with Google ID.
-			user, err = h.service.UpdateGoogleID(ctx, user.ID.String(), req.GoogleID)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Google ID", "details": err.Error()})
-				return
+			// 3b. If found by email but without a Google ID, update the user.
+			if user.GoogleID == nil {
+				user, err = h.service.UpdateGoogleID(ctx, user.ID.String(), req.GoogleID)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Google ID", "details": err.Error()})
+					return
+				}
 			}
 		}
 	}
@@ -289,11 +288,10 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 		return
 	}
 
-	// Set refresh token cookie and redirect.
-	c.SetCookie("access_token", accessToken, 15*60, "/", "", true, true) // 15 minutes
+	// Set tokens as cookies and redirect.
+	c.SetCookie("access_token", accessToken, 15*60, "/", "", true, true)
 	c.SetCookie("refresh_token", refreshToken, 7*24*3600, "/", "", true, true)
 	c.SetSameSite(http.SameSiteLaxMode)
-
 	c.Redirect(http.StatusFound, os.Getenv("REDIRECT_LOGIN_SUCCESSFUL"))
 }
 
