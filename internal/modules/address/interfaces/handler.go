@@ -34,7 +34,7 @@ func (h *AddressHandler) GetStreetNamesHandler(c *gin.Context) {
 
 // GetHouseNumbersHandler returns distinct house numbers for a given street.
 func (h *AddressHandler) GetHouseNumbersHandler(c *gin.Context) {
-	streetID := c.Query("id")
+	streetID := c.Query("street_id")
 	if streetID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id parameter is required (street id)"})
 		return
@@ -49,7 +49,7 @@ func (h *AddressHandler) GetHouseNumbersHandler(c *gin.Context) {
 
 // GetBoxNumbersHandler returns distinct box numbers for a given street and house number.
 func (h *AddressHandler) GetBoxNumbersHandler(c *gin.Context) {
-	streetID := c.Query("id")
+	streetID := c.Query("street_id")
 	houseNumber := c.Query("house_number")
 	if streetID == "" || houseNumber == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id and house_number parameters are required"})

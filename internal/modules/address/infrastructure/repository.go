@@ -81,7 +81,8 @@ func (r *AddressRepository) GetBoxNumbers(ctx context.Context, streetID, houseNu
 // If boxNumber is an empty string, it is ignored.
 func (r *AddressRepository) GetFinalAddress(ctx context.Context, streetID string, houseNumber string, boxNumber *string) (*domain.Address, error) {
 	sqlQuery := `
-		SELECT a.address_id, a.streetname_fr, a.house_number, a.box_number, a.municipality_name_fr, a.postcode, ad.distance
+		SELECT a.address_id, a.streetname_fr, a.house_number, a.box_number, a.municipality_name_fr, a.postcode, 
+		       COALESCE(ad.distance, 10000) AS distance
 		FROM addresses a
 		LEFT JOIN address_distance ad ON a.address_id = ad.address_id
 		WHERE a.street_id = $1 
