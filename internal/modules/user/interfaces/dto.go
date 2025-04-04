@@ -18,7 +18,7 @@ type RegistrationRequest struct {
 	Email       string  `json:"email"`
 	Password    string  `json:"password"`
 	PhoneNumber *string `json:"phoneNumber"`
-	Address     *string `json:"address"`
+	Address     *string `json:"addressId"`
 }
 
 type UpdateUserRequest struct {
