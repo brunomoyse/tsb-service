@@ -84,6 +84,27 @@ func (es *EmailService) renderVerifyEmail(lang, userName, verifyLink string) (st
 	return buf.String(), nil
 }
 
+func (es *EmailService) renderWelcomeEmail(lang, userName, menuLink string) (string, error) {
+	tmpl, err := es.loadTemplate(lang, "welcome.html")
+	if err != nil {
+		return "", err
+	}
+
+	data := struct {
+		UserName string
+		MenuLink string
+	}{
+		UserName: userName,
+		MenuLink: menuLink,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute welcome template: %w", err)
+	}
+	return buf.String(), nil
+}
+
 // SendVerificationEmail constructs and sends the verification email using SendGrid.
 // lang: e.g. "en", "fr", "zh", etc.
 func (es *EmailService) SendVerificationEmail(ctx context.Context, toAddress, userName, verifyLink string) error {
@@ -115,6 +136,36 @@ func (es *EmailService) SendVerificationEmail(ctx context.Context, toAddress, us
 	}
 	if response.StatusCode >= 400 {
 		return fmt.Errorf("failed to send verification email, status: %d, body: %s", response.StatusCode, response.Body)
+	}
+	return nil
+}
+
+func (es *EmailService) SendWelcomeEmail(ctx context.Context, toAddress, userName, menuLink string) error {
+	lang := utils.GetLang(ctx)
+	htmlContent, err := es.renderWelcomeEmail(lang, userName, menuLink)
+	if err != nil {
+		return fmt.Errorf("failed to render welcome email: %w", err)
+	}
+
+	plainTextContent := "Welcome! You're ready to order!"
+
+	subject := "Welcome to Tokyo Sushi Bar"
+	if lang == "fr" {
+		subject = "Bienvenue chez Tokyo Sushi Bar"
+	} else if lang == "zh" {
+		subject = "欢迎来到东京寿司体验"
+	}
+
+	from := mail.NewEmail(es.senderName, es.senderEmail)
+	to := mail.NewEmail("", toAddress)
+	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
+
+	response, err := es.sendgridClient.Send(message)
+	if err != nil {
+		return fmt.Errorf("failed to send welcome email: %w", err)
+	}
+	if response.StatusCode >= 400 {
+		return fmt.Errorf("failed to send welcome email, status: %d, body: %s", response.StatusCode, response.Body)
 	}
 	return nil
 }

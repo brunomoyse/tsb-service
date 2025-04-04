@@ -145,6 +145,7 @@ func main() {
 
 	api.POST("/login", userHandler.LoginHandler)
 	api.POST("/register", userHandler.RegisterHandler)
+	api.GET("/verify", userHandler.VerifyEmailHandler)
 
 	api.GET("/oauth/google", userHandler.GoogleAuthHandler)
 	api.GET("/oauth/google/callback", userHandler.GoogleAuthCallbackHandler)

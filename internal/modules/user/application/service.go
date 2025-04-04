@@ -32,6 +32,7 @@ type UserService interface {
 	UpdateUserPassword(ctx context.Context, userID string, password string, salt string) (*domain.User, error)
 	UpdateEmailVerifiedAt(ctx context.Context, userID string) (*domain.User, error)
 	InvalidateRefreshToken(ctx context.Context, refreshToken string) error
+	VerifyUserEmail(ctx context.Context, userID string) error
 }
 
 type userService struct {
@@ -86,9 +87,11 @@ func (s *userService) CreateUser(ctx context.Context, name string, email string,
 		}
 		newUser.ID = id
 
-		// 2. Build verification URL or token. @TODO: Implement VerificationToken generation.
-		appBaseUrl := os.Getenv("APP_BASE_URL")
-		verificationURL := fmt.Sprintf("%s/verify?token=%s", appBaseUrl, "newUser.VerificationToken")
+		// 2. Build verification URL.
+		apiBaseUrl := os.Getenv("API_BASE_URL")
+		jwtSecret := os.Getenv("JWT_SECRET")
+		verificationToken, _ := generateEmailVerificationJWT(newUser, jwtSecret)
+		verificationURL := fmt.Sprintf("%s/verify?token=%s", apiBaseUrl, verificationToken)
 
 		// 3. Send verification email asynchronously in a goroutine.
 		go func() {
@@ -244,6 +247,43 @@ func (s *userService) RefreshToken(
 	return accessToken, refreshToken, user, nil
 }
 
+func (s *userService) VerifyUserEmail(ctx context.Context, userID string) error {
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+
+	if user.EmailVerifiedAt != nil {
+		return fmt.Errorf("email already verified")
+	}
+
+	currentTime := time.Now()
+
+	user.EmailVerifiedAt = &currentTime
+
+	// 1. Update email verified at
+	user, err = s.repo.UpdateUser(ctx, user)
+	if err != nil {
+		return fmt.Errorf("failed to update email verified at: %w", err)
+	}
+
+	// 2. Send welcome email
+	go func() {
+		bgCtx := context.Background()
+		es, err := emailService.NewEmailService(bgCtx)
+		if err != nil {
+			log.Printf("failed to initialize email service: %v", err)
+			return
+		}
+		err = es.SendWelcomeEmail(bgCtx, user.Email, user.Name, os.Getenv("APP_BASE_URL")+"/menu")
+		if err != nil {
+			log.Printf("failed to send welcome email: %v", err)
+		}
+	}()
+
+	return nil
+}
+
 // Token validation
 func (s *userService) validateRefreshToken(tokenString, secret string) (*domain.JwtClaims, error) {
 	claims := &domain.JwtClaims{}
@@ -309,6 +349,28 @@ func generateTokens(user domain.User, jwtSecret string) (string, string, error) 
 	}
 
 	return accessTokenString, refreshTokenString, nil
+}
+
+// GenerateEmailVerificationJWT generates a JWT token for email verification.
+func generateEmailVerificationJWT(user domain.User, jwtSecret string) (string, error) {
+	// Define token expiration; for example, 24 hours.
+	expirationTime := time.Now().Add(24 * time.Hour)
+
+	// Create a new token object, specifying signing method and the claims.
+	claims := jwt.MapClaims{
+		"sub":     user.ID,               // subject
+		"purpose": "email_verification",  // optional: to distinguish token usage
+		"iat":     time.Now().Unix(),     // issued at
+		"exp":     expirationTime.Unix(), // expiration time
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	// Sign the token with the provided secret key.
+	tokenString, err := token.SignedString([]byte(jwtSecret))
+	if err != nil {
+		return "", err
+	}
+	return tokenString, nil
 }
 
 // @TODO
