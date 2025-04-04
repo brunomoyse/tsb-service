@@ -18,14 +18,14 @@ type RegistrationRequest struct {
 	Email       string  `json:"email"`
 	Password    string  `json:"password"`
 	PhoneNumber *string `json:"phoneNumber"`
-	Address     *string `json:"addressId"`
+	AddressID   *string `json:"addressId"`
 }
 
 type UpdateUserRequest struct {
 	Name        *string `json:"name"`
 	Email       *string `json:"email"`
 	PhoneNumber *string `json:"phoneNumber"`
-	Address     *string `json:"address"`
+	AddressID   *string `json:"addressId"`
 }
 
 // GoogleAuthRequest is used when a user logs in via Google.
@@ -41,7 +41,7 @@ type UserResponse struct {
 	Name        string    `json:"name"`
 	Email       string    `json:"email"`
 	PhoneNumber *string   `json:"phoneNumber"`
-	Address     *string   `json:"address"`
+	AddressID   *string   `json:"addressId"`
 }
 
 type LoginResponse struct {
@@ -55,7 +55,7 @@ func NewUserResponse(u *domain.User) *UserResponse {
 		Name:        u.Name,
 		Email:       u.Email,
 		PhoneNumber: u.PhoneNumber,
-		Address:     u.Address,
+		AddressID:   u.AddressID,
 	}
 }
 

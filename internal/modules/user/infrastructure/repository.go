@@ -19,12 +19,12 @@ func NewUserRepository(db *sqlx.DB) domain.UserRepository {
 
 func (r *UserRepository) Save(ctx context.Context, user *domain.User) (uuid.UUID, error) {
 	query := `
-		INSERT INTO users (name, email, phone_number, address, password_hash, salt)
+		INSERT INTO users (name, email, phone_number, address_id, password_hash, salt)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id;
 	`
 	var id uuid.UUID
-	if err := r.db.QueryRowContext(ctx, query, user.Name, user.Email, user.PhoneNumber, user.Address, user.PasswordHash, user.Salt).Scan(&id); err != nil {
+	if err := r.db.QueryRowContext(ctx, query, user.Name, user.Email, user.PhoneNumber, user.AddressID, user.PasswordHash, user.Salt).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
 	user.ID = id
@@ -92,10 +92,10 @@ func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) (*do
 	fmt.Println(user.EmailVerifiedAt)
 	query := `
 		UPDATE users
-		SET name = $1, email = $2, phone_number = $3, address = $4, email_verified_at = $5
+		SET name = $1, email = $2, phone_number = $3, address_id = $4, email_verified_at = $5
 		WHERE id = $6
 	`
-	_, err := r.db.ExecContext(ctx, query, user.Name, user.Email, user.PhoneNumber, user.Address, user.EmailVerifiedAt, user.ID)
+	_, err := r.db.ExecContext(ctx, query, user.Name, user.Email, user.PhoneNumber, user.AddressID, user.EmailVerifiedAt, user.ID)
 	if err != nil {
 		return nil, err
 	}
