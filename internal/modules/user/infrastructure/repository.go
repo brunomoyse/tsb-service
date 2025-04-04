@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"fmt"
 	"tsb-service/internal/modules/user/domain"
 
 	"github.com/google/uuid"
@@ -88,12 +89,13 @@ func (r *UserRepository) UpdateGoogleID(ctx context.Context, userID string, goog
 }
 
 func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) (*domain.User, error) {
+	fmt.Println(user.EmailVerifiedAt)
 	query := `
 		UPDATE users
-		SET name = $1, email = $2, phone_number = $3, address = $4 
-		WHERE id = $5
+		SET name = $1, email = $2, phone_number = $3, address = $4, email_verified_at = $5
+		WHERE id = $6
 	`
-	_, err := r.db.ExecContext(ctx, query, user.Name, user.Email, user.PhoneNumber, user.Address, user.ID)
+	_, err := r.db.ExecContext(ctx, query, user.Name, user.Email, user.PhoneNumber, user.Address, user.EmailVerifiedAt, user.ID)
 	if err != nil {
 		return nil, err
 	}

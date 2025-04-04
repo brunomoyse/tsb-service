@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"github.com/golang-jwt/jwt/v4"
 	"log"
 	"net/http"
 	"net/url"
@@ -101,6 +103,63 @@ func (h *UserHandler) RegisterHandler(c *gin.Context) {
 
 	res := NewUserResponse(user)
 	c.JSON(http.StatusOK, res)
+}
+
+// VerifyEmailHandler validates the verification token and marks the user as verified.
+func (h *UserHandler) VerifyEmailHandler(c *gin.Context) {
+	// Get the token from the query parameter.
+	tokenStr := c.Query("token")
+	if tokenStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "token is required"})
+		return
+	}
+
+	// Load the JWT secret from the environment.
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "server misconfiguration"})
+		return
+	}
+
+	// Parse and validate the token.
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		// Ensure the signing method is HMAC.
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(jwtSecret), nil
+	})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token: " + err.Error()})
+		return
+	}
+
+	// Validate token claims.
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token claims"})
+		return
+	}
+
+	// Check for a valid subject (user id) and the correct purpose.
+	userID, ok := claims["sub"].(string)
+	if !ok || userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token subject"})
+		return
+	}
+	if claims["purpose"] != "email_verification" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token purpose"})
+		return
+	}
+
+	// Call the service to mark the user as verified.
+	err = h.service.VerifyUserEmail(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Redirect(http.StatusFound, os.Getenv("REDIRECT_EMAIL_VERIFY_SUCCESSFUL"))
 }
 
 func (h *UserHandler) LoginHandler(c *gin.Context) {

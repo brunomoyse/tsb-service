@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome to Tokyo Sushi Bar</title>
+    <style>
+        /* Basic styling similar to your verify email template */
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background: #f2f2f2;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            overflow: hidden;
+            padding: 30px;
+        }
+        .container img {
+            display: block;
+            margin: 0 auto 20px;
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .content p {
+            line-height: 1.6;
+            margin: 16px 0;
+        }
+        .content p.lead {
+            font-size: 18px;
+            color: #444;
+        }
+        .footer {
+            background-color: #fafafa;
+            padding: 20px 0;
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <img alt="Logo" src="https://nuagemagique.dev/icons/tsb-logo.svg" />
+    <div class="content">
+        <p class="lead">Hello {{.UserName}},</p>
+        <p>Welcome to <strong>Tokyo Sushi Bar</strong>! We’re thrilled to have you on board and can’t wait for you to explore our authentic sushi experience.</p>
+        <p>Your account is now active. To get started, please click the button below to discover our menu:</p>
+        <!-- Inline-styled button -->
+        <p style="text-align: center;">
+            <a href="{{.MenuLink}}"
+               style="
+                   display: inline-block;
+                   background: #ed1c24;
+                   color: #ffffff;
+                   padding: 8px 16px;
+                   text-decoration: none;
+                   font-size: 14px;
+                   border-radius: 4px;
+                   margin: 20px 0;
+                   transition: transform 0.2s ease, box-shadow 0.2s ease;
+                 "
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';"
+               onmouseout="this.style.transform='none'; this.style.boxShadow='none';"
+            >
+                Discover the menu
+            </a>
+        </p>
+        <p>We’re excited to serve you the best sushi experience in town.</p>
+    </div>
+    <div class="footer">
+        <p>If you did not sign up for this account, please ignore this email.</p>
+        <p>&copy; 2025 Tokyo Sushi Bar. All rights reserved.</p>
+    </div>
+</div>
+</body>
+</html>
