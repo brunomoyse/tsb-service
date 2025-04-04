@@ -7,32 +7,31 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+
 	"tsb-service/pkg/utils"
 
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/ses"
-	"github.com/aws/aws-sdk-go-v2/service/ses/types"
+	"github.com/sendgrid/sendgrid-go"
+	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
 //go:embed */*.html
 var emailFS embed.FS
 
-// EmailService encapsulates all email functionality.
+// EmailService encapsulates all email functionality using SendGrid.
 type EmailService struct {
-	sesClient   *ses.Client
-	senderEmail string
-	senderName  string
+	sendgridClient *sendgrid.Client
+	senderEmail    string
+	senderName     string
 }
 
-// NewEmailService initializes the EmailService by loading the AWS configuration,
-// reading the SENDER_EMAIL environment variable, and preparing the SES client.
+// NewEmailService initializes the EmailService by reading the SENDGRID_API_KEY,
+// SENDER_EMAIL, and SENDER_NAME environment variables and preparing the SendGrid client.
 func NewEmailService(ctx context.Context) (*EmailService, error) {
-	// Load AWS SES configuration.
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to load AWS config: %w", err)
+	apiKey := os.Getenv("SENDGRID_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("SENDGRID_API_KEY environment variable is required")
 	}
-	client := ses.NewFromConfig(cfg)
+	client := sendgrid.NewSendClient(apiKey)
 
 	senderEmail := os.Getenv("SENDER_EMAIL")
 	if senderEmail == "" {
@@ -45,9 +44,9 @@ func NewEmailService(ctx context.Context) (*EmailService, error) {
 	}
 
 	return &EmailService{
-		sesClient:   client,
-		senderEmail: senderEmail,
-		senderName:  senderName,
+		sendgridClient: client,
+		senderEmail:    senderEmail,
+		senderName:     senderName,
 	}, nil
 }
 
@@ -85,21 +84,20 @@ func (es *EmailService) renderVerifyEmail(lang, userName, verifyLink string) (st
 	return buf.String(), nil
 }
 
-// SendVerificationEmail constructs and sends the verification email using AWS SES.
+// SendVerificationEmail constructs and sends the verification email using SendGrid.
 // lang: e.g. "en", "fr", "zh", etc.
 func (es *EmailService) SendVerificationEmail(ctx context.Context, toAddress, userName, verifyLink string) error {
 	lang := utils.GetLang(ctx)
 	// Render the email content for the requested language.
-	htmlBody, err := es.renderVerifyEmail(lang, userName, verifyLink)
+	htmlContent, err := es.renderVerifyEmail(lang, userName, verifyLink)
 	if err != nil {
 		return fmt.Errorf("failed to render verification email: %w", err)
 	}
 
-	// Build a "From" header like "Tokyo Sushi Experience <sender@example.com>"
-	from := fmt.Sprintf("%s <%s>", es.senderName, es.senderEmail)
+	// Optionally, set a plain text version or strip HTML tags from htmlContent.
+	plainTextContent := "Please verify your email by clicking the link."
 
-	// Build the SES email input.
-	// Optionally, you can also localize the subject line if needed.
+	// Set localized subject if desired.
 	subject := "Please verify your email"
 	if lang == "fr" {
 		subject = "Veuillez vérifier votre adresse e-mail"
@@ -107,33 +105,16 @@ func (es *EmailService) SendVerificationEmail(ctx context.Context, toAddress, us
 		subject = "验证您的邮箱"
 	}
 
-	input := &ses.SendEmailInput{
-		Source: awsString(from),
-		Destination: &types.Destination{
-			ToAddresses: []string{toAddress},
-		},
-		Message: &types.Message{
-			Subject: &types.Content{
-				Data: awsString(subject),
-			},
-			Body: &types.Body{
-				Html: &types.Content{
-					Data: awsString(htmlBody),
-				},
-			},
-		},
-	}
+	from := mail.NewEmail(es.senderName, es.senderEmail)
+	to := mail.NewEmail("", toAddress)
+	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
 
-	// Send the email via SES.
-	_, err = es.sesClient.SendEmail(ctx, input)
+	response, err := es.sendgridClient.Send(message)
 	if err != nil {
 		return fmt.Errorf("failed to send verification email: %w", err)
 	}
-
+	if response.StatusCode >= 400 {
+		return fmt.Errorf("failed to send verification email, status: %d, body: %s", response.StatusCode, response.Body)
+	}
 	return nil
-}
-
-// awsString returns a pointer to the given string.
-func awsString(s string) *string {
-	return &s
 }

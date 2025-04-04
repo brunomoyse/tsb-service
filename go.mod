@@ -26,6 +26,8 @@ require (
 	github.com/aws/smithy-go v1.22.2 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
+	github.com/sendgrid/rest v2.6.9+incompatible // indirect
+	github.com/sendgrid/sendgrid-go v3.16.0+incompatible // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 )
 
