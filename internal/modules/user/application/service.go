@@ -20,8 +20,8 @@ import (
 )
 
 type UserService interface {
-	CreateUser(ctx context.Context, name string, email string, phoneNumber *string, address *string, password *string, googleID *string) (*domain.User, error)
-	UpdateMe(ctx context.Context, userID string, name *string, email *string, phoneNumber *string, address *string) (*domain.User, error)
+	CreateUser(ctx context.Context, name string, email string, phoneNumber *string, addressID *string, password *string, googleID *string) (*domain.User, error)
+	UpdateMe(ctx context.Context, userID string, name *string, email *string, phoneNumber *string, addressID *string) (*domain.User, error)
 	Login(ctx context.Context, email string, password string, jwtToken string) (*domain.User, *string, *string, error)
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
@@ -45,7 +45,7 @@ func NewUserService(repo domain.UserRepository) UserService {
 	}
 }
 
-func (s *userService) CreateUser(ctx context.Context, name string, email string, phoneNumber *string, address *string, password *string, googleID *string) (*domain.User, error) {
+func (s *userService) CreateUser(ctx context.Context, name string, email string, phoneNumber *string, addressID *string, password *string, googleID *string) (*domain.User, error) {
 	// Ensure at least one credential is provided.
 	if password == nil && googleID == nil {
 		return nil, fmt.Errorf("password or googleID must be provided")
@@ -80,7 +80,7 @@ func (s *userService) CreateUser(ctx context.Context, name string, email string,
 		}
 
 		// 1. User does not exist; create a new user.
-		newUser := domain.NewUser(name, email, phoneNumber, address, &hashedPassword, &salt)
+		newUser := domain.NewUser(name, email, phoneNumber, addressID, &hashedPassword, &salt)
 		id, err := s.repo.Save(ctx, &newUser)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create user: %w", err)
@@ -180,7 +180,7 @@ func (s *userService) UpdateGoogleID(ctx context.Context, userID string, googleI
 	return s.repo.UpdateGoogleID(ctx, userID, googleID)
 }
 
-func (s *userService) UpdateMe(ctx context.Context, userID string, name *string, email *string, phoneNumber *string, address *string) (*domain.User, error) {
+func (s *userService) UpdateMe(ctx context.Context, userID string, name *string, email *string, phoneNumber *string, addressID *string) (*domain.User, error) {
 	user, err := s.repo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -195,8 +195,8 @@ func (s *userService) UpdateMe(ctx context.Context, userID string, name *string,
 	if phoneNumber != nil {
 		user.PhoneNumber = phoneNumber
 	}
-	if address != nil {
-		user.Address = address
+	if addressID != nil {
+		user.AddressID = addressID
 	}
 
 	return s.repo.UpdateUser(ctx, user)

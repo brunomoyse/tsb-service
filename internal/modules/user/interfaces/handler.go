@@ -67,7 +67,7 @@ func (h *UserHandler) UpdateMeHandler(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.UpdateMe(ctx, userID, req.Name, req.Email, req.PhoneNumber, req.Address)
+	user, err := h.service.UpdateMe(ctx, userID, req.Name, req.Email, req.PhoneNumber, req.AddressID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user profile", "details": err.Error()})
 		return
@@ -95,7 +95,7 @@ func (h *UserHandler) RegisterHandler(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.CreateUser(ctx, req.Name, req.Email, req.PhoneNumber, req.Address, &req.Password, nil)
+	user, err := h.service.CreateUser(ctx, req.Name, req.Email, req.PhoneNumber, req.AddressID, &req.Password, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user", "details": err.Error()})
 		return
