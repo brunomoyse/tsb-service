@@ -22,6 +22,10 @@ import (
 	userInfrastructure "tsb-service/internal/modules/user/infrastructure"
 	userInterfaces "tsb-service/internal/modules/user/interfaces"
 
+	addressApplication "tsb-service/internal/modules/address/application"
+	addressInfrastructure "tsb-service/internal/modules/address/infrastructure"
+	addressInterfaces "tsb-service/internal/modules/address/interfaces"
+
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/oauth2"
@@ -74,6 +78,10 @@ func main() {
 	userRepo := userInfrastructure.NewUserRepository(dbConn)
 	userService := userApplication.NewUserService(userRepo)
 	userHandler := userInterfaces.NewUserHandler(userService, jwtSecret)
+
+	addressRepo := addressInfrastructure.NewAddressRepository(dbConn)
+	addressService := addressApplication.NewAddressService(addressRepo)
+	addressHandler := addressInterfaces.NewAddressHandler(addressService)
 
 	// Initialize Gin router
 	router := gin.Default()
@@ -128,6 +136,12 @@ func main() {
 	api.GET("/products/:id", productHandler.GetProductHandler)
 	api.GET("/categories", productHandler.GetCategoriesHandler)
 	api.GET("/categories/:categoryID/products", productHandler.GetProductsByCategoryHandler)
+
+	api.GET("/addresses/streets", addressHandler.GetStreetNamesHandler)
+	api.GET("/addresses/house-numbers", addressHandler.GetHouseNumbersHandler)
+	api.GET("/addresses/box-numbers", addressHandler.GetBoxNumbersHandler)
+	api.GET("/addresses/final-address", addressHandler.GetFinalAddressHandler)
+	api.GET("/addresses/:id", addressHandler.GetAddressByIDHandler)
 
 	api.POST("/login", userHandler.LoginHandler)
 	api.POST("/register", userHandler.RegisterHandler)
