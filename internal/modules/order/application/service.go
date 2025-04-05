@@ -45,8 +45,12 @@ func (s *orderService) CreateOrder(ctx context.Context, o *domain.Order, op *[]d
 		order.ID.String(),
 		time.Now().Format(time.RFC3339),
 	)
-	// Broadcast the event to all connected SSE clients.
-	sse.Hub.Broadcast(eventPayload)
+
+	go func() {
+		time.Sleep(1 * time.Second)
+		// Trigger the event sending via the SSE hub.
+		sse.Hub.Broadcast(eventPayload)
+	}()
 
 	return order, orderProducts, nil
 }
@@ -77,8 +81,11 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID,
 		time.Now().Format(time.RFC3339),
 	)
 
-	// Trigger the event sending via the SSE hub.
-	sse.Hub.Broadcast(eventPayload)
+	go func() {
+		time.Sleep(1 * time.Second)
+		// Trigger the event sending via the SSE hub.
+		sse.Hub.Broadcast(eventPayload)
+	}()
 
 	return nil
 }
