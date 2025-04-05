@@ -115,7 +115,7 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 		req.IsOnlinePayment,
 		req.AddressID,
 		req.AddressExtra,
-		req.ExtraComment,
+		req.OrderNote,
 		req.OrderExtra,
 	)
 

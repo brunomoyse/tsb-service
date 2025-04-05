@@ -42,7 +42,7 @@ type Order struct {
 	EstimatedReadyTime *time.Time       `db:"estimated_ready_time" json:"estimatedReadyTime,omitempty"`
 	AddressID          *string          `db:"address_id" json:"addressId,omitempty"`
 	AddressExtra       *string          `db:"address_extra" json:"addressExtra,omitempty"`
-	ExtraComment       *string          `db:"extra_comment" json:"extraComment,omitempty"`
+	OrderNote          *string          `db:"order_note" json:"orderNote,omitempty"`
 	OrderExtra         json.RawMessage  `db:"order_extra" json:"orderExtras,omitempty"`
 }
 
@@ -82,7 +82,7 @@ func NewOrder(
 	isOnlinePayment bool,
 	addressID *string,
 	addressExtra *string,
-	extraComment *string,
+	orderNote *string,
 	orderExtra []OrderExtra,
 ) *Order {
 	orderExtraJSON, _ := json.Marshal(orderExtra)
@@ -95,7 +95,7 @@ func NewOrder(
 		IsOnlinePayment: isOnlinePayment,
 		AddressID:       addressID,
 		AddressExtra:    addressExtra,
-		ExtraComment:    extraComment,
+		OrderNote:       orderNote,
 		OrderExtra:      orderExtraJSON,
 	}
 }

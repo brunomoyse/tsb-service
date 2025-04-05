@@ -20,7 +20,7 @@ type CreateOrderRequest struct {
 	AddressExtra *string `json:"addressExtra,omitempty"`
 
 	// Any extra comments or special instructions for the order.
-	ExtraComment *string `json:"extraComment,omitempty"`
+	OrderNote *string `json:"orderNote,omitempty"`
 
 	// Additional extras for the order (e.g., chopsticks, sauces, etc.).
 	OrderExtra []domain.OrderExtra `json:"orderExtras,omitempty"`
