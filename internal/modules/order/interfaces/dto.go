@@ -23,7 +23,7 @@ type CreateOrderRequest struct {
 	OrderNote *string `json:"orderNote,omitempty"`
 
 	// Additional extras for the order (e.g., chopsticks, sauces, etc.).
-	OrderExtra []domain.OrderExtra `json:"orderExtras,omitempty"`
+	OrderExtra []domain.OrderExtra `json:"orderExtra,omitempty"`
 
 	// A list of products (by ID and quantity) that the customer is ordering.
 	OrderProducts []OrderProductDTO `json:"orderProducts"`
