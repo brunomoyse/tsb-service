@@ -1,6 +1,7 @@
 package interfaces
 
 import (
+	addressDomain "tsb-service/internal/modules/address/domain"
 	"tsb-service/internal/modules/user/domain"
 
 	"github.com/google/uuid"
@@ -14,7 +15,8 @@ type LoginRequest struct {
 
 // RegistrationRequest is used when a new user registers.
 type RegistrationRequest struct {
-	Name        string  `json:"name"`
+	FirstName   string  `json:"firstName"`
+	LastName    string  `json:"lastName"`
 	Email       string  `json:"email"`
 	Password    string  `json:"password"`
 	PhoneNumber *string `json:"phoneNumber"`
@@ -22,7 +24,8 @@ type RegistrationRequest struct {
 }
 
 type UpdateUserRequest struct {
-	Name        *string `json:"name"`
+	FirstName   *string `json:"firstName"`
+	LastName    *string `json:"lastName"`
 	Email       *string `json:"email"`
 	PhoneNumber *string `json:"phoneNumber"`
 	AddressID   *string `json:"addressId"`
@@ -30,18 +33,20 @@ type UpdateUserRequest struct {
 
 // GoogleAuthRequest is used when a user logs in via Google.
 type GoogleAuthRequest struct {
-	GoogleID string `json:"googleId"`
-	Email    string `json:"email"`
-	Name     string `json:"name"`
+	GoogleID  string `json:"googleId"`
+	Email     string `json:"email"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
 }
 
 // UserResponse is returned after successful operations involving a user.
 type UserResponse struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Email       string    `json:"email"`
-	PhoneNumber *string   `json:"phoneNumber"`
-	AddressID   *string   `json:"addressId"`
+	ID          uuid.UUID              `json:"id"`
+	FirstName   string                 `json:"firstName"`
+	LastName    string                 `json:"lastName"`
+	Email       string                 `json:"email"`
+	PhoneNumber *string                `json:"phoneNumber"`
+	Address     *addressDomain.Address `json:"address"`
 }
 
 type LoginResponse struct {
@@ -49,18 +54,19 @@ type LoginResponse struct {
 	AccessToken string        `json:"accessToken"`
 }
 
-func NewUserResponse(u *domain.User) *UserResponse {
+func NewUserResponse(u *domain.User, a *addressDomain.Address) *UserResponse {
 	return &UserResponse{
 		ID:          u.ID,
-		Name:        u.Name,
+		FirstName:   u.FirstName,
+		LastName:    u.LastName,
 		Email:       u.Email,
 		PhoneNumber: u.PhoneNumber,
-		AddressID:   u.AddressID,
+		Address:     a,
 	}
 }
 
-func NewLoginResponse(u *domain.User) *LoginResponse {
+func NewLoginResponse(u *domain.User, a *addressDomain.Address) *LoginResponse {
 	return &LoginResponse{
-		User: NewUserResponse(u),
+		User: NewUserResponse(u, a),
 	}
 }

@@ -20,8 +20,8 @@ import (
 )
 
 type UserService interface {
-	CreateUser(ctx context.Context, name string, email string, phoneNumber *string, addressID *string, password *string, googleID *string) (*domain.User, error)
-	UpdateMe(ctx context.Context, userID string, name *string, email *string, phoneNumber *string, addressID *string) (*domain.User, error)
+	CreateUser(ctx context.Context, firstName string, lastName string, email string, phoneNumber *string, addressID *string, password *string, googleID *string) (*domain.User, error)
+	UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressID *string) (*domain.User, error)
 	Login(ctx context.Context, email string, password string, jwtToken string) (*domain.User, *string, *string, error)
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
@@ -45,7 +45,7 @@ func NewUserService(repo domain.UserRepository) UserService {
 	}
 }
 
-func (s *userService) CreateUser(ctx context.Context, name string, email string, phoneNumber *string, addressID *string, password *string, googleID *string) (*domain.User, error) {
+func (s *userService) CreateUser(ctx context.Context, firstName string, lastName string, email string, phoneNumber *string, addressID *string, password *string, googleID *string) (*domain.User, error) {
 	// Ensure at least one credential is provided.
 	if password == nil && googleID == nil {
 		return nil, fmt.Errorf("password or googleID must be provided")
@@ -80,7 +80,7 @@ func (s *userService) CreateUser(ctx context.Context, name string, email string,
 		}
 
 		// 1. User does not exist; create a new user.
-		newUser := domain.NewUser(name, email, phoneNumber, addressID, &hashedPassword, &salt)
+		newUser := domain.NewUser(firstName, lastName, email, phoneNumber, addressID, &hashedPassword, &salt)
 		id, err := s.repo.Save(ctx, &newUser)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create user: %w", err)
@@ -102,7 +102,9 @@ func (s *userService) CreateUser(ctx context.Context, name string, email string,
 			if err != nil {
 				log.Printf("failed to initialize email service: %v", err)
 			}
-			err = es.SendVerificationEmail(bgCtx, newUser.Email, newUser.Name, verificationURL)
+			// Build user full name.
+			fullName := fmt.Sprintf("%s %s", newUser.FirstName, newUser.LastName)
+			err = es.SendVerificationEmail(bgCtx, newUser.Email, fullName, verificationURL)
 			if err != nil {
 			}
 		}()
@@ -112,7 +114,7 @@ func (s *userService) CreateUser(ctx context.Context, name string, email string,
 	}
 
 	// Google flow.
-	newUser := domain.NewGoogleUser(name, email, *googleID)
+	newUser := domain.NewGoogleUser(firstName, lastName, email, *googleID)
 	id, err := s.repo.Save(ctx, &newUser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
@@ -180,14 +182,17 @@ func (s *userService) UpdateGoogleID(ctx context.Context, userID string, googleI
 	return s.repo.UpdateGoogleID(ctx, userID, googleID)
 }
 
-func (s *userService) UpdateMe(ctx context.Context, userID string, name *string, email *string, phoneNumber *string, addressID *string) (*domain.User, error) {
+func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressID *string) (*domain.User, error) {
 	user, err := s.repo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	if name != nil {
-		user.Name = *name
+	if firstName != nil {
+		user.FirstName = *firstName
+	}
+	if lastName != nil {
+		user.LastName = *lastName
 	}
 	if email != nil {
 		user.Email = *email
@@ -275,7 +280,9 @@ func (s *userService) VerifyUserEmail(ctx context.Context, userID string) error 
 			log.Printf("failed to initialize email service: %v", err)
 			return
 		}
-		err = es.SendWelcomeEmail(bgCtx, user.Email, user.Name, os.Getenv("APP_BASE_URL")+"/menu")
+		// Build full name
+		fullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
+		err = es.SendWelcomeEmail(bgCtx, user.Email, fullName, os.Getenv("APP_BASE_URL")+"/menu")
 		if err != nil {
 			log.Printf("failed to send welcome email: %v", err)
 		}

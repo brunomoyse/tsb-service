@@ -99,7 +99,7 @@ func (r *AddressRepository) GetFinalAddress(ctx context.Context, streetID string
 
 func (r *AddressRepository) GetAddressByID(ctx context.Context, ID string) (*domain.Address, error) {
 	sqlQuery := `
-		SELECT a.address_id, a.streetname_fr, a.house_number, a.box_number, a.municipality_name_fr, a.postcode, ad.distance
+		SELECT a.address_id, a.streetname_fr, a.house_number, a.box_number, a.municipality_name_fr, a.postcode, COALESCE(ad.distance, 10000) AS distance
 		FROM addresses a
 		LEFT JOIN address_distance ad ON a.address_id = ad.address_id
 		WHERE a.address_id = $1;

@@ -29,7 +29,7 @@ var (
 	numRegexp   = regexp.MustCompile(`\d+`)
 )
 
-// parseCode takes a pointer to a code (e.g., "A10")
+// ParseCode takes a pointer to a code (e.g., "A10")
 // and returns the alphabetical prefix (e.g., "A") and numeric part (10).
 func ParseCode(code *string) (string, int) {
 	if code == nil {
