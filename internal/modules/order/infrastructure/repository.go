@@ -59,7 +59,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		INSERT INTO orders (
 			user_id, order_status, order_type, is_online_payment, 
 			discount_amount, delivery_fee, total_price, estimated_ready_time, 
-			address_id, address_extra, extra_comment, order_extra
+			address_id, address_extra, order_note, order_extra
 		) VALUES (
 			$1, $2, $3, $4, 
 			$5, $6, $7, $8, 
@@ -85,7 +85,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		o.EstimatedReadyTime,
 		o.AddressID,
 		o.AddressExtra,
-		o.ExtraComment,
+		o.OrderNote,
 		string(orderExtraJSON), // convert []byte to string
 	)
 	if err != nil {

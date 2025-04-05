@@ -7,13 +7,13 @@ CREATE TABLE IF NOT EXISTS public.orders
     order_status text NOT NULL DEFAULT 'PENDING'::text, -- 'PENDING', 'CONFIRMED', etc.
     order_type text NOT NULL,                           -- 'DELIVERY', 'PICKUP'
     is_online_payment boolean NOT NULL DEFAULT false,
-    discount_amount numeric(10,2) NOT NULL DEFAULT 0,
+    discount_amount numeric(10,2),
     delivery_fee numeric(10,2),                     -- if order_type is DELIVERY
     total_price numeric(10,2) NOT NULL,
     estimated_ready_time timestamp(0) with time zone, -- when order is ready or delivered
     address_id uuid,                                   -- if order_type is DELIVERY
     address_extra text,                                -- extra info about the address
-    extra_comment text,                                -- general comments about the order
+    order_note text,                                -- general comments about the order
     order_extra jsonb,                                 -- extra info about the order
     CONSTRAINT orders_pkey PRIMARY KEY (id),
     CONSTRAINT orders_user_id_foreign FOREIGN KEY (user_id)
