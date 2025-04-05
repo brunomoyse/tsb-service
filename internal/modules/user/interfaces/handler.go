@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	addressApplication "tsb-service/internal/modules/address/application"
+	addressDomain "tsb-service/internal/modules/address/domain"
 
 	"tsb-service/internal/modules/user/application"
 	"tsb-service/internal/modules/user/domain"
@@ -21,14 +23,20 @@ import (
 )
 
 type UserHandler struct {
-	service   application.UserService
-	jwtSecret string
+	service        application.UserService
+	addressService addressApplication.AddressService
+	jwtSecret      string
 }
 
-func NewUserHandler(service application.UserService, jwtSecret string) *UserHandler {
+func NewUserHandler(
+	service application.UserService,
+	addressService addressApplication.AddressService,
+	jwtSecret string,
+) *UserHandler {
 	return &UserHandler{
-		service:   service,
-		jwtSecret: jwtSecret,
+		service:        service,
+		addressService: addressService,
+		jwtSecret:      jwtSecret,
 	}
 }
 
@@ -47,7 +55,13 @@ func (h *UserHandler) GetUserProfileHandler(c *gin.Context) {
 		return
 	}
 
-	res := NewUserResponse(user)
+	// If user has an address ID, fetch the address details.
+	var address *addressDomain.Address
+	if user.AddressID != nil {
+		address, _ = h.addressService.GetAddressByID(c.Request.Context(), *user.AddressID)
+	}
+
+	res := NewUserResponse(user, address)
 
 	c.JSON(http.StatusOK, res)
 }
@@ -67,13 +81,19 @@ func (h *UserHandler) UpdateMeHandler(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.UpdateMe(ctx, userID, req.Name, req.Email, req.PhoneNumber, req.AddressID)
+	user, err := h.service.UpdateMe(ctx, userID, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user profile", "details": err.Error()})
 		return
 	}
 
-	res := NewUserResponse(user)
+	// If user has an address ID, fetch the address details.
+	var address *addressDomain.Address
+	if user.AddressID != nil {
+		address, _ = h.addressService.GetAddressByID(c.Request.Context(), *user.AddressID)
+	}
+
+	res := NewUserResponse(user, address)
 	c.JSON(http.StatusOK, res)
 }
 
@@ -87,7 +107,7 @@ func (h *UserHandler) RegisterHandler(c *gin.Context) {
 	}
 
 	// Validate required fields.
-	if req.Name == "" || req.Email == "" || req.Password == "" {
+	if req.FirstName == "" || req.LastName == "" || req.Email == "" || req.Password == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "missing required fields",
 			"details": "name, email and password are required",
@@ -95,13 +115,19 @@ func (h *UserHandler) RegisterHandler(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.CreateUser(ctx, req.Name, req.Email, req.PhoneNumber, req.AddressID, &req.Password, nil)
+	user, err := h.service.CreateUser(ctx, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressID, &req.Password, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user", "details": err.Error()})
 		return
 	}
 
-	res := NewUserResponse(user)
+	// If user has an address ID, fetch the address details.
+	var address *addressDomain.Address
+	if user.AddressID != nil {
+		address, _ = h.addressService.GetAddressByID(c.Request.Context(), *user.AddressID)
+	}
+
+	res := NewUserResponse(user, address)
 	c.JSON(http.StatusOK, res)
 }
 
@@ -178,11 +204,17 @@ func (h *UserHandler) LoginHandler(c *gin.Context) {
 		return
 	}
 
+	// If user has an address ID, fetch the address details.
+	var address *addressDomain.Address
+	if user.AddressID != nil {
+		address, _ = h.addressService.GetAddressByID(c.Request.Context(), *user.AddressID)
+	}
+
 	c.SetCookie("access_token", *accessToken, 15*60, "/", "", true, true) // 15 minutes
 	c.SetCookie("refresh_token", *refreshToken, 7*24*3600, "/", "", true, true)
 	c.SetSameSite(http.SameSiteLaxMode)
 
-	c.JSON(http.StatusOK, NewLoginResponse(user))
+	c.JSON(http.StatusOK, NewLoginResponse(user, address))
 }
 
 func (h *UserHandler) LogoutHandler(c *gin.Context) {
@@ -279,9 +311,10 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 
 	// Fetch user info from Google.
 	type GoogleUserInfo struct {
-		Sub   string `json:"sub"`
-		Email string `json:"email"`
-		Name  string `json:"name"`
+		Sub        string `json:"sub"`
+		Email      string `json:"email"`
+		GivenName  string `json:"given_name"`  // first name
+		FamilyName string `json:"family_name"` // last name
 	}
 	client := oauth2.GoogleOAuthConfig.Client(ctx, token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
@@ -299,9 +332,10 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 
 	// Prepare the auth request DTO.
 	req := GoogleAuthRequest{
-		GoogleID: googleUser.Sub,
-		Email:    googleUser.Email,
-		Name:     googleUser.Name,
+		GoogleID:  googleUser.Sub,
+		Email:     googleUser.Email,
+		FirstName: googleUser.GivenName,
+		LastName:  googleUser.FamilyName,
 	}
 
 	var user *domain.User
@@ -323,7 +357,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 
 		// 3a. If still not found, create a new user.
 		if user == nil {
-			user, err = h.service.CreateUser(ctx, req.Name, req.Email, nil, nil, nil, &req.GoogleID)
+			user, err = h.service.CreateUser(ctx, req.FirstName, req.LastName, req.Email, nil, nil, nil, &req.GoogleID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user", "details": err.Error()})
 				return
@@ -383,7 +417,6 @@ func (h *UserHandler) RefreshTokenHandler(c *gin.Context) {
 		"user": gin.H{
 			"id":    user.ID,
 			"email": user.Email,
-			"name":  user.Name,
 		},
 	})
 }

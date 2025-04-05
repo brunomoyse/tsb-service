@@ -11,7 +11,8 @@ type User struct {
 	ID              uuid.UUID  `db:"id" json:"id"`
 	CreatedAt       time.Time  `db:"created_at" json:"createdAt"`
 	UpdatedAt       time.Time  `db:"updated_at" json:"updatedAt"`
-	Name            string     `db:"name" json:"name"`
+	FirstName       string     `db:"first_name" json:"firstName"`
+	LastName        string     `db:"last_name" json:"lastName"`
 	Email           string     `db:"email" json:"email"`
 	EmailVerifiedAt *time.Time `db:"email_verified_at" json:"emailVerifiedAt"`
 	PhoneNumber     *string    `db:"phone_number" json:"phoneNumber"`
@@ -29,10 +30,11 @@ type JwtClaims struct {
 	ID   string `json:"jti"`  // Unique token identifier
 }
 
-func NewUser(name string, email string, phoneNumber *string, addressID *string, passwordHash *string, salt *string) User {
+func NewUser(firstName string, lastName string, email string, phoneNumber *string, addressID *string, passwordHash *string, salt *string) User {
 	return User{
 		ID:           uuid.Nil,
-		Name:         name,
+		FirstName:    firstName,
+		LastName:     lastName,
 		Email:        email,
 		PhoneNumber:  phoneNumber,
 		AddressID:    addressID,
@@ -41,11 +43,12 @@ func NewUser(name string, email string, phoneNumber *string, addressID *string, 
 	}
 }
 
-func NewGoogleUser(name string, email string, googleID string) User {
+func NewGoogleUser(firstName string, lastName string, email string, googleID string) User {
 	return User{
-		ID:       uuid.Nil,
-		Name:     name,
-		Email:    email,
-		GoogleID: &googleID,
+		ID:        uuid.Nil,
+		FirstName: firstName,
+		LastName:  lastName,
+		Email:     email,
+		GoogleID:  &googleID,
 	}
 }

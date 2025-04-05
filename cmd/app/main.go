@@ -75,13 +75,13 @@ func main() {
 	orderService := orderApplication.NewOrderService(orderRepo)
 	orderHandler := orderInterfaces.NewOrderHandler(orderService, productService, paymentService)
 
-	userRepo := userInfrastructure.NewUserRepository(dbConn)
-	userService := userApplication.NewUserService(userRepo)
-	userHandler := userInterfaces.NewUserHandler(userService, jwtSecret)
-
 	addressRepo := addressInfrastructure.NewAddressRepository(dbConn)
 	addressService := addressApplication.NewAddressService(addressRepo)
 	addressHandler := addressInterfaces.NewAddressHandler(addressService)
+
+	userRepo := userInfrastructure.NewUserRepository(dbConn)
+	userService := userApplication.NewUserService(userRepo)
+	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
 
 	// Initialize Gin router
 	router := gin.Default()
