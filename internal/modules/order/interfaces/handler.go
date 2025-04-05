@@ -38,6 +38,8 @@ func NewOrderHandler(
 
 func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 	var req CreateOrderRequest
+	var orderResponse OrderResponse
+
 	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"invalid request payload": err.Error()})
 		return
@@ -108,6 +110,43 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 		return
 	}
 
+	deliveryFee := decimal.NewFromInt(0)
+	if req.OrderType == domain.OrderTypeDelivery {
+		address, err := h.addressService.GetAddressByID(c.Request.Context(), *req.AddressID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve address"})
+			return
+		}
+
+		if address == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "address not found"})
+			return
+		}
+
+		orderResponse.Address = address
+
+		// Calculate the delivery fees
+		var fee int64
+		switch {
+		case address.Distance < 4000:
+			fee = 0
+		case address.Distance < 5000:
+			fee = 1
+		case address.Distance < 6000:
+			fee = 2
+		case address.Distance < 7000:
+			fee = 3
+		case address.Distance < 8000:
+			fee = 4
+		case address.Distance < 9000:
+			fee = 5
+		default:
+			fee = 0
+		}
+		deliveryFee = decimal.NewFromInt(fee)
+		computedOrderTotal = computedOrderTotal.Add(deliveryFee)
+	}
+
 	// Build the domain order object.
 	tempOrder := domain.NewOrder(
 		userID,
@@ -117,6 +156,7 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 		req.AddressExtra,
 		req.OrderNote,
 		req.OrderExtra,
+		&deliveryFee,
 	)
 
 	// Perform the order creation.
@@ -166,10 +206,8 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 		}
 	}
 
-	orderResponse := OrderResponse{
-		Order:         *order,
-		OrderProducts: orderProductsResponse,
-	}
+	orderResponse.Order = *order
+	orderResponse.OrderProducts = orderProductsResponse
 
 	// Handle payment creation if needed.
 	if req.IsOnlinePayment {
@@ -195,21 +233,6 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 		if err := json.Unmarshal(molliePayment.Links, &parsedLinks); err == nil {
 			orderResponse.MolliePayment.PaymentURL = parsedLinks.Checkout.Href
 		}
-	}
-
-	if req.OrderType == domain.OrderTypeDelivery {
-		address, err := h.addressService.GetAddressByID(c.Request.Context(), *req.AddressID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve address"})
-			return
-		}
-
-		if address == nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "address not found"})
-			return
-		}
-
-		orderResponse.Address = address
 	}
 
 	c.JSON(http.StatusOK, orderResponse)
