@@ -3,6 +3,7 @@ package interfaces
 import (
 	"github.com/google/uuid"
 	"time"
+	addressDomain "tsb-service/internal/modules/address/domain"
 	"tsb-service/internal/modules/order/domain"
 )
 
@@ -15,8 +16,8 @@ type CreateOrderRequest struct {
 	IsOnlinePayment bool `json:"isOnlinePayment"`
 
 	// Delivery address information (if OrderType is "DELIVERY").
-	AddressID    *uuid.UUID `json:"addressId,omitempty"` // Geocoded BeSt address
-	AddressExtra *string    `json:"addressExtra,omitempty"`
+	AddressID    *string `json:"addressId,omitempty"` // Geocoded BeSt address
+	AddressExtra *string `json:"addressExtra,omitempty"`
 
 	// Any extra comments or special instructions for the order.
 	ExtraComment *string `json:"extraComment,omitempty"`
@@ -46,6 +47,8 @@ type OrderResponse struct {
 	OrderProducts []domain.OrderProduct `json:"products"`
 	// MolliePayment is the payment information associated with the order.
 	MolliePayment *MolliePayment `json:"payment,omitempty"`
+	// Address is the delivery address for the order (if applicable).
+	Address *addressDomain.Address `json:"address,omitempty"`
 }
 
 type MolliePayment struct {

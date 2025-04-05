@@ -173,7 +173,7 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 }
 
 func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*domain.Order, error) {
-	// Basic pagination safety: ensure page & limit are > 0
+	// Basic pagination safety : ensure page & limit are > 0
 	if page < 1 {
 		page = 1
 	}

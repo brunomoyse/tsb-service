@@ -67,17 +67,17 @@ func main() {
 	productService := productApplication.NewProductService(productRepo)
 	productHandler := productInterfaces.NewProductHandler(productService)
 
+	addressRepo := addressInfrastructure.NewAddressRepository(dbConn)
+	addressService := addressApplication.NewAddressService(addressRepo)
+	addressHandler := addressInterfaces.NewAddressHandler(addressService)
+
 	paymentRepo := paymentInfrastructure.NewPaymentRepository(dbConn)
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient)
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService)
 
 	orderRepo := orderInfrastructure.NewOrderRepository(dbConn)
 	orderService := orderApplication.NewOrderService(orderRepo)
-	orderHandler := orderInterfaces.NewOrderHandler(orderService, productService, paymentService)
-
-	addressRepo := addressInfrastructure.NewAddressRepository(dbConn)
-	addressService := addressApplication.NewAddressService(addressRepo)
-	addressHandler := addressInterfaces.NewAddressHandler(addressService)
+	orderHandler := orderInterfaces.NewOrderHandler(orderService, productService, paymentService, addressService)
 
 	userRepo := userInfrastructure.NewUserRepository(dbConn)
 	userService := userApplication.NewUserService(userRepo)

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	addressApplication "tsb-service/internal/modules/address/application"
 	"tsb-service/internal/modules/order/application"
 	"tsb-service/internal/modules/order/domain"
 	paymentApplication "tsb-service/internal/modules/payment/application"
@@ -23,14 +24,16 @@ type OrderHandler struct {
 	service        application.OrderService
 	productService productApplication.ProductService
 	paymentService paymentApplication.PaymentService
+	addressService addressApplication.AddressService
 }
 
 func NewOrderHandler(
 	service application.OrderService,
 	productService productApplication.ProductService,
 	paymentService paymentApplication.PaymentService,
+	addressService addressApplication.AddressService,
 ) *OrderHandler {
-	return &OrderHandler{service: service, productService: productService, paymentService: paymentService}
+	return &OrderHandler{service: service, productService: productService, paymentService: paymentService, addressService: addressService}
 }
 
 func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
@@ -194,6 +197,21 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 		}
 	}
 
+	if req.OrderType == domain.OrderTypeDelivery {
+		address, err := h.addressService.GetAddressByID(c.Request.Context(), *req.AddressID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve address"})
+			return
+		}
+
+		if address == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "address not found"})
+			return
+		}
+
+		orderResponse.Address = address
+	}
+
 	c.JSON(http.StatusOK, orderResponse)
 }
 
@@ -309,6 +327,21 @@ func (h *OrderHandler) GetOrderHandler(c *gin.Context) {
 		if err := json.Unmarshal(molliePayment.Links, &parsedLinks); err == nil {
 			orderResponse.MolliePayment.PaymentURL = parsedLinks.Checkout.Href
 		}
+	}
+
+	if order.OrderType == domain.OrderTypeDelivery {
+		address, err := h.addressService.GetAddressByID(c.Request.Context(), *order.AddressID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve address"})
+			return
+		}
+
+		if address == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "address not found"})
+			return
+		}
+
+		orderResponse.Address = address
 	}
 
 	// 8. Return the final OrderResponse.
@@ -467,6 +500,21 @@ func (h *OrderHandler) GetUserOrdersHandler(c *gin.Context) {
 			}
 		}
 
+		if ord.OrderType == domain.OrderTypeDelivery {
+			address, err := h.addressService.GetAddressByID(c.Request.Context(), *ord.AddressID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve address"})
+				return
+			}
+
+			if address == nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "address not found"})
+				return
+			}
+
+			orderResp.Address = address
+		}
+
 		responses = append(responses, orderResp)
 	}
 
@@ -614,6 +662,21 @@ func (h *OrderHandler) GetAdminOrdersHandler(c *gin.Context) {
 			}
 		}
 
+		if ord.OrderType == domain.OrderTypeDelivery {
+			address, err := h.addressService.GetAddressByID(c.Request.Context(), *ord.AddressID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve address"})
+				return
+			}
+
+			if address == nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "address not found"})
+				return
+			}
+
+			orderResp.Address = address
+		}
+
 		responses = append(responses, orderResp)
 	}
 
@@ -752,6 +815,21 @@ func (h *OrderHandler) GetAdminOrderHandler(c *gin.Context) {
 		if err := json.Unmarshal(molliePayment.Links, &parsedLinks); err == nil {
 			orderResponse.MolliePayment.PaymentURL = parsedLinks.Checkout.Href
 		}
+	}
+
+	if order.OrderType == domain.OrderTypeDelivery {
+		address, err := h.addressService.GetAddressByID(c.Request.Context(), *order.AddressID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve address"})
+			return
+		}
+
+		if address == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "address not found"})
+			return
+		}
+
+		orderResponse.Address = address
 	}
 
 	// 6. Return the final OrderResponse.
