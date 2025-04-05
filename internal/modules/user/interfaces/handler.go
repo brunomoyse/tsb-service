@@ -313,8 +313,8 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	type GoogleUserInfo struct {
 		Sub        string `json:"sub"`
 		Email      string `json:"email"`
-		GivenName  string `json:"given_name"`  // first name
-		FamilyName string `json:"family_name"` // last name
+		GivenName  string `json:"given_name"`
+		FamilyName string `json:"family_name"`
 	}
 	client := oauth2.GoogleOAuthConfig.Client(ctx, token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")

@@ -19,12 +19,12 @@ func NewUserRepository(db *sqlx.DB) domain.UserRepository {
 
 func (r *UserRepository) Save(ctx context.Context, user *domain.User) (uuid.UUID, error) {
 	query := `
-		INSERT INTO users (first_name, last_name, email, phone_number, address_id, password_hash, salt)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO users (first_name, last_name, email, phone_number, address_id, password_hash, salt, google_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id;
 	`
 	var id uuid.UUID
-	if err := r.db.QueryRowContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.PasswordHash, user.Salt).Scan(&id); err != nil {
+	if err := r.db.QueryRowContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.PasswordHash, user.Salt, user.GoogleID).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
 	user.ID = id
