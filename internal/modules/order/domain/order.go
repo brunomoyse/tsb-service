@@ -40,7 +40,7 @@ type Order struct {
 	DeliveryFee        *decimal.Decimal `db:"delivery_fee" json:"deliveryFee,omitempty"`
 	TotalPrice         decimal.Decimal  `db:"total_price" json:"totalPrice"`
 	EstimatedReadyTime *time.Time       `db:"estimated_ready_time" json:"estimatedReadyTime,omitempty"`
-	AddressID          *uuid.UUID       `db:"address_id" json:"addressId,omitempty"`
+	AddressID          *string          `db:"address_id" json:"addressId,omitempty"`
 	AddressExtra       *string          `db:"address_extra" json:"addressExtra,omitempty"`
 	ExtraComment       *string          `db:"extra_comment" json:"extraComment,omitempty"`
 	OrderExtra         json.RawMessage  `db:"order_extra" json:"orderExtras,omitempty"`
@@ -80,7 +80,7 @@ func NewOrder(
 	userID uuid.UUID,
 	orderType OrderType,
 	isOnlinePayment bool,
-	addressID *uuid.UUID,
+	addressID *string,
 	addressExtra *string,
 	extraComment *string,
 	orderExtra []OrderExtra,
