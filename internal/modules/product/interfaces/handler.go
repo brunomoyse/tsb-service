@@ -63,7 +63,12 @@ func (h *ProductHandler) CreateProductHandler(c *gin.Context) {
 	// If an image file is provided, handle the file upload.
 	file, fileHeader, err := c.Request.FormFile("image")
 	if err == nil { // file was provided
-		defer file.Close()
+		defer func(file multipart.File) {
+			err := file.Close()
+			if err != nil {
+				log.Printf("failed to close file: %v", err)
+			}
+		}(file)
 
 		// Prepare a new multipart form request for the file service.
 		fileServiceUrl := os.Getenv("FILE_SERVICE_URL")
@@ -85,7 +90,10 @@ func (h *ProductHandler) CreateProductHandler(c *gin.Context) {
 			if err := writer.WriteField("product_slug", *product.Slug); err != nil {
 				log.Printf("failed to write product_slug field: %v", err)
 			}
-			writer.Close()
+			err := writer.Close()
+			if err != nil {
+				return
+			}
 
 			// Build and send the POST request to the file service.
 			uploadReq, err := http.NewRequest("POST", fileServiceUrl+"/upload", &b)
@@ -98,7 +106,12 @@ func (h *ProductHandler) CreateProductHandler(c *gin.Context) {
 				if err != nil {
 					log.Printf("failed to upload file: %v", err)
 				} else {
-					defer resp.Body.Close()
+					defer func(Body io.ReadCloser) {
+						err := Body.Close()
+						if err != nil {
+							log.Printf("failed to close response body: %v", err)
+						}
+					}(resp.Body)
 					// Optionally, check the response status code or response body here.
 					if resp.StatusCode != http.StatusOK {
 						log.Printf("file service responded with status: %s", resp.Status)
@@ -212,29 +225,37 @@ func (h *ProductHandler) GetProductsByCategoryHandler(c *gin.Context) {
 
 // UpdateProductHandler handles partial product updates.
 func (h *ProductHandler) UpdateProductHandler(c *gin.Context) {
-	// Get product id from URL parameter.
+	// 1. Get product id from URL parameter.
 	idStr := c.Param("id")
 	productID, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "invalid product id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product id"})
 		return
 	}
 
-	// Retrieve the current product.
+	// 2. Retrieve the current product.
 	currentProduct, err := h.service.GetProduct(c.Request.Context(), productID.String())
 	if err != nil {
-		c.JSON(500, gin.H{"error": "failed to retrieve product"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve product"})
 		return
 	}
 
-	// Bind the JSON payload to our update request.
+	// 3. Parse the multipart form (limit to 10 MB).
+	if err := c.Request.ParseMultipartForm(10 << 20); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse multipart form: " + err.Error()})
+		return
+	}
+
+	// 4. Decode the JSON payload from the "data" field.
+	data := c.PostForm("data")
 	var req UpdateProductRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "invalid request body"})
+	if err := json.Unmarshal([]byte(data), &req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload: " + err.Error()})
 		return
 	}
 
-	// Merge the update values if provided.
+	// 5. Merge update values if provided.
+	// (Adjust these according to your UpdateProductRequest struct and business logic.)
 	if req.Price != nil {
 		currentProduct.Price = *req.Price
 	}
@@ -265,25 +286,86 @@ func (h *ProductHandler) UpdateProductHandler(c *gin.Context) {
 				Description: t.Description,
 			})
 		}
-		// Replace translations only if provided.
 		currentProduct.Translations = translations
 	}
 
-	// Call the service layer to update the product.
+	// 6. If an image file is provided, handle the file upload.
+	file, fileHeader, err := c.Request.FormFile("image")
+	if err == nil { // image file was provided
+		defer func(file multipart.File) {
+			err := file.Close()
+			if err != nil {
+				log.Printf("failed to close file: %v", err)
+			}
+		}(file)
+
+		// Prepare a new multipart form request for the file service.
+		fileServiceUrl := os.Getenv("FILE_SERVICE_URL")
+		var b bytes.Buffer
+		writer := multipart.NewWriter(&b)
+
+		// Add the file field.
+		part, err := writer.CreateFormFile("image", fileHeader.Filename)
+		if err != nil {
+			log.Printf("failed to create form file part: %v", err)
+		} else {
+			if _, err := io.Copy(part, file); err != nil {
+				log.Printf("failed to copy file content: %v", err)
+			}
+		}
+
+		// If the product's slug exists, add the product_slug field.
+		if currentProduct.Slug != nil {
+			if err := writer.WriteField("product_slug", *currentProduct.Slug); err != nil {
+				log.Printf("failed to write product_slug field: %v", err)
+			}
+			err := writer.Close()
+			if err != nil {
+				return
+			}
+
+			// Build and send the POST request to the file service.
+			uploadReq, err := http.NewRequest("POST", fileServiceUrl+"/upload", &b)
+			if err != nil {
+				log.Printf("failed to create file upload request: %v", err)
+			} else {
+				uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+				client := &http.Client{}
+				resp, err := client.Do(uploadReq)
+				if err != nil {
+					log.Printf("failed to upload file: %v", err)
+				} else {
+					defer func(Body io.ReadCloser) {
+						err := Body.Close()
+						if err != nil {
+							log.Printf("failed to close response body: %v", err)
+						}
+					}(resp.Body)
+					if resp.StatusCode != http.StatusOK {
+						log.Printf("file service responded with status: %s", resp.Status)
+					}
+				}
+			}
+		}
+	} else {
+		// No image file provided; optionally log this information.
+		log.Println("no image file provided in the update request")
+	}
+
+	// 7. Call the service layer to update the product.
 	if err := h.service.UpdateProduct(c.Request.Context(), currentProduct); err != nil {
-		c.JSON(500, gin.H{"error": "failed to update product"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update product: " + err.Error()})
 		return
 	}
 
-	// Retrieve the updated product
+	// 8. Retrieve the updated product.
 	updatedProduct, err := h.service.GetProduct(c.Request.Context(), productID.String())
 	if err != nil {
-		c.JSON(500, gin.H{"error": "failed to retrieve updated product"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve updated product"})
 		return
 	}
 
-	// Create a response DTO from the product domain object.
+	// 9. Create a response DTO from the product domain object and return it.
 	res := NewAdminProductResponse(updatedProduct)
-
-	c.JSON(200, res)
+	c.JSON(http.StatusOK, res)
 }
