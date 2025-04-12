@@ -114,7 +114,8 @@ func (h *ProductHandler) CreateProductHandler(c *gin.Context) {
 					}(resp.Body)
 					// Optionally, check the response status code or response body here.
 					if resp.StatusCode != http.StatusOK {
-						log.Printf("file service responded with status: %s", resp.Status)
+						bodyBytes, _ := io.ReadAll(resp.Body)
+						log.Printf("file service responded with status: %s", resp.Status, bodyBytes)
 					}
 				}
 			}
@@ -342,7 +343,8 @@ func (h *ProductHandler) UpdateProductHandler(c *gin.Context) {
 						}
 					}(resp.Body)
 					if resp.StatusCode != http.StatusOK {
-						log.Printf("file service responded with status: %s", resp.Status)
+						bodyBytes, _ := io.ReadAll(resp.Body)
+						log.Printf("file service responded with status: %s", resp.Status, bodyBytes)
 					}
 				}
 			}
