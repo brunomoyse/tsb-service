@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Confirmation de commande | Tokyo Sushi Bar</title>
+    <title>Order Confirmation | Tokyo Sushi Bar</title>
     <style>
-        /* Styles de base */
+        /* Base styling */
         body, html {
             margin: 0;
             padding: 0;
@@ -69,20 +69,20 @@
 </head>
 <body>
 <div class="container">
-    <!-- Logo du restaurant -->
+    <!-- Restaurant Logo -->
     <img alt="Logo" src="https://nuagemagique.dev/icons/tsb-logo.svg" />
 
     <div class="content">
-        <p class="lead">Bonjour {{.UserName}},</p>
-        <p>Merci d'avoir passé commande chez <strong>Tokyo Sushi Bar</strong> ! Nous vous confirmons la réception de votre commande, qui est actuellement en attente de validation par le restaurant. Vous recevrez prochainement un nouvel e-mail confirmant votre commande et précisant le délai estimé pour la livraison ou le retrait.</p>
+        <p class="lead">Hello {{.UserName}},</p>
+        <p>Thank you for ordering at <strong>Tokyo Sushi Bar</strong>! We confirm that we have received your order and it is currently pending validation by the restaurant. You will receive another email shortly confirming your order along with an estimated delivery/takeaway time.</p>
 
-        <h3>Récapitulatif de la commande</h3>
+        <h3>Order Summary</h3>
         <table class="order-summary">
             <thead>
             <tr>
-                <th>Produit</th>
-                <th>Qté</th>
-                <th>Prix</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th style="text-align: right;">Price</th>
             </tr>
             </thead>
             <tbody>
@@ -90,26 +90,28 @@
             <tr>
                 <td>{{.Name}}</td>
                 <td>{{.Quantity}}</td>
-                <td>{{.Price}}</td>
+                <td style="text-align: right;">{{.TotalPrice}}</td>
             </tr>
             {{end}}
             </tbody>
         </table>
 
-        <p><strong>Sous-total :</strong> {{.SubtotalPrice}}</p>
-        {{if eq .OrderType "delivery"}}
-        <p><strong>Frais de livraison :</strong> {{.DeliveryFee}}</p>
-        {{else if eq .OrderType "takeaway"}}
-        <p><strong>Remise sur le retrait :</strong> -{{.TakeawayDiscount}}</p>
+        <p><strong>Subtotal:</strong> {{.SubtotalPrice}}</p>
+        {{if eq .OrderType "DELIVERY"}}
+        <p><strong>Delivery Fee:</strong> {{.DeliveryFee}}</p>
+        {{else if eq .OrderType "PICKUP"}}
+        <!--
+        <p><strong>Takeaway Discount:</strong> -{{.TakeawayDiscount}}</p>
+        -->
         {{end}}
-        <p><strong>Total :</strong> {{.TotalPrice}}</p>
+        <p><strong>Total:</strong> {{.TotalPrice}}</p>
 
-        <p>Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions pour votre confiance et sommes impatients de vous faire découvrir notre expérience sushi authentique.</p>
+        <p>If you have any questions about your order, please do not hesitate to contact us. We appreciate your trust in us and look forward to delighting you with our authentic sushi experience.</p>
     </div>
 
     <div class="footer">
-        <p>Si vous n'êtes pas à l'origine de cette commande, veuillez ignorer cet e-mail.</p>
-        <p>&copy; 2025 Tokyo Sushi Bar. Tous droits réservés.</p>
+        <p>If you did not place this order, please disregard this email.</p>
+        <p>&copy; 2025 Tokyo Sushi Bar. All rights reserved.</p>
     </div>
 </div>
 </body>

@@ -2,8 +2,10 @@ package utils
 
 import (
 	"context"
+	"github.com/shopspring/decimal"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 type contextKey string
@@ -46,4 +48,8 @@ func ParseCode(code *string) (string, int) {
 		}
 	}
 	return alpha, num
+}
+
+func FormatDecimal(d decimal.Decimal) string {
+	return strings.Replace(d.StringFixed(2), ".", ",", 1)
 }

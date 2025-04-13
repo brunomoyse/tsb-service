@@ -13,7 +13,7 @@ import (
 	"time"
 	"tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/utils"
-	emailService "tsb-service/templates/email"
+	es "tsb-service/services/email/scaleway"
 
 	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/argon2"
@@ -95,17 +95,9 @@ func (s *userService) CreateUser(ctx context.Context, firstName string, lastName
 
 		// 3. Send verification email asynchronously in a goroutine.
 		go func() {
-			// Create a new background context for the asynchronous work.
-			bgCtx := context.Background()
-			bgCtx = utils.SetLang(bgCtx, utils.GetLang(ctx))
-			es, err := emailService.NewEmailService(bgCtx)
+			err = es.SendVerificationEmail(newUser, utils.GetLang(ctx), verificationURL)
 			if err != nil {
-				log.Printf("failed to initialize email service: %v", err)
-			}
-			// Build user full name.
-			fullName := fmt.Sprintf("%s %s", newUser.FirstName, newUser.LastName)
-			err = es.SendVerificationEmail(bgCtx, newUser.Email, fullName, verificationURL)
-			if err != nil {
+				log.Printf("failed to send verification email: %v", err)
 			}
 		}()
 
@@ -274,15 +266,7 @@ func (s *userService) VerifyUserEmail(ctx context.Context, userID string) error 
 
 	// 2. Send welcome email
 	go func() {
-		bgCtx := context.Background()
-		es, err := emailService.NewEmailService(bgCtx)
-		if err != nil {
-			log.Printf("failed to initialize email service: %v", err)
-			return
-		}
-		// Build full name
-		fullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
-		err = es.SendWelcomeEmail(bgCtx, user.Email, fullName, os.Getenv("APP_BASE_URL")+"/menu")
+		err = es.SendWelcomeEmail(*user, utils.GetLang(ctx), os.Getenv("APP_BASE_URL")+"/menu")
 		if err != nil {
 			log.Printf("failed to send welcome email: %v", err)
 		}

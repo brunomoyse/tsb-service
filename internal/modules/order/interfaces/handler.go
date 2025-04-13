@@ -3,7 +3,10 @@ package interfaces
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -14,10 +17,9 @@ import (
 	paymentDomain "tsb-service/internal/modules/payment/domain"
 	productApplication "tsb-service/internal/modules/product/application"
 	productDomain "tsb-service/internal/modules/product/domain"
+	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/utils"
-
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	es "tsb-service/services/email/scaleway"
 )
 
 type OrderHandler struct {
@@ -234,6 +236,19 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 			orderResponse.MolliePayment.PaymentURL = parsedLinks.Checkout.Href
 		}
 	}
+
+	go func() {
+		// FOR TEST
+		user := userDomain.User{
+			FirstName: "Bruno",
+			LastName:  "Moyse",
+			Email:     "moyse94@gmail.com",
+		}
+		err = es.SendOrderPendingEmail(user, utils.GetLang(c.Request.Context()), orderResponse.Order, orderResponse.OrderProducts)
+		if err != nil {
+			log.Printf("failed to send order pending email: %v", err)
+		}
+	}()
 
 	c.JSON(http.StatusOK, orderResponse)
 }
