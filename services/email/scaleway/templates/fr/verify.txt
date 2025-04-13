@@ -1,0 +1,14 @@
+Bonjour {{.UserName}},
+
+Merci de vous être inscrit chez Tokyo Sushi Bar ! Nous sommes ravis de vous faire découvrir nos créations fraîches et savoureuses, issues de la tradition japonaise.
+
+Pour finaliser votre inscription et activer votre compte, veuillez vérifier votre adresse e-mail en cliquant sur le lien ci-dessous :
+
+Vérifier mon adresse e-mail : {{.VerifyLink}}
+
+Nous avons hâte de vous faire découvrir notre approche moderne du sushi traditionnel.
+お待ちしております！ (Nous vous attendons !)
+
+Si vous n’êtes pas à l’origine de cette demande, veuillez ignorer cet e-mail.
+
+© 2025 Tokyo Sushi Bar. Tous droits réservés.

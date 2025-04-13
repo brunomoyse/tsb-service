@@ -4,74 +4,110 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
-	"github.com/shopspring/decimal"
 	"html/template"
+	"io"
+
+	textTemplate "text/template"
+
+	"github.com/shopspring/decimal"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/utils"
 )
 
-//go:embed templates/*/*.html
-var emailFS embed.FS
+// --------------------------------------------------------------------------------
+// Embedded Templates for HTML & plain text versions.
+// --------------------------------------------------------------------------------
 
-// loadTemplate loads the template file from the embedded file system using the provided path.
-func loadTemplate(path string) (*template.Template, error) {
-	tmpl, err := template.ParseFS(emailFS, path)
+//go:embed templates/*/*.html
+var htmlEmailFS embed.FS
+
+//go:embed templates/*/*.txt
+var textEmailFS embed.FS
+
+// --------------------------------------------------------------------------------
+// templateExecutor is a common interface satisfied by both html/template.Template
+// and text/template.Template (they both expose the Execute method).
+// --------------------------------------------------------------------------------
+
+type templateExecutor interface {
+	Execute(w io.Writer, data interface{}) error
+}
+
+// --------------------------------------------------------------------------------
+// Template loaders
+// --------------------------------------------------------------------------------
+
+// loadHTMLTemplate loads an HTML template from the embedded HTML FS.
+func loadHTMLTemplate(path string) (templateExecutor, error) {
+	tmpl, err := template.ParseFS(htmlEmailFS, path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse template %q: %w", path, err)
+		return nil, fmt.Errorf("failed to parse HTML template %q: %w", path, err)
 	}
 	return tmpl, nil
 }
 
-func renderVerifyEmail(path string, user userDomain.User, verifyLink string) (string, error) {
-	tmpl, err := loadTemplate(path)
+// loadTextTemplate loads a plain text template from the embedded text FS.
+func loadTextTemplate(path string) (templateExecutor, error) {
+	tmpl, err := textTemplate.ParseFS(textEmailFS, path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse text template %q: %w", path, err)
+	}
+	return tmpl, nil
+}
 
+// --------------------------------------------------------------------------------
+// Generic render function
+// --------------------------------------------------------------------------------
+
+// renderEmail loads a template using the provided loader, executes it with data,
+// and returns the rendered string.
+func renderEmail(path string, data interface{}, loader func(string) (templateExecutor, error)) (string, error) {
+	tmpl, err := loader(path)
 	if err != nil {
 		return "", err
 	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute template %q: %w", path, err)
+	}
+	return buf.String(), nil
+}
 
-	data := struct {
+// --------------------------------------------------------------------------------
+// Common Data Preparation Helpers
+// --------------------------------------------------------------------------------
+
+// prepareVerifyEmailData prepares the data structure common for verify emails.
+func prepareVerifyEmailData(user userDomain.User, verifyLink string) struct {
+	UserName   string
+	VerifyLink string
+} {
+	return struct {
 		UserName   string
 		VerifyLink string
 	}{
 		UserName:   fmt.Sprintf("%s %s", user.FirstName, user.LastName),
 		VerifyLink: verifyLink,
 	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute verify template: %w", err)
-	}
-	return buf.String(), nil
 }
 
-func renderWelcomeEmail(path string, user userDomain.User, menuLink string) (string, error) {
-	tmpl, err := loadTemplate(path)
-	if err != nil {
-		return "", err
-	}
-
-	data := struct {
+// prepareWelcomeEmailData prepares the data for welcome emails.
+func prepareWelcomeEmailData(user userDomain.User, menuLink string) struct {
+	UserName string
+	MenuLink string
+} {
+	return struct {
 		UserName string
 		MenuLink string
 	}{
 		UserName: fmt.Sprintf("%s %s", user.FirstName, user.LastName),
 		MenuLink: menuLink,
 	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute welcome template: %w", err)
-	}
-	return buf.String(), nil
 }
 
-func renderOrderPendingEmail(path string, u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (string, error) {
-	tmpl, err := loadTemplate(path)
-	if err != nil {
-		return "", err
-	}
-
+// prepareOrderPendingData prepares the data for order pending emails.
+func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (interface{}, error) {
 	type OrderProductView struct {
 		Name       string
 		Quantity   int64
@@ -88,7 +124,6 @@ func renderOrderPendingEmail(path string, u userDomain.User, op []orderDomain.Or
 	}
 
 	subtotal := decimal.NewFromInt(0)
-
 	for _, item := range op {
 		subtotal = subtotal.Add(item.TotalPrice)
 	}
@@ -106,14 +141,56 @@ func renderOrderPendingEmail(path string, u userDomain.User, op []orderDomain.Or
 		OrderItems:       orderViews,
 		OrderType:        string(o.OrderType),
 		SubtotalPrice:    utils.FormatDecimal(subtotal),
-		TakeawayDiscount: utils.FormatDecimal(decimal.NewFromFloat(0)), // @TODO
+		TakeawayDiscount: utils.FormatDecimal(decimal.NewFromFloat(0)), // @TODO: adjust discount if needed
 		DeliveryFee:      utils.FormatDecimal(*o.DeliveryFee),
 		TotalPrice:       utils.FormatDecimal(o.TotalPrice),
 	}
 
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute order pending template: %w", err)
+	return data, nil
+}
+
+// --------------------------------------------------------------------------------
+// Specific Render Functions
+// --------------------------------------------------------------------------------
+
+// renderVerifyEmailHTML renders the HTML version of the verification email.
+func renderVerifyEmailHTML(path string, user userDomain.User, verifyLink string) (string, error) {
+	data := prepareVerifyEmailData(user, verifyLink)
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+// renderVerifyEmailText renders the plain text version of the verification email.
+func renderVerifyEmailText(path string, user userDomain.User, verifyLink string) (string, error) {
+	data := prepareVerifyEmailData(user, verifyLink)
+	return renderEmail(path, data, loadTextTemplate)
+}
+
+// renderWelcomeEmailHTML renders the HTML version of the welcome email.
+func renderWelcomeEmailHTML(path string, user userDomain.User, menuLink string) (string, error) {
+	data := prepareWelcomeEmailData(user, menuLink)
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+// renderWelcomeEmailText renders the plain text version of the welcome email.
+func renderWelcomeEmailText(path string, user userDomain.User, menuLink string) (string, error) {
+	data := prepareWelcomeEmailData(user, menuLink)
+	return renderEmail(path, data, loadTextTemplate)
+}
+
+// renderOrderPendingEmailHTML renders the HTML version of the order pending email.
+func renderOrderPendingEmailHTML(path string, u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (string, error) {
+	data, err := prepareOrderPendingData(u, op, o)
+	if err != nil {
+		return "", err
 	}
-	return buf.String(), nil
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+// renderOrderPendingEmailText renders the plain text version of the order pending email.
+func renderOrderPendingEmailText(path string, u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (string, error) {
+	data, err := prepareOrderPendingData(u, op, o)
+	if err != nil {
+		return "", err
+	}
+	return renderEmail(path, data, loadTextTemplate)
 }

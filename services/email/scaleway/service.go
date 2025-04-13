@@ -73,12 +73,15 @@ func SendVerificationEmail(user userDomain.User, lang string, verificationURL st
 	// Determine the template path based on the user's language.
 	path := fmt.Sprintf("templates/%s/verify.html", lang)
 
-	htmlContent, err := renderVerifyEmail(path, user, verificationURL)
+	htmlContent, err := renderVerifyEmailHTML(path, user, verificationURL)
 	if err != nil {
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
 
-	plainTextContent := "This is a verification email."
+	plainTextContent, err := renderVerifyEmailText(path, user, verificationURL)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
 
 	// Localized subject lines.
 	subjects := map[string]string{
@@ -125,12 +128,15 @@ func SendWelcomeEmail(user userDomain.User, lang, menuURL string) error {
 	// Determine the template path based on the user's language.
 	path := fmt.Sprintf("templates/%s/welcome.html", lang)
 
-	htmlContent, err := renderWelcomeEmail(path, user, menuURL)
+	htmlContent, err := renderWelcomeEmailHTML(path, user, menuURL)
 	if err != nil {
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
 
-	plainTextContent := "This is a welcome email."
+	plainTextContent, err := renderWelcomeEmailText(path, user, menuURL)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
 
 	subjects := map[string]string{
 		"en": "Welcome to Tokyo Sushi Bar",
@@ -176,12 +182,15 @@ func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.
 	// Determine the template path based on the user's language.
 	path := fmt.Sprintf("templates/%s/order-pending.html", lang)
 
-	htmlContent, err := renderOrderPendingEmail(path, user, op, order)
+	htmlContent, err := renderOrderPendingEmailHTML(path, user, op, order)
 	if err != nil {
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
 
-	plainTextContent := "This is an order pending email."
+	plainTextContent, err := renderOrderPendingEmailText(path, user, op, order)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
 
 	subjects := map[string]string{
 		"en": "Order pending validation",
