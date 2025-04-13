@@ -10,7 +10,7 @@ import (
 
 // ProductService defines the application service interface for product operations.
 type ProductService interface {
-	CreateProduct(ctx context.Context, categoryID uuid.UUID, price decimal.Decimal, code *string, isVisible bool, isAvailable bool, isHalal bool, isVegan bool, translations []domain.Translation) (*domain.Product, error)
+	CreateProduct(ctx context.Context, categoryID uuid.UUID, price decimal.Decimal, code *string, pieceCount *int, isVisible bool, isAvailable bool, isHalal bool, isVegan bool, translations []domain.Translation) (*domain.Product, error)
 	GetProduct(ctx context.Context, id string) (*domain.Product, error)
 	GetProducts(ctx context.Context) ([]*domain.Product, error)
 	GetProductsByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error)
@@ -34,6 +34,7 @@ func (s *productService) CreateProduct(
 	categoryID uuid.UUID,
 	price decimal.Decimal,
 	code *string,
+	pieceCount *int,
 	isVisible bool,
 	isAvailable bool,
 	isHalal bool,
@@ -46,6 +47,7 @@ func (s *productService) CreateProduct(
 	}
 
 	product.Code = code
+	product.PieceCount = pieceCount
 	product.IsVisible = isVisible
 	product.IsAvailable = isAvailable
 	product.IsHalal = isHalal
