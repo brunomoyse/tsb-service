@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	addressApplication "tsb-service/internal/modules/address/application"
+	addressDomain "tsb-service/internal/modules/address/domain"
 	"tsb-service/internal/modules/order/application"
 	"tsb-service/internal/modules/order/domain"
 	paymentApplication "tsb-service/internal/modules/payment/application"
@@ -747,27 +748,28 @@ func (h *OrderHandler) UpdateOrderStatusHandler(c *gin.Context) {
 
 	if oldOrder.OrderStatus == domain.OrderStatusPending && (req.OrderStatus == domain.OrderStatusConfirmed || req.OrderStatus == domain.OrderStatusPreparing) {
 		go func() {
+			// Create an independent background context.
+			ctx := context.Background()
+
 			// 1. Retrieve the user by ID.
-			user, err := h.userService.GetUserByID(context.Background(), userIDStr)
+			user, err := h.userService.GetUserByID(ctx, userIDStr)
 			if err != nil {
 				log.Printf("failed to retrieve user: %v", err)
 				return
 			}
 
-			// 2. Fetch the order and related products.
-			order, orderProducts, err := h.service.GetOrderByID(context.Background(), orderID)
+			// 2. Fetch the order and its products.
+			order, orderProducts, err := h.service.GetOrderByID(ctx, orderID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
+				log.Printf("failed to retrieve order: %v", err)
 				return
 			}
 			if order == nil {
-				// If you consider "not found" a 404
-				c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+				log.Printf("order not found")
 				return
 			}
 			if orderProducts == nil {
-				// or handle the case if order was found but no products
-				c.JSON(http.StatusNotFound, gin.H{"error": "no order products found"})
+				log.Printf("no order products found")
 				return
 			}
 
@@ -777,9 +779,9 @@ func (h *OrderHandler) UpdateOrderStatusHandler(c *gin.Context) {
 				productIDs[i] = op.ProductID.String()
 			}
 
-			products, err := h.productService.GetProductsByIDs(context.Background(), productIDs)
+			products, err := h.productService.GetProductsByIDs(ctx, productIDs)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve products"})
+				log.Printf("failed to retrieve products: %v", err)
 				return
 			}
 
@@ -794,7 +796,7 @@ func (h *OrderHandler) UpdateOrderStatusHandler(c *gin.Context) {
 			for i, op := range *orderProducts {
 				prod, ok := productMap[op.ProductID]
 				if !ok {
-					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("product %s not found", op.ProductID)})
+					log.Printf("product %s not found", op.ProductID)
 					return
 				}
 				orderProductsResponse[i] = domain.OrderProduct{
@@ -810,8 +812,23 @@ func (h *OrderHandler) UpdateOrderStatusHandler(c *gin.Context) {
 				}
 			}
 
-			// 5. Send the email notification.
-			err = es.SendOrderConfirmedEmail(*user, "fr", *order, orderProductsResponse)
+			// 5. Retrieve the delivery address if this is a delivery order.
+			var address *addressDomain.Address
+			if order.OrderType == domain.OrderTypeDelivery {
+				address, err = h.addressService.GetAddressByID(ctx, *order.AddressID)
+				if err != nil {
+					log.Printf("failed to retrieve address: %v", err)
+					return
+				}
+				if address == nil {
+					log.Printf("address not found")
+					return
+				}
+			}
+
+			// 6. Send the order confirmation email.
+			// (Assuming es.SendOrderConfirmedEmail has its own error logging/handling).
+			err = es.SendOrderConfirmedEmail(*user, "fr", *order, orderProductsResponse, address)
 			if err != nil {
 				log.Printf("failed to send order confirmed email: %v", err)
 			}

@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io"
 	"os"
+	addressDomain "tsb-service/internal/modules/address/domain"
 
 	textTemplate "text/template"
 
@@ -153,7 +154,7 @@ func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o
 }
 
 // prepareOrderConfirmedData prepares the data for order confirmed emails.
-func prepareOrderConfirmedData(u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (interface{}, error) {
+func prepareOrderConfirmedData(u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order, a *addressDomain.Address) (interface{}, error) {
 	type OrderProductView struct {
 		Name       string
 		Quantity   int64
@@ -174,6 +175,20 @@ func prepareOrderConfirmedData(u userDomain.User, op []orderDomain.OrderProduct,
 		subtotal = subtotal.Add(item.TotalPrice)
 	}
 
+	var boxNumber string
+	if a != nil && a.BoxNumber != nil {
+		boxNumber = *a.BoxNumber
+	}
+
+	// Prepare address fields safely.
+	var streetName, houseNumber, municipalityName, postcode string
+	if a != nil {
+		streetName = a.StreetName
+		houseNumber = a.HouseNumber
+		municipalityName = a.MunicipalityName
+		postcode = a.Postcode
+	}
+
 	data := struct {
 		UserName         string
 		OrderItems       []OrderProductView
@@ -184,6 +199,13 @@ func prepareOrderConfirmedData(u userDomain.User, op []orderDomain.OrderProduct,
 		TotalPrice       string
 		StatusLink       string
 		DeliveryTime     string
+		Address          struct {
+			StreetName       string
+			HouseNumber      string
+			BoxNumber        string
+			MunicipalityName string
+			Postcode         string
+		}
 	}{
 		UserName:         fmt.Sprintf("%s %s", u.FirstName, u.LastName),
 		OrderItems:       orderViews,
@@ -192,8 +214,21 @@ func prepareOrderConfirmedData(u userDomain.User, op []orderDomain.OrderProduct,
 		TakeawayDiscount: utils.FormatDecimal(decimal.NewFromFloat(0)), // @TODO: adjust discount
 		DeliveryFee:      utils.FormatDecimal(*o.DeliveryFee),
 		TotalPrice:       utils.FormatDecimal(o.TotalPrice),
-		StatusLink:       fmt.Sprintf("%/me?followOrder=%s", os.Getenv("APP_BASE_URL"), o.ID),
+		StatusLink:       fmt.Sprintf("%s/me?followOrder=%s", os.Getenv("APP_BASE_URL"), o.ID),
 		DeliveryTime:     "19:30", // @TODO: Implement when o.EstimatedDeliveryTime is available
+		Address: struct {
+			StreetName       string
+			HouseNumber      string
+			BoxNumber        string
+			MunicipalityName string
+			Postcode         string
+		}{
+			StreetName:       streetName,
+			HouseNumber:      houseNumber,
+			BoxNumber:        boxNumber,
+			MunicipalityName: municipalityName,
+			Postcode:         postcode,
+		},
 	}
 
 	return data, nil
@@ -246,8 +281,9 @@ func renderOrderPendingEmailText(path string, u userDomain.User, op []orderDomai
 }
 
 // renderOrderConfirmedEmailHTML renders the HTML version of the order confirmed email.
-func renderOrderConfirmedEmailHTML(path string, u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (string, error) {
-	data, err := prepareOrderConfirmedData(u, op, o)
+func renderOrderConfirmedEmailHTML(path string, u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order, a *addressDomain.Address) (string, error) {
+	data, err := prepareOrderConfirmedData(u, op, o, a)
+
 	if err != nil {
 		return "", err
 	}
@@ -255,8 +291,8 @@ func renderOrderConfirmedEmailHTML(path string, u userDomain.User, op []orderDom
 }
 
 // renderOrderConfirmedEmailText renders the plain text version of the order confirmed email.
-func renderOrderConfirmedEmailText(path string, u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (string, error) {
-	data, err := prepareOrderConfirmedData(u, op, o)
+func renderOrderConfirmedEmailText(path string, u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order, a *addressDomain.Address) (string, error) {
+	data, err := prepareOrderConfirmedData(u, op, o, a)
 	if err != nil {
 		return "", err
 	}

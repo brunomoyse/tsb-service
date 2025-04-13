@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/scaleway/scaleway-sdk-go/logger"
 	"os"
+	addressDomain "tsb-service/internal/modules/address/domain"
 	orderDomain "tsb-service/internal/modules/order/domain"
 
 	temv1alpha1 "github.com/scaleway/scaleway-sdk-go/api/tem/v1alpha1"
@@ -58,7 +59,7 @@ func InitService() error {
 func SendVerificationEmail(user userDomain.User, lang string, verificationURL string) error {
 	// @TODO: Remove hardcoded language
 	lang = "fr"
-	
+
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -226,7 +227,7 @@ func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.
 	return nil
 }
 
-func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomain.Order, op []orderDomain.OrderProduct) error {
+func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomain.Order, op []orderDomain.OrderProduct, address *addressDomain.Address) error {
 	// @TODO: Remove hardcoded language
 	lang = "fr"
 
@@ -247,12 +248,12 @@ func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomai
 	// Determine the template path based on the user's language.
 	path := fmt.Sprintf("templates/%s/order-confirmed", lang)
 
-	htmlContent, err := renderOrderConfirmedEmailHTML(path, user, op, order)
+	htmlContent, err := renderOrderConfirmedEmailHTML(path, user, op, order, address)
 	if err != nil {
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
 
-	plainTextContent, err := renderOrderConfirmedEmailText(path, user, op, order)
+	plainTextContent, err := renderOrderConfirmedEmailText(path, user, op, order, address)
 	if err != nil {
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
