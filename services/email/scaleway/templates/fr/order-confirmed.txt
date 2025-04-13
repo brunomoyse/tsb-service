@@ -23,6 +23,12 @@ Frais de livraison : {{.DeliveryFee}}
 {{end}}
 Total :            {{.TotalPrice}}
 
+{{if .Address}}
+Adresse de livraison:
+{{.Address.StreetName}} {{.Address.HouseNumber}}{{if .Address.BoxNumber}} (Box {{.Address.BoxNumber}}){{end}}
+{{.Address.MunicipalityName}}, {{.Address.Postcode}}
+{{end}}
+
 Pour suivre l'état de votre commande, veuillez cliquer sur le lien suivant : {{.StatusLink}}
 
 Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions de votre confiance et avons hâte de vous régaler avec notre expérience sushi authentique.

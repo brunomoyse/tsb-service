@@ -71,17 +71,25 @@
 <div class="container">
     <!-- Logo du restaurant -->
     <img alt="Logo" src="https://nuagemagique.dev/icons/tsb-logo.svg" />
-
     <div class="content">
         <p class="lead">Bonjour {{.UserName}},</p>
-        <p>Merci d'avoir commandé chez <strong>Tokyo Sushi Bar</strong> ! Nous avons le plaisir de vous informer que votre commande a été confirmée par le restaurant.</p>
+        <p>
+            Merci d'avoir commandé chez <strong>Tokyo Sushi Bar</strong> ! Nous sommes heureux de vous informer que votre commande a été confirmée par le restaurant.
+        </p>
         <p>
             {{if eq .OrderType "DELIVERY"}}
-            Votre commande sera livrée à {{.DeliveryTime}}.
+            Votre commande sera livrée le <strong>{{.DeliveryTime}}</strong> (heure estimée).
             {{else if eq .OrderType "PICKUP"}}
-            Votre commande sera disponible en retrait à {{.DeliveryTime}}.
+            Votre commande sera disponible pour retrait le <strong>{{.DeliveryTime}}</strong> (heure estimée).
             {{end}}
         </p>
+        {{if .Address}}
+        <p>
+            <strong>Adresse de livraison :</strong><br/>
+            {{.Address.StreetName}} {{.Address.HouseNumber}}{{if .Address.BoxNumber}} / {{.Address.BoxNumber}}{{end}}<br/>
+            {{.Address.MunicipalityName}}, {{.Address.Postcode}}
+        </p>
+        {{end}}
 
         <h3>Récapitulatif de la commande</h3>
         <table class="order-summary">
@@ -112,20 +120,19 @@
         {{end}}
         <p><strong>Total :</strong> {{.TotalPrice}}</p>
 
-        <!-- Bouton de suivi du statut -->
         <p style="text-align: center;">
             <a href="{{.StatusLink}}"
                style="
-                   display: inline-block;
-                   background: #ed1c24;
-                   color: #ffffff;
-                   padding: 8px 16px;
-                   text-decoration: none;
-                   font-size: 14px;
-                   border-radius: 4px;
-                   margin: 20px 0;
-                   transition: transform 0.2s ease, box-shadow 0.2s ease;
-               "
+                display: inline-block;
+                background: #ed1c24;
+                color: #ffffff;
+                padding: 8px 16px;
+                text-decoration: none;
+                font-size: 14px;
+                border-radius: 4px;
+                margin: 20px 0;
+                transition: transform 0.2s ease, box-shadow 0.2s ease;
+             "
                onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';"
                onmouseout="this.style.transform='none'; this.style.boxShadow='none';"
             >
@@ -133,7 +140,9 @@
             </a>
         </p>
 
-        <p>Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions de votre confiance et avons hâte de vous régaler avec notre expérience sushi authentique.</p>
+        <p>
+            Pour toute question concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions de votre confiance et avons hâte de vous régaler avec notre expérience sushi authentique.
+        </p>
     </div>
 
     <div class="footer">

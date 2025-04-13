@@ -65,6 +65,24 @@
             color: #777;
             margin-top: 30px;
         }
+        /* Styling for the address box */
+        .address-box {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            background-color: #f9f9f9;
+        }
+        .address-box h3 {
+            margin: 0 0 10px;
+            font-size: 16px;
+            color: #333;
+        }
+        .address-box p {
+            margin: 0;
+            line-height: 1.6;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -111,6 +129,17 @@
         <!-- <p><strong>Takeaway Discount:</strong> -{{.TakeawayDiscount}}</p> -->
         {{end}}
         <p><strong>Total:</strong> {{.TotalPrice}}</p>
+
+        <!-- Address Box: Display only if Address data is provided -->
+        {{if .Address}}
+        <div class="address-box">
+            <h3>Delivery Address</h3>
+            <p>
+                {{.Address.StreetName}} {{.Address.HouseNumber}}{{if .Address.BoxNumber}} (Box {{.Address.BoxNumber}}){{end}}<br/>
+                {{.Address.MunicipalityName}}, {{.Address.Postcode}}
+            </p>
+        </div>
+        {{end}}
 
         <!-- Follow status button -->
         <p style="text-align: center;">
