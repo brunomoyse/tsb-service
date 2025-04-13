@@ -82,13 +82,13 @@ func main() {
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient)
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService)
 
-	orderRepo := orderInfrastructure.NewOrderRepository(dbConn)
-	orderService := orderApplication.NewOrderService(orderRepo)
-	orderHandler := orderInterfaces.NewOrderHandler(orderService, productService, paymentService, addressService)
-
 	userRepo := userInfrastructure.NewUserRepository(dbConn)
 	userService := userApplication.NewUserService(userRepo)
 	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
+
+	orderRepo := orderInfrastructure.NewOrderRepository(dbConn)
+	orderService := orderApplication.NewOrderService(orderRepo)
+	orderHandler := orderInterfaces.NewOrderHandler(orderService, productService, paymentService, addressService, userService)
 
 	// Initialize Gin router
 	router := gin.Default()

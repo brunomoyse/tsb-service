@@ -71,7 +71,7 @@ func SendVerificationEmail(user userDomain.User, lang string, verificationURL st
 	newReq.To = append(newReq.To, &to)
 
 	// Determine the template path based on the user's language.
-	path := fmt.Sprintf("templates/%s/verify.html", lang)
+	path := fmt.Sprintf("templates/%s/verify", lang)
 
 	htmlContent, err := renderVerifyEmailHTML(path, user, verificationURL)
 	if err != nil {
@@ -126,7 +126,7 @@ func SendWelcomeEmail(user userDomain.User, lang, menuURL string) error {
 	newReq.To = append(newReq.To, &to)
 
 	// Determine the template path based on the user's language.
-	path := fmt.Sprintf("templates/%s/welcome.html", lang)
+	path := fmt.Sprintf("templates/%s/welcome", lang)
 
 	htmlContent, err := renderWelcomeEmailHTML(path, user, menuURL)
 	if err != nil {
@@ -180,7 +180,7 @@ func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.
 	newReq.To = append(newReq.To, &to)
 
 	// Determine the template path based on the user's language.
-	path := fmt.Sprintf("templates/%s/order-pending.html", lang)
+	path := fmt.Sprintf("templates/%s/order-pending", lang)
 
 	htmlContent, err := renderOrderPendingEmailHTML(path, user, op, order)
 	if err != nil {
@@ -196,6 +196,60 @@ func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.
 		"en": "Order pending validation",
 		"fr": "Commande en attente de validation",
 		"zh": "订单待验证",
+	}
+
+	subject, ok := subjects[lang]
+	if !ok {
+		subject = subjects["fr"]
+	}
+
+	newReq.Subject = subject
+	newReq.HTML = htmlContent
+	newReq.Text = plainTextContent
+
+	// Send the email using the Scaleway TEM API.
+	_, err = temClient.CreateEmail(&newReq)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	logger.Debugf("Email sent to %s with subject: %s", user.Email, subject)
+
+	return nil
+}
+
+func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomain.Order, op []orderDomain.OrderProduct) error {
+	// Copy baseReq to avoid modifying the original request.
+	newReq := *baseReq
+
+	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
+
+	// Fill "To" field.
+	to := temv1alpha1.CreateEmailRequestAddress{
+		Email: user.Email,
+		Name:  &userFullName,
+	}
+
+	// Push the address to the list of recipients.
+	newReq.To = append(newReq.To, &to)
+
+	// Determine the template path based on the user's language.
+	path := fmt.Sprintf("templates/%s/order-confirmed", lang)
+
+	htmlContent, err := renderOrderConfirmedEmailHTML(path, user, op, order)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	plainTextContent, err := renderOrderConfirmedEmailText(path, user, op, order)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	subjects := map[string]string{
+		"en": "Order confirmed",
+		"fr": "Commande confirmée",
+		"zh": "订单已确认",
 	}
 
 	subject, ok := subjects[lang]

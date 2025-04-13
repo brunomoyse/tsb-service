@@ -3,13 +3,12 @@ package application
 import (
 	"context"
 	"fmt"
+	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
+	"github.com/google/uuid"
 	"time"
 	"tsb-service/internal/modules/order/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
 	"tsb-service/pkg/sse"
-
-	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
-	"github.com/google/uuid"
 )
 
 type OrderService interface {
