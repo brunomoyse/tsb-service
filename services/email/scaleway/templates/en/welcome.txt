@@ -1,0 +1,12 @@
+Hello {{.UserName}},
+
+Welcome to Tokyo Sushi Bar! We’re thrilled to have you on board and can’t wait for you to explore our authentic sushi experience.
+
+Your account is now active. To get started, please visit the following link to discover our menu:
+{{.MenuLink}}
+
+We’re excited to serve you the best sushi experience in town.
+
+If you did not sign up for this account, please ignore this email.
+
+© 2025 Tokyo Sushi Bar. All rights reserved.

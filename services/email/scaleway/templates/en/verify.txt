@@ -1,0 +1,14 @@
+Hello {{.UserName}},
+
+Thank you for joining Tokyo Sushi Bar! We’re excited to have you explore our fresh, flavorful, and truly authentic sushi experience.
+
+To complete your registration and activate your membership, please verify your email by clicking the link below:
+
+Verify My Email: {{.VerifyLink}}
+
+We look forward to delighting you with our modern take on traditional sushi.
+お待ちしております！ (We’re waiting for you!)
+
+If you did not request this email, please ignore it.
+
+© 2025 Tokyo Sushi Bar. All rights reserved.

@@ -1,0 +1,27 @@
+Bonjour {{.UserName}},
+
+Merci d'avoir passé commande chez Tokyo Sushi Bar ! Nous vous confirmons la réception de votre commande, qui est actuellement en attente de validation par le restaurant. Vous recevrez prochainement un nouvel e-mail confirmant votre commande et précisant le délai estimé pour la livraison ou le retrait.
+
+----------------------------
+Récapitulatif de la commande
+----------------------------
+{{range .OrderItems}}
+Produit : {{.Name}}
+Qté     : {{.Quantity}}
+Prix    : {{.TotalPrice}}
+
+{{end}}
+----------------------------
+Sous-total :      {{.SubtotalPrice}}
+{{if eq .OrderType "DELIVERY"}}
+Frais de livraison : {{.DeliveryFee}}
+{{else if eq .OrderType "PICKUP"}}
+Remise sur le retrait : {{.TakeawayDiscount}}
+{{end}}
+Total :           {{.TotalPrice}}
+
+Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions pour votre confiance et sommes impatients de vous faire découvrir notre expérience sushi authentique.
+
+Si vous n'êtes pas à l'origine de cette commande, veuillez ignorer cet e-mail.
+
+© 2025 Tokyo Sushi Bar. Tous droits réservés.
