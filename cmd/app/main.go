@@ -9,6 +9,7 @@ import (
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
 	productInterfaces "tsb-service/internal/modules/product/interfaces"
 	"tsb-service/pkg/sse"
+	"tsb-service/services/email/scaleway"
 
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderInfrastructure "tsb-service/internal/modules/order/infrastructure"
@@ -51,6 +52,12 @@ func main() {
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		log.Fatal("JWT_SECRET is required")
+	}
+
+	// Init mail service
+	err = scaleway.InitService()
+	if err != nil {
+		log.Fatalf("Failed to initialize email service: %v", err)
 	}
 
 	// Load Google OAuth credentials.
