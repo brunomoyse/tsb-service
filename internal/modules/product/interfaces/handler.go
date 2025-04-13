@@ -48,6 +48,7 @@ func (h *ProductHandler) CreateProductHandler(c *gin.Context) {
 		req.CategoryID,
 		req.Price,
 		req.Code,
+		req.PieceCount,
 		req.IsVisible,
 		req.IsAvailable,
 		req.IsHalal,

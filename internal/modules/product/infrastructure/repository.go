@@ -76,15 +76,15 @@ func (r *ProductRepository) Create(ctx context.Context, product *domain.Product)
 
 	// Insert the product.
 	query := `
-		INSERT INTO products (id, price, code, slug, piece_count, is_visible, is_available, is_halal, is_vegan, category_id)
+		INSERT INTO products (id, price, code, piece_count, slug, is_visible, is_available, is_halal, is_vegan, category_id)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 	_, err = tx.ExecContext(ctx, query,
 		product.ID.String(),
 		product.Price,
 		product.Code,
-		product.Slug,
 		product.PieceCount,
+		product.Slug,
 		product.IsVisible,
 		product.IsAvailable,
 		product.IsHalal,
