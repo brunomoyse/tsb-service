@@ -240,17 +240,20 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 		}
 	}
 
-	go func() {
-		user, err := h.userService.GetUserByID(context.Background(), userID.String())
-		if err != nil {
-			log.Printf("failed to retrieve user: %v", err)
-			return
-		}
-		err = es.SendOrderPendingEmail(*user, utils.GetLang(c.Request.Context()), orderResponse.Order, orderResponse.OrderProducts)
-		if err != nil {
-			log.Printf("failed to send order pending email: %v", err)
-		}
-	}()
+	// If offline payment, send the order confirmation email already. If online payment, will be sent after payment.
+	if !req.IsOnlinePayment {
+		go func() {
+			user, err := h.userService.GetUserByID(context.Background(), userID.String())
+			if err != nil {
+				log.Printf("failed to retrieve user: %v", err)
+				return
+			}
+			err = es.SendOrderPendingEmail(*user, "fr", orderResponse.Order, orderResponse.OrderProducts)
+			if err != nil {
+				log.Printf("failed to send order pending email: %v", err)
+			}
+		}()
+	}
 
 	c.JSON(http.StatusOK, orderResponse)
 }
@@ -714,8 +717,6 @@ func (h *OrderHandler) UpdateOrderStatusHandler(c *gin.Context) {
 		return
 	}
 
-	userLang := utils.GetLang(c.Request.Context())
-
 	// 1. Parse order ID from URL param.
 	orderID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -810,7 +811,7 @@ func (h *OrderHandler) UpdateOrderStatusHandler(c *gin.Context) {
 			}
 
 			// 5. Send the email notification.
-			err = es.SendOrderConfirmedEmail(*user, userLang, *order, orderProductsResponse)
+			err = es.SendOrderConfirmedEmail(*user, "fr", *order, orderProductsResponse)
 			if err != nil {
 				log.Printf("failed to send order confirmed email: %v", err)
 			}

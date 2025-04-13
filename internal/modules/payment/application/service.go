@@ -16,6 +16,8 @@ type PaymentService interface {
 	CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct) (*domain.MolliePayment, error)
 	UpdatePaymentStatus(ctx context.Context, externalMolliePaymentID string) error
 	GetPaymentByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error)
+	GetExternalPaymentByID(ctx context.Context, externalMolliePaymentID string) (*mollie.Response, *mollie.Payment, error)
+	GetPaymentByExternalID(ctx context.Context, externalMolliePaymentID string) (*domain.MolliePayment, error)
 }
 
 type paymentService struct {
@@ -95,7 +97,7 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 
 func (s *paymentService) UpdatePaymentStatus(ctx context.Context, externalMolliePaymentID string) error {
 	// Fetch the payment from Mollie
-	_, externalPayment, err := s.mollieClient.Payments.Get(ctx, externalMolliePaymentID, nil)
+	_, externalPayment, err := s.GetExternalPaymentByID(ctx, externalMolliePaymentID)
 
 	if err != nil {
 		return fmt.Errorf("failed to fetch payment from Mollie: %w", err)
@@ -116,6 +118,19 @@ func (s *paymentService) UpdatePaymentStatus(ctx context.Context, externalMollie
 	sse.Hub.Broadcast(eventPayload)
 
 	return nil
+}
+
+func (s *paymentService) GetExternalPaymentByID(ctx context.Context, externalMolliePaymentID string) (*mollie.Response, *mollie.Payment, error) {
+	return s.mollieClient.Payments.Get(ctx, externalMolliePaymentID, nil)
+}
+
+func (s *paymentService) GetPaymentByExternalID(ctx context.Context, externalPaymentID string) (*domain.MolliePayment, error) {
+	payment, err := s.repo.FindByExternalID(ctx, externalPaymentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find payment: %w", err)
+	}
+
+	return payment, nil
 }
 
 func (s *paymentService) GetPaymentByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error) {
