@@ -70,25 +70,23 @@ func main() {
 		log.Fatalf("Failed to initialize Mollie client: %v", err)
 	}
 
-	productRepo := productInfrastructure.NewProductRepository(dbConn)
-	productService := productApplication.NewProductService(productRepo)
-	productHandler := productInterfaces.NewProductHandler(productService)
-
 	addressRepo := addressInfrastructure.NewAddressRepository(dbConn)
-	addressService := addressApplication.NewAddressService(addressRepo)
-	addressHandler := addressInterfaces.NewAddressHandler(addressService)
-
-	paymentRepo := paymentInfrastructure.NewPaymentRepository(dbConn)
-	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient)
-	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService)
-
-	userRepo := userInfrastructure.NewUserRepository(dbConn)
-	userService := userApplication.NewUserService(userRepo)
-	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
-
 	orderRepo := orderInfrastructure.NewOrderRepository(dbConn)
+	paymentRepo := paymentInfrastructure.NewPaymentRepository(dbConn)
+	productRepo := productInfrastructure.NewProductRepository(dbConn)
+	userRepo := userInfrastructure.NewUserRepository(dbConn)
+
+	addressService := addressApplication.NewAddressService(addressRepo)
 	orderService := orderApplication.NewOrderService(orderRepo)
+	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient)
+	productService := productApplication.NewProductService(productRepo)
+	userService := userApplication.NewUserService(userRepo)
+
+	addressHandler := addressInterfaces.NewAddressHandler(addressService)
 	orderHandler := orderInterfaces.NewOrderHandler(orderService, productService, paymentService, addressService, userService)
+	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService)
+	productHandler := productInterfaces.NewProductHandler(productService)
+	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
 
 	// Initialize Gin router
 	router := gin.Default()

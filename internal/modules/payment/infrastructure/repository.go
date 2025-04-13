@@ -245,3 +245,20 @@ func (r *PaymentRepository) FindByOrderID(ctx context.Context, orderID uuid.UUID
 
 	return &payment, nil
 }
+
+func (r *PaymentRepository) FindByExternalID(ctx context.Context, paymentID string) (*domain.MolliePayment, error) {
+	const query = `
+		SELECT *
+		FROM mollie_payments
+		WHERE mollie_payment_id = $1
+		LIMIT 1;
+	`
+
+	var payment domain.MolliePayment
+	err := r.db.GetContext(ctx, &payment, query, paymentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find payment by ID: %w", err)
+	}
+
+	return &payment, nil
+}
