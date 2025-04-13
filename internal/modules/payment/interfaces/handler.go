@@ -60,12 +60,14 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 			return
 		}
 
+		payment, err := h.service.GetPaymentByExternalID(context.Background(), req.ExternalMolliePaymentID)
+		if err != nil {
+			log.Printf("failed to retrieve payment: %v", err)
+			return
+		}
+
 		if externalPayment.Status == "paid" {
-			payment, err := h.service.GetPaymentByExternalID(context.Background(), req.ExternalMolliePaymentID)
-			if err != nil {
-				log.Printf("failed to retrieve payment: %v", err)
-				return
-			}
+
 			order, orderProducts, err := h.orderService.GetOrderByID(context.Background(), payment.OrderID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
@@ -130,6 +132,13 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 			err = es.SendOrderPendingEmail(*u, "fr", *order, orderProductsResponse)
 			if err != nil {
 				log.Printf("failed to send order pending email: %v", err)
+			}
+		} else if externalPayment.Status == "cancelled" || externalPayment.Status == "failed" || externalPayment.Status == "expired" {
+			log.Printf("payment status is not 'paid': %s", externalPayment.Status)
+			err = h.orderService.UpdateOrderStatus(context.Background(), payment.OrderID, domain.OrderStatusCancelled)
+			if err != nil {
+				log.Printf("failed to update order status: %v", err)
+				return
 			}
 		}
 	}()
