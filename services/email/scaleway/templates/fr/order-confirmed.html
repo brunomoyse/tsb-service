@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Confirmation de commande | Tokyo Sushi Bar</title>
+    <style>
+        /* Base styling */
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background: #f2f2f2;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            overflow: hidden;
+            padding: 30px;
+        }
+        .container img {
+            display: block;
+            margin: 0 auto 20px;
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .content {
+            margin-bottom: 20px;
+        }
+        .content p {
+            line-height: 1.6;
+            margin: 16px 0;
+        }
+        .content p.lead {
+            font-size: 18px;
+            color: #444;
+        }
+        h3 {
+            margin: 20px 0 10px;
+            color: #333;
+        }
+        .order-summary {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .order-summary th, .order-summary td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        .order-summary th {
+            background-color: #f7f7f7;
+        }
+        .footer {
+            background-color: #fafafa;
+            padding: 20px 0;
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Logo du restaurant -->
+    <img alt="Logo" src="https://nuagemagique.dev/icons/tsb-logo.svg" />
+
+    <div class="content">
+        <p class="lead">Bonjour {{.UserName}},</p>
+        <p>Merci d'avoir commandé chez <strong>Tokyo Sushi Bar</strong> ! Nous avons le plaisir de vous informer que votre commande a été confirmée par le restaurant.</p>
+        <p>
+            {{if eq .OrderType "DELIVERY"}}
+            Votre commande sera livrée à {{.DeliveryTime}}.
+            {{else if eq .OrderType "PICKUP"}}
+            Votre commande sera disponible en retrait à {{.DeliveryTime}}.
+            {{end}}
+        </p>
+
+        <h3>Récapitulatif de la commande</h3>
+        <table class="order-summary">
+            <thead>
+            <tr>
+                <th>Produit</th>
+                <th>Qté</th>
+                <th style="text-align: right;">Prix</th>
+            </tr>
+            </thead>
+            <tbody>
+            {{range .OrderItems}}
+            <tr>
+                <td>{{.Name}}</td>
+                <td>{{.Quantity}}</td>
+                <td style="text-align: right;">{{.TotalPrice}}</td>
+            </tr>
+            {{end}}
+            </tbody>
+        </table>
+
+        <p><strong>Sous-total :</strong> {{.SubtotalPrice}}</p>
+        {{if eq .OrderType "DELIVERY"}}
+        <p><strong>Frais de livraison :</strong> {{.DeliveryFee}}</p>
+        {{else if eq .OrderType "PICKUP"}}
+        <!-- Optionnel : Remise pour retrait si applicable -->
+        <!-- <p><strong>Remise pour retrait :</strong> -{{.TakeawayDiscount}}</p> -->
+        {{end}}
+        <p><strong>Total :</strong> {{.TotalPrice}}</p>
+
+        <!-- Bouton de suivi du statut -->
+        <p style="text-align: center;">
+            <a href="{{.StatusLink}}"
+               style="
+                   display: inline-block;
+                   background: #ed1c24;
+                   color: #ffffff;
+                   padding: 8px 16px;
+                   text-decoration: none;
+                   font-size: 14px;
+                   border-radius: 4px;
+                   margin: 20px 0;
+                   transition: transform 0.2s ease, box-shadow 0.2s ease;
+               "
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';"
+               onmouseout="this.style.transform='none'; this.style.boxShadow='none';"
+            >
+                Suivre l'état de votre commande
+            </a>
+        </p>
+
+        <p>Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions de votre confiance et avons hâte de vous régaler avec notre expérience sushi authentique.</p>
+    </div>
+
+    <div class="footer">
+        <p>Si vous n'avez pas passé cette commande, veuillez ignorer cet e-mail.</p>
+        <p>&copy; 2025 Tokyo Sushi Bar. Tous droits réservés.</p>
+    </div>
+</div>
+</body>
+</html>

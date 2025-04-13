@@ -1,0 +1,32 @@
+您好 {{.UserName}}，
+
+感谢您在 Tokyo Sushi Bar 下单！我们很高兴地通知您，您的订单已由餐厅确认。
+
+{{if eq .OrderType "DELIVERY"}}
+您的订单将于 {{.DeliveryTime}} 送达。
+{{else if eq .OrderType "PICKUP"}}
+您的订单将于 {{.DeliveryTime}} 可自取。
+{{end}}
+
+订单摘要：
+{{range .OrderItems}}
+商品：    {{.Name}}
+数量：    {{.Quantity}}
+价格：    {{.TotalPrice}}
+
+{{end}}
+小计：        {{.SubtotalPrice}}
+{{if eq .OrderType "DELIVERY"}}
+配送费：    {{.DeliveryFee}}
+{{else if eq .OrderType "PICKUP"}}
+<!-- 可选：自提折扣：{{.TakeawayDiscount}} -->
+{{end}}
+总计：        {{.TotalPrice}}
+
+请通过以下链接跟踪您的订单状态： {{.StatusLink}}
+
+如果您对订单有任何疑问，请随时联系我们。我们感谢您的信任，并期待为您提供正宗的寿司体验！
+
+如果您并未下此订单，请忽略此邮件。
+
+© 2025 Tokyo Sushi Bar。保留所有权利。

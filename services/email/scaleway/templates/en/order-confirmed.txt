@@ -1,0 +1,32 @@
+Hello {{.UserName}},
+
+Thank you for ordering at Tokyo Sushi Bar! We are pleased to inform you that your order has been confirmed by the restaurant.
+
+{{if eq .OrderType "DELIVERY"}}
+Your order will be delivered to you at {{.DeliveryTime}}.
+{{else if eq .OrderType "PICKUP"}}
+Your order will be available for pickup at {{.DeliveryTime}}.
+{{end}}
+
+Order Summary:
+{{range .OrderItems}}
+Product:  {{.Name}}
+Quantity: {{.Quantity}}
+Price:    {{.TotalPrice}}
+
+{{end}}
+Subtotal:      {{.SubtotalPrice}}
+{{if eq .OrderType "DELIVERY"}}
+Delivery Fee:  {{.DeliveryFee}}
+{{else if eq .OrderType "PICKUP"}}
+<!-- Optional: Takeaway Discount: {{.TakeawayDiscount}} -->
+{{end}}
+Total:         {{.TotalPrice}}
+
+Follow your order status: {{.StatusLink}}
+
+If you have any questions about your order, please do not hesitate to contact us. We appreciate your trust and look forward to delighting you with our authentic sushi experience.
+
+If you did not place this order, please disregard this email.
+
+© 2025 Tokyo Sushi Bar. All rights reserved.

@@ -1,6 +1,7 @@
 package interfaces
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -17,7 +18,7 @@ import (
 	paymentDomain "tsb-service/internal/modules/payment/domain"
 	productApplication "tsb-service/internal/modules/product/application"
 	productDomain "tsb-service/internal/modules/product/domain"
-	userDomain "tsb-service/internal/modules/user/domain"
+	userApplication "tsb-service/internal/modules/user/application"
 	"tsb-service/pkg/utils"
 	es "tsb-service/services/email/scaleway"
 )
@@ -27,6 +28,7 @@ type OrderHandler struct {
 	productService productApplication.ProductService
 	paymentService paymentApplication.PaymentService
 	addressService addressApplication.AddressService
+	userService    userApplication.UserService
 }
 
 func NewOrderHandler(
@@ -34,8 +36,9 @@ func NewOrderHandler(
 	productService productApplication.ProductService,
 	paymentService paymentApplication.PaymentService,
 	addressService addressApplication.AddressService,
+	userService userApplication.UserService,
 ) *OrderHandler {
-	return &OrderHandler{service: service, productService: productService, paymentService: paymentService, addressService: addressService}
+	return &OrderHandler{service: service, productService: productService, paymentService: paymentService, addressService: addressService, userService: userService}
 }
 
 func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
@@ -238,13 +241,12 @@ func (h *OrderHandler) CreateOrderHandler(c *gin.Context) {
 	}
 
 	go func() {
-		// FOR TEST
-		user := userDomain.User{
-			FirstName: "Bruno",
-			LastName:  "Moyse",
-			Email:     "moyse94@gmail.com",
+		user, err := h.userService.GetUserByID(context.Background(), userID.String())
+		if err != nil {
+			log.Printf("failed to retrieve user: %v", err)
+			return
 		}
-		err = es.SendOrderPendingEmail(user, utils.GetLang(c.Request.Context()), orderResponse.Order, orderResponse.OrderProducts)
+		err = es.SendOrderPendingEmail(*user, utils.GetLang(c.Request.Context()), orderResponse.Order, orderResponse.OrderProducts)
 		if err != nil {
 			log.Printf("failed to send order pending email: %v", err)
 		}
@@ -261,19 +263,7 @@ func (h *OrderHandler) GetOrderHandler(c *gin.Context) {
 		return
 	}
 
-	// 2. Retrieve the logged-in user.
-	userIDStr := c.GetString("userID")
-	if userIDStr == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
-		return
-	}
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID"})
-		return
-	}
-
-	// 3. Fetch the order and related products.
+	// 2. Fetch the order and related products.
 	order, orderProducts, err := h.service.GetOrderByID(c.Request.Context(), orderID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
@@ -290,13 +280,7 @@ func (h *OrderHandler) GetOrderHandler(c *gin.Context) {
 		return
 	}
 
-	// 4. Validate ownership.
-	if order.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "access denied"})
-		return
-	}
-
-	// 5. Load product details for the products in the order.
+	// 3. Load product details for the products in the order.
 	productIDs := make([]string, len(*orderProducts))
 	for i, op := range *orderProducts {
 		productIDs[i] = op.ProductID.String()
@@ -314,7 +298,7 @@ func (h *OrderHandler) GetOrderHandler(c *gin.Context) {
 		productMap[p.ID] = *p
 	}
 
-	// 6. Enrich order products with product details.
+	// 4. Enrich order products with product details.
 	orderProductsResponse := make([]domain.OrderProduct, len(*orderProducts))
 	for i, op := range *orderProducts {
 		prod, ok := productMap[op.ProductID]
@@ -335,7 +319,7 @@ func (h *OrderHandler) GetOrderHandler(c *gin.Context) {
 		}
 	}
 
-	// 7. Construct a response with order + enriched products.
+	// 5. Construct a response with order + enriched products.
 	orderResponse := OrderResponse{
 		Order:         *order,
 		OrderProducts: orderProductsResponse,
@@ -382,7 +366,7 @@ func (h *OrderHandler) GetOrderHandler(c *gin.Context) {
 		orderResponse.Address = address
 	}
 
-	// 8. Return the final OrderResponse.
+	// 6. Return the final OrderResponse.
 	c.JSON(http.StatusOK, orderResponse)
 }
 
@@ -723,6 +707,15 @@ func (h *OrderHandler) GetAdminOrdersHandler(c *gin.Context) {
 }
 
 func (h *OrderHandler) UpdateOrderStatusHandler(c *gin.Context) {
+	// Retrieve the logged-in user's ID from the Gin context.
+	userIDStr := c.GetString("userID")
+	if userIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		return
+	}
+
+	userLang := utils.GetLang(c.Request.Context())
+
 	// 1. Parse order ID from URL param.
 	orderID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -737,11 +730,91 @@ func (h *OrderHandler) UpdateOrderStatusHandler(c *gin.Context) {
 		return
 	}
 
+	// 3. Check the current status of the order.
+	oldOrder, _, err := h.service.GetOrderByID(c.Request.Context(), orderID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
+		return
+	}
+
 	// 3. Update the order status.
 	err = h.service.UpdateOrderStatus(c.Request.Context(), orderID, req.OrderStatus)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update order status"})
 		return
+	}
+
+	if oldOrder.OrderStatus == domain.OrderStatusPending && (req.OrderStatus == domain.OrderStatusConfirmed || req.OrderStatus == domain.OrderStatusPreparing) {
+		go func() {
+			// 1. Retrieve the user by ID.
+			user, err := h.userService.GetUserByID(context.Background(), userIDStr)
+			if err != nil {
+				log.Printf("failed to retrieve user: %v", err)
+				return
+			}
+
+			// 2. Fetch the order and related products.
+			order, orderProducts, err := h.service.GetOrderByID(context.Background(), orderID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
+				return
+			}
+			if order == nil {
+				// If you consider "not found" a 404
+				c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+				return
+			}
+			if orderProducts == nil {
+				// or handle the case if order was found but no products
+				c.JSON(http.StatusNotFound, gin.H{"error": "no order products found"})
+				return
+			}
+
+			// 3. Load product details for the products in the order.
+			productIDs := make([]string, len(*orderProducts))
+			for i, op := range *orderProducts {
+				productIDs[i] = op.ProductID.String()
+			}
+
+			products, err := h.productService.GetProductsByIDs(context.Background(), productIDs)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve products"})
+				return
+			}
+
+			// Build a lookup map: productID -> product details.
+			productMap := make(map[uuid.UUID]productDomain.ProductOrderDetails, len(products))
+			for _, p := range products {
+				productMap[p.ID] = *p
+			}
+
+			// 4. Enrich order products with product details.
+			orderProductsResponse := make([]domain.OrderProduct, len(*orderProducts))
+			for i, op := range *orderProducts {
+				prod, ok := productMap[op.ProductID]
+				if !ok {
+					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("product %s not found", op.ProductID)})
+					return
+				}
+				orderProductsResponse[i] = domain.OrderProduct{
+					Product: domain.Product{
+						ID:           prod.ID,
+						Code:         prod.Code,
+						CategoryName: prod.CategoryName,
+						Name:         prod.Name,
+					},
+					Quantity:   op.Quantity,
+					UnitPrice:  op.UnitPrice,
+					TotalPrice: op.TotalPrice,
+				}
+			}
+
+			// 5. Send the email notification.
+			err = es.SendOrderConfirmedEmail(*user, userLang, *order, orderProductsResponse)
+			if err != nil {
+				log.Printf("failed to send order confirmed email: %v", err)
+			}
+		}()
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "order status updated successfully"})

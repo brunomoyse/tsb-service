@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"os"
 
 	textTemplate "text/template"
 
@@ -40,18 +41,20 @@ type templateExecutor interface {
 
 // loadHTMLTemplate loads an HTML template from the embedded HTML FS.
 func loadHTMLTemplate(path string) (templateExecutor, error) {
-	tmpl, err := template.ParseFS(htmlEmailFS, path)
+	htmlPath := fmt.Sprintf("%s.html", path)
+	tmpl, err := template.ParseFS(htmlEmailFS, htmlPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse HTML template %q: %w", path, err)
+		return nil, fmt.Errorf("failed to parse HTML template %q: %w", htmlPath, err)
 	}
 	return tmpl, nil
 }
 
 // loadTextTemplate loads a plain text template from the embedded text FS.
 func loadTextTemplate(path string) (templateExecutor, error) {
-	tmpl, err := textTemplate.ParseFS(textEmailFS, path)
+	textPath := fmt.Sprintf("%s.txt", path)
+	tmpl, err := textTemplate.ParseFS(textEmailFS, textPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse text template %q: %w", path, err)
+		return nil, fmt.Errorf("failed to parse text template %q: %w", textPath, err)
 	}
 	return tmpl, nil
 }
@@ -149,6 +152,53 @@ func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o
 	return data, nil
 }
 
+// prepareOrderConfirmedData prepares the data for order confirmed emails.
+func prepareOrderConfirmedData(u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (interface{}, error) {
+	type OrderProductView struct {
+		Name       string
+		Quantity   int64
+		TotalPrice string
+	}
+
+	var orderViews []OrderProductView
+	for _, item := range op {
+		orderViews = append(orderViews, OrderProductView{
+			Name:       fmt.Sprintf("%s - %s", item.Product.CategoryName, item.Product.Name),
+			Quantity:   item.Quantity,
+			TotalPrice: utils.FormatDecimal(item.TotalPrice),
+		})
+	}
+
+	subtotal := decimal.NewFromInt(0)
+	for _, item := range op {
+		subtotal = subtotal.Add(item.TotalPrice)
+	}
+
+	data := struct {
+		UserName         string
+		OrderItems       []OrderProductView
+		OrderType        string
+		SubtotalPrice    string
+		TakeawayDiscount string
+		DeliveryFee      string
+		TotalPrice       string
+		StatusLink       string
+		DeliveryTime     string
+	}{
+		UserName:         fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		OrderItems:       orderViews,
+		OrderType:        string(o.OrderType),
+		SubtotalPrice:    utils.FormatDecimal(subtotal),
+		TakeawayDiscount: utils.FormatDecimal(decimal.NewFromFloat(0)), // @TODO: adjust discount
+		DeliveryFee:      utils.FormatDecimal(*o.DeliveryFee),
+		TotalPrice:       utils.FormatDecimal(o.TotalPrice),
+		StatusLink:       fmt.Sprintf("%/me?followOrder=%s", os.Getenv("APP_BASE_URL"), o.ID),
+		DeliveryTime:     "19:30", // @TODO: Implement when o.EstimatedDeliveryTime is available
+	}
+
+	return data, nil
+}
+
 // --------------------------------------------------------------------------------
 // Specific Render Functions
 // --------------------------------------------------------------------------------
@@ -189,6 +239,24 @@ func renderOrderPendingEmailHTML(path string, u userDomain.User, op []orderDomai
 // renderOrderPendingEmailText renders the plain text version of the order pending email.
 func renderOrderPendingEmailText(path string, u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (string, error) {
 	data, err := prepareOrderPendingData(u, op, o)
+	if err != nil {
+		return "", err
+	}
+	return renderEmail(path, data, loadTextTemplate)
+}
+
+// renderOrderConfirmedEmailHTML renders the HTML version of the order confirmed email.
+func renderOrderConfirmedEmailHTML(path string, u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (string, error) {
+	data, err := prepareOrderConfirmedData(u, op, o)
+	if err != nil {
+		return "", err
+	}
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+// renderOrderConfirmedEmailText renders the plain text version of the order confirmed email.
+func renderOrderConfirmedEmailText(path string, u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (string, error) {
+	data, err := prepareOrderConfirmedData(u, op, o)
 	if err != nil {
 		return "", err
 	}
