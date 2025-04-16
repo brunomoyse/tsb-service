@@ -1,0 +1,41 @@
+type Order {
+    id: ID!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    status: OrderStatusEnum!
+    type: OrderTypeEnum!
+    isOnlinePayment: Boolean!
+    discountAmount: String!
+    deliveryFee: String!
+    totalPrice: String!
+    estimatedReadyTime: DateTime
+    addressExtra: String
+    orderNote: String
+    orderExtra: String
+
+    payment: Payment
+    customer: User!
+    address: Address!
+
+    items: [OrderItem!]!
+}
+
+type OrderItem {
+    id: ID!
+    product: Product!
+    unitPrice: String!
+    quantity: Int!
+    totalPrice: String!
+}
+
+enum OrderTypeEnum {
+    DELIVERY
+    PICKUP
+}
+
+enum OrderStatusEnum {
+    PENDING
+    PROCESSING
+    COMPLETED
+    CANCELED
+}

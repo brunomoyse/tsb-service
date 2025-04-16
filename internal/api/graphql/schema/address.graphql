@@ -1,0 +1,9 @@
+type Address {
+    id: ID!
+    postcode: String!
+    municipalityName: String!
+    streetName: String!
+    houseNumber: String
+    boxNumber: String
+    distance: Float!
+}

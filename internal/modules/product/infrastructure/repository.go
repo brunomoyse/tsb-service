@@ -7,6 +7,7 @@ import (
 	"github.com/gosimple/slug"
 	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
+	"log"
 	"regexp"
 	"sort"
 	"strconv"
@@ -578,4 +579,71 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 	})
 
 	return products, nil
+}
+
+func (r *ProductRepository) FindCategoriesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Category, error) {
+	query := `
+		SELECT 
+			p.id AS product_id,
+			pc.id AS category_id,
+			pc.order AS category_order,
+			pct.locale AS locale,
+			pct.name AS category_name
+		FROM products p
+		JOIN product_categories pc ON p.category_id = pc.id
+		JOIN product_category_translations pct ON pc.id = pct.product_category_id
+		WHERE p.id = ANY($1)
+		AND pct.locale = $2
+	`
+
+	rows, err := r.db.QueryxContext(ctx, query, pq.Array(productIDs), "fr")
+	if err != nil {
+		log.Printf("FindCategoriesByProductIDs: Query failed: %v", err)
+		return nil, err
+	}
+	defer func(rows *sqlx.Rows) {
+		if err := rows.Close(); err != nil {
+			log.Printf("FindCategoriesByProductIDs: Error closing rows: %v", err)
+		}
+	}(rows)
+
+	result := make(map[string][]*domain.Category)
+
+	// Use a temporary struct to scan query results.
+	for rows.Next() {
+		var cr struct {
+			ProductID     uuid.UUID `db:"product_id"`
+			CategoryID    uuid.UUID `db:"category_id"`
+			CategoryOrder int       `db:"category_order"`
+			Locale        string    `db:"locale"`
+			CategoryName  string    `db:"category_name"`
+		}
+
+		if err := rows.StructScan(&cr); err != nil {
+			log.Printf("FindCategoriesByProductIDs: Error scanning row: %v", err)
+			return nil, err
+		}
+
+		// Build a domain.Category with its translation.
+		cat := &domain.Category{
+			ID:    cr.CategoryID,
+			Order: cr.CategoryOrder,
+			Translations: []domain.Translation{
+				{
+					Language: cr.Locale,
+					Name:     cr.CategoryName,
+				},
+			},
+		}
+
+		// Since each product has a single category, simply set a slice containing the category.
+		result[cr.ProductID.String()] = []*domain.Category{cat}
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Printf("FindCategoriesByProductIDs: Row iteration error: %v", err)
+		return nil, err
+	}
+
+	return result, nil
 }
