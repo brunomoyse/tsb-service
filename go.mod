@@ -1,23 +1,35 @@
 module tsb-service
 
-go 1.23
+go 1.24
+
+toolchain go1.24.2
 
 require (
+	github.com/99designs/gqlgen v0.17.70
 	github.com/gin-contrib/cors v1.7.3
 	github.com/google/uuid v1.6.0
 	github.com/gosimple/slug v1.15.0
+	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.33
 	github.com/sendgrid/sendgrid-go v3.16.0+incompatible
 	github.com/shopspring/decimal v1.4.0
+	github.com/vektah/gqlparser/v2 v2.5.23
 	golang.org/x/oauth2 v0.26.0
 )
 
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
+	github.com/agnivade/levenshtein v1.2.1 // indirect
+	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/kr/text v0.2.0 // indirect
+	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/sendgrid/rest v2.6.9+incompatible // indirect
+	github.com/sosodev/duration v1.3.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
@@ -47,10 +59,10 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	golang.org/x/arch v0.13.0 // indirect
-	golang.org/x/crypto v0.32.0
-	golang.org/x/net v0.34.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
-	google.golang.org/protobuf v1.36.3 // indirect
+	golang.org/x/crypto v0.36.0
+	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
+	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

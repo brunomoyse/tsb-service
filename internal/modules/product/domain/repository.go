@@ -13,4 +13,6 @@ type ProductRepository interface {
 	FindByCategoryID(ctx context.Context, categoryID string) ([]*Product, error)
 	FindAllCategories(ctx context.Context) ([]*Category, error)
 	FindByIDs(ctx context.Context, productIDs []string) ([]*ProductOrderDetails, error)
+
+	FindCategoriesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*Category, error)
 }

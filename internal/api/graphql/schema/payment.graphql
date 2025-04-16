@@ -1,0 +1,36 @@
+scalar DateTime
+scalar JSON
+
+type Payment {
+    id: ID!
+    resource: String
+    mollie_payment_id: String!
+    status: String!
+    description: String
+    cancel_url: String
+    webhook_url: String
+    country_code: String
+    restrict_payment_methods_to_country: String
+    profile_id: String
+    settlement_id: String
+    order_id: ID!
+    is_cancelable: Boolean!
+    mode: String
+    locale: String
+    method: String
+    metadata: JSON
+    links: JSON
+    created_at: DateTime!
+    authorized_at: DateTime
+    paid_at: DateTime
+    canceled_at: DateTime
+    expires_at: DateTime
+    expired_at: DateTime
+    failed_at: DateTime
+    amount: Float
+    amount_refunded: Float
+    amount_remaining: Float
+    amount_captured: Float
+    amount_charged_back: Float
+    settlement_amount: Float
+}

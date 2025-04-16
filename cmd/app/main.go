@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"tsb-service/internal/api/graphql/resolver"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
 	productInterfaces "tsb-service/internal/modules/product/interfaces"
@@ -117,6 +118,17 @@ func main() {
 		c.Status(http.StatusOK)
 	})
 
+	// Load DataLoaderMiddleware
+	router.Use(middleware.DataLoaderMiddleware(productService))
+
+	// Create your GraphQL resolver with the injected productService.
+	rootResolver := resolver.NewResolver(productService)
+
+	// Create your GraphQL handler (using your favorite GraphQL library)
+	graphqlHandler := resolver.GraphQLHandler(rootResolver)
+
+	router.POST("/graphql", graphqlHandler)
+
 	// Setup routes (grouped by API version or module as needed)
 	// Setup routes for /api/v1.
 	api := router.Group("/api/v1")
@@ -126,7 +138,8 @@ func main() {
 		c.Status(http.StatusOK)
 	})
 
-	api.Use(middleware.LanguageExtractor()) // applied to all routes under /api/v1
+	// Middleware for JWT authentication
+	api.Use(middleware.LanguageExtractor())
 
 	api.POST("payments/webhook", paymentHandler.UpdatePaymentStatusHandler)
 

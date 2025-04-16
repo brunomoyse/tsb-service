@@ -1,0 +1,27 @@
+type Product {
+    id: ID!
+    createdAt: DateTime!
+    price: Float!
+    code: String
+    slug: String!
+    pieceCount: Int!
+    isVisible: Boolean!
+    isAvailable: Boolean!
+    isHalal: Boolean!
+    isVegan: Boolean!
+
+    name: String!
+    description: String
+
+    category: ProductCategory!
+}
+
+type ProductCategory {
+    id: ID!
+    name: String!
+    order: Int!
+}
+
+extend type Query {
+    products: [Product!]!
+}
