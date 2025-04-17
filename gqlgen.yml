@@ -166,6 +166,11 @@ models:
       customer:
         resolver: true
 
+  OrderItem:
+    fields:
+      product:
+        resolver: true
+
   ProductCategory:
     fields:
       products:

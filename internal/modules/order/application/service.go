@@ -16,7 +16,7 @@ type OrderService interface {
 	GetPaginatedOrders(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*domain.Order, error)
 	UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) error
 	GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error)
-	GetOrderProductsByOrderIDs(ctx context.Context, orderIDs []uuid.UUID) (map[uuid.UUID][]domain.OrderProductRaw, error)
+	GetOrderProductsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.OrderProductRaw, error)
 
 	BatchGetOrdersByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error)
 }
@@ -95,7 +95,7 @@ func (s *orderService) GetOrderByID(ctx context.Context, orderID uuid.UUID) (*do
 	return s.repo.FindByID(ctx, orderID)
 }
 
-func (s *orderService) GetOrderProductsByOrderIDs(ctx context.Context, orderIDs []uuid.UUID) (map[uuid.UUID][]domain.OrderProductRaw, error) {
+func (s *orderService) GetOrderProductsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.OrderProductRaw, error) {
 	return s.repo.FindByOrderIDs(ctx, orderIDs)
 }
 

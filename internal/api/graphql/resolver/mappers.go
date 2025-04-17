@@ -101,3 +101,11 @@ func ToGQLAddress(a *addressDomain.Address) *model.Address {
 		Distance:         a.Distance,
 	}
 }
+
+func ToGQLOrderItem(oi *orderDomain.OrderProductRaw) *model.OrderItem {
+	return &model.OrderItem{
+		Quantity:   int(oi.Quantity),
+		UnitPrice:  oi.UnitPrice.String(),
+		TotalPrice: oi.TotalPrice.String(),
+	}
+}
