@@ -1,10 +1,10 @@
 type Product {
     id: ID!
     createdAt: DateTime!
-    price: Float!
+    price: String!
     code: String
     slug: String!
-    pieceCount: Int!
+    pieceCount: Int
     isVisible: Boolean!
     isAvailable: Boolean!
     isHalal: Boolean!
@@ -20,8 +20,10 @@ type ProductCategory {
     id: ID!
     name: String!
     order: Int!
+    products: [Product!]!
 }
 
 extend type Query {
     products: [Product!]!
+    productCategories: [ProductCategory!]!
 }

@@ -647,3 +647,122 @@ func (r *ProductRepository) FindCategoriesByProductIDs(ctx context.Context, prod
 
 	return result, nil
 }
+
+func (r *ProductRepository) FindByCategoryIDs(ctx context.Context, categoryIDs []string) (map[string][]*domain.Product, error) {
+	query := `
+        SELECT 
+            p.id,
+            p.price,
+            p.code,
+            p.slug,
+            p.piece_count,
+            p.is_visible,
+            p.is_available,
+            p.is_halal,
+            p.is_vegan,
+            p.category_id,
+            p.created_at,
+            p.updated_at,
+            t.locale,
+            t.name,
+            t.description
+        FROM products p
+        LEFT JOIN product_translations t ON p.id = t.product_id
+        WHERE p.category_id = ANY($1);
+    `
+	rows, err := r.db.QueryxContext(ctx, query, pq.Array(categoryIDs))
+	if err != nil {
+		log.Printf("FindByCategoryIDs: Query failed: %v", err)
+		return nil, err
+	}
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("FindByCategoryIDs: Error closing rows: %v", err)
+		}
+	}()
+
+	// First, collect products in a two-level map: categoryID -> productID -> *Product
+	productsByCat := make(map[string]map[string]*domain.Product)
+
+	for rows.Next() {
+		// temp container for one row
+		var cr struct {
+			ID          uuid.UUID       `db:"id"`
+			Price       decimal.Decimal `db:"price"`
+			Code        *string         `db:"code"`
+			Slug        *string         `db:"slug"`
+			PieceCount  *int            `db:"piece_count"`
+			IsVisible   bool            `db:"is_visible"`
+			IsAvailable bool            `db:"is_available"`
+			IsHalal     bool            `db:"is_halal"`
+			IsVegan     bool            `db:"is_vegan"`
+			CategoryID  uuid.UUID       `db:"category_id"`
+			CreatedAt   time.Time       `db:"created_at"`
+			UpdatedAt   time.Time       `db:"updated_at"`
+			Locale      string          `db:"locale"`
+			Name        string          `db:"name"`
+			Description *string         `db:"description"`
+		}
+
+		if err := rows.StructScan(&cr); err != nil {
+			log.Printf("FindByCategoryIDs: Error scanning row: %v", err)
+			return nil, err
+		}
+
+		catKey := cr.CategoryID.String()
+		prodKey := cr.ID.String()
+
+		// ensure map for this category exists
+		if _, ok := productsByCat[catKey]; !ok {
+			productsByCat[catKey] = make(map[string]*domain.Product)
+		}
+
+		// get or create the domain.Product
+		prodMap := productsByCat[catKey]
+		p, exists := prodMap[prodKey]
+		if !exists {
+			p = &domain.Product{
+				ID:           cr.ID,
+				Price:        cr.Price,
+				Code:         cr.Code,
+				Slug:         cr.Slug,
+				PieceCount:   cr.PieceCount,
+				IsVisible:    cr.IsVisible,
+				IsAvailable:  cr.IsAvailable,
+				IsHalal:      cr.IsHalal,
+				IsVegan:      cr.IsVegan,
+				CategoryID:   cr.CategoryID,
+				CreatedAt:    cr.CreatedAt,
+				UpdatedAt:    cr.UpdatedAt,
+				Translations: []domain.Translation{},
+			}
+			prodMap[prodKey] = p
+		}
+
+		// append this translation (if any)
+		if cr.Locale != "" {
+			p.Translations = append(p.Translations, domain.Translation{
+				Language:    cr.Locale,
+				Name:        cr.Name,
+				Description: cr.Description,
+			})
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Printf("FindByCategoryIDs: Row iteration error: %v", err)
+		return nil, err
+	}
+
+	// Flatten into the final map[string][]*domain.Product
+	result := make(map[string][]*domain.Product, len(productsByCat))
+	for catKey, prodMap := range productsByCat {
+		slice := make([]*domain.Product, 0, len(prodMap))
+		for _, p := range prodMap {
+			slice = append(slice, p)
+		}
+		result[catKey] = slice
+	}
+
+	return result, nil
+}
