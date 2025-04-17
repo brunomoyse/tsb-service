@@ -15,7 +15,7 @@ type Order {
 
     payment: Payment
     customer: User!
-    address: Address!
+    address: Address
 
     items: [OrderItem!]!
 }

@@ -20,7 +20,7 @@ func DataLoaderMiddleware(
 		ctx := c.Request.Context()
 
 		// Attach DataLoaders into the context, passing in the actual ProductService
-		// ctx = addressApplication.AttachDataLoaders(ctx, ads)
+		ctx = addressApplication.AttachDataLoaders(ctx, ads)
 		ctx = productApplication.AttachDataLoaders(ctx, prs)
 		ctx = paymentApplication.AttachDataLoaders(ctx, pas)
 		ctx = orderApplication.AttachDataLoaders(ctx, ors)

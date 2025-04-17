@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"tsb-service/internal/modules/address/domain"
 )
 
@@ -109,4 +110,49 @@ func (r *AddressRepository) GetAddressByID(ctx context.Context, ID string) (*dom
 		return nil, fmt.Errorf("failed to get address by ID: %w", err)
 	}
 	return &addr, nil
+}
+
+func (r *AddressRepository) BatchGetAddressesByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.Address, error) {
+	if len(orderIDs) == 0 {
+		return map[string][]*domain.Address{}, nil
+	}
+
+	// 1) include o.id AS order_id so we know which order each address row belongs to
+	sqlQuery := `
+    SELECT
+      o.id                    AS order_id,
+      a.address_id            AS address_id,
+      a.streetname_fr         AS streetname_fr,
+      a.house_number          AS house_number,
+      a.box_number            AS box_number,
+      a.municipality_name_fr  AS municipality_name_fr,
+      a.postcode              AS postcode,
+      COALESCE(ad.distance, 10000) AS distance
+    FROM addresses AS a
+    JOIN orders    AS o   ON o.address_id = a.address_id
+    LEFT JOIN address_distance AS ad ON ad.address_id = a.address_id
+    WHERE o.id = ANY($1);
+    `
+
+	// 2) define a temporary row type to scan into
+	type addressRow struct {
+		OrderID        string `db:"order_id"`
+		domain.Address        // embeds all the address fields
+	}
+
+	var rows []addressRow
+	// 3) use pq.Array to pass your []string as a PostgreSQL text[]
+	if err := r.db.SelectContext(ctx, &rows, sqlQuery, pq.Array(orderIDs)); err != nil {
+		return nil, fmt.Errorf("failed to get addresses by order IDs: %w", err)
+	}
+
+	// 4) group by OrderID
+	addressMap := make(map[string][]*domain.Address, len(rows))
+	for _, row := range rows {
+		// take the embedded Address by pointer
+		addr := row.Address
+		addressMap[row.OrderID] = append(addressMap[row.OrderID], &addr)
+	}
+
+	return addressMap, nil
 }
