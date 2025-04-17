@@ -116,6 +116,7 @@ type User struct {
 	LastName    string    `json:"lastName"`
 	PhoneNumber *string   `json:"phoneNumber,omitempty"`
 	Address     *Address  `json:"address,omitempty"`
+	Orders      []*Order  `json:"orders,omitempty"`
 }
 
 type OrderStatusEnum string

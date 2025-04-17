@@ -11,9 +11,19 @@ import (
 	"tsb-service/internal/api/graphql/model"
 )
 
+// Me is the resolver for the me field.
+func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
+	panic(fmt.Errorf("not implemented: Me - me"))
+}
+
 // Address is the resolver for the address field.
 func (r *userResolver) Address(ctx context.Context, obj *model.User) (*model.Address, error) {
 	panic(fmt.Errorf("not implemented: Address - address"))
+}
+
+// Orders is the resolver for the orders field.
+func (r *userResolver) Orders(ctx context.Context, obj *model.User) ([]*model.Order, error) {
+	panic(fmt.Errorf("not implemented: Orders - orders"))
 }
 
 // User returns graphql1.UserResolver implementation.
