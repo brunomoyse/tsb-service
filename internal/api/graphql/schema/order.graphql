@@ -11,7 +11,7 @@ type Order {
     estimatedReadyTime: DateTime
     addressExtra: String
     orderNote: String
-    orderExtra: String
+    orderExtra: JSON
 
     payment: Payment
     customer: User!

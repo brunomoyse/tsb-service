@@ -9,11 +9,25 @@ import (
 	"fmt"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
+	orderApplication "tsb-service/internal/modules/order/application"
+	orderDomain "tsb-service/internal/modules/order/domain"
+	"tsb-service/pkg/utils"
 )
 
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
-	panic(fmt.Errorf("not implemented: Me - me"))
+	// Load the userID from the context
+	userID := utils.GetUserID(ctx)
+
+	u, err := r.UserService.GetUserByID(ctx, userID)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to load user: %w", err)
+	}
+
+	user := ToGQLUser(u)
+
+	return user, nil
 }
 
 // Address is the resolver for the address field.
@@ -23,7 +37,24 @@ func (r *userResolver) Address(ctx context.Context, obj *model.User) (*model.Add
 
 // Orders is the resolver for the orders field.
 func (r *userResolver) Orders(ctx context.Context, obj *model.User) ([]*model.Order, error) {
-	panic(fmt.Errorf("not implemented: Orders - orders"))
+	loader := orderApplication.GetUserOrderLoader(ctx)
+
+	if loader == nil {
+		return nil, fmt.Errorf("no user order loader found")
+	}
+
+	// Check for error while loading the orders.
+	o, err := loader.Loader.Load(ctx, obj.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load user orders: %w", err)
+	}
+
+	// Map the orders to the GraphQL model
+	orders := Map(o, func(order *orderDomain.Order) *model.Order {
+		return ToGQLOrder(order)
+	})
+
+	return orders, nil
 }
 
 // User returns graphql1.UserResolver implementation.

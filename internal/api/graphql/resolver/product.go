@@ -57,17 +57,17 @@ func (r *productCategoryResolver) Products(ctx context.Context, obj *model.Produ
 	}
 
 	// Check for error while loading the products.
-	products, err := loader.Loader.Load(ctx, obj.ID.String())
+	p, err := loader.Loader.Load(ctx, obj.ID.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load products: %w", err)
 	}
 
 	// Map the products to the GraphQL model
-	productList := Map(products, func(product *domain.Product) *model.Product {
+	products := Map(p, func(product *domain.Product) *model.Product {
 		return ToGQLProduct(product, userLang)
 	})
 
-	return productList, nil
+	return products, nil
 }
 
 // Products is the resolver for the products field.
