@@ -11,6 +11,7 @@ import (
 	"tsb-service/internal/api/graphql/model"
 	addressApplication "tsb-service/internal/modules/address/application"
 	addressDomain "tsb-service/internal/modules/address/domain"
+	orderApplication "tsb-service/internal/modules/order/application"
 	"tsb-service/internal/modules/order/domain"
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	paymentDomain "tsb-service/internal/modules/payment/domain"
@@ -104,7 +105,29 @@ func (r *orderResolver) Payment(ctx context.Context, obj *model.Order) (*model.P
 
 // Items is the resolver for the items field.
 func (r *orderResolver) Items(ctx context.Context, obj *model.Order) ([]*model.OrderItem, error) {
-	panic(fmt.Errorf("not implemented: Items - items"))
+	loader := orderApplication.GetOrderItemLoader(ctx)
+
+	if loader == nil {
+		return nil, fmt.Errorf("no order items loader found")
+	}
+
+	// Check for error while loading the items.
+	i, err := loader.Loader.Load(ctx, obj.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load order items: %w", err)
+	}
+
+	// Map the items to the GraphQL model
+	items := Map(i, func(item *domain.OrderProductRaw) *model.OrderItem {
+		return ToGQLOrderItem(item)
+	})
+
+	return items, nil
+}
+
+// Product is the resolver for the product field.
+func (r *orderItemResolver) Product(ctx context.Context, obj *model.OrderItem) (*model.Product, error) {
+	panic(fmt.Errorf("not implemented: Product - product"))
 }
 
 // Orders is the resolver for the orders field.
@@ -124,8 +147,12 @@ func (r *queryResolver) Orders(ctx context.Context) ([]*model.Order, error) {
 // Order returns graphql1.OrderResolver implementation.
 func (r *Resolver) Order() graphql1.OrderResolver { return &orderResolver{r} }
 
+// OrderItem returns graphql1.OrderItemResolver implementation.
+func (r *Resolver) OrderItem() graphql1.OrderItemResolver { return &orderItemResolver{r} }
+
 // Query returns graphql1.QueryResolver implementation.
 func (r *Resolver) Query() graphql1.QueryResolver { return &queryResolver{r} }
 
 type orderResolver struct{ *Resolver }
+type orderItemResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }

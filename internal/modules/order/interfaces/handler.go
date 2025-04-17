@@ -416,9 +416,9 @@ func (h *OrderHandler) GetUserOrdersHandler(c *gin.Context) {
 	}
 
 	// 3) Gather all order IDs
-	var orderIDs []uuid.UUID
+	var orderIDs []string
 	for _, o := range orders {
-		orderIDs = append(orderIDs, o.ID)
+		orderIDs = append(orderIDs, o.ID.String())
 	}
 
 	// 4) Fetch all order products (raw) in a single query
@@ -459,7 +459,7 @@ func (h *OrderHandler) GetUserOrdersHandler(c *gin.Context) {
 	responses := make([]OrderResponse, 0, len(orders))
 	for _, ord := range orders {
 		// a) Enrich the raw order products with product details
-		opList := productsByOrder[ord.ID] // slice of OrderProductRaw
+		opList := productsByOrder[ord.ID.String()] // slice of OrderProductRaw
 		enrichedOP := make([]domain.OrderProduct, len(opList))
 
 		for i, rawOP := range opList {
@@ -578,9 +578,9 @@ func (h *OrderHandler) GetAdminOrdersHandler(c *gin.Context) {
 	}
 
 	// 3) Gather all order IDs
-	var orderIDs []uuid.UUID
+	var orderIDs []string
 	for _, o := range orders {
-		orderIDs = append(orderIDs, o.ID)
+		orderIDs = append(orderIDs, o.ID.String())
 	}
 
 	// 4) Fetch all order products (raw) in a single query
@@ -621,7 +621,7 @@ func (h *OrderHandler) GetAdminOrdersHandler(c *gin.Context) {
 	responses := make([]OrderResponse, 0, len(orders))
 	for _, ord := range orders {
 		// a) Enrich the raw order products with product details
-		opList := productsByOrder[ord.ID] // slice of OrderProductRaw
+		opList := productsByOrder[ord.ID.String()] // slice of OrderProductRaw
 		enrichedOP := make([]domain.OrderProduct, len(opList))
 
 		for i, rawOP := range opList {

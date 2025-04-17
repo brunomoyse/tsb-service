@@ -42,11 +42,10 @@ type Order struct {
 }
 
 type OrderItem struct {
-	ID         uuid.UUID `json:"id"`
-	Product    *Product  `json:"product"`
-	UnitPrice  string    `json:"unitPrice"`
-	Quantity   int       `json:"quantity"`
-	TotalPrice string    `json:"totalPrice"`
+	Product    *Product `json:"product"`
+	UnitPrice  string   `json:"unitPrice"`
+	Quantity   int      `json:"quantity"`
+	TotalPrice string   `json:"totalPrice"`
 }
 
 type Payment struct {
