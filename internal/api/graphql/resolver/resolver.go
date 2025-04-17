@@ -10,16 +10,28 @@ import (
 	"github.com/gin-gonic/gin"
 	"tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/directives"
-	"tsb-service/internal/modules/product/application"
+	orderApplication "tsb-service/internal/modules/order/application"
+	productApplication "tsb-service/internal/modules/product/application"
+	userApplication "tsb-service/internal/modules/user/application"
 )
 
 type Resolver struct {
-	ProductService application.ProductService
+	OrderService   orderApplication.OrderService
+	ProductService productApplication.ProductService
+	UserService    userApplication.UserService
 }
 
 // NewResolver constructs the Resolver with required services.
-func NewResolver(productService application.ProductService) *Resolver {
-	return &Resolver{ProductService: productService}
+func NewResolver(
+	orderService orderApplication.OrderService,
+	productService productApplication.ProductService,
+	userService userApplication.UserService,
+) *Resolver {
+	return &Resolver{
+		OrderService:   orderService,
+		ProductService: productService,
+		UserService:    userService,
+	}
 }
 
 // GraphQLHandler defines the GraphQL endpoint with @auth directive injection

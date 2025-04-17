@@ -17,6 +17,8 @@ type OrderService interface {
 	UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) error
 	GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error)
 	GetOrderProductsByOrderIDs(ctx context.Context, orderIDs []uuid.UUID) (map[uuid.UUID][]domain.OrderProductRaw, error)
+
+	BatchGetOrdersByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error)
 }
 
 type orderService struct {
@@ -95,4 +97,8 @@ func (s *orderService) GetOrderByID(ctx context.Context, orderID uuid.UUID) (*do
 
 func (s *orderService) GetOrderProductsByOrderIDs(ctx context.Context, orderIDs []uuid.UUID) (map[uuid.UUID][]domain.OrderProductRaw, error) {
 	return s.repo.FindByOrderIDs(ctx, orderIDs)
+}
+
+func (s *orderService) BatchGetOrdersByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error) {
+	return s.repo.FindByUserIDs(ctx, userIDs)
 }

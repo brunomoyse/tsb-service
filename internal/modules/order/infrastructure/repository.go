@@ -275,3 +275,33 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []uuid.UU
 
 	return productsByOrder, nil
 }
+
+func (r *OrderRepository) FindByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error) {
+	// 1) Expand the IN clause
+	query, args, err := sqlx.In(`
+        SELECT *
+        FROM orders
+        WHERE user_id IN (?)
+        ORDER BY created_at DESC
+    `, userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2) Rebind for the specific driver (?, $1, etc)
+	query = r.db.Rebind(query)
+
+	// 3) Fetch into a slice
+	var orders []domain.Order
+	if err := r.db.SelectContext(ctx, &orders, query, args...); err != nil {
+		return nil, err
+	}
+
+	// 4) Group by user_id
+	result := make(map[string][]*domain.Order, len(userIDs))
+	for _, o := range orders {
+		result[o.UserID.String()] = append(result[o.UserID.String()], &o)
+	}
+
+	return result, nil
+}

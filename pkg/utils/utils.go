@@ -11,6 +11,7 @@ import (
 type contextKey string
 
 const LangKey contextKey = "lang"
+const UserIDKey contextKey = "userID"
 
 // SetLang stores the language in the context.
 func SetLang(ctx context.Context, lang string) context.Context {
@@ -24,6 +25,18 @@ func GetLang(ctx context.Context) string {
 		return "fr"
 	}
 	return lang
+}
+
+func SetUserID(ctx context.Context, userID string) context.Context {
+	return context.WithValue(ctx, UserIDKey, userID)
+}
+
+func GetUserID(ctx context.Context) string {
+	userID, _ := ctx.Value(UserIDKey).(string)
+	if userID == "" {
+		return ""
+	}
+	return userID
 }
 
 var (

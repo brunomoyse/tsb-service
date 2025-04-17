@@ -2,7 +2,6 @@ package infrastructure
 
 import (
 	"context"
-	"fmt"
 	"tsb-service/internal/modules/user/domain"
 
 	"github.com/google/uuid"
@@ -80,7 +79,6 @@ func (r *UserRepository) UpdateGoogleID(ctx context.Context, userID string, goog
 }
 
 func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) (*domain.User, error) {
-	fmt.Println(user.EmailVerifiedAt)
 	query := `
 		UPDATE users
 		SET first_name = $1, last_name = $2, email = $3, phone_number = $4, address_id = $5, email_verified_at = $6

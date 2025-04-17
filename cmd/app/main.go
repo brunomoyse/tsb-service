@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	gqlMiddleware "tsb-service/internal/api/graphql/middleware"
 	"tsb-service/internal/api/graphql/resolver"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
@@ -122,15 +123,27 @@ func main() {
 	router.Use(middleware.LanguageExtractor())
 
 	// Load DataLoaderMiddleware
-	router.Use(middleware.DataLoaderMiddleware(productService))
+	router.Use(
+		middleware.DataLoaderMiddleware(
+			orderService,
+			productService,
+			userService,
+		),
+	)
 
-	// Create your GraphQL resolver with the injected productService.
-	rootResolver := resolver.NewResolver(productService)
+	// Create the GraphQL resolver with the injected services
+	rootResolver := resolver.NewResolver(
+		orderService,
+		productService,
+		userService,
+	)
 
 	// Create your GraphQL handler (using your favorite GraphQL library)
 	graphqlHandler := resolver.GraphQLHandler(rootResolver)
+	// Add a middleware to store the userID in the context (extracted from JWT)
+	optionalAuthMiddleware := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)
 
-	router.POST("/graphql", graphqlHandler)
+	router.POST("/graphql", optionalAuthMiddleware, graphqlHandler)
 
 	// Setup routes (grouped by API version or module as needed)
 	// Setup routes for /api/v1.
