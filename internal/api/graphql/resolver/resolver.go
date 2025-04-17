@@ -21,7 +21,7 @@ func NewResolver(productService application.ProductService) *Resolver {
 	return &Resolver{ProductService: productService}
 }
 
-// Defining the Graphql handler
+// GraphQLHandler Defining the Graphql handler
 func GraphQLHandler(resolver *Resolver) gin.HandlerFunc {
 	// Pass the injected resolver into the schema configuration.
 	h := handler.New(graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}))

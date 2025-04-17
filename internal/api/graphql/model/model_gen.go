@@ -45,7 +45,7 @@ type OrderItem struct {
 	ID         uuid.UUID `json:"id"`
 	Product    *Product  `json:"product"`
 	UnitPrice  string    `json:"unitPrice"`
-	Quantity   int32     `json:"quantity"`
+	Quantity   int       `json:"quantity"`
 	TotalPrice string    `json:"totalPrice"`
 }
 
@@ -86,10 +86,10 @@ type Payment struct {
 type Product struct {
 	ID          uuid.UUID        `json:"id"`
 	CreatedAt   time.Time        `json:"createdAt"`
-	Price       float64          `json:"price"`
+	Price       string           `json:"price"`
 	Code        *string          `json:"code,omitempty"`
 	Slug        string           `json:"slug"`
-	PieceCount  int32            `json:"pieceCount"`
+	PieceCount  *int             `json:"pieceCount,omitempty"`
 	IsVisible   bool             `json:"isVisible"`
 	IsAvailable bool             `json:"isAvailable"`
 	IsHalal     bool             `json:"isHalal"`
@@ -100,9 +100,10 @@ type Product struct {
 }
 
 type ProductCategory struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitempty"`
+	ID       uuid.UUID  `json:"id"`
+	Name     string     `json:"name"`
+	Order    int        `json:"order"`
+	Products []*Product `json:"products"`
 }
 
 type Query struct {

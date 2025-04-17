@@ -11,6 +11,7 @@ import (
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	productApplication "tsb-service/internal/modules/product/application"
+	"tsb-service/internal/modules/product/domain"
 	"tsb-service/pkg/utils"
 )
 
@@ -18,7 +19,7 @@ import (
 func (r *productResolver) Category(ctx context.Context, obj *model.Product) (*model.ProductCategory, error) {
 	userLang := utils.GetLang(ctx)
 
-	loader := productApplication.GetProductProductCategoryLoader(ctx)
+	loader := productApplication.GetProductCategoryLoader(ctx)
 	if loader == nil {
 		return nil, errors.New("no product category loader found")
 	}
@@ -35,15 +36,36 @@ func (r *productResolver) Category(ctx context.Context, obj *model.Product) (*mo
 	}
 
 	// Map the categories to the GraphQL model
-	var productCategory *model.ProductCategory
-	if len(categories) > 0 {
-		productCategory = &model.ProductCategory{
-			ID:   categories[0].ID,
-			Name: categories[0].GetTranslationFor(userLang).Name,
-		}
+	productCategories := Map(categories, func(category *domain.Category) *model.ProductCategory {
+		return ToGQLProductCategory(category, userLang)
+	})
+
+	// Return the first category found. (Assuming one product belongs to one category)
+	return productCategories[0], nil
+}
+
+// Products is the resolver for the products field.
+func (r *productCategoryResolver) Products(ctx context.Context, obj *model.ProductCategory) ([]*model.Product, error) {
+	userLang := utils.GetLang(ctx)
+
+	loader := productApplication.GetCategoryProductLoader(ctx)
+
+	if loader == nil {
+		return nil, errors.New("no category product loader found")
 	}
 
-	return productCategory, nil
+	// Check for error while loading the products.
+	products, err := loader.Loader.Load(ctx, obj.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load products: %w", err)
+	}
+
+	// Map the products to the GraphQL model
+	productList := Map(products, func(product *domain.Product) *model.Product {
+		return ToGQLProduct(product, userLang)
+	})
+
+	return productList, nil
 }
 
 // Products is the resolver for the products field.
@@ -54,23 +76,42 @@ func (r *queryResolver) Products(ctx context.Context) ([]*model.Product, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get products: %w", err)
 	}
-	// Map
-	var products []*model.Product
-	for _, product := range p {
-		products = append(products, &model.Product{
-			ID:   product.ID,
-			Name: product.GetTranslationFor(userLang).Name,
-		})
-	}
+
+	products := Map(p, func(product *domain.Product) *model.Product {
+		return ToGQLProduct(product, userLang)
+	})
 
 	return products, nil
+}
+
+// ProductCategories is the resolver for the productCategories field.
+func (r *queryResolver) ProductCategories(ctx context.Context) ([]*model.ProductCategory, error) {
+	userLang := utils.GetLang(ctx)
+
+	c, err := r.ProductService.GetCategories(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get categories: %w", err)
+	}
+
+	categories := Map(c, func(cat *domain.Category) *model.ProductCategory {
+		return ToGQLProductCategory(cat, userLang)
+	})
+
+	return categories, nil
 }
 
 // Product returns graphql1.ProductResolver implementation.
 func (r *Resolver) Product() graphql1.ProductResolver { return &productResolver{r} }
 
+// ProductCategory returns graphql1.ProductCategoryResolver implementation.
+func (r *Resolver) ProductCategory() graphql1.ProductCategoryResolver {
+	return &productCategoryResolver{r}
+}
+
 // Query returns graphql1.QueryResolver implementation.
 func (r *Resolver) Query() graphql1.QueryResolver { return &queryResolver{r} }
 
 type productResolver struct{ *Resolver }
+type productCategoryResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
