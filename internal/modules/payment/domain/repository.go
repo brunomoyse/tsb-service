@@ -11,4 +11,6 @@ type PaymentRepository interface {
 	RefreshStatus(ctx context.Context, externalPayment mollie.Payment) (*uuid.UUID, error)
 	FindByOrderID(ctx context.Context, orderID uuid.UUID) (*MolliePayment, error)
 	FindByExternalID(ctx context.Context, externalPaymentID string) (*MolliePayment, error)
+
+	FindByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*MolliePayment, error)
 }

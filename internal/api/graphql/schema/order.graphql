@@ -39,3 +39,7 @@ enum OrderStatusEnum {
     COMPLETED
     CANCELED
 }
+
+extend type Query {
+    orders: [Order!]! @auth
+}
