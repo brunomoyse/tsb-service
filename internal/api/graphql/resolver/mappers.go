@@ -3,6 +3,7 @@ package resolver
 import (
 	"encoding/json"
 	"tsb-service/internal/api/graphql/model"
+	addressDomain "tsb-service/internal/modules/address/domain"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	paymentDomain "tsb-service/internal/modules/payment/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
@@ -86,5 +87,17 @@ func ToGQLPayment(p *paymentDomain.MolliePayment) *model.Payment {
 		OrderID:   p.OrderID,
 		Status:    p.Status,
 		Links:     links,
+	}
+}
+
+func ToGQLAddress(a *addressDomain.Address) *model.Address {
+	return &model.Address{
+		ID:               a.ID,
+		StreetName:       a.StreetName,
+		HouseNumber:      a.HouseNumber,
+		BoxNumber:        a.BoxNumber,
+		Postcode:         a.Postcode,
+		MunicipalityName: a.MunicipalityName,
+		Distance:         a.Distance,
 	}
 }

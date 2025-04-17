@@ -11,6 +11,8 @@ type AddressService interface {
 	GetBoxNumbers(ctx context.Context, streetID string, houseNumber string) ([]*string, error)
 	GetFinalAddress(ctx context.Context, streetID string, houseNumber string, boxNumber *string) (*domain.Address, error)
 	GetAddressByID(ctx context.Context, ID string) (*domain.Address, error)
+
+	BatchGetAddressesByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.Address, error)
 }
 
 type addressService struct {
@@ -53,4 +55,8 @@ func (s *addressService) GetFinalAddress(ctx context.Context, streetID string, h
 
 func (s *addressService) GetAddressByID(ctx context.Context, ID string) (*domain.Address, error) {
 	return s.repo.GetAddressByID(ctx, ID)
+}
+
+func (s *addressService) BatchGetAddressesByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.Address, error) {
+	return s.repo.BatchGetAddressesByOrderIDs(ctx, orderIDs)
 }

@@ -11,4 +11,6 @@ type AddressRepository interface {
 	GetBoxNumbers(ctx context.Context, streetName, houseNumber string) ([]*string, error)
 	GetFinalAddress(ctx context.Context, streetID string, houseNumber string, boxNumber *string) (*Address, error)
 	GetAddressByID(ctx context.Context, ID string) (*Address, error)
+
+	BatchGetAddressesByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*Address, error)
 }

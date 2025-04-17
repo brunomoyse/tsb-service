@@ -31,7 +31,7 @@ func NewUserOrderLoader(os OrderService) *UserOrderLoader {
 			func(ctx context.Context, productIDs []string) (map[string][]*domain.Order, error) {
 				return os.BatchGetOrdersByUserIDs(ctx, productIDs)
 			},
-			"failed to fetch categories",
+			"failed to fetch addresses",
 		),
 	}
 }

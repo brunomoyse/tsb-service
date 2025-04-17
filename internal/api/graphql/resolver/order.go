@@ -9,8 +9,10 @@ import (
 	"fmt"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
+	addressApplication "tsb-service/internal/modules/address/application"
+	addressDomain "tsb-service/internal/modules/address/domain"
 	paymentApplication "tsb-service/internal/modules/payment/application"
-	"tsb-service/internal/modules/payment/domain"
+	paymentDomain "tsb-service/internal/modules/payment/domain"
 )
 
 // Payment is the resolver for the payment field.
@@ -28,7 +30,7 @@ func (r *orderResolver) Payment(ctx context.Context, obj *model.Order) (*model.P
 	}
 
 	// Map the payment to the GraphQL model
-	payments := Map(p, func(payment *domain.MolliePayment) *model.Payment {
+	payments := Map(p, func(payment *paymentDomain.MolliePayment) *model.Payment {
 		return ToGQLPayment(payment)
 	})
 
@@ -43,7 +45,30 @@ func (r *orderResolver) Payment(ctx context.Context, obj *model.Order) (*model.P
 
 // Address is the resolver for the address field.
 func (r *orderResolver) Address(ctx context.Context, obj *model.Order) (*model.Address, error) {
-	panic(fmt.Errorf("not implemented: Address - address"))
+	loader := addressApplication.GetOrderAddressLoader(ctx)
+
+	if loader == nil {
+		return nil, fmt.Errorf("no order address loader found")
+	}
+
+	// Check for error while loading the address.
+	a, err := loader.Loader.Load(ctx, obj.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load order address: %w", err)
+	}
+
+	// Map the address to the GraphQL model
+	addresses := Map(a, func(address *addressDomain.Address) *model.Address {
+		return ToGQLAddress(address)
+	})
+
+	// Return nil if no addresses were found.
+	if len(addresses) == 0 {
+		return nil, nil
+	}
+
+	// Return the first address found. (Assuming one order belongs to one address)
+	return addresses[0], nil
 }
 
 // Items is the resolver for the items field.

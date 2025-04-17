@@ -12,13 +12,13 @@ import (
 )
 
 type Address struct {
-	ID               uuid.UUID `json:"id"`
-	Postcode         string    `json:"postcode"`
-	MunicipalityName string    `json:"municipalityName"`
-	StreetName       string    `json:"streetName"`
-	HouseNumber      *string   `json:"houseNumber,omitempty"`
-	BoxNumber        *string   `json:"boxNumber,omitempty"`
-	Distance         float64   `json:"distance"`
+	ID               string  `json:"id"`
+	Postcode         string  `json:"postcode"`
+	MunicipalityName string  `json:"municipalityName"`
+	StreetName       string  `json:"streetName"`
+	HouseNumber      string  `json:"houseNumber"`
+	BoxNumber        *string `json:"boxNumber,omitempty"`
+	Distance         float64 `json:"distance"`
 }
 
 type Order struct {
@@ -37,7 +37,7 @@ type Order struct {
 	OrderExtra         map[string]any  `json:"orderExtra,omitempty"`
 	Payment            *Payment        `json:"payment,omitempty"`
 	Customer           *User           `json:"customer"`
-	Address            *Address        `json:"address"`
+	Address            *Address        `json:"address,omitempty"`
 	Items              []*OrderItem    `json:"items"`
 }
 
