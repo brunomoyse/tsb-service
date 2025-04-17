@@ -18,6 +18,8 @@ type PaymentService interface {
 	GetPaymentByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error)
 	GetExternalPaymentByID(ctx context.Context, externalMolliePaymentID string) (*mollie.Response, *mollie.Payment, error)
 	GetPaymentByExternalID(ctx context.Context, externalMolliePaymentID string) (*domain.MolliePayment, error)
+
+	BatchGetPaymentsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.MolliePayment, error)
 }
 
 type paymentService struct {
@@ -140,4 +142,8 @@ func (s *paymentService) GetPaymentByOrderID(ctx context.Context, orderID uuid.U
 	}
 
 	return payment, nil
+}
+
+func (s *paymentService) BatchGetPaymentsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.MolliePayment, error) {
+	return s.repo.FindByOrderIDs(ctx, orderIDs)
 }

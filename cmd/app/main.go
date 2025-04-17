@@ -125,7 +125,9 @@ func main() {
 	// Load DataLoaderMiddleware
 	router.Use(
 		middleware.DataLoaderMiddleware(
+			addressService,
 			orderService,
+			paymentService,
 			productService,
 			userService,
 		),
@@ -133,7 +135,9 @@ func main() {
 
 	// Create the GraphQL resolver with the injected services
 	rootResolver := resolver.NewResolver(
+		addressService,
 		orderService,
+		paymentService,
 		productService,
 		userService,
 	)
@@ -163,10 +167,6 @@ func main() {
 	//
 	// PUBLIC ROUTES
 	//
-	api.GET("/products", productHandler.GetProductsHandler)
-	api.GET("/products/:id", productHandler.GetProductHandler)
-	api.GET("/categories", productHandler.GetCategoriesHandler)
-	api.GET("/categories/:categoryID/products", productHandler.GetProductsByCategoryHandler)
 
 	api.GET("/addresses/streets", addressHandler.GetStreetNamesHandler)
 	api.GET("/addresses/house-numbers", addressHandler.GetHouseNumbersHandler)

@@ -27,18 +27,18 @@ func (r *productResolver) Category(ctx context.Context, obj *model.Product) (*mo
 	}
 
 	// Check for error while loading the category.
-	categories, err := loader.Loader.Load(ctx, obj.ID.String())
+	c, err := loader.Loader.Load(ctx, obj.ID.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load product category: %w", err)
 	}
 
 	// Return nil if no categories were found.
-	if len(categories) == 0 {
+	if len(c) == 0 {
 		return nil, nil
 	}
 
 	// Map the categories to the GraphQL model
-	productCategories := Map(categories, func(category *domain.Category) *model.ProductCategory {
+	productCategories := Map(c, func(category *domain.Category) *model.ProductCategory {
 		return ToGQLProductCategory(category, userLang)
 	})
 
@@ -150,9 +150,5 @@ func (r *Resolver) ProductCategory() graphql1.ProductCategoryResolver {
 	return &productCategoryResolver{r}
 }
 
-// Query returns graphql1.QueryResolver implementation.
-func (r *Resolver) Query() graphql1.QueryResolver { return &queryResolver{r} }
-
 type productResolver struct{ *Resolver }
 type productCategoryResolver struct{ *Resolver }
-type queryResolver struct{ *Resolver }

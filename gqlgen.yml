@@ -157,7 +157,7 @@ models:
 
   Order:
     fields:
-      products:
+      items:
         resolver: true
       payment:
         resolver: true

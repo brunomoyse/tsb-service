@@ -1,8 +1,10 @@
 package resolver
 
 import (
+	"encoding/json"
 	"tsb-service/internal/api/graphql/model"
 	orderDomain "tsb-service/internal/modules/order/domain"
+	paymentDomain "tsb-service/internal/modules/payment/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
 	userDomain "tsb-service/internal/modules/user/domain"
 )
@@ -54,6 +56,9 @@ func ToGQLUser(u *userDomain.User) *model.User {
 }
 
 func ToGQLOrder(o *orderDomain.Order) *model.Order {
+	var orderExtra map[string]any
+	_ = json.Unmarshal(o.OrderExtra, &orderExtra)
+
 	return &model.Order{
 		ID:                 o.ID,
 		CreatedAt:          o.CreatedAt,
@@ -67,6 +72,19 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		EstimatedReadyTime: o.EstimatedReadyTime,
 		AddressExtra:       o.AddressExtra,
 		OrderNote:          o.OrderNote,
-		//OrderExtra: o.OrderExtra, // @TODO: Use JSON in GQL schema
+		OrderExtra:         orderExtra,
+	}
+}
+
+func ToGQLPayment(p *paymentDomain.MolliePayment) *model.Payment {
+	var links map[string]any
+	_ = json.Unmarshal(p.Links, &links)
+
+	return &model.Payment{
+		ID:        p.ID,
+		CreatedAt: p.CreatedAt,
+		OrderID:   p.OrderID,
+		Status:    p.Status,
+		Links:     links,
 	}
 }
