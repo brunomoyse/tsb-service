@@ -141,7 +141,7 @@ func (r *AddressRepository) BatchGetAddressesByOrderIDs(ctx context.Context, ord
 	}
 
 	var rows []addressRow
-	// 3) use pq.Array to pass your []string as a PostgreSQL text[]
+	// 3) use pq.Array to pass your []string as a PostgresSQL text[]
 	if err := r.db.SelectContext(ctx, &rows, sqlQuery, pq.Array(orderIDs)); err != nil {
 		return nil, fmt.Errorf("failed to get addresses by order IDs: %w", err)
 	}

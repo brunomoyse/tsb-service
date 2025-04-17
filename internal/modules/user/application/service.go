@@ -33,6 +33,8 @@ type UserService interface {
 	UpdateEmailVerifiedAt(ctx context.Context, userID string) (*domain.User, error)
 	InvalidateRefreshToken(ctx context.Context, refreshToken string) error
 	VerifyUserEmail(ctx context.Context, userID string) error
+
+	BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error)
 }
 
 type userService struct {
@@ -290,6 +292,10 @@ func (s *userService) validateRefreshToken(tokenString, secret string) (*domain.
 	}
 
 	return claims, nil
+}
+
+func (s *userService) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error) {
+	return s.repo.BatchGetUsersByOrderIDs(ctx, orderIDs)
 }
 
 func generateSalt() (string, error) {

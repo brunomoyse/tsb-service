@@ -35,9 +35,9 @@ type Order struct {
 	AddressExtra       *string         `json:"addressExtra,omitempty"`
 	OrderNote          *string         `json:"orderNote,omitempty"`
 	OrderExtra         map[string]any  `json:"orderExtra,omitempty"`
-	Payment            *Payment        `json:"payment,omitempty"`
-	Customer           *User           `json:"customer"`
 	Address            *Address        `json:"address,omitempty"`
+	Customer           *User           `json:"customer"`
+	Payment            *Payment        `json:"payment,omitempty"`
 	Items              []*OrderItem    `json:"items"`
 }
 

@@ -13,10 +13,9 @@ type Order {
     orderNote: String
     orderExtra: JSON
 
-    payment: Payment
-    customer: User!
     address: Address
-
+    customer: User!
+    payment: Payment
     items: [OrderItem!]!
 }
 

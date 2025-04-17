@@ -11,37 +11,12 @@ import (
 	"tsb-service/internal/api/graphql/model"
 	addressApplication "tsb-service/internal/modules/address/application"
 	addressDomain "tsb-service/internal/modules/address/domain"
+	"tsb-service/internal/modules/order/domain"
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	paymentDomain "tsb-service/internal/modules/payment/domain"
+	userApplication "tsb-service/internal/modules/user/application"
+	userDomain "tsb-service/internal/modules/user/domain"
 )
-
-// Payment is the resolver for the payment field.
-func (r *orderResolver) Payment(ctx context.Context, obj *model.Order) (*model.Payment, error) {
-	loader := paymentApplication.GetOrderPaymentLoader(ctx)
-
-	if loader == nil {
-		return nil, fmt.Errorf("no order payment loader found")
-	}
-
-	// Check for error while loading the payment.
-	p, err := loader.Loader.Load(ctx, obj.ID.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to load order payment: %w", err)
-	}
-
-	// Map the payment to the GraphQL model
-	payments := Map(p, func(payment *paymentDomain.MolliePayment) *model.Payment {
-		return ToGQLPayment(payment)
-	})
-
-	// Return nil if no payments were found.
-	if len(payments) == 0 {
-		return nil, nil
-	}
-
-	// Return the first payment found. (Assuming one order belongs to one payment)
-	return payments[0], nil
-}
 
 // Address is the resolver for the address field.
 func (r *orderResolver) Address(ctx context.Context, obj *model.Order) (*model.Address, error) {
@@ -71,6 +46,62 @@ func (r *orderResolver) Address(ctx context.Context, obj *model.Order) (*model.A
 	return addresses[0], nil
 }
 
+// Customer is the resolver for the customer field.
+func (r *orderResolver) Customer(ctx context.Context, obj *model.Order) (*model.User, error) {
+	loader := userApplication.GetOrderUserLoader(ctx)
+
+	if loader == nil {
+		return nil, fmt.Errorf("no order user loader found")
+	}
+
+	// Check for error while loading the user.
+	a, err := loader.Loader.Load(ctx, obj.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load order user: %w", err)
+	}
+
+	// Map the user to the GraphQL model
+	users := Map(a, func(user *userDomain.User) *model.User {
+		return ToGQLUser(user)
+	})
+
+	// Return nil if no users were found.
+	if len(users) == 0 {
+		return nil, nil
+	}
+
+	// Return the first user found. (Assuming one order belongs to one user)
+	return users[0], nil
+}
+
+// Payment is the resolver for the payment field.
+func (r *orderResolver) Payment(ctx context.Context, obj *model.Order) (*model.Payment, error) {
+	loader := paymentApplication.GetOrderPaymentLoader(ctx)
+
+	if loader == nil {
+		return nil, fmt.Errorf("no order payment loader found")
+	}
+
+	// Check for error while loading the payment.
+	p, err := loader.Loader.Load(ctx, obj.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load order payment: %w", err)
+	}
+
+	// Map the payment to the GraphQL model
+	payments := Map(p, func(payment *paymentDomain.MolliePayment) *model.Payment {
+		return ToGQLPayment(payment)
+	})
+
+	// Return nil if no payments were found.
+	if len(payments) == 0 {
+		return nil, nil
+	}
+
+	// Return the first payment found. (Assuming one order belongs to one payment)
+	return payments[0], nil
+}
+
 // Items is the resolver for the items field.
 func (r *orderResolver) Items(ctx context.Context, obj *model.Order) ([]*model.OrderItem, error) {
 	panic(fmt.Errorf("not implemented: Items - items"))
@@ -78,7 +109,16 @@ func (r *orderResolver) Items(ctx context.Context, obj *model.Order) ([]*model.O
 
 // Orders is the resolver for the orders field.
 func (r *queryResolver) Orders(ctx context.Context) ([]*model.Order, error) {
-	panic(fmt.Errorf("not implemented: Orders - orders"))
+	o, err := r.OrderService.GetPaginatedOrders(ctx, 1, 20, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders: %w", err)
+	}
+
+	orders := Map(o, func(order *domain.Order) *model.Order {
+		return ToGQLOrder(order)
+	})
+
+	return orders, nil
 }
 
 // Order returns graphql1.OrderResolver implementation.
