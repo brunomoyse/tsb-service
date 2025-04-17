@@ -9,6 +9,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/gin-gonic/gin"
 	"tsb-service/internal/api/graphql"
+	"tsb-service/internal/api/graphql/directives"
 	"tsb-service/internal/modules/product/application"
 )
 
@@ -21,21 +22,21 @@ func NewResolver(productService application.ProductService) *Resolver {
 	return &Resolver{ProductService: productService}
 }
 
-// GraphQLHandler Defining the Graphql handler
+// GraphQLHandler defines the GraphQL endpoint with @auth directive injection
 func GraphQLHandler(resolver *Resolver) gin.HandlerFunc {
-	// Pass the injected resolver into the schema configuration.
-	h := handler.New(graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}))
+	cfg := graphql.Config{Resolvers: resolver}
+	cfg.Directives.Auth = directives.Auth
+
+	h := handler.New(graphql.NewExecutableSchema(cfg))
 
 	h.AddTransport(transport.Options{})
-	h.AddTransport(transport.GET{})
 	h.AddTransport(transport.POST{})
 
-	h.Use(extension.Introspection{})
 	h.Use(extension.AutomaticPersistedQuery{
 		//nolint:mnd // Store 50 queries in memory using Least Recently Used (LRU) algorithm
 		Cache: lru.New[string](50),
 	})
-	h.Use(extension.FixedComplexityLimit(50)) // https://gqlgen.com/reference/complexity/
+	h.Use(extension.FixedComplexityLimit(50))
 
 	return func(c *gin.Context) {
 		h.ServeHTTP(c.Writer, c.Request)

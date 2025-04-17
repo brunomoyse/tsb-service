@@ -5,4 +5,9 @@ type User {
     lastName: String!
     phoneNumber: String
     address: Address
+    orders: [Order!]
+}
+
+extend type Query {
+    me: User! @auth
 }
