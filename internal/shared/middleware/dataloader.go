@@ -24,7 +24,7 @@ func DataLoaderMiddleware(
 		ctx = productApplication.AttachDataLoaders(ctx, prs)
 		ctx = paymentApplication.AttachDataLoaders(ctx, pas)
 		ctx = orderApplication.AttachDataLoaders(ctx, ors)
-		// ctx = userApplication.AttachDataLoaders(ctx, us)
+		ctx = userApplication.AttachDataLoaders(ctx, uss)
 
 		// Update the request with the new context
 		c.Request = c.Request.WithContext(ctx)

@@ -16,4 +16,5 @@ type UserRepository interface {
 	UpdateEmailVerifiedAt(ctx context.Context, userID string) (*User, error)
 	InvalidateRefreshToken(ctx context.Context, refreshToken string) error
 	UpdateUser(ctx context.Context, user *User) (*User, error)
+	BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*User, error)
 }
