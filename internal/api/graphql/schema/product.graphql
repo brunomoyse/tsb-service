@@ -25,5 +25,7 @@ type ProductCategory {
 
 extend type Query {
     products: [Product!]!
+    product(id: ID!): Product!
     productCategories: [ProductCategory!]!
+    productCategory(id: ID!): ProductCategory!
 }

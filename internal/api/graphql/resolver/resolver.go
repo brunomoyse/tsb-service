@@ -32,10 +32,10 @@ func GraphQLHandler(resolver *Resolver) gin.HandlerFunc {
 
 	h.Use(extension.Introspection{})
 	h.Use(extension.AutomaticPersistedQuery{
-		//nolint:mnd // Store 100 queries in memory using Least Recently Used (LRU) algorithm
+		//nolint:mnd // Store 50 queries in memory using Least Recently Used (LRU) algorithm
 		Cache: lru.New[string](50),
 	})
-	// h.Use(extension.FixedComplexityLimit(5)) // https://gqlgen.com/reference/complexity/
+	h.Use(extension.FixedComplexityLimit(50)) // https://gqlgen.com/reference/complexity/
 
 	return func(c *gin.Context) {
 		h.ServeHTTP(c.Writer, c.Request)

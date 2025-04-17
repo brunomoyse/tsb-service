@@ -13,6 +13,8 @@ import (
 	productApplication "tsb-service/internal/modules/product/application"
 	"tsb-service/internal/modules/product/domain"
 	"tsb-service/pkg/utils"
+
+	"github.com/google/uuid"
 )
 
 // Category is the resolver for the category field.
@@ -84,6 +86,26 @@ func (r *queryResolver) Products(ctx context.Context) ([]*model.Product, error) 
 	return products, nil
 }
 
+// Product is the resolver for the product field.
+func (r *queryResolver) Product(ctx context.Context, id uuid.UUID) (*model.Product, error) {
+	userLang := utils.GetLang(ctx)
+
+	p, err := r.ProductService.GetProduct(ctx, id)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get product: %w", err)
+	}
+
+	if p == nil {
+		return nil, nil
+	}
+
+	// Map the product to the GraphQL model
+	product := ToGQLProduct(p, userLang)
+
+	return product, nil
+}
+
 // ProductCategories is the resolver for the productCategories field.
 func (r *queryResolver) ProductCategories(ctx context.Context) ([]*model.ProductCategory, error) {
 	userLang := utils.GetLang(ctx)
@@ -99,6 +121,25 @@ func (r *queryResolver) ProductCategories(ctx context.Context) ([]*model.Product
 	})
 
 	return categories, nil
+}
+
+// ProductCategory is the resolver for the productCategory field.
+func (r *queryResolver) ProductCategory(ctx context.Context, id uuid.UUID) (*model.ProductCategory, error) {
+	userLang := utils.GetLang(ctx)
+
+	c, err := r.ProductService.GetCategory(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get category: %w", err)
+	}
+
+	if c == nil {
+		return nil, nil
+	}
+
+	// Map the category to the GraphQL model
+	category := ToGQLProductCategory(c, userLang)
+
+	return category, nil
 }
 
 // Product returns graphql1.ProductResolver implementation.
