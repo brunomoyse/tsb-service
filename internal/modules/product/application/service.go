@@ -11,11 +11,12 @@ import (
 // ProductService defines the application service interface for product operations.
 type ProductService interface {
 	CreateProduct(ctx context.Context, categoryID uuid.UUID, price decimal.Decimal, code *string, pieceCount *int, isVisible bool, isAvailable bool, isHalal bool, isVegan bool, translations []domain.Translation) (*domain.Product, error)
-	GetProduct(ctx context.Context, id string) (*domain.Product, error)
+	GetProduct(ctx context.Context, id uuid.UUID) (*domain.Product, error)
 	GetProducts(ctx context.Context) ([]*domain.Product, error)
 	GetProductsByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error)
 	GetProductsByCategory(ctx context.Context, categoryID string) ([]*domain.Product, error)
 	GetCategories(ctx context.Context) ([]*domain.Category, error)
+	GetCategory(ctx context.Context, id uuid.UUID) (*domain.Category, error)
 	UpdateProduct(ctx context.Context, product *domain.Product) error
 
 	BatchGetCategoriesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Category, error)
@@ -69,7 +70,7 @@ func (s *productService) UpdateProduct(ctx context.Context, product *domain.Prod
 }
 
 // GetProduct retrieves a product by its unique identifier.
-func (s *productService) GetProduct(ctx context.Context, id string) (*domain.Product, error) {
+func (s *productService) GetProduct(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
 	return s.repo.FindByID(ctx, id)
 }
 
@@ -85,6 +86,10 @@ func (s *productService) GetProductsByIDs(ctx context.Context, productIDs []stri
 // GetCategories retrieves a list of categories.
 func (s *productService) GetCategories(ctx context.Context) ([]*domain.Category, error) {
 	return s.repo.FindAllCategories(ctx)
+}
+
+func (s *productService) GetCategory(ctx context.Context, id uuid.UUID) (*domain.Category, error) {
+	return s.repo.FindCategoryByID(ctx, id)
 }
 
 // GetProductsByCategory retrieves a list of products by category.

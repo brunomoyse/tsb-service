@@ -118,6 +118,9 @@ func main() {
 		c.Status(http.StatusOK)
 	})
 
+	// Middleware for JWT authentication
+	router.Use(middleware.LanguageExtractor())
+
 	// Load DataLoaderMiddleware
 	router.Use(middleware.DataLoaderMiddleware(productService))
 
@@ -137,9 +140,6 @@ func main() {
 	api.HEAD("/up", func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
-
-	// Middleware for JWT authentication
-	api.Use(middleware.LanguageExtractor())
 
 	api.POST("payments/webhook", paymentHandler.UpdatePaymentStatusHandler)
 

@@ -132,8 +132,16 @@ func (h *ProductHandler) CreateProductHandler(c *gin.Context) {
 }
 
 func (h *ProductHandler) GetProductHandler(c *gin.Context) {
+	idStr := c.Param("id")
+	productID, err := uuid.Parse(idStr)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid product id"})
+		return
+	}
+
 	// Retrieve product by ID (omitting error handling for brevity)
-	product, _ := h.service.GetProduct(c.Request.Context(), c.Param("id"))
+	product, _ := h.service.GetProduct(c.Request.Context(), productID)
 
 	userLocale := c.GetString("lang")
 	if userLocale == "" {
@@ -236,7 +244,7 @@ func (h *ProductHandler) UpdateProductHandler(c *gin.Context) {
 	}
 
 	// 2. Retrieve the current product.
-	currentProduct, err := h.service.GetProduct(c.Request.Context(), productID.String())
+	currentProduct, err := h.service.GetProduct(c.Request.Context(), productID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve product"})
 		return
@@ -362,7 +370,7 @@ func (h *ProductHandler) UpdateProductHandler(c *gin.Context) {
 	}
 
 	// 8. Retrieve the updated product.
-	updatedProduct, err := h.service.GetProduct(c.Request.Context(), productID.String())
+	updatedProduct, err := h.service.GetProduct(c.Request.Context(), productID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve updated product"})
 		return
