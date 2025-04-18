@@ -725,7 +725,7 @@ func (r *ProductRepository) FindCategoriesByProductIDs(ctx context.Context, prod
 // FindByCategoryIDs retrieves products for each of the given category IDs,
 // batching the SQL-to-domain mapping via queryProducts, then grouping by category.
 func (r *ProductRepository) FindByCategoryIDs(ctx context.Context, categoryIDs []string) (map[string][]*domain.Product, error) {
-	const query = `
+	query := `
         SELECT
             p.id,
             p.price,
@@ -759,6 +759,50 @@ func (r *ProductRepository) FindByCategoryIDs(ctx context.Context, categoryIDs [
 	result := make(map[string][]*domain.Product, len(products))
 	for _, p := range products {
 		key := p.CategoryID.String()
+		result[key] = append(result[key], p)
+	}
+
+	return result, nil
+}
+
+func (r *ProductRepository) BatchGetProductByIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Product, error) {
+	if len(productIDs) == 0 {
+		return map[string][]*domain.Product{}, nil
+	}
+
+	query := `
+        SELECT
+            p.id,
+            p.price,
+            p.code,
+            p.slug,
+            p.piece_count,
+            p.is_visible,
+            p.is_available,
+            p.is_halal,
+            p.is_vegan,
+            p.category_id,
+            p.created_at,
+            p.updated_at,
+            t.locale,
+            t.name,
+            t.description
+        FROM products p
+        LEFT JOIN product_translations t ON p.id = t.product_id
+        WHERE p.id = ANY($1)
+        ORDER BY p.code;
+    `
+
+	// Appel du helper pour exécuter la requête et mapper les produits
+	products, err := r.queryProducts(ctx, query, pq.Array(productIDs))
+	if err != nil {
+		return nil, err
+	}
+
+	// On groupe les produits par leur ID
+	result := make(map[string][]*domain.Product, len(productIDs))
+	for _, p := range products {
+		key := p.ID.String()
 		result[key] = append(result[key], p)
 	}
 

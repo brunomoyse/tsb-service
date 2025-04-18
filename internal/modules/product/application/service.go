@@ -21,6 +21,7 @@ type ProductService interface {
 
 	BatchGetCategoriesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Category, error)
 	BatchGetProductsByCategory(ctx context.Context, categoryIDs []string) (map[string][]*domain.Product, error)
+	BatchGetProductByIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Product, error)
 }
 
 type productService struct {
@@ -103,4 +104,8 @@ func (s *productService) BatchGetCategoriesByProductIDs(ctx context.Context, pro
 
 func (s *productService) BatchGetProductsByCategory(ctx context.Context, categoryIDs []string) (map[string][]*domain.Product, error) {
 	return s.repo.FindByCategoryIDs(ctx, categoryIDs)
+}
+
+func (s *productService) BatchGetProductByIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Product, error) {
+	return s.repo.BatchGetProductByIDs(ctx, productIDs)
 }

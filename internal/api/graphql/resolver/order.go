@@ -12,11 +12,14 @@ import (
 	addressApplication "tsb-service/internal/modules/address/application"
 	addressDomain "tsb-service/internal/modules/address/domain"
 	orderApplication "tsb-service/internal/modules/order/application"
-	"tsb-service/internal/modules/order/domain"
+	orderDomain "tsb-service/internal/modules/order/domain"
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	paymentDomain "tsb-service/internal/modules/payment/domain"
+	productApplication "tsb-service/internal/modules/product/application"
+	productDomain "tsb-service/internal/modules/product/domain"
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/utils"
 )
 
 // Address is the resolver for the address field.
@@ -118,7 +121,7 @@ func (r *orderResolver) Items(ctx context.Context, obj *model.Order) ([]*model.O
 	}
 
 	// Map the items to the GraphQL model
-	items := Map(i, func(item *domain.OrderProductRaw) *model.OrderItem {
+	items := Map(i, func(item *orderDomain.OrderProductRaw) *model.OrderItem {
 		return ToGQLOrderItem(item)
 	})
 
@@ -127,7 +130,33 @@ func (r *orderResolver) Items(ctx context.Context, obj *model.Order) ([]*model.O
 
 // Product is the resolver for the product field.
 func (r *orderItemResolver) Product(ctx context.Context, obj *model.OrderItem) (*model.Product, error) {
-	panic(fmt.Errorf("not implemented: Product - product"))
+	userLang := utils.GetLang(ctx)
+	productID := obj.ProductID
+
+	loader := productApplication.GetOrderItemProductLoader(ctx)
+
+	if loader == nil {
+		return nil, fmt.Errorf("no order item product loader found")
+	}
+
+	// Check for error while loading the product.
+	p, err := loader.Loader.Load(ctx, productID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load order item product: %w", err)
+	}
+
+	// Map the product to the GraphQL model
+	products := Map(p, func(product *productDomain.Product) *model.Product {
+		return ToGQLProduct(product, userLang)
+	})
+
+	// Return nil if no products were found.
+	if len(products) == 0 {
+		return nil, nil
+	}
+
+	// Return the first product found. (Assuming one order item belongs to one product)
+	return products[0], nil
 }
 
 // Orders is the resolver for the orders field.
@@ -137,7 +166,7 @@ func (r *queryResolver) Orders(ctx context.Context) ([]*model.Order, error) {
 		return nil, fmt.Errorf("failed to get orders: %w", err)
 	}
 
-	orders := Map(o, func(order *domain.Order) *model.Order {
+	orders := Map(o, func(order *orderDomain.Order) *model.Order {
 		return ToGQLOrder(order)
 	})
 
