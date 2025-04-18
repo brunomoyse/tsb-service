@@ -179,9 +179,5 @@ func (r *Resolver) Order() graphql1.OrderResolver { return &orderResolver{r} }
 // OrderItem returns graphql1.OrderItemResolver implementation.
 func (r *Resolver) OrderItem() graphql1.OrderItemResolver { return &orderItemResolver{r} }
 
-// Query returns graphql1.QueryResolver implementation.
-func (r *Resolver) Query() graphql1.QueryResolver { return &queryResolver{r} }
-
 type orderResolver struct{ *Resolver }
 type orderItemResolver struct{ *Resolver }
-type queryResolver struct{ *Resolver }

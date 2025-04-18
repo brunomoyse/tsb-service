@@ -109,6 +109,13 @@ type ProductCategory struct {
 type Query struct {
 }
 
+type Street struct {
+	ID               string `json:"id"`
+	StreetName       string `json:"streetName"`
+	MunicipalityName string `json:"municipalityName"`
+	Postcode         string `json:"postcode"`
+}
+
 type User struct {
 	ID          uuid.UUID `json:"id"`
 	Email       string    `json:"email"`

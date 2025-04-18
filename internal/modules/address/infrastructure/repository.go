@@ -17,7 +17,7 @@ func NewAddressRepository(db *sqlx.DB) domain.AddressRepository {
 	return &AddressRepository{db: db}
 }
 
-func (r *AddressRepository) SearchStreetNames(ctx context.Context, query string) ([]domain.Street, error) {
+func (r *AddressRepository) SearchStreetNames(ctx context.Context, query string) ([]*domain.Street, error) {
 	sqlQuery := `
 		SELECT street_id, streetname_fr, municipality_name_fr, postcode
 		FROM streets
@@ -25,10 +25,23 @@ func (r *AddressRepository) SearchStreetNames(ctx context.Context, query string)
 		ORDER BY similarity(streetname_fr_unaccent, lower(unaccent($1))) DESC
 		LIMIT 5;
 	`
-	var streets []domain.Street
-	if err := r.db.SelectContext(ctx, &streets, sqlQuery, query); err != nil {
+
+	var streetRows []domain.Street
+	if err := r.db.SelectContext(ctx, &streetRows, sqlQuery, query); err != nil {
 		return nil, err
 	}
+
+	// Return early if no results
+	if len(streetRows) == 0 {
+		return []*domain.Street{}, nil
+	}
+
+	// Convert to []*domain.Street
+	streets := make([]*domain.Street, len(streetRows))
+	for i := range streetRows {
+		streets[i] = &streetRows[i]
+	}
+
 	return streets, nil
 }
 

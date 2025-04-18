@@ -77,6 +77,15 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 	}
 }
 
+func ToGQLOrderItem(oi *orderDomain.OrderProductRaw) *model.OrderItem {
+	return &model.OrderItem{
+		ProductID:  oi.ProductID,
+		Quantity:   int(oi.Quantity),
+		UnitPrice:  oi.UnitPrice.String(),
+		TotalPrice: oi.TotalPrice.String(),
+	}
+}
+
 func ToGQLPayment(p *paymentDomain.MolliePayment) *model.Payment {
 	var links map[string]any
 	_ = json.Unmarshal(p.Links, &links)
@@ -102,11 +111,11 @@ func ToGQLAddress(a *addressDomain.Address) *model.Address {
 	}
 }
 
-func ToGQLOrderItem(oi *orderDomain.OrderProductRaw) *model.OrderItem {
-	return &model.OrderItem{
-		ProductID:  oi.ProductID,
-		Quantity:   int(oi.Quantity),
-		UnitPrice:  oi.UnitPrice.String(),
-		TotalPrice: oi.TotalPrice.String(),
+func ToGQLStreet(s *addressDomain.Street) *model.Street {
+	return &model.Street{
+		ID:               s.ID,
+		StreetName:       s.StreetName,
+		MunicipalityName: s.MunicipalityName,
+		Postcode:         s.Postcode,
 	}
 }
