@@ -1,4 +1,2 @@
-"""
-Marks a field or query/mutation that requires a logged‑in user.
-"""
 directive @auth on FIELD_DEFINITION
+directive @admin on FIELD_DEFINITION

@@ -34,6 +34,7 @@ func OptionalAuthMiddleware(secretKey string) gin.HandlerFunc {
 
 			if err == nil && token.Valid && claims.Subject != "" {
 				ctxWithUser := utils.SetUserID(c.Request.Context(), claims.Subject)
+				ctxWithUser = utils.SetIsAdmin(ctxWithUser, claims.Audience != nil && len(claims.Audience) > 0 && claims.Audience[0] == "admin")
 				c.Request = c.Request.WithContext(ctxWithUser)
 
 				// (optional) also set in Gin if you ever need c.Get("userID")

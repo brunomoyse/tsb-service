@@ -46,6 +46,7 @@ func NewResolver(
 func GraphQLHandler(resolver *Resolver) gin.HandlerFunc {
 	cfg := graphql.Config{Resolvers: resolver}
 	cfg.Directives.Auth = directives.Auth
+	cfg.Directives.Admin = directives.Admin
 
 	h := handler.New(graphql.NewExecutableSchema(cfg))
 

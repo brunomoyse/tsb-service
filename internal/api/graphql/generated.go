@@ -50,7 +50,8 @@ type ResolverRoot interface {
 }
 
 type DirectiveRoot struct {
-	Auth func(ctx context.Context, obj any, next graphql.Resolver) (res any, err error)
+	Admin func(ctx context.Context, obj any, next graphql.Resolver) (res any, err error)
+	Auth  func(ctx context.Context, obj any, next graphql.Resolver) (res any, err error)
 }
 
 type ComplexityRoot struct {
@@ -5443,11 +5444,11 @@ func (ec *executionContext) _Query_orders(ctx context.Context, field graphql.Col
 		}
 
 		directive1 := func(ctx context.Context) (any, error) {
-			if ec.directives.Auth == nil {
+			if ec.directives.Admin == nil {
 				var zeroVal []*model.Order
-				return zeroVal, errors.New("directive auth is not implemented")
+				return zeroVal, errors.New("directive admin is not implemented")
 			}
-			return ec.directives.Auth(ctx, nil, directive0)
+			return ec.directives.Admin(ctx, nil, directive0)
 		}
 
 		tmp, err := directive1(rctx)
@@ -5545,11 +5546,11 @@ func (ec *executionContext) _Query_order(ctx context.Context, field graphql.Coll
 		}
 
 		directive1 := func(ctx context.Context) (any, error) {
-			if ec.directives.Auth == nil {
+			if ec.directives.Admin == nil {
 				var zeroVal *model.Order
-				return zeroVal, errors.New("directive auth is not implemented")
+				return zeroVal, errors.New("directive admin is not implemented")
 			}
-			return ec.directives.Auth(ctx, nil, directive0)
+			return ec.directives.Admin(ctx, nil, directive0)
 		}
 
 		tmp, err := directive1(rctx)
