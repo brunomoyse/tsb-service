@@ -20,6 +20,8 @@ import (
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/utils"
+
+	"github.com/google/uuid"
 )
 
 // Address is the resolver for the address field.
@@ -171,6 +173,60 @@ func (r *queryResolver) Orders(ctx context.Context) ([]*model.Order, error) {
 	})
 
 	return orders, nil
+}
+
+// Order is the resolver for the order field.
+func (r *queryResolver) Order(ctx context.Context, id uuid.UUID) (*model.Order, error) {
+	o, _, err := r.OrderService.GetOrderByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order: %w", err)
+	}
+
+	if o == nil {
+		return nil, nil
+	}
+
+	// Map the order to the GraphQL model
+	order := ToGQLOrder(o)
+
+	return order, nil
+}
+
+// MyOrders is the resolver for the myOrders field.
+func (r *queryResolver) MyOrders(ctx context.Context) ([]*model.Order, error) {
+	userID := utils.GetUserID(ctx)
+
+	// Cast userID to uuid.UUID
+	userUUID, err := uuid.Parse(userID)
+
+	o, err := r.OrderService.GetPaginatedOrders(ctx, 1, 20, &userUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders: %w", err)
+	}
+
+	orders := Map(o, func(order *orderDomain.Order) *model.Order {
+		return ToGQLOrder(order)
+	})
+
+	return orders, nil
+}
+
+// MyOrder is the resolver for the myOrder field.
+func (r *queryResolver) MyOrder(ctx context.Context, id uuid.UUID) (*model.Order, error) {
+	// @TODO: Check if the user is the owner of the order in the service layer.
+	o, _, err := r.OrderService.GetOrderByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order: %w", err)
+	}
+
+	if o == nil {
+		return nil, nil
+	}
+
+	// Map the order to the GraphQL model
+	order := ToGQLOrder(o)
+
+	return order, nil
 }
 
 // Order returns graphql1.OrderResolver implementation.
