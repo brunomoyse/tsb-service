@@ -40,5 +40,8 @@ enum OrderStatusEnum {
 }
 
 extend type Query {
-    orders: [Order!]! @auth
+    orders: [Order!]! @auth # TODO: Admin only
+    order(id: ID!): Order! @auth # TODO: Admin only
+    myOrders: [Order!]! @auth
+    myOrder(id: ID!): Order! @auth
 }

@@ -186,8 +186,6 @@ func main() {
 	api.POST("/admin/products", middleware.AuthMiddleware(jwtSecret), productHandler.CreateProductHandler)
 	api.PUT("/admin/products/:id", middleware.AuthMiddleware(jwtSecret), productHandler.UpdateProductHandler)
 
-	api.GET("/admin/orders", middleware.AuthMiddleware(jwtSecret), orderHandler.GetAdminOrdersHandler)
-	api.GET("/admin/orders/:id", middleware.AuthMiddleware(jwtSecret), orderHandler.GetAdminOrderHandler)
 	api.PATCH("/admin/orders/:id", middleware.AuthMiddleware(jwtSecret), orderHandler.UpdateOrderStatusHandler)
 
 	if err := router.Run(":8080"); err != nil {
