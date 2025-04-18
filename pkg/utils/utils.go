@@ -12,6 +12,7 @@ type contextKey string
 
 const LangKey contextKey = "lang"
 const UserIDKey contextKey = "userID"
+const IsAdminKey contextKey = "isAdmin"
 
 // SetLang stores the language in the context.
 func SetLang(ctx context.Context, lang string) context.Context {
@@ -37,6 +38,15 @@ func GetUserID(ctx context.Context) string {
 		return ""
 	}
 	return userID
+}
+
+func SetIsAdmin(ctx context.Context, isAdmin bool) context.Context {
+	return context.WithValue(ctx, IsAdminKey, isAdmin)
+}
+
+func GetIsAdmin(ctx context.Context) bool {
+	isAdmin, _ := ctx.Value(IsAdminKey).(bool)
+	return isAdmin
 }
 
 var (
