@@ -64,7 +64,7 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		ID:                 o.ID,
 		CreatedAt:          o.CreatedAt,
 		UpdatedAt:          o.UpdatedAt,
-		Status:             model.OrderStatusEnum(o.OrderStatus),
+		Status:             o.OrderStatus,
 		Type:               model.OrderTypeEnum(o.OrderType),
 		IsOnlinePayment:    o.IsOnlinePayment,
 		DiscountAmount:     o.DiscountAmount.String(),

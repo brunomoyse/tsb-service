@@ -27,16 +27,26 @@ type OrderItem {
     totalPrice: String!
 }
 
+enum OrderStatusEnum {
+    PENDING
+    CONFIRMED
+    PREPARING
+    AWAITING_PICK_UP
+    PICKED_UP
+    OUT_FOR_DELIVERY
+    DELIVERED
+    CANCELLED
+    FAILED
+}
+
 enum OrderTypeEnum {
     DELIVERY
     PICKUP
 }
 
-enum OrderStatusEnum {
-    PENDING
-    PROCESSING
-    COMPLETED
-    CANCELED
+input UpdateOrderInput {
+    status: OrderStatusEnum
+    estimatedReadyTime: DateTime
 }
 
 extend type Query {
@@ -44,4 +54,19 @@ extend type Query {
     order(id: ID!): Order! @admin
     myOrders: [Order!]! @auth
     myOrder(id: ID!): Order! @auth
+}
+
+extend type Mutation {
+    updateOrder(
+        id: ID!
+        input: UpdateOrderInput!
+    ): Order! @admin
+}
+
+extend type Subscription {
+    # for the restaurant—fires on *every* order update
+    ordersUpdated: Order! @admin
+
+    # for a customer—fires only when *their* order (by ID) changes
+    myOrderUpdated(orderID: ID!): Order! @auth
 }

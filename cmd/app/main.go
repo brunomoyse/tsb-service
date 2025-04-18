@@ -10,6 +10,7 @@ import (
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
 	productInterfaces "tsb-service/internal/modules/product/interfaces"
+	"tsb-service/pkg/pubsub"
 	"tsb-service/pkg/sse"
 	"tsb-service/services/email/scaleway"
 
@@ -130,8 +131,12 @@ func main() {
 		),
 	)
 
+	// For graphql subscriptions, we need to use a pubsub broker.
+	broker := pubsub.NewBroker()
+
 	// Create the GraphQL resolver with the injected services
 	rootResolver := resolver.NewResolver(
+		broker,
 		addressService,
 		orderService,
 		paymentService,
@@ -145,6 +150,7 @@ func main() {
 	optionalAuthMiddleware := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)
 
 	router.POST("/graphql", optionalAuthMiddleware, graphqlHandler)
+	router.GET("/graphql", middleware.AuthMiddleware(jwtSecret), graphqlHandler)
 
 	// Setup routes (grouped by API version or module as needed)
 	// Setup routes for /api/v1.

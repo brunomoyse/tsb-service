@@ -1,4 +1,3 @@
-// internal/api/graphql/middleware/auth.go
 package middleware
 
 import (
