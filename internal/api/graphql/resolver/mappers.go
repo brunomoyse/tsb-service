@@ -104,6 +104,7 @@ func ToGQLAddress(a *addressDomain.Address) *model.Address {
 
 func ToGQLOrderItem(oi *orderDomain.OrderProductRaw) *model.OrderItem {
 	return &model.OrderItem{
+		ProductID:  oi.ProductID,
 		Quantity:   int(oi.Quantity),
 		UnitPrice:  oi.UnitPrice.String(),
 		TotalPrice: oi.TotalPrice.String(),

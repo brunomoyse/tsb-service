@@ -21,6 +21,7 @@ type Order {
 
 type OrderItem {
     product: Product!
+    productID: ID!
     unitPrice: String!
     quantity: Int!
     totalPrice: String!

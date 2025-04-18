@@ -86,6 +86,7 @@ type ComplexityRoot struct {
 
 	OrderItem struct {
 		Product    func(childComplexity int) int
+		ProductID  func(childComplexity int) int
 		Quantity   func(childComplexity int) int
 		TotalPrice func(childComplexity int) int
 		UnitPrice  func(childComplexity int) int
@@ -389,6 +390,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.OrderItem.Product(childComplexity), true
+
+	case "OrderItem.productID":
+		if e.complexity.OrderItem.ProductID == nil {
+			break
+		}
+
+		return e.complexity.OrderItem.ProductID(childComplexity), true
 
 	case "OrderItem.quantity":
 		if e.complexity.OrderItem.Quantity == nil {
@@ -2258,6 +2266,8 @@ func (ec *executionContext) fieldContext_Order_items(_ context.Context, field gr
 			switch field.Name {
 			case "product":
 				return ec.fieldContext_OrderItem_product(ctx, field)
+			case "productID":
+				return ec.fieldContext_OrderItem_productID(ctx, field)
 			case "unitPrice":
 				return ec.fieldContext_OrderItem_unitPrice(ctx, field)
 			case "quantity":
@@ -2338,6 +2348,50 @@ func (ec *executionContext) fieldContext_OrderItem_product(_ context.Context, fi
 				return ec.fieldContext_Product_category(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Product", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderItem_productID(ctx context.Context, field graphql.CollectedField, obj *model.OrderItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_OrderItem_productID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ProductID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uuid.UUID)
+	fc.Result = res
+	return ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_OrderItem_productID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7778,6 +7832,11 @@ func (ec *executionContext) _OrderItem(ctx context.Context, sel ast.SelectionSet
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "productID":
+			out.Values[i] = ec._OrderItem_productID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "unitPrice":
 			out.Values[i] = ec._OrderItem_unitPrice(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
