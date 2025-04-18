@@ -84,26 +84,28 @@ type Payment struct {
 }
 
 type Product struct {
-	ID          uuid.UUID        `json:"id"`
-	CreatedAt   time.Time        `json:"createdAt"`
-	Price       string           `json:"price"`
-	Code        *string          `json:"code,omitempty"`
-	Slug        string           `json:"slug"`
-	PieceCount  *int             `json:"pieceCount,omitempty"`
-	IsVisible   bool             `json:"isVisible"`
-	IsAvailable bool             `json:"isAvailable"`
-	IsHalal     bool             `json:"isHalal"`
-	IsVegan     bool             `json:"isVegan"`
-	Name        string           `json:"name"`
-	Description *string          `json:"description,omitempty"`
-	Category    *ProductCategory `json:"category"`
+	ID           uuid.UUID        `json:"id"`
+	CreatedAt    time.Time        `json:"createdAt"`
+	Price        string           `json:"price"`
+	Code         *string          `json:"code,omitempty"`
+	Slug         string           `json:"slug"`
+	PieceCount   *int             `json:"pieceCount,omitempty"`
+	IsVisible    bool             `json:"isVisible"`
+	IsAvailable  bool             `json:"isAvailable"`
+	IsHalal      bool             `json:"isHalal"`
+	IsVegan      bool             `json:"isVegan"`
+	Name         string           `json:"name"`
+	Description  *string          `json:"description,omitempty"`
+	Category     *ProductCategory `json:"category"`
+	Translations []*Translation   `json:"translations"`
 }
 
 type ProductCategory struct {
-	ID       uuid.UUID  `json:"id"`
-	Name     string     `json:"name"`
-	Order    int        `json:"order"`
-	Products []*Product `json:"products"`
+	ID           uuid.UUID      `json:"id"`
+	Order        int            `json:"order"`
+	Name         string         `json:"name"`
+	Products     []*Product     `json:"products"`
+	Translations []*Translation `json:"translations"`
 }
 
 type Query struct {
@@ -114,6 +116,12 @@ type Street struct {
 	StreetName       string `json:"streetName"`
 	MunicipalityName string `json:"municipalityName"`
 	Postcode         string `json:"postcode"`
+}
+
+type Translation struct {
+	Language    string  `json:"language"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
 }
 
 type User struct {

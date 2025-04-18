@@ -46,6 +46,32 @@ func (r *productResolver) Category(ctx context.Context, obj *model.Product) (*mo
 	return productCategories[0], nil
 }
 
+// Translations is the resolver for the translations field.
+func (r *productResolver) Translations(ctx context.Context, obj *model.Product) ([]*model.Translation, error) {
+	loader := productApplication.GetProductTranslationLoader(ctx)
+	if loader == nil {
+		return nil, errors.New("no product translations loader found")
+	}
+
+	// Load domain.Translation slices by product ID
+	pts, err := loader.Loader.Load(ctx, obj.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load product translations: %w", err)
+	}
+
+	// Map domain.Translation → *model.Translation
+	translations := Map(pts, func(t *domain.Translation) *model.Translation {
+		return ToGQLTranslation(t)
+	})
+
+	// If there are no translations, return nil
+	if len(translations) == 0 {
+		return nil, nil
+	}
+
+	return translations, nil
+}
+
 // Products is the resolver for the products field.
 func (r *productCategoryResolver) Products(ctx context.Context, obj *model.ProductCategory) ([]*model.Product, error) {
 	userLang := utils.GetLang(ctx)
@@ -68,6 +94,34 @@ func (r *productCategoryResolver) Products(ctx context.Context, obj *model.Produ
 	})
 
 	return products, nil
+}
+
+// Translations is the resolver for the translations field.
+func (r *productCategoryResolver) Translations(ctx context.Context, obj *model.ProductCategory) ([]*model.Translation, error) {
+	loader := productApplication.GetCategoryTranslationLoader(ctx)
+
+	if loader == nil {
+		return nil, errors.New("no category translations loader found")
+	}
+
+	// Check for error while loading the translations.
+	pc, err := loader.Loader.Load(ctx, obj.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load category translations: %w", err)
+	}
+
+	// Map the translations to the GraphQL model
+	translations := Map(pc, func(t *domain.Translation) *model.Translation {
+		return ToGQLTranslation(t)
+	})
+
+	// Return nil if no translations were found.
+	if len(translations) == 0 {
+		return nil, nil
+	}
+
+	// Return translations found.
+	return translations, nil
 }
 
 // Products is the resolver for the products field.

@@ -143,13 +143,13 @@ func (h *ProductHandler) GetProductHandler(c *gin.Context) {
 	// Retrieve product by ID (omitting error handling for brevity)
 	product, _ := h.service.GetProduct(c.Request.Context(), productID)
 
-	userLocale := c.GetString("lang")
-	if userLocale == "" {
-		userLocale = "fr"
+	userLang := c.GetString("lang")
+	if userLang == "" {
+		userLang = "fr"
 	}
 
 	// Build your response DTO including only the chosen translation.
-	res := NewPublicProductResponse(product, userLocale)
+	res := NewPublicProductResponse(product, userLang)
 
 	c.JSON(http.StatusOK, res)
 }
@@ -163,14 +163,14 @@ func (h *ProductHandler) GetProductsHandler(c *gin.Context) {
 		return
 	}
 
-	// Assume you extract the user's preferred locale from the request header.
-	userLocale := c.GetHeader("Accept-Language")
+	// Assume you extract the user's preferred language from the request header.
+	userLang := c.GetHeader("Accept-Language")
 
 	// Build your response DTOs including only the chosen translations.
 	var res []PublicProductResponse
 	for _, p := range products {
 		if p.IsVisible == true {
-			res = append(res, *NewPublicProductResponse(p, userLocale))
+			res = append(res, *NewPublicProductResponse(p, userLang))
 		}
 	}
 
@@ -198,13 +198,13 @@ func (h *ProductHandler) GetCategoriesHandler(c *gin.Context) {
 		return
 	}
 
-	// Assume you extract the user's preferred locale from the request header.
-	userLocale := c.GetHeader("Accept-Language")
+	// Assume you extract the user's preferred language from the request header.
+	userLang := c.GetHeader("Accept-Language")
 
 	// Build your response DTOs including only the chosen translations.
 	var res []PublicCategoryResponse
 	for _, c := range categories {
-		res = append(res, *NewPublicCategoryResponse(c, userLocale))
+		res = append(res, *NewPublicCategoryResponse(c, userLang))
 	}
 
 	c.JSON(http.StatusOK, res)
@@ -221,13 +221,13 @@ func (h *ProductHandler) GetProductsByCategoryHandler(c *gin.Context) {
 		return
 	}
 
-	// Assume you extract the user's preferred locale from the request header.
-	userLocale := c.GetHeader("Accept-Language")
+	// Assume you extract the user's preferred language from the request header.
+	userLang := c.GetHeader("Accept-Language")
 
 	// Build your response DTOs including only the chosen translations.
 	var res []PublicProductResponse
 	for _, p := range products {
-		res = append(res, *NewPublicProductResponse(p, userLocale))
+		res = append(res, *NewPublicProductResponse(p, userLang))
 	}
 
 	c.JSON(http.StatusOK, res)

@@ -22,6 +22,8 @@ type ProductService interface {
 	BatchGetCategoriesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Category, error)
 	BatchGetProductsByCategory(ctx context.Context, categoryIDs []string) (map[string][]*domain.Product, error)
 	BatchGetProductByIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Product, error)
+	BatchGetCategoryTranslations(ctx context.Context, categoryIDs []string) (map[string][]*domain.Translation, error)
+	BatchGetProductTranslations(ctx context.Context, productIDs []string) (map[string][]*domain.Translation, error)
 }
 
 type productService struct {
@@ -108,4 +110,12 @@ func (s *productService) BatchGetProductsByCategory(ctx context.Context, categor
 
 func (s *productService) BatchGetProductByIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Product, error) {
 	return s.repo.BatchGetProductByIDs(ctx, productIDs)
+}
+
+func (s *productService) BatchGetCategoryTranslations(ctx context.Context, categoryIDs []string) (map[string][]*domain.Translation, error) {
+	return s.repo.BatchGetCategoryTranslations(ctx, categoryIDs)
+}
+
+func (s *productService) BatchGetProductTranslations(ctx context.Context, productIDs []string) (map[string][]*domain.Translation, error) {
+	return s.repo.BatchGetProductTranslations(ctx, productIDs)
 }

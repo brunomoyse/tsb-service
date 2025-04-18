@@ -37,7 +37,7 @@ type UpdateProductRequest struct {
 }
 
 type UpdateTranslationRequest struct {
-	Language    string  `json:"locale"`
+	Language    string  `json:"language"`
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
 }

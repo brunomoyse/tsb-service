@@ -10,17 +10,33 @@ type Product {
     isHalal: Boolean!
     isVegan: Boolean!
 
+    # Generated based on Accept-Language header
     name: String!
     description: String
 
     category: ProductCategory!
+
+    # Admin only
+    translations: [Translation!]!
+}
+
+type Translation {
+    language: String!,
+    name: String!,
+    description: String
 }
 
 type ProductCategory {
     id: ID!
-    name: String!
     order: Int!
+
+    # Generated based on Accept-Language header
+    name: String!
+
     products: [Product!]!
+
+    # Admin only
+    translations: [Translation!]!
 }
 
 extend type Query {

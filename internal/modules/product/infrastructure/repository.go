@@ -63,7 +63,7 @@ func (r *ProductRepository) Create(ctx context.Context, product *domain.Product)
 		SELECT name
 		FROM product_category_translations 
 		WHERE product_category_id = $1 
-		  AND locale = 'fr'
+		  AND language = 'fr'
 	`
 		err = tx.QueryRowContext(ctx, queryCategory, product.CategoryID.String()).Scan(&frenchCategoryName)
 		if err != nil {
@@ -99,7 +99,7 @@ func (r *ProductRepository) Create(ctx context.Context, product *domain.Product)
 
 	// Insert each translation.
 	translationQuery := `
-		INSERT INTO product_translations (id, product_id, locale, name, description)
+		INSERT INTO product_translations (id, product_id, language, name, description)
 		VALUES ($1, $2, $3, $4, $5)
 	`
 	for _, t := range product.Translations {
@@ -154,7 +154,7 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 		SELECT name 
 		FROM product_category_translations 
 		WHERE product_category_id = $1 
-		  AND locale = 'fr'
+		  AND language = 'fr'
 	`
 		err = tx.QueryRowContext(ctx, queryCategory, product.CategoryID.String()).Scan(&frenchCategoryName)
 		if err != nil {
@@ -197,13 +197,13 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 		return fmt.Errorf("failed to update product: %w", err)
 	}
 
-	// Upsert translations for the provided locales.
-	// This query inserts a new translation, or if a conflict on (product_id, locale) occurs,
+	// Upsert translations for the provided languages.
+	// This query inserts a new translation, or if a conflict on (product_id, language) occurs,
 	// updates the name and description.
 	upsertQuery := `
-		INSERT INTO product_translations (product_id, locale, name, description)
+		INSERT INTO product_translations (product_id, language, name, description)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (product_id, locale)
+		ON CONFLICT (product_id, language)
 		DO UPDATE SET
 		    name = EXCLUDED.name,
 		    description = EXCLUDED.description
@@ -216,7 +216,7 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 			t.Description,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to upsert translation for locale %s: %w", t.Language, err)
+			return fmt.Errorf("failed to upsert translation for language %s: %w", t.Language, err)
 		}
 	}
 
@@ -243,7 +243,7 @@ func (r *ProductRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain
             p.category_id,
             p.created_at,
             p.updated_at,
-            t.locale,
+            t.language,
             t.name,
             t.description
         FROM products p
@@ -276,7 +276,7 @@ func (r *ProductRepository) FindAll(ctx context.Context) ([]*domain.Product, err
             p.category_id,
             p.created_at,
             p.updated_at,
-            t.locale,
+            t.language,
             t.name,
             t.description
         FROM products p
@@ -300,8 +300,8 @@ func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) 
 		LEFT JOIN product_translations pt ON p.id = pt.product_id
 		LEFT JOIN product_category_translations pct ON p.category_id = pct.product_category_id
 		WHERE p.id = ANY($1)
-		AND pt.locale = $2
-		AND pct.locale = $2
+		AND pt.language = $2
+		AND pct.language = $2
 		ORDER BY p.code;
 	`
 	var products []*domain.ProductOrderDetails
@@ -328,7 +328,7 @@ func (r *ProductRepository) FindByCategoryID(ctx context.Context, categoryID str
             p.category_id,
             p.created_at,
             p.updated_at,
-            t.locale,
+            t.language,
             t.name,
             t.description
         FROM products p
@@ -344,7 +344,7 @@ func (r *ProductRepository) FindAllCategories(ctx context.Context) ([]*domain.Ca
         SELECT 
             c.id,
             c.order,
-            t.locale,
+            t.language,
             t.name
         FROM product_categories c
         LEFT JOIN product_category_translations t ON c.id = t.product_category_id;
@@ -363,10 +363,10 @@ func (r *ProductRepository) FindAllCategories(ctx context.Context) ([]*domain.Ca
 
 	// Define a temporary struct that uses pointers for nullable columns.
 	type categoryRow struct {
-		ID     string  `db:"id"`
-		Order  int     `db:"order"`
-		Locale *string `db:"locale"`
-		Name   *string `db:"name"`
+		ID       string  `db:"id"`
+		Order    int     `db:"order"`
+		Language *string `db:"language"`
+		Name     *string `db:"name"`
 	}
 
 	// Use a map to group rows by category ID.
@@ -392,10 +392,10 @@ func (r *ProductRepository) FindAllCategories(ctx context.Context) ([]*domain.Ca
 			categoriesMap[row.ID] = cat
 		}
 
-		// Append a translation if both locale and name are non-nil.
-		if row.Locale != nil && row.Name != nil {
+		// Append a translation if both language and name are non-nil.
+		if row.Language != nil && row.Name != nil {
 			translation := domain.Translation{
-				Language: *row.Locale,
+				Language: *row.Language,
 				Name:     *row.Name,
 			}
 			cat.Translations = append(cat.Translations, translation)
@@ -425,7 +425,7 @@ func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) 
         SELECT 
             c.id,
             c.order,
-            t.locale,
+            t.language,
             t.name
         FROM product_categories c
         LEFT JOIN product_category_translations t 
@@ -447,7 +447,7 @@ func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) 
 	type categoryRow struct {
 		ID       uuid.UUID `db:"id"`
 		Order    int       `db:"order"`
-		Language *string   `db:"locale"`
+		Language *string   `db:"language"`
 		Name     *string   `db:"name"`
 	}
 
@@ -521,7 +521,7 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 		CategoryID       string          `db:"category_id"`
 		CreatedAt        time.Time       `db:"created_at"`
 		UpdatedAt        time.Time       `db:"updated_at"`
-		Locale           *string         `db:"locale"`
+		Language         *string         `db:"language"`
 		TransName        *string         `db:"name"`
 		TransDescription *string         `db:"description"`
 	}
@@ -572,9 +572,9 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 		}
 
 		// Append translation if available.
-		if row.Locale != nil && row.TransName != nil {
+		if row.Language != nil && row.TransName != nil {
 			trans := domain.Translation{
-				Language: *row.Locale,
+				Language: *row.Language,
 				Name:     *row.TransName,
 			}
 			if row.TransDescription != nil {
@@ -661,13 +661,13 @@ func (r *ProductRepository) FindCategoriesByProductIDs(ctx context.Context, prod
 			p.id AS product_id,
 			pc.id AS category_id,
 			pc.order AS category_order,
-			pct.locale AS locale,
+			pct.language AS language,
 			pct.name AS category_name
 		FROM products p
 		JOIN product_categories pc ON p.category_id = pc.id
 		JOIN product_category_translations pct ON pc.id = pct.product_category_id
 		WHERE p.id = ANY($1)
-		AND pct.locale = $2
+		AND pct.language = $2
 	`
 
 	rows, err := r.db.QueryxContext(ctx, query, pq.Array(productIDs), "fr")
@@ -689,7 +689,7 @@ func (r *ProductRepository) FindCategoriesByProductIDs(ctx context.Context, prod
 			ProductID     uuid.UUID `db:"product_id"`
 			CategoryID    uuid.UUID `db:"category_id"`
 			CategoryOrder int       `db:"category_order"`
-			Locale        string    `db:"locale"`
+			Language      string    `db:"language"`
 			CategoryName  string    `db:"category_name"`
 		}
 
@@ -704,7 +704,7 @@ func (r *ProductRepository) FindCategoriesByProductIDs(ctx context.Context, prod
 			Order: cr.CategoryOrder,
 			Translations: []domain.Translation{
 				{
-					Language: cr.Locale,
+					Language: cr.Language,
 					Name:     cr.CategoryName,
 				},
 			},
@@ -739,7 +739,7 @@ func (r *ProductRepository) FindByCategoryIDs(ctx context.Context, categoryIDs [
             p.category_id,
             p.created_at,
             p.updated_at,
-            t.locale,
+            t.language,
             t.name,
             t.description
         FROM products p
@@ -784,7 +784,7 @@ func (r *ProductRepository) BatchGetProductByIDs(ctx context.Context, productIDs
             p.category_id,
             p.created_at,
             p.updated_at,
-            t.locale,
+            t.language,
             t.name,
             t.description
         FROM products p
@@ -807,4 +807,115 @@ func (r *ProductRepository) BatchGetProductByIDs(ctx context.Context, productIDs
 	}
 
 	return result, nil
+}
+
+func (r *ProductRepository) BatchGetProductTranslations(
+	ctx context.Context,
+	productIDs []string,
+) (map[string][]*domain.Translation, error) {
+	// 1) early return for empty input
+	if len(productIDs) == 0 {
+		return make(map[string][]*domain.Translation), nil
+	}
+
+	// 2) pull back product_id so we can key our map
+	const query = `
+    SELECT
+      pt.product_id,
+      pt.language,
+      pt.name,
+      pt.description
+    FROM product_translations AS pt
+    WHERE pt.product_id = ANY($1);
+    `
+
+	// 3) execute the query
+	rows, err := r.db.QueryxContext(ctx, query, pq.Array(productIDs))
+	if err != nil {
+		return nil, fmt.Errorf("failed to query product translations: %w", err)
+	}
+	defer rows.Close()
+
+	// 4) prepare the result map
+	translationsByProduct := make(map[string][]*domain.Translation)
+
+	// 5) scan & group
+	for rows.Next() {
+		var tr struct {
+			ProductID string `db:"product_id"`
+			domain.Translation
+		}
+		if err := rows.StructScan(&tr); err != nil {
+			return nil, fmt.Errorf("failed to scan translation row: %w", err)
+		}
+
+		t := &domain.Translation{
+			Language:    tr.Language,
+			Name:        tr.Name,
+			Description: tr.Description,
+		}
+		translationsByProduct[tr.ProductID] = append(translationsByProduct[tr.ProductID], t)
+	}
+
+	// 6) catch any iteration error
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating translation rows: %w", err)
+	}
+
+	return translationsByProduct, nil
+}
+
+func (r *ProductRepository) BatchGetCategoryTranslations(
+	ctx context.Context,
+	categoryIDs []string,
+) (map[string][]*domain.Translation, error) {
+	// 1) early exit on no input
+	if len(categoryIDs) == 0 {
+		return make(map[string][]*domain.Translation), nil
+	}
+
+	// 2) pull back the FK so we can key the map
+	const query = `
+    SELECT
+      pct.product_category_id,
+      pct.language,
+      pct.name
+    FROM product_category_translations AS pct
+    WHERE pct.product_category_id = ANY($1);
+    `
+
+	// 3) run the query with pq.Array
+	rows, err := r.db.QueryxContext(ctx, query, pq.Array(categoryIDs))
+	if err != nil {
+		return nil, fmt.Errorf("failed to query category translations: %w", err)
+	}
+	defer rows.Close()
+
+	// 4) prepare the result map
+	translationsByCat := make(map[string][]*domain.Translation)
+
+	// 5) scan each row and group
+	for rows.Next() {
+		var tr struct {
+			CategoryID string `db:"product_category_id"`
+			Language   string `db:"language"`
+			Name       string `db:"name"`
+		}
+		if err := rows.StructScan(&tr); err != nil {
+			return nil, fmt.Errorf("failed to scan translation row: %w", err)
+		}
+
+		t := &domain.Translation{
+			Language: tr.Language,
+			Name:     tr.Name,
+		}
+		translationsByCat[tr.CategoryID] = append(translationsByCat[tr.CategoryID], t)
+	}
+
+	// 6) check iteration errors
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating translation rows: %w", err)
+	}
+
+	return translationsByCat, nil
 }
