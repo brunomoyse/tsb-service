@@ -6,7 +6,7 @@ import (
 )
 
 type AddressService interface {
-	SearchStreetNames(ctx context.Context, query string) ([]domain.Street, error)
+	SearchStreetNames(ctx context.Context, query string) ([]*domain.Street, error)
 	GetDistinctHouseNumbers(ctx context.Context, streetID string) ([]string, error)
 	GetBoxNumbers(ctx context.Context, streetID string, houseNumber string) ([]*string, error)
 	GetFinalAddress(ctx context.Context, streetID string, houseNumber string, boxNumber *string) (*domain.Address, error)
@@ -25,7 +25,7 @@ func NewAddressService(repo domain.AddressRepository) AddressService {
 	}
 }
 
-func (s *addressService) SearchStreetNames(ctx context.Context, query string) ([]domain.Street, error) {
+func (s *addressService) SearchStreetNames(ctx context.Context, query string) ([]*domain.Street, error) {
 	streetNames, err := s.repo.SearchStreetNames(ctx, query)
 	if err != nil {
 		return nil, err
