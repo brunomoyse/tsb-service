@@ -119,3 +119,11 @@ func ToGQLStreet(s *addressDomain.Street) *model.Street {
 		Postcode:         s.Postcode,
 	}
 }
+
+func ToGQLTranslation(s *productDomain.Translation) *model.Translation {
+	return &model.Translation{
+		Language:    s.Language,
+		Name:        s.Name,
+		Description: s.Description,
+	}
+}

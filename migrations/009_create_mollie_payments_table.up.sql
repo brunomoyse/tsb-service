@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS public.mollie_payments
     order_id uuid NOT NULL,                   -- reference to the related order
     is_cancelable boolean NOT NULL DEFAULT false,
     mode text,
-    locale text,
+    language text,
     method text,
     metadata jsonb,
     links jsonb,

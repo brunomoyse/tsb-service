@@ -27,8 +27,6 @@ import (
 
 	addressApplication "tsb-service/internal/modules/address/application"
 	addressInfrastructure "tsb-service/internal/modules/address/infrastructure"
-	addressInterfaces "tsb-service/internal/modules/address/interfaces"
-
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/oauth2"
@@ -84,7 +82,6 @@ func main() {
 	productService := productApplication.NewProductService(productRepo)
 	userService := userApplication.NewUserService(userRepo)
 
-	addressHandler := addressInterfaces.NewAddressHandler(addressService)
 	orderHandler := orderInterfaces.NewOrderHandler(orderService, productService, paymentService, addressService, userService)
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService)
 	productHandler := productInterfaces.NewProductHandler(productService)
@@ -167,13 +164,6 @@ func main() {
 	//
 	// PUBLIC ROUTES
 	//
-
-	api.GET("/addresses/streets", addressHandler.GetStreetNamesHandler)
-	api.GET("/addresses/house-numbers", addressHandler.GetHouseNumbersHandler)
-	api.GET("/addresses/box-numbers", addressHandler.GetBoxNumbersHandler)
-	api.GET("/addresses/final-address", addressHandler.GetFinalAddressHandler)
-	api.GET("/addresses/:id", addressHandler.GetAddressByIDHandler)
-
 	api.POST("/login", userHandler.LoginHandler)
 	api.POST("/register", userHandler.RegisterHandler)
 	api.GET("/verify", userHandler.VerifyEmailHandler)
