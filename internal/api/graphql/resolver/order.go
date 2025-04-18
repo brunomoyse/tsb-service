@@ -24,6 +24,29 @@ import (
 	"github.com/google/uuid"
 )
 
+// UpdateOrder is the resolver for the updateOrder field.
+func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input model.UpdateOrderInput) (*model.Order, error) {
+	err := r.OrderService.UpdateOrderStatus(ctx, id, *input.Status)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update order status: %w", err)
+	}
+
+	// Fetch the updated order
+	o, _, err := r.OrderService.GetOrderByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order: %w", err)
+	}
+
+	// Map the order to the GraphQL model
+	order := ToGQLOrder(o)
+
+	// Publish the order update to the broker
+	r.Broker.Publish("ordersUpdated", order)
+	r.Broker.Publish(fmt.Sprintf("orderUpdated:%s", id), order)
+
+	return order, nil
+}
+
 // Address is the resolver for the address field.
 func (r *orderResolver) Address(ctx context.Context, obj *model.Order) (*model.Address, error) {
 	loader := addressApplication.GetOrderAddressLoader(ctx)
@@ -229,11 +252,69 @@ func (r *queryResolver) MyOrder(ctx context.Context, id uuid.UUID) (*model.Order
 	return order, nil
 }
 
+// OrdersUpdated is the resolver for the ordersUpdated field.
+func (r *subscriptionResolver) OrdersUpdated(ctx context.Context) (<-chan *model.Order, error) {
+	ch := make(chan *model.Order, 1)
+	sub := r.Broker.Subscribe("ordersUpdated")
+
+	go func() {
+		<-ctx.Done()
+		r.Broker.Unsubscribe("ordersUpdated", sub)
+	}()
+
+	go func() {
+		for msg := range sub {
+			if o, ok := msg.(*model.Order); ok {
+				ch <- o
+			}
+		}
+	}()
+
+	return ch, nil
+}
+
+// MyOrderUpdated is the resolver for the myOrderUpdated field.
+func (r *subscriptionResolver) MyOrderUpdated(ctx context.Context, orderID uuid.UUID) (<-chan *model.Order, error) {
+	userID := utils.GetUserID(ctx)
+	if userID == "" {
+		return nil, fmt.Errorf("UNAUTHENTICATED")
+	}
+	// @todo: verify the order belongs to this user
+	// e.g. if !r.OrderService.BelongsTo(ctx, userID, orderID) { error }
+
+	topic := fmt.Sprintf("orderUpdated:%s", orderID)
+	ch := make(chan *model.Order, 1)
+	sub := r.Broker.Subscribe(topic)
+
+	go func() {
+		<-ctx.Done()
+		r.Broker.Unsubscribe(topic, sub)
+	}()
+
+	go func() {
+		for msg := range sub {
+			if o, ok := msg.(*model.Order); ok {
+				ch <- o
+			}
+		}
+	}()
+
+	return ch, nil
+}
+
+// Mutation returns graphql1.MutationResolver implementation.
+func (r *Resolver) Mutation() graphql1.MutationResolver { return &mutationResolver{r} }
+
 // Order returns graphql1.OrderResolver implementation.
 func (r *Resolver) Order() graphql1.OrderResolver { return &orderResolver{r} }
 
 // OrderItem returns graphql1.OrderItemResolver implementation.
 func (r *Resolver) OrderItem() graphql1.OrderItemResolver { return &orderItemResolver{r} }
 
+// Subscription returns graphql1.SubscriptionResolver implementation.
+func (r *Resolver) Subscription() graphql1.SubscriptionResolver { return &subscriptionResolver{r} }
+
+type mutationResolver struct{ *Resolver }
 type orderResolver struct{ *Resolver }
 type orderItemResolver struct{ *Resolver }
+type subscriptionResolver struct{ *Resolver }

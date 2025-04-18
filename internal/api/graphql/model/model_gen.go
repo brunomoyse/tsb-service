@@ -7,6 +7,7 @@ import (
 	"io"
 	"strconv"
 	"time"
+	"tsb-service/internal/modules/order/domain"
 
 	"github.com/google/uuid"
 )
@@ -21,24 +22,27 @@ type Address struct {
 	Distance         float64 `json:"distance"`
 }
 
+type Mutation struct {
+}
+
 type Order struct {
-	ID                 uuid.UUID       `json:"id"`
-	CreatedAt          time.Time       `json:"createdAt"`
-	UpdatedAt          time.Time       `json:"updatedAt"`
-	Status             OrderStatusEnum `json:"status"`
-	Type               OrderTypeEnum   `json:"type"`
-	IsOnlinePayment    bool            `json:"isOnlinePayment"`
-	DiscountAmount     string          `json:"discountAmount"`
-	DeliveryFee        string          `json:"deliveryFee"`
-	TotalPrice         string          `json:"totalPrice"`
-	EstimatedReadyTime *time.Time      `json:"estimatedReadyTime,omitempty"`
-	AddressExtra       *string         `json:"addressExtra,omitempty"`
-	OrderNote          *string         `json:"orderNote,omitempty"`
-	OrderExtra         map[string]any  `json:"orderExtra,omitempty"`
-	Address            *Address        `json:"address,omitempty"`
-	Customer           *User           `json:"customer"`
-	Payment            *Payment        `json:"payment,omitempty"`
-	Items              []*OrderItem    `json:"items"`
+	ID                 uuid.UUID          `json:"id"`
+	CreatedAt          time.Time          `json:"createdAt"`
+	UpdatedAt          time.Time          `json:"updatedAt"`
+	Status             domain.OrderStatus `json:"status"`
+	Type               OrderTypeEnum      `json:"type"`
+	IsOnlinePayment    bool               `json:"isOnlinePayment"`
+	DiscountAmount     string             `json:"discountAmount"`
+	DeliveryFee        string             `json:"deliveryFee"`
+	TotalPrice         string             `json:"totalPrice"`
+	EstimatedReadyTime *time.Time         `json:"estimatedReadyTime,omitempty"`
+	AddressExtra       *string            `json:"addressExtra,omitempty"`
+	OrderNote          *string            `json:"orderNote,omitempty"`
+	OrderExtra         map[string]any     `json:"orderExtra,omitempty"`
+	Address            *Address           `json:"address,omitempty"`
+	Customer           *User              `json:"customer"`
+	Payment            *Payment           `json:"payment,omitempty"`
+	Items              []*OrderItem       `json:"items"`
 }
 
 type OrderItem struct {
@@ -118,10 +122,18 @@ type Street struct {
 	Postcode         string `json:"postcode"`
 }
 
+type Subscription struct {
+}
+
 type Translation struct {
 	Language    string  `json:"language"`
 	Name        string  `json:"name"`
 	Description *string `json:"description,omitempty"`
+}
+
+type UpdateOrderInput struct {
+	Status             *domain.OrderStatus `json:"status,omitempty"`
+	EstimatedReadyTime *time.Time          `json:"estimatedReadyTime,omitempty"`
 }
 
 type User struct {
@@ -132,51 +144,6 @@ type User struct {
 	PhoneNumber *string   `json:"phoneNumber,omitempty"`
 	Address     *Address  `json:"address,omitempty"`
 	Orders      []*Order  `json:"orders,omitempty"`
-}
-
-type OrderStatusEnum string
-
-const (
-	OrderStatusEnumPending    OrderStatusEnum = "PENDING"
-	OrderStatusEnumProcessing OrderStatusEnum = "PROCESSING"
-	OrderStatusEnumCompleted  OrderStatusEnum = "COMPLETED"
-	OrderStatusEnumCanceled   OrderStatusEnum = "CANCELED"
-)
-
-var AllOrderStatusEnum = []OrderStatusEnum{
-	OrderStatusEnumPending,
-	OrderStatusEnumProcessing,
-	OrderStatusEnumCompleted,
-	OrderStatusEnumCanceled,
-}
-
-func (e OrderStatusEnum) IsValid() bool {
-	switch e {
-	case OrderStatusEnumPending, OrderStatusEnumProcessing, OrderStatusEnumCompleted, OrderStatusEnumCanceled:
-		return true
-	}
-	return false
-}
-
-func (e OrderStatusEnum) String() string {
-	return string(e)
-}
-
-func (e *OrderStatusEnum) UnmarshalGQL(v any) error {
-	str, ok := v.(string)
-	if !ok {
-		return fmt.Errorf("enums must be strings")
-	}
-
-	*e = OrderStatusEnum(str)
-	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid OrderStatusEnum", str)
-	}
-	return nil
-}
-
-func (e OrderStatusEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type OrderTypeEnum string
