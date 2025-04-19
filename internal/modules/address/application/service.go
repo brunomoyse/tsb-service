@@ -13,6 +13,7 @@ type AddressService interface {
 	GetAddressByID(ctx context.Context, ID string) (*domain.Address, error)
 
 	BatchGetAddressesByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.Address, error)
+	BatchGetAddressesByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Address, error)
 }
 
 type addressService struct {
@@ -59,4 +60,8 @@ func (s *addressService) GetAddressByID(ctx context.Context, ID string) (*domain
 
 func (s *addressService) BatchGetAddressesByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.Address, error) {
 	return s.repo.BatchGetAddressesByOrderIDs(ctx, orderIDs)
+}
+
+func (s *addressService) BatchGetAddressesByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Address, error) {
+	return s.repo.BatchGetAddressesByUserIDs(ctx, userIDs)
 }

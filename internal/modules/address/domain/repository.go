@@ -13,4 +13,5 @@ type AddressRepository interface {
 	GetAddressByID(ctx context.Context, ID string) (*Address, error)
 
 	BatchGetAddressesByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*Address, error)
+	BatchGetAddressesByUserIDs(ctx context.Context, userIDs []string) (map[string][]*Address, error)
 }
