@@ -22,7 +22,161 @@ import (
 	"tsb-service/pkg/utils"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
+
+// CreateOrder is the resolver for the createOrder field.
+func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error) {
+	// 1) Authenticated user
+	userID := utils.GetUserID(ctx)
+	if userID == "" {
+		return nil, fmt.Errorf("UNAUTHENTICATED: please login")
+	}
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	// 2) Fetch products and build price map
+	prodCount := len(input.Items)
+	ids := make([]string, prodCount)
+	for i, op := range input.Items {
+		ids[i] = op.ProductID.String()
+	}
+	products, err := r.ProductService.GetProductsByIDs(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve products: %w", err)
+	}
+	priceMap := make(map[uuid.UUID]decimal.Decimal, len(products))
+	for _, p := range products {
+		priceMap[p.ID] = p.Price
+	}
+
+	// 3) Compute line totals and overall total
+	rawItems := make([]orderDomain.OrderProductRaw, 0, prodCount)
+	total := decimal.Zero
+	for _, op := range input.Items {
+		pid := op.ProductID
+		unitPrice, ok := priceMap[pid]
+		if !ok {
+			return nil, fmt.Errorf("product %s not found", pid)
+		}
+		qty := int64(op.Quantity)
+		lineTotal := unitPrice.Mul(decimal.NewFromInt(qty))
+		total = total.Add(lineTotal)
+		rawItems = append(rawItems, orderDomain.OrderProductRaw{
+			ProductID:  pid,
+			Quantity:   qty,
+			UnitPrice:  unitPrice,
+			TotalPrice: lineTotal,
+		})
+	}
+
+	// 4) Determine order type
+	var odType orderDomain.OrderType
+	switch input.OrderType {
+	case model.OrderTypeEnumDelivery:
+		odType = orderDomain.OrderTypeDelivery
+	default:
+		odType = orderDomain.OrderTypePickUp
+	}
+
+	// 5) Enforce minimum amounts
+	if odType == orderDomain.OrderTypePickUp && total.LessThan(decimal.NewFromInt(20)) {
+		return nil, fmt.Errorf("minimum order amount for pickup is 20")
+	}
+	if odType == orderDomain.OrderTypeDelivery && total.LessThan(decimal.NewFromInt(25)) {
+		return nil, fmt.Errorf("minimum order amount for delivery is 25")
+	}
+
+	// 6) Compute delivery fee if needed
+	fee := decimal.NewFromInt(0)
+	if odType == orderDomain.OrderTypeDelivery {
+		if input.AddressID == nil {
+			return nil, fmt.Errorf("addressID required for delivery")
+		}
+
+		addr, err := r.AddressService.GetAddressByID(ctx, *input.AddressID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve address: %w", err)
+		}
+		if addr == nil {
+			return nil, fmt.Errorf("address not found")
+		}
+		var dFee int64
+		switch {
+		case addr.Distance < 4000:
+			dFee = 0
+		case addr.Distance < 5000:
+			dFee = 1
+		case addr.Distance < 6000:
+			dFee = 2
+		case addr.Distance < 7000:
+			dFee = 3
+		case addr.Distance < 8000:
+			dFee = 4
+		case addr.Distance < 9000:
+			dFee = 5
+		default:
+			dFee = 0
+		}
+		fee = decimal.NewFromInt(dFee)
+		total = total.Add(fee)
+	}
+
+	// 7) Build domain order
+	var extras []orderDomain.OrderExtra
+	for name, raw := range input.OrderExtra {
+		// raw should be []interface{} of strings
+		opts := []string{}
+		if arr, ok := raw.([]interface{}); ok {
+			for _, v := range arr {
+				if s, ok := v.(string); ok {
+					opts = append(opts, s)
+				}
+			}
+		}
+		extras = append(extras, orderDomain.OrderExtra{
+			Name:    name,
+			Options: opts,
+		})
+	}
+
+	tempOrder := orderDomain.NewOrder(
+		userUUID,
+		odType,
+		input.IsOnlinePayment,
+		input.AddressID,
+		input.AddressExtra,
+		input.OrderNote,
+		extras,
+		&fee,
+	)
+
+	// 8) Persist via service
+	order, itemsRaw, err := r.OrderService.CreateOrder(ctx, tempOrder, &rawItems)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create order: %w", err)
+	}
+
+	// 9) Map to GraphQL model
+	gql := ToGQLOrder(order)
+	// Attach items
+	gql.Items = make([]*model.OrderItem, len(*itemsRaw))
+	for i, ir := range *itemsRaw {
+		gql.Items[i] = &model.OrderItem{
+			ProductID:  ir.ProductID,
+			Quantity:   int(ir.Quantity),
+			UnitPrice:  ir.UnitPrice.String(),
+			TotalPrice: ir.TotalPrice.String(),
+		}
+	}
+
+	// 10) Publish subscription
+	r.Broker.Publish("orderCreated", gql)
+
+	return gql, nil
+}
 
 // UpdateOrder is the resolver for the updateOrder field.
 func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input model.UpdateOrderInput) (*model.Order, error) {
@@ -41,7 +195,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	order := ToGQLOrder(o)
 
 	// Publish the order update to the broker
-	r.Broker.Publish("ordersUpdated", order)
+	r.Broker.Publish("orderUpdated", order)
 	r.Broker.Publish(fmt.Sprintf("orderUpdated:%s", id), order)
 
 	return order, nil
@@ -236,6 +390,8 @@ func (r *queryResolver) MyOrders(ctx context.Context) ([]*model.Order, error) {
 
 // MyOrder is the resolver for the myOrder field.
 func (r *queryResolver) MyOrder(ctx context.Context, id uuid.UUID) (*model.Order, error) {
+	userID := utils.GetUserID(ctx)
+
 	// @TODO: Check if the user is the owner of the order in the service layer.
 	o, _, err := r.OrderService.GetOrderByID(ctx, id)
 	if err != nil {
@@ -246,20 +402,48 @@ func (r *queryResolver) MyOrder(ctx context.Context, id uuid.UUID) (*model.Order
 		return nil, nil
 	}
 
+	// @TODO: Remove when the service layer check is implemented.
+	if o.UserID.String() != userID {
+		return nil, fmt.Errorf("user is not owned by this order")
+	}
+
 	// Map the order to the GraphQL model
 	order := ToGQLOrder(o)
 
 	return order, nil
 }
 
-// OrdersUpdated is the resolver for the ordersUpdated field.
-func (r *subscriptionResolver) OrdersUpdated(ctx context.Context) (<-chan *model.Order, error) {
+// OrderCreated is the resolver for the orderCreated field.
+func (r *subscriptionResolver) OrderCreated(ctx context.Context) (<-chan *model.Order, error) {
 	ch := make(chan *model.Order, 1)
-	sub := r.Broker.Subscribe("ordersUpdated")
+	sub := r.Broker.Subscribe("orderCreated")
 
 	go func() {
 		<-ctx.Done()
-		r.Broker.Unsubscribe("ordersUpdated", sub)
+		r.Broker.Unsubscribe("orderCreated", sub)
+		close(ch)
+	}()
+
+	go func() {
+		for msg := range sub {
+			if o, ok := msg.(*model.Order); ok {
+				ch <- o
+			}
+		}
+	}()
+
+	return ch, nil
+}
+
+// OrderUpdated is the resolver for the orderUpdated field.
+func (r *subscriptionResolver) OrderUpdated(ctx context.Context) (<-chan *model.Order, error) {
+	ch := make(chan *model.Order, 1)
+	sub := r.Broker.Subscribe("orderUpdated")
+
+	go func() {
+		<-ctx.Done()
+		r.Broker.Unsubscribe("orderUpdated", sub)
+		close(ch)
 	}()
 
 	go func() {
@@ -289,6 +473,7 @@ func (r *subscriptionResolver) MyOrderUpdated(ctx context.Context, orderID uuid.
 	go func() {
 		<-ctx.Done()
 		r.Broker.Unsubscribe(topic, sub)
+		close(ch)
 	}()
 
 	go func() {
