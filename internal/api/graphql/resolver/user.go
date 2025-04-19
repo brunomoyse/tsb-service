@@ -14,6 +14,29 @@ import (
 	"tsb-service/pkg/utils"
 )
 
+// UpdateMe is the resolver for the updateMe field.
+func (r *mutationResolver) UpdateMe(ctx context.Context, input model.UpdateUserInput) (*model.User, error) {
+	userID := utils.GetUserID(ctx)
+
+	u, err := r.UserService.UpdateMe(
+		ctx,
+		userID,
+		input.FirstName,
+		input.LastName,
+		input.Email,
+		input.PhoneNumber,
+		input.AddressID,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	user := ToGQLUser(u)
+
+	return user, nil
+}
+
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 	// Load the userID from the context

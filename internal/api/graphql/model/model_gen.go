@@ -37,6 +37,19 @@ type CreateOrderItemInput struct {
 	Quantity  int       `json:"quantity"`
 }
 
+type CreateProductInput struct {
+	Price        string              `json:"price"`
+	Code         *string             `json:"code,omitempty"`
+	Slug         string              `json:"slug"`
+	PieceCount   *int                `json:"pieceCount,omitempty"`
+	IsVisible    bool                `json:"isVisible"`
+	IsAvailable  bool                `json:"isAvailable"`
+	IsHalal      bool                `json:"isHalal"`
+	IsVegan      bool                `json:"isVegan"`
+	Translations []*TranslationInput `json:"translations"`
+	CategoryID   uuid.UUID           `json:"categoryID"`
+}
+
 type Mutation struct {
 }
 
@@ -146,9 +159,35 @@ type Translation struct {
 	Description *string `json:"description,omitempty"`
 }
 
+type TranslationInput struct {
+	Language    string  `json:"language"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+}
+
 type UpdateOrderInput struct {
 	Status             *domain.OrderStatus `json:"status,omitempty"`
 	EstimatedReadyTime *time.Time          `json:"estimatedReadyTime,omitempty"`
+}
+
+type UpdateProductInput struct {
+	Price        *string             `json:"price,omitempty"`
+	Code         *string             `json:"code,omitempty"`
+	Slug         *string             `json:"slug,omitempty"`
+	PieceCount   *int                `json:"pieceCount,omitempty"`
+	IsVisible    *bool               `json:"isVisible,omitempty"`
+	IsAvailable  *bool               `json:"isAvailable,omitempty"`
+	IsHalal      *bool               `json:"isHalal,omitempty"`
+	IsVegan      *bool               `json:"isVegan,omitempty"`
+	Translations []*TranslationInput `json:"translations"`
+}
+
+type UpdateUserInput struct {
+	FirstName   *string `json:"firstName,omitempty"`
+	LastName    *string `json:"lastName,omitempty"`
+	Email       *string `json:"email,omitempty"`
+	PhoneNumber *string `json:"phoneNumber,omitempty"`
+	AddressID   *string `json:"addressID,omitempty"`
 }
 
 type User struct {

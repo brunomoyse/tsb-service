@@ -11,13 +11,10 @@ import (
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
 	productInterfaces "tsb-service/internal/modules/product/interfaces"
 	"tsb-service/pkg/pubsub"
-	"tsb-service/pkg/sse"
 	"tsb-service/services/email/scaleway"
 
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderInfrastructure "tsb-service/internal/modules/order/infrastructure"
-	orderInterfaces "tsb-service/internal/modules/order/interfaces"
-
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	paymentInfrastructure "tsb-service/internal/modules/payment/infrastructure"
 	paymentInterfaces "tsb-service/internal/modules/payment/interfaces"
@@ -83,7 +80,6 @@ func main() {
 	productService := productApplication.NewProductService(productRepo)
 	userService := userApplication.NewUserService(userRepo)
 
-	orderHandler := orderInterfaces.NewOrderHandler(orderService, productService, paymentService, addressService, userService)
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService)
 	productHandler := productInterfaces.NewProductHandler(productService)
 	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
@@ -144,12 +140,13 @@ func main() {
 		userService,
 	)
 
-	// Create your GraphQL handler (using your favorite GraphQL library)
+	// Create the GraphQL handler
 	graphqlHandler := resolver.GraphQLHandler(rootResolver)
 	// Add a middleware to store the userID in the context (extracted from JWT)
 	optionalAuthMiddleware := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)
 
 	router.POST("/graphql", optionalAuthMiddleware, graphqlHandler)
+	// Force auth check on ws handshake
 	router.GET("/graphql", middleware.AuthMiddleware(jwtSecret), graphqlHandler)
 
 	// Setup routes (grouped by API version or module as needed)
@@ -161,38 +158,27 @@ func main() {
 		c.Status(http.StatusOK)
 	})
 
+	// Mollie webhook
 	api.POST("payments/webhook", paymentHandler.UpdatePaymentStatusHandler)
 
-	// Register the SSE endpoint.
-	// Since SSE is just HTTP, we can mount it using gin.WrapH.
-	api.GET("/sse", gin.WrapH(sse.Hub))
-
-	//
-	// PUBLIC ROUTES
-	//
+	// Auth routes
 	api.POST("/login", userHandler.LoginHandler)
 	api.POST("/register", userHandler.RegisterHandler)
 	api.GET("/verify", userHandler.VerifyEmailHandler)
 
-	api.GET("/oauth/google", userHandler.GoogleAuthHandler)
-	api.GET("/oauth/google/callback", userHandler.GoogleAuthCallbackHandler)
-
 	api.POST("/tokens/refresh", userHandler.RefreshTokenHandler)
 	api.GET("/tokens/revoke", userHandler.LogoutHandler)
 
-	//
-	// AUTHENTICATED ROUTES
-	//
+	// Google OAuth
+	api.GET("/oauth/google", userHandler.GoogleAuthHandler)
+	api.GET("/oauth/google/callback", userHandler.GoogleAuthCallbackHandler)
+
+	// To replace with GQL
 	api.PATCH("/me", middleware.AuthMiddleware(jwtSecret), userHandler.UpdateMeHandler)
-	api.GET("/orders/:id", middleware.AuthMiddleware(jwtSecret), orderHandler.GetOrderHandler)
-	api.POST("/orders", middleware.AuthMiddleware(jwtSecret), orderHandler.CreateOrderHandler)
 
 	// Admin routes
-	api.GET("/admin/products", middleware.AuthMiddleware(jwtSecret), productHandler.GetAdminProductsHandler)
 	api.POST("/admin/products", middleware.AuthMiddleware(jwtSecret), productHandler.CreateProductHandler)
 	api.PUT("/admin/products/:id", middleware.AuthMiddleware(jwtSecret), productHandler.UpdateProductHandler)
-
-	api.PATCH("/admin/orders/:id", middleware.AuthMiddleware(jwtSecret), orderHandler.UpdateOrderStatusHandler)
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
