@@ -1,3 +1,5 @@
+scalar Upload
+
 type Product {
     id: ID!
     createdAt: DateTime!
@@ -42,31 +44,33 @@ type ProductCategory {
 input CreateProductInput {
     price: String!
     code: String
-    slug: String!
     pieceCount: Int
     isVisible: Boolean!
     isAvailable: Boolean!
     isHalal: Boolean!
     isVegan: Boolean!
+    categoryID: ID!
 
     # Translations
     translations: [TranslationInput!]!
 
-    categoryID: ID!
+    image: Upload
 }
 
 input UpdateProductInput {
     price: String
     code: String
-    slug: String
     pieceCount: Int
     isVisible: Boolean
     isAvailable: Boolean
     isHalal: Boolean
     isVegan: Boolean
+    categoryID: ID
 
     # Translations
-    translations: [TranslationInput!]!
+    translations: [TranslationInput!]
+
+    image: Upload
 }
 
 input TranslationInput {

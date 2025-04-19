@@ -158,3 +158,30 @@ func ToDomainOrder(o *model.Order) *orderDomain.Order {
 		EstimatedReadyTime: o.EstimatedReadyTime,
 	}
 }
+
+func toDomainTranslations(in []*model.TranslationInput) []productDomain.Translation {
+	out := make([]productDomain.Translation, len(in))
+	for i, t := range in {
+		out[i] = productDomain.Translation{
+			Language:    t.Language,
+			Name:        t.Name,
+			Description: t.Description,
+		}
+	}
+	return out
+}
+
+func toDomainTranslationsPtr(in []*model.TranslationInput) []productDomain.Translation {
+	if in == nil {
+		return nil
+	}
+	out := make([]productDomain.Translation, len(in))
+	for i, t := range in {
+		out[i] = productDomain.Translation{
+			Language:    t.Language,
+			Name:        t.Name,
+			Description: t.Description,
+		}
+	}
+	return out
+}

@@ -176,19 +176,19 @@ func (r *AddressRepository) BatchGetAddressesByUserIDs(ctx context.Context, user
 	}
 
 	sqlQuery := `
-	SELECT
-	  u.id                    AS user_id,
-	  a.address_id            AS address_id,
-	  a.streetname_fr         AS streetname_fr,
-	  a.house_number          AS house_number,
-	  a.box_number            AS box_number,
-	  a.municipality_name_fr  AS municipality_name_fr,
-	  a.postcode              AS postcode,
-	  COALESCE(ad.distance, 10000) AS distance
-	FROM addresses AS a
-	JOIN users     AS u   ON u.address_id = a.address_id
-	LEFT JOIN address_distance AS ad ON ad.address_id = a.address_id
-	WHERE u.id = ANY($1);
+		SELECT
+		  u.id                    AS user_id,
+		  a.address_id            AS address_id,
+		  a.streetname_fr         AS streetname_fr,
+		  a.house_number          AS house_number,
+		  a.box_number            AS box_number,
+		  a.municipality_name_fr  AS municipality_name_fr,
+		  a.postcode              AS postcode,
+		  COALESCE(ad.distance, 10000) AS distance
+		FROM addresses AS a
+		JOIN users     AS u   ON u.address_id = a.address_id
+		LEFT JOIN address_distance AS ad ON ad.address_id = a.address_id
+		WHERE u.id = ANY($1);
 	`
 
 	type addressRow struct {
