@@ -39,9 +39,56 @@ type ProductCategory {
     translations: [Translation!]!
 }
 
+input CreateProductInput {
+    price: String!
+    code: String
+    slug: String!
+    pieceCount: Int
+    isVisible: Boolean!
+    isAvailable: Boolean!
+    isHalal: Boolean!
+    isVegan: Boolean!
+
+    # Translations
+    translations: [TranslationInput!]!
+
+    categoryID: ID!
+}
+
+input UpdateProductInput {
+    price: String
+    code: String
+    slug: String
+    pieceCount: Int
+    isVisible: Boolean
+    isAvailable: Boolean
+    isHalal: Boolean
+    isVegan: Boolean
+
+    # Translations
+    translations: [TranslationInput!]!
+}
+
+input TranslationInput {
+    language: String!
+    name: String!
+    description: String
+}
+
 extend type Query {
     products: [Product!]!
     product(id: ID!): Product!
     productCategories: [ProductCategory!]!
     productCategory(id: ID!): ProductCategory!
+}
+
+extend type Mutation {
+    createProduct (
+        input: CreateProductInput!
+    ): Product! @admin
+
+    updateProduct(
+        id: ID!
+        input: UpdateProductInput!
+    ): Product! @admin
 }
