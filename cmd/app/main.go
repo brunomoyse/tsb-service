@@ -9,7 +9,6 @@ import (
 	"tsb-service/internal/api/graphql/resolver"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
-	productInterfaces "tsb-service/internal/modules/product/interfaces"
 	"tsb-service/pkg/pubsub"
 	"tsb-service/services/email/scaleway"
 
@@ -81,7 +80,6 @@ func main() {
 	userService := userApplication.NewUserService(userRepo)
 
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService)
-	productHandler := productInterfaces.NewProductHandler(productService)
 	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
 
 	// Initialize Gin router
@@ -172,13 +170,6 @@ func main() {
 	// Google OAuth
 	api.GET("/oauth/google", userHandler.GoogleAuthHandler)
 	api.GET("/oauth/google/callback", userHandler.GoogleAuthCallbackHandler)
-
-	// To replace with GQL
-	api.PATCH("/me", middleware.AuthMiddleware(jwtSecret), userHandler.UpdateMeHandler)
-
-	// Admin routes
-	api.POST("/admin/products", middleware.AuthMiddleware(jwtSecret), productHandler.CreateProductHandler)
-	api.PUT("/admin/products/:id", middleware.AuthMiddleware(jwtSecret), productHandler.UpdateProductHandler)
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

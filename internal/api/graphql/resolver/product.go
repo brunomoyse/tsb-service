@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"strings"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	productApplication "tsb-service/internal/modules/product/application"
@@ -15,16 +17,118 @@ import (
 	"tsb-service/pkg/utils"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 // CreateProduct is the resolver for the createProduct field.
 func (r *mutationResolver) CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error) {
-	panic(fmt.Errorf("not implemented: CreateProduct - createProduct"))
+	userLang := utils.GetLang(ctx)
+
+	// 1. Persist the product first
+	price, err := decimal.NewFromString(input.Price)
+	if err != nil {
+		return nil, fmt.Errorf("invalid price format: %w", err)
+	}
+	prod, err := r.ProductService.CreateProduct(
+		ctx,
+		input.CategoryID,
+		price,
+		input.Code,
+		input.PieceCount,
+		input.IsVisible,
+		input.IsAvailable,
+		input.IsHalal,
+		input.IsVegan,
+		toDomainTranslations(input.Translations),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create product: %w", err)
+	}
+
+	// 2. If an image was supplied, forward it to the file‑service
+	if input.Image != nil {
+		if err := utils.UploadProductImage(ctx, input.Image.File, input.Image.Filename, prod.Slug); err != nil {
+			log.Printf("image upload failed: %v", err)
+		}
+	}
+
+	// 3. Map domain → GraphQL and return
+	gqlProd := ToGQLProduct(prod, userLang)
+	return gqlProd, nil
 }
 
 // UpdateProduct is the resolver for the updateProduct field.
 func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, input model.UpdateProductInput) (*model.Product, error) {
-	panic(fmt.Errorf("not implemented: UpdateProduct - updateProduct"))
+	userLang := utils.GetLang(ctx)
+
+	// 1. Load the current product so we can patch only the provided fields.
+	prod, err := r.ProductService.GetProduct(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch product %s: %w", id, err)
+	}
+
+	// 2. Apply changes from the GraphQL input.
+	if input.CategoryID != nil {
+		prod.CategoryID = *input.CategoryID
+	}
+
+	if input.Price != nil {
+		clean := strings.ReplaceAll(strings.TrimSpace(*input.Price), ",", ".")
+		p, err := decimal.NewFromString(clean)
+		if err != nil {
+			return nil, fmt.Errorf("invalid price format: %w", err)
+		}
+		prod.Price = p
+	}
+
+	if input.Code != nil {
+		prod.Code = input.Code
+	}
+	if input.PieceCount != nil {
+		prod.PieceCount = input.PieceCount
+	}
+	if input.IsVisible != nil {
+		prod.IsVisible = *input.IsVisible
+	}
+	if input.IsAvailable != nil {
+		prod.IsAvailable = *input.IsAvailable
+	}
+	if input.IsHalal != nil {
+		prod.IsHalal = *input.IsHalal
+	}
+	if input.IsVegan != nil {
+		prod.IsVegan = *input.IsVegan
+	}
+	if input.Translations != nil {
+		prod.Translations = toDomainTranslationsPtr(input.Translations)
+	}
+
+	// 3. Persist the update with the single domain object.
+	if err := r.ProductService.UpdateProduct(ctx, prod); err != nil {
+		return nil, fmt.Errorf("failed to update product: %w", err)
+	}
+
+	// 4. We need to refetch the product to get the latest slug
+	prod, err = r.ProductService.GetProduct(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch product %s: %w", id, err)
+	}
+
+	// 5. Upload/replace image if provided.
+	if input.Image != nil {
+		if err := utils.UploadProductImage(
+			ctx,
+			input.Image.File,
+			input.Image.Filename,
+			prod.Slug, // slug might be nil; helper handles that
+		); err != nil {
+			log.Printf("image upload failed: %v", err)
+		}
+	}
+
+	// 6. Return the updated product in GraphQL form.
+	return ToGQLProduct(prod, userLang), nil
 }
 
 // Category is the resolver for the category field.

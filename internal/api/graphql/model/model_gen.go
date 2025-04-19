@@ -9,6 +9,7 @@ import (
 	"time"
 	"tsb-service/internal/modules/order/domain"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/google/uuid"
 )
 
@@ -40,14 +41,14 @@ type CreateOrderItemInput struct {
 type CreateProductInput struct {
 	Price        string              `json:"price"`
 	Code         *string             `json:"code,omitempty"`
-	Slug         string              `json:"slug"`
 	PieceCount   *int                `json:"pieceCount,omitempty"`
 	IsVisible    bool                `json:"isVisible"`
 	IsAvailable  bool                `json:"isAvailable"`
 	IsHalal      bool                `json:"isHalal"`
 	IsVegan      bool                `json:"isVegan"`
-	Translations []*TranslationInput `json:"translations"`
 	CategoryID   uuid.UUID           `json:"categoryID"`
+	Translations []*TranslationInput `json:"translations"`
+	Image        *graphql.Upload     `json:"image,omitempty"`
 }
 
 type Mutation struct {
@@ -173,13 +174,14 @@ type UpdateOrderInput struct {
 type UpdateProductInput struct {
 	Price        *string             `json:"price,omitempty"`
 	Code         *string             `json:"code,omitempty"`
-	Slug         *string             `json:"slug,omitempty"`
 	PieceCount   *int                `json:"pieceCount,omitempty"`
 	IsVisible    *bool               `json:"isVisible,omitempty"`
 	IsAvailable  *bool               `json:"isAvailable,omitempty"`
 	IsHalal      *bool               `json:"isHalal,omitempty"`
 	IsVegan      *bool               `json:"isVegan,omitempty"`
-	Translations []*TranslationInput `json:"translations"`
+	CategoryID   *uuid.UUID          `json:"categoryID,omitempty"`
+	Translations []*TranslationInput `json:"translations,omitempty"`
+	Image        *graphql.Upload     `json:"image,omitempty"`
 }
 
 type UpdateUserInput struct {
