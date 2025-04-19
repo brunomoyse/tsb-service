@@ -47,7 +47,7 @@ func NewOrderItemLoader(os OrderService) *OrderItemLoader {
 	return &OrderItemLoader{
 		Loader: db.NewTypedLoader[*domain.OrderProductRaw](
 			func(ctx context.Context, orderIDs []string) (map[string][]*domain.OrderProductRaw, error) {
-				return os.GetOrderProductsByOrderIDs(ctx, orderIDs)
+				return os.BatchGetOrderProductsByOrderIDs(ctx, orderIDs)
 			},
 			"failed to fetch order items",
 		),
