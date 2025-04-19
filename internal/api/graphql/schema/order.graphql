@@ -6,7 +6,7 @@ type Order {
     type: OrderTypeEnum!
     isOnlinePayment: Boolean!
     discountAmount: String!
-    deliveryFee: String!
+    deliveryFee: String
     totalPrice: String!
     estimatedReadyTime: DateTime
     addressExtra: String
@@ -44,6 +44,21 @@ enum OrderTypeEnum {
     PICKUP
 }
 
+input CreateOrderInput {
+    orderType: OrderTypeEnum!
+    isOnlinePayment: Boolean!
+    addressID: String
+    addressExtra: String
+    orderNote: String
+    orderExtra: JSON
+    items: [CreateOrderItemInput!]!
+}
+
+input CreateOrderItemInput {
+    productID: ID!
+    quantity: Int!
+}
+
 input UpdateOrderInput {
     status: OrderStatusEnum
     estimatedReadyTime: DateTime
@@ -57,15 +72,15 @@ extend type Query {
 }
 
 extend type Mutation {
-    updateOrder(
-        id: ID!
-        input: UpdateOrderInput!
-    ): Order! @admin
+    createOrder(input: CreateOrderInput!): Order! @auth
+    updateOrder(id: ID!, input: UpdateOrderInput!): Order! @admin
 }
 
 extend type Subscription {
+    orderCreated: Order! @admin
+
     # for the restaurant—fires on *every* order update
-    ordersUpdated: Order! @admin
+    orderUpdated: Order! @admin
 
     # for a customer—fires only when *their* order (by ID) changes
     myOrderUpdated(orderID: ID!): Order! @auth

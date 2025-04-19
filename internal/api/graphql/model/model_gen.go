@@ -22,6 +22,21 @@ type Address struct {
 	Distance         float64 `json:"distance"`
 }
 
+type CreateOrderInput struct {
+	OrderType       OrderTypeEnum           `json:"orderType"`
+	IsOnlinePayment bool                    `json:"isOnlinePayment"`
+	AddressID       *string                 `json:"addressID,omitempty"`
+	AddressExtra    *string                 `json:"addressExtra,omitempty"`
+	OrderNote       *string                 `json:"orderNote,omitempty"`
+	OrderExtra      map[string]any          `json:"orderExtra,omitempty"`
+	Items           []*CreateOrderItemInput `json:"items"`
+}
+
+type CreateOrderItemInput struct {
+	ProductID uuid.UUID `json:"productID"`
+	Quantity  int       `json:"quantity"`
+}
+
 type Mutation struct {
 }
 
@@ -33,7 +48,7 @@ type Order struct {
 	Type               OrderTypeEnum      `json:"type"`
 	IsOnlinePayment    bool               `json:"isOnlinePayment"`
 	DiscountAmount     string             `json:"discountAmount"`
-	DeliveryFee        string             `json:"deliveryFee"`
+	DeliveryFee        *string            `json:"deliveryFee,omitempty"`
 	TotalPrice         string             `json:"totalPrice"`
 	EstimatedReadyTime *time.Time         `json:"estimatedReadyTime,omitempty"`
 	AddressExtra       *string            `json:"addressExtra,omitempty"`
