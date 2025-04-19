@@ -2,7 +2,6 @@ package resolver
 
 import (
 	"encoding/json"
-	"github.com/shopspring/decimal"
 	"tsb-service/internal/api/graphql/model"
 	addressDomain "tsb-service/internal/modules/address/domain"
 	orderDomain "tsb-service/internal/modules/order/domain"
@@ -132,30 +131,6 @@ func ToGQLTranslation(s *productDomain.Translation) *model.Translation {
 		Language:    s.Language,
 		Name:        s.Name,
 		Description: s.Description,
-	}
-}
-
-/* ToDomain */
-func ToDomainOrder(o *model.Order) *orderDomain.Order {
-	deliveryFee := func(s *string) *decimal.Decimal {
-		if s == nil {
-			return nil
-		}
-		d := decimal.RequireFromString(*s)
-		return &d
-	}(o.DeliveryFee)
-
-	return &orderDomain.Order{
-		ID:                 o.ID,
-		CreatedAt:          o.CreatedAt,
-		UpdatedAt:          o.UpdatedAt,
-		OrderStatus:        o.Status,
-		OrderType:          orderDomain.OrderType(o.Type),
-		IsOnlinePayment:    o.IsOnlinePayment,
-		DiscountAmount:     decimal.RequireFromString(o.DiscountAmount),
-		DeliveryFee:        deliveryFee,
-		TotalPrice:         decimal.RequireFromString(o.TotalPrice),
-		EstimatedReadyTime: o.EstimatedReadyTime,
 	}
 }
 
