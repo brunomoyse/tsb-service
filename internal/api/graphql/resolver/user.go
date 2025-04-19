@@ -9,6 +9,8 @@ import (
 	"fmt"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
+	addressApplication "tsb-service/internal/modules/address/application"
+	addressDomain "tsb-service/internal/modules/address/domain"
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/utils"
@@ -55,7 +57,24 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 
 // Address is the resolver for the address field.
 func (r *userResolver) Address(ctx context.Context, obj *model.User) (*model.Address, error) {
-	panic(fmt.Errorf("not implemented: Address - address"))
+	loader := addressApplication.GetUserAddressLoader(ctx)
+
+	if loader == nil {
+		return nil, fmt.Errorf("no user address loader found")
+	}
+
+	// Check for error while loading the address.
+	a, err := loader.Loader.Load(ctx, obj.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load user address: %w", err)
+	}
+
+	// Map the address to the GraphQL model
+	address := Map(a, func(address *addressDomain.Address) *model.Address {
+		return ToGQLAddress(address)
+	})
+
+	return address[0], nil
 }
 
 // Orders is the resolver for the orders field.
