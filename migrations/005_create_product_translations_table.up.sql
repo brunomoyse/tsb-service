@@ -8,12 +8,12 @@ CREATE TABLE IF NOT EXISTS public.product_translations
     product_id uuid NOT NULL,
     name text NOT NULL,
     description text,
-    locale text NOT NULL,
+    language text NOT NULL,
     CONSTRAINT product_translations_pkey PRIMARY KEY (id),
-    CONSTRAINT product_translations_product_id_locale_unique UNIQUE (product_id, locale),
+    CONSTRAINT product_translations_product_id_language_unique UNIQUE (product_id, language),
     CONSTRAINT product_translations_product_id_foreign FOREIGN KEY (product_id)
         REFERENCES public.products (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
-    CONSTRAINT product_translations_locale_check CHECK (locale::text = ANY (ARRAY['en'::text, 'fr'::text, 'zh'::text]::text[]))
+    CONSTRAINT product_translations_language_check CHECK (language::text = ANY (ARRAY['en'::text, 'fr'::text, 'zh'::text]::text[]))
 );

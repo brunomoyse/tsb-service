@@ -11,12 +11,18 @@ import (
 // ProductService defines the application service interface for product operations.
 type ProductService interface {
 	CreateProduct(ctx context.Context, categoryID uuid.UUID, price decimal.Decimal, code *string, pieceCount *int, isVisible bool, isAvailable bool, isHalal bool, isVegan bool, translations []domain.Translation) (*domain.Product, error)
-	GetProduct(ctx context.Context, id string) (*domain.Product, error)
+	GetProduct(ctx context.Context, id uuid.UUID) (*domain.Product, error)
 	GetProducts(ctx context.Context) ([]*domain.Product, error)
 	GetProductsByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error)
-	GetProductsByCategory(ctx context.Context, categoryID string) ([]*domain.Product, error)
 	GetCategories(ctx context.Context) ([]*domain.Category, error)
+	GetCategory(ctx context.Context, id uuid.UUID) (*domain.Category, error)
 	UpdateProduct(ctx context.Context, product *domain.Product) error
+
+	BatchGetCategoriesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Category, error)
+	BatchGetProductsByCategory(ctx context.Context, categoryIDs []string) (map[string][]*domain.Product, error)
+	BatchGetProductByIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Product, error)
+	BatchGetCategoryTranslations(ctx context.Context, categoryIDs []string) (map[string][]*domain.Translation, error)
+	BatchGetProductTranslations(ctx context.Context, productIDs []string) (map[string][]*domain.Translation, error)
 }
 
 type productService struct {
@@ -66,7 +72,7 @@ func (s *productService) UpdateProduct(ctx context.Context, product *domain.Prod
 }
 
 // GetProduct retrieves a product by its unique identifier.
-func (s *productService) GetProduct(ctx context.Context, id string) (*domain.Product, error) {
+func (s *productService) GetProduct(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
 	return s.repo.FindByID(ctx, id)
 }
 
@@ -84,7 +90,26 @@ func (s *productService) GetCategories(ctx context.Context) ([]*domain.Category,
 	return s.repo.FindAllCategories(ctx)
 }
 
-// GetProductsByCategory retrieves a list of products by category.
-func (s *productService) GetProductsByCategory(ctx context.Context, categoryID string) ([]*domain.Product, error) {
-	return s.repo.FindByCategoryID(ctx, categoryID)
+func (s *productService) GetCategory(ctx context.Context, id uuid.UUID) (*domain.Category, error) {
+	return s.repo.FindCategoryByID(ctx, id)
+}
+
+func (s *productService) BatchGetCategoriesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Category, error) {
+	return s.repo.FindCategoriesByProductIDs(ctx, productIDs)
+}
+
+func (s *productService) BatchGetProductsByCategory(ctx context.Context, categoryIDs []string) (map[string][]*domain.Product, error) {
+	return s.repo.FindByCategoryIDs(ctx, categoryIDs)
+}
+
+func (s *productService) BatchGetProductByIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Product, error) {
+	return s.repo.BatchGetProductByIDs(ctx, productIDs)
+}
+
+func (s *productService) BatchGetCategoryTranslations(ctx context.Context, categoryIDs []string) (map[string][]*domain.Translation, error) {
+	return s.repo.BatchGetCategoryTranslations(ctx, categoryIDs)
+}
+
+func (s *productService) BatchGetProductTranslations(ctx context.Context, productIDs []string) (map[string][]*domain.Translation, error) {
+	return s.repo.BatchGetProductTranslations(ctx, productIDs)
 }
