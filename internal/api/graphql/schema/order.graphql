@@ -89,5 +89,5 @@ extend type Subscription {
     orderUpdated: Order! @admin
 
     # for a customer—fires only when *their* order (by ID) changes
-    myOrderUpdated(orderID: ID!): Order! @auth
+    myOrderUpdated(orderId: ID!): Order! @auth
 }
