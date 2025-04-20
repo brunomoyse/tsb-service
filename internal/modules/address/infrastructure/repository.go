@@ -101,9 +101,18 @@ func (r *AddressRepository) GetFinalAddress(ctx context.Context, streetID string
 		LEFT JOIN address_distance ad ON a.address_id = ad.address_id
 		WHERE a.street_id = $1 
 		  AND a.house_number = $2 
-		  AND ( ($3::text IS NULL AND a.box_number IS NULL) OR (a.box_number = $3::text) )
+		  AND (
+			-- exact match when both sides non-null
+			(a.box_number = $3::text)
+			-- or both are null/empty
+			OR (
+			  a.box_number IS NULL
+			  AND ( $3 IS NULL OR $3::text = '' )
+			)
+		  )
 		LIMIT 1;
 	`
+
 	var addr domain.Address
 	if err := r.db.GetContext(ctx, &addr, sqlQuery, streetID, houseNumber, boxNumber); err != nil {
 		return nil, fmt.Errorf("failed to get final address: %w", err)
