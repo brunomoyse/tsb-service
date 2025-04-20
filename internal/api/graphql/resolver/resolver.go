@@ -76,6 +76,9 @@ func GraphQLHandler(resolver *Resolver) gin.HandlerFunc {
 	h.AddTransport(transport.POST{})
 	h.AddTransport(transport.GET{})
 
+	// Enable introspection
+	h.Use(extension.Introspection{})
+
 	h.Use(extension.AutomaticPersistedQuery{
 		//nolint:mnd // Store 50 queries in memory using Least Recently Used (LRU) algorithm
 		Cache: lru.New[string](50),
