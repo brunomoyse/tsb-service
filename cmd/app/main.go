@@ -111,11 +111,20 @@ func main() {
 		c.Status(http.StatusOK)
 	})
 
+	// Setup routes (grouped by API version or module as needed)
+	// Setup routes for /api/v1.
+	api := router.Group("/api/v1")
+
+	// Health check for HEAD requests
+	api.HEAD("/up", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+	
 	// Middleware for JWT authentication
-	router.Use(middleware.LanguageExtractor())
+	api.Use(middleware.LanguageExtractor())
 
 	// Load DataLoaderMiddleware
-	router.Use(
+	api.Use(
 		middleware.DataLoaderMiddleware(
 			addressService,
 			orderService,
@@ -143,18 +152,9 @@ func main() {
 	// Add a middleware to store the userID in the context (extracted from JWT)
 	optionalAuthMiddleware := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)
 
-	router.POST("/graphql", optionalAuthMiddleware, graphqlHandler)
+	api.POST("/graphql", optionalAuthMiddleware, graphqlHandler)
 	// Force auth check on ws handshake
-	router.GET("/graphql", middleware.AuthMiddleware(jwtSecret), graphqlHandler)
-
-	// Setup routes (grouped by API version or module as needed)
-	// Setup routes for /api/v1.
-	api := router.Group("/api/v1")
-
-	// Health check for HEAD requests
-	api.HEAD("/up", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
+	api.GET("/graphql", middleware.AuthMiddleware(jwtSecret), graphqlHandler)
 
 	// Mollie webhook
 	api.POST("payments/webhook", paymentHandler.UpdatePaymentStatusHandler)

@@ -189,7 +189,7 @@ type UpdateUserInput struct {
 	LastName    *string `json:"lastName,omitempty"`
 	Email       *string `json:"email,omitempty"`
 	PhoneNumber *string `json:"phoneNumber,omitempty"`
-	AddressID   *string `json:"addressID,omitempty"`
+	AddressID   *string `json:"addressId,omitempty"`
 }
 
 type User struct {

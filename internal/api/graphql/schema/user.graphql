@@ -13,7 +13,7 @@ input UpdateUserInput {
     lastName: String
     email: String
     phoneNumber: String
-    addressID: String
+    addressId: String
 }
 
 extend type Query {
