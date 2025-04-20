@@ -124,22 +124,15 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		total = total.Add(fee)
 	}
 
-	// 7) Build domain order
 	var extras []orderDomain.OrderExtra
-	for name, raw := range input.OrderExtra {
-		// raw should be []interface{} of strings
-		opts := []string{}
-		if arr, ok := raw.([]interface{}); ok {
-			for _, v := range arr {
-				if s, ok := v.(string); ok {
-					opts = append(opts, s)
-				}
+	if input.OrderExtra != nil {
+		extras = make([]orderDomain.OrderExtra, len(input.OrderExtra))
+		for i, extraIn := range input.OrderExtra {
+			extras[i] = orderDomain.OrderExtra{
+				Name:    extraIn.Name,
+				Options: extraIn.Options,
 			}
 		}
-		extras = append(extras, orderDomain.OrderExtra{
-			Name:    name,
-			Options: opts,
-		})
 	}
 
 	tempOrder := orderDomain.NewOrder(
