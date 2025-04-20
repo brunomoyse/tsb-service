@@ -17,8 +17,8 @@ type Street {
 
 extend type Query {
     streets(query: String!): [Street]!
-    houseNumbers(streetID: String!): [String!]!
-    boxNumbers(streetID: String!, houseNumber: String!): [String]!
+    houseNumbers(streetId: String!): [String!]!
+    boxNumbers(streetId: String!, houseNumber: String!): [String]!
     address(id: String!): Address!
     addressByLocation(
         streetID: String!

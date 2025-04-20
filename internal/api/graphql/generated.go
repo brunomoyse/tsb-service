@@ -927,7 +927,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.BoxNumbers(childComplexity, args["streetID"].(string), args["houseNumber"].(string)), true
+		return e.complexity.Query.BoxNumbers(childComplexity, args["streetId"].(string), args["houseNumber"].(string)), true
 
 	case "Query.houseNumbers":
 		if e.complexity.Query.HouseNumbers == nil {
@@ -939,7 +939,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.HouseNumbers(childComplexity, args["streetID"].(string)), true
+		return e.complexity.Query.HouseNumbers(childComplexity, args["streetId"].(string)), true
 
 	case "Query.me":
 		if e.complexity.Query.Me == nil {
@@ -1577,7 +1577,7 @@ func (ec *executionContext) field_Query_boxNumbers_args(ctx context.Context, raw
 	if err != nil {
 		return nil, err
 	}
-	args["streetID"] = arg0
+	args["streetId"] = arg0
 	arg1, err := ec.field_Query_boxNumbers_argsHouseNumber(ctx, rawArgs)
 	if err != nil {
 		return nil, err
@@ -1589,8 +1589,8 @@ func (ec *executionContext) field_Query_boxNumbers_argsStreetID(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (string, error) {
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("streetID"))
-	if tmp, ok := rawArgs["streetID"]; ok {
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("streetId"))
+	if tmp, ok := rawArgs["streetId"]; ok {
 		return ec.unmarshalNString2string(ctx, tmp)
 	}
 
@@ -1618,15 +1618,15 @@ func (ec *executionContext) field_Query_houseNumbers_args(ctx context.Context, r
 	if err != nil {
 		return nil, err
 	}
-	args["streetID"] = arg0
+	args["streetId"] = arg0
 	return args, nil
 }
 func (ec *executionContext) field_Query_houseNumbers_argsStreetID(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (string, error) {
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("streetID"))
-	if tmp, ok := rawArgs["streetID"]; ok {
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("streetId"))
+	if tmp, ok := rawArgs["streetId"]; ok {
 		return ec.unmarshalNString2string(ctx, tmp)
 	}
 
@@ -6048,7 +6048,7 @@ func (ec *executionContext) _Query_houseNumbers(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().HouseNumbers(rctx, fc.Args["streetID"].(string))
+		return ec.resolvers.Query().HouseNumbers(rctx, fc.Args["streetId"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6103,7 +6103,7 @@ func (ec *executionContext) _Query_boxNumbers(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().BoxNumbers(rctx, fc.Args["streetID"].(string), fc.Args["houseNumber"].(string))
+		return ec.resolvers.Query().BoxNumbers(rctx, fc.Args["streetId"].(string), fc.Args["houseNumber"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
