@@ -1074,7 +1074,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Subscription.MyOrderUpdated(childComplexity, args["orderID"].(uuid.UUID)), true
+		return e.complexity.Subscription.MyOrderUpdated(childComplexity, args["orderId"].(uuid.UUID)), true
 
 	case "Subscription.orderCreated":
 		if e.complexity.Subscription.OrderCreated == nil {
@@ -1756,15 +1756,15 @@ func (ec *executionContext) field_Subscription_myOrderUpdated_args(ctx context.C
 	if err != nil {
 		return nil, err
 	}
-	args["orderID"] = arg0
+	args["orderId"] = arg0
 	return args, nil
 }
 func (ec *executionContext) field_Subscription_myOrderUpdated_argsOrderID(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (uuid.UUID, error) {
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("orderID"))
-	if tmp, ok := rawArgs["orderID"]; ok {
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("orderId"))
+	if tmp, ok := rawArgs["orderId"]; ok {
 		return ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, tmp)
 	}
 
@@ -7634,7 +7634,7 @@ func (ec *executionContext) _Subscription_myOrderUpdated(ctx context.Context, fi
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		directive0 := func(rctx context.Context) (any, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Subscription().MyOrderUpdated(rctx, fc.Args["orderID"].(uuid.UUID))
+			return ec.resolvers.Subscription().MyOrderUpdated(rctx, fc.Args["orderId"].(uuid.UUID))
 		}
 
 		directive1 := func(ctx context.Context) (any, error) {

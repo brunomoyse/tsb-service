@@ -7,6 +7,7 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"log"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	addressApplication "tsb-service/internal/modules/address/application"
@@ -20,6 +21,7 @@ import (
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/utils"
+	es "tsb-service/services/email/scaleway"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -152,9 +154,36 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		return nil, fmt.Errorf("failed to create order: %w", err)
 	}
 
-	// 9) Map to GraphQL model
+	// 9) Enrich each raw item with its product details
+	//    build a lookup map from product ID → product info
+	prodMap := make(map[uuid.UUID]productDomain.ProductOrderDetails, len(products))
+	for _, p := range products {
+		prodMap[p.ID] = *p
+	}
+
+	// now map persisted raw items → full OrderProduct
+	items := make([]orderDomain.OrderProduct, len(*itemsRaw))
+	for i, ir := range *itemsRaw {
+		pd, ok := prodMap[ir.ProductID]
+		if !ok {
+			// this should never happen—just in case
+			return nil, fmt.Errorf("missing product details for %s", ir.ProductID)
+		}
+		items[i] = orderDomain.OrderProduct{
+			Product: orderDomain.Product{
+				ID:           pd.ID,
+				Code:         pd.Code,
+				CategoryName: pd.CategoryName,
+				Name:         pd.Name,
+			},
+			Quantity:   ir.Quantity,
+			UnitPrice:  ir.UnitPrice,
+			TotalPrice: ir.TotalPrice,
+		}
+	}
+
+	// 10) Map to GraphQL model
 	gql := ToGQLOrder(order)
-	// Attach items
 	gql.Items = make([]*model.OrderItem, len(*itemsRaw))
 	for i, ir := range *itemsRaw {
 		gql.Items[i] = &model.OrderItem{
@@ -163,6 +192,28 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			UnitPrice:  ir.UnitPrice.String(),
 			TotalPrice: ir.TotalPrice.String(),
 		}
+	}
+
+	// Handle payment creation if needed.
+	if input.IsOnlinePayment {
+		molliePayment, err := r.PaymentService.CreatePayment(ctx, *order, items)
+		if err != nil || molliePayment == nil {
+			return nil, fmt.Errorf("failed to create payment: %w", err)
+		}
+	} else {
+		// If offline payment, set the order status to pending.
+		go func() {
+			user, err := r.UserService.GetUserByID(context.Background(), userID)
+			if err != nil {
+				log.Printf("failed to retrieve user: %v", err)
+				return
+			}
+
+			err = es.SendOrderPendingEmail(*user, "fr", *order, items)
+			if err != nil {
+				log.Printf("failed to send order pending email: %v", err)
+			}
+		}()
 	}
 
 	// 10) Publish subscription
