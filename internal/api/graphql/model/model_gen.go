@@ -24,17 +24,18 @@ type Address struct {
 }
 
 type CreateOrderInput struct {
-	OrderType       OrderTypeEnum           `json:"orderType"`
-	IsOnlinePayment bool                    `json:"isOnlinePayment"`
-	AddressID       *string                 `json:"addressID,omitempty"`
-	AddressExtra    *string                 `json:"addressExtra,omitempty"`
-	OrderNote       *string                 `json:"orderNote,omitempty"`
-	OrderExtra      map[string]any          `json:"orderExtra,omitempty"`
-	Items           []*CreateOrderItemInput `json:"items"`
+	OrderType          OrderTypeEnum           `json:"orderType"`
+	IsOnlinePayment    bool                    `json:"isOnlinePayment"`
+	AddressID          *string                 `json:"addressId,omitempty"`
+	AddressExtra       *string                 `json:"addressExtra,omitempty"`
+	OrderNote          *string                 `json:"orderNote,omitempty"`
+	OrderExtra         []*OrderExtraInput      `json:"orderExtra,omitempty"`
+	PreferredReadyTime *string                 `json:"preferredReadyTime,omitempty"`
+	Items              []*CreateOrderItemInput `json:"items"`
 }
 
 type CreateOrderItemInput struct {
-	ProductID uuid.UUID `json:"productID"`
+	ProductID uuid.UUID `json:"productId"`
 	Quantity  int       `json:"quantity"`
 }
 
@@ -74,6 +75,11 @@ type Order struct {
 	Items              []*OrderItem       `json:"items"`
 }
 
+type OrderExtraInput struct {
+	Name    string   `json:"name"`
+	Options []string `json:"options,omitempty"`
+}
+
 type OrderItem struct {
 	Product    *Product  `json:"product"`
 	ProductID  uuid.UUID `json:"productID"`
@@ -85,35 +91,35 @@ type OrderItem struct {
 type Payment struct {
 	ID                              uuid.UUID      `json:"id"`
 	Resource                        *string        `json:"resource,omitempty"`
-	MolliePaymentID                 string         `json:"mollie_payment_id"`
+	MolliePaymentID                 string         `json:"molliePaymentId"`
 	Status                          string         `json:"status"`
 	Description                     *string        `json:"description,omitempty"`
-	CancelURL                       *string        `json:"cancel_url,omitempty"`
-	WebhookURL                      *string        `json:"webhook_url,omitempty"`
+	CancelURL                       *string        `json:"cancelUrl,omitempty"`
+	WebhookURL                      *string        `json:"webhookUrl,omitempty"`
 	CountryCode                     *string        `json:"country_code,omitempty"`
-	RestrictPaymentMethodsToCountry *string        `json:"restrict_payment_methods_to_country,omitempty"`
-	ProfileID                       *string        `json:"profile_id,omitempty"`
-	SettlementID                    *string        `json:"settlement_id,omitempty"`
-	OrderID                         uuid.UUID      `json:"order_id"`
-	IsCancelable                    bool           `json:"is_cancelable"`
+	RestrictPaymentMethodsToCountry *string        `json:"restrictPaymentMethodsToCountry,omitempty"`
+	ProfileID                       *string        `json:"profileId,omitempty"`
+	SettlementID                    *string        `json:"settlementId,omitempty"`
+	OrderID                         uuid.UUID      `json:"orderId"`
+	IsCancelable                    bool           `json:"isCancelable"`
 	Mode                            *string        `json:"mode,omitempty"`
 	Locale                          *string        `json:"locale,omitempty"`
 	Method                          *string        `json:"method,omitempty"`
 	Metadata                        map[string]any `json:"metadata,omitempty"`
 	Links                           map[string]any `json:"links,omitempty"`
-	CreatedAt                       time.Time      `json:"created_at"`
-	AuthorizedAt                    *time.Time     `json:"authorized_at,omitempty"`
-	PaidAt                          *time.Time     `json:"paid_at,omitempty"`
-	CanceledAt                      *time.Time     `json:"canceled_at,omitempty"`
-	ExpiresAt                       *time.Time     `json:"expires_at,omitempty"`
-	ExpiredAt                       *time.Time     `json:"expired_at,omitempty"`
-	FailedAt                        *time.Time     `json:"failed_at,omitempty"`
+	CreatedAt                       time.Time      `json:"createdAt"`
+	AuthorizedAt                    *time.Time     `json:"authorizedAt,omitempty"`
+	PaidAt                          *time.Time     `json:"paidAt,omitempty"`
+	CanceledAt                      *time.Time     `json:"canceledAt,omitempty"`
+	ExpiresAt                       *time.Time     `json:"expiresAt,omitempty"`
+	ExpiredAt                       *time.Time     `json:"expiredAt,omitempty"`
+	FailedAt                        *time.Time     `json:"failedAt,omitempty"`
 	Amount                          *float64       `json:"amount,omitempty"`
-	AmountRefunded                  *float64       `json:"amount_refunded,omitempty"`
-	AmountRemaining                 *float64       `json:"amount_remaining,omitempty"`
-	AmountCaptured                  *float64       `json:"amount_captured,omitempty"`
-	AmountChargedBack               *float64       `json:"amount_charged_back,omitempty"`
-	SettlementAmount                *float64       `json:"settlement_amount,omitempty"`
+	AmountRefunded                  *float64       `json:"amountRefunded,omitempty"`
+	AmountRemaining                 *float64       `json:"amountRemaining,omitempty"`
+	AmountCaptured                  *float64       `json:"amountCaptured,omitempty"`
+	AmountChargedBack               *float64       `json:"amountChargedBack,omitempty"`
+	SettlementAmount                *float64       `json:"settlementAmount,omitempty"`
 }
 
 type Product struct {

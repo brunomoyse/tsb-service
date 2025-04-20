@@ -44,18 +44,24 @@ enum OrderTypeEnum {
     PICKUP
 }
 
+input OrderExtraInput {
+    name: String!
+    options: [String!]
+}
+
 input CreateOrderInput {
     orderType: OrderTypeEnum!
     isOnlinePayment: Boolean!
-    addressID: String
+    addressId: String
     addressExtra: String
     orderNote: String
-    orderExtra: JSON
+    orderExtra: [OrderExtraInput!]
+    preferredReadyTime: String
     items: [CreateOrderItemInput!]!
 }
 
 input CreateOrderItemInput {
-    productID: ID!
+    productId: ID!
     quantity: Int!
 }
 

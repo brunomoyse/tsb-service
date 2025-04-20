@@ -550,49 +550,49 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Payment.Amount(childComplexity), true
 
-	case "Payment.amount_captured":
+	case "Payment.amountCaptured":
 		if e.complexity.Payment.AmountCaptured == nil {
 			break
 		}
 
 		return e.complexity.Payment.AmountCaptured(childComplexity), true
 
-	case "Payment.amount_charged_back":
+	case "Payment.amountChargedBack":
 		if e.complexity.Payment.AmountChargedBack == nil {
 			break
 		}
 
 		return e.complexity.Payment.AmountChargedBack(childComplexity), true
 
-	case "Payment.amount_refunded":
+	case "Payment.amountRefunded":
 		if e.complexity.Payment.AmountRefunded == nil {
 			break
 		}
 
 		return e.complexity.Payment.AmountRefunded(childComplexity), true
 
-	case "Payment.amount_remaining":
+	case "Payment.amountRemaining":
 		if e.complexity.Payment.AmountRemaining == nil {
 			break
 		}
 
 		return e.complexity.Payment.AmountRemaining(childComplexity), true
 
-	case "Payment.authorized_at":
+	case "Payment.authorizedAt":
 		if e.complexity.Payment.AuthorizedAt == nil {
 			break
 		}
 
 		return e.complexity.Payment.AuthorizedAt(childComplexity), true
 
-	case "Payment.cancel_url":
+	case "Payment.cancelUrl":
 		if e.complexity.Payment.CancelURL == nil {
 			break
 		}
 
 		return e.complexity.Payment.CancelURL(childComplexity), true
 
-	case "Payment.canceled_at":
+	case "Payment.canceledAt":
 		if e.complexity.Payment.CanceledAt == nil {
 			break
 		}
@@ -606,7 +606,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Payment.CountryCode(childComplexity), true
 
-	case "Payment.created_at":
+	case "Payment.createdAt":
 		if e.complexity.Payment.CreatedAt == nil {
 			break
 		}
@@ -620,21 +620,21 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Payment.Description(childComplexity), true
 
-	case "Payment.expired_at":
+	case "Payment.expiredAt":
 		if e.complexity.Payment.ExpiredAt == nil {
 			break
 		}
 
 		return e.complexity.Payment.ExpiredAt(childComplexity), true
 
-	case "Payment.expires_at":
+	case "Payment.expiresAt":
 		if e.complexity.Payment.ExpiresAt == nil {
 			break
 		}
 
 		return e.complexity.Payment.ExpiresAt(childComplexity), true
 
-	case "Payment.failed_at":
+	case "Payment.failedAt":
 		if e.complexity.Payment.FailedAt == nil {
 			break
 		}
@@ -648,7 +648,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Payment.ID(childComplexity), true
 
-	case "Payment.is_cancelable":
+	case "Payment.isCancelable":
 		if e.complexity.Payment.IsCancelable == nil {
 			break
 		}
@@ -690,28 +690,28 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Payment.Mode(childComplexity), true
 
-	case "Payment.mollie_payment_id":
+	case "Payment.molliePaymentId":
 		if e.complexity.Payment.MolliePaymentID == nil {
 			break
 		}
 
 		return e.complexity.Payment.MolliePaymentID(childComplexity), true
 
-	case "Payment.order_id":
+	case "Payment.orderId":
 		if e.complexity.Payment.OrderID == nil {
 			break
 		}
 
 		return e.complexity.Payment.OrderID(childComplexity), true
 
-	case "Payment.paid_at":
+	case "Payment.paidAt":
 		if e.complexity.Payment.PaidAt == nil {
 			break
 		}
 
 		return e.complexity.Payment.PaidAt(childComplexity), true
 
-	case "Payment.profile_id":
+	case "Payment.profileId":
 		if e.complexity.Payment.ProfileID == nil {
 			break
 		}
@@ -725,21 +725,21 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Payment.Resource(childComplexity), true
 
-	case "Payment.restrict_payment_methods_to_country":
+	case "Payment.restrictPaymentMethodsToCountry":
 		if e.complexity.Payment.RestrictPaymentMethodsToCountry == nil {
 			break
 		}
 
 		return e.complexity.Payment.RestrictPaymentMethodsToCountry(childComplexity), true
 
-	case "Payment.settlement_amount":
+	case "Payment.settlementAmount":
 		if e.complexity.Payment.SettlementAmount == nil {
 			break
 		}
 
 		return e.complexity.Payment.SettlementAmount(childComplexity), true
 
-	case "Payment.settlement_id":
+	case "Payment.settlementId":
 		if e.complexity.Payment.SettlementID == nil {
 			break
 		}
@@ -753,7 +753,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Payment.Status(childComplexity), true
 
-	case "Payment.webhook_url":
+	case "Payment.webhookUrl":
 		if e.complexity.Payment.WebhookURL == nil {
 			break
 		}
@@ -1171,6 +1171,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCreateOrderInput,
 		ec.unmarshalInputCreateOrderItemInput,
 		ec.unmarshalInputCreateProductInput,
+		ec.unmarshalInputOrderExtraInput,
 		ec.unmarshalInputTranslationInput,
 		ec.unmarshalInputUpdateOrderInput,
 		ec.unmarshalInputUpdateProductInput,
@@ -3423,28 +3424,28 @@ func (ec *executionContext) fieldContext_Order_payment(_ context.Context, field 
 				return ec.fieldContext_Payment_id(ctx, field)
 			case "resource":
 				return ec.fieldContext_Payment_resource(ctx, field)
-			case "mollie_payment_id":
-				return ec.fieldContext_Payment_mollie_payment_id(ctx, field)
+			case "molliePaymentId":
+				return ec.fieldContext_Payment_molliePaymentId(ctx, field)
 			case "status":
 				return ec.fieldContext_Payment_status(ctx, field)
 			case "description":
 				return ec.fieldContext_Payment_description(ctx, field)
-			case "cancel_url":
-				return ec.fieldContext_Payment_cancel_url(ctx, field)
-			case "webhook_url":
-				return ec.fieldContext_Payment_webhook_url(ctx, field)
+			case "cancelUrl":
+				return ec.fieldContext_Payment_cancelUrl(ctx, field)
+			case "webhookUrl":
+				return ec.fieldContext_Payment_webhookUrl(ctx, field)
 			case "country_code":
 				return ec.fieldContext_Payment_country_code(ctx, field)
-			case "restrict_payment_methods_to_country":
-				return ec.fieldContext_Payment_restrict_payment_methods_to_country(ctx, field)
-			case "profile_id":
-				return ec.fieldContext_Payment_profile_id(ctx, field)
-			case "settlement_id":
-				return ec.fieldContext_Payment_settlement_id(ctx, field)
-			case "order_id":
-				return ec.fieldContext_Payment_order_id(ctx, field)
-			case "is_cancelable":
-				return ec.fieldContext_Payment_is_cancelable(ctx, field)
+			case "restrictPaymentMethodsToCountry":
+				return ec.fieldContext_Payment_restrictPaymentMethodsToCountry(ctx, field)
+			case "profileId":
+				return ec.fieldContext_Payment_profileId(ctx, field)
+			case "settlementId":
+				return ec.fieldContext_Payment_settlementId(ctx, field)
+			case "orderId":
+				return ec.fieldContext_Payment_orderId(ctx, field)
+			case "isCancelable":
+				return ec.fieldContext_Payment_isCancelable(ctx, field)
 			case "mode":
 				return ec.fieldContext_Payment_mode(ctx, field)
 			case "locale":
@@ -3455,32 +3456,32 @@ func (ec *executionContext) fieldContext_Order_payment(_ context.Context, field 
 				return ec.fieldContext_Payment_metadata(ctx, field)
 			case "links":
 				return ec.fieldContext_Payment_links(ctx, field)
-			case "created_at":
-				return ec.fieldContext_Payment_created_at(ctx, field)
-			case "authorized_at":
-				return ec.fieldContext_Payment_authorized_at(ctx, field)
-			case "paid_at":
-				return ec.fieldContext_Payment_paid_at(ctx, field)
-			case "canceled_at":
-				return ec.fieldContext_Payment_canceled_at(ctx, field)
-			case "expires_at":
-				return ec.fieldContext_Payment_expires_at(ctx, field)
-			case "expired_at":
-				return ec.fieldContext_Payment_expired_at(ctx, field)
-			case "failed_at":
-				return ec.fieldContext_Payment_failed_at(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Payment_createdAt(ctx, field)
+			case "authorizedAt":
+				return ec.fieldContext_Payment_authorizedAt(ctx, field)
+			case "paidAt":
+				return ec.fieldContext_Payment_paidAt(ctx, field)
+			case "canceledAt":
+				return ec.fieldContext_Payment_canceledAt(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_Payment_expiresAt(ctx, field)
+			case "expiredAt":
+				return ec.fieldContext_Payment_expiredAt(ctx, field)
+			case "failedAt":
+				return ec.fieldContext_Payment_failedAt(ctx, field)
 			case "amount":
 				return ec.fieldContext_Payment_amount(ctx, field)
-			case "amount_refunded":
-				return ec.fieldContext_Payment_amount_refunded(ctx, field)
-			case "amount_remaining":
-				return ec.fieldContext_Payment_amount_remaining(ctx, field)
-			case "amount_captured":
-				return ec.fieldContext_Payment_amount_captured(ctx, field)
-			case "amount_charged_back":
-				return ec.fieldContext_Payment_amount_charged_back(ctx, field)
-			case "settlement_amount":
-				return ec.fieldContext_Payment_settlement_amount(ctx, field)
+			case "amountRefunded":
+				return ec.fieldContext_Payment_amountRefunded(ctx, field)
+			case "amountRemaining":
+				return ec.fieldContext_Payment_amountRemaining(ctx, field)
+			case "amountCaptured":
+				return ec.fieldContext_Payment_amountCaptured(ctx, field)
+			case "amountChargedBack":
+				return ec.fieldContext_Payment_amountChargedBack(ctx, field)
+			case "settlementAmount":
+				return ec.fieldContext_Payment_settlementAmount(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Payment", field.Name)
 		},
@@ -3879,8 +3880,8 @@ func (ec *executionContext) fieldContext_Payment_resource(_ context.Context, fie
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_mollie_payment_id(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_mollie_payment_id(ctx, field)
+func (ec *executionContext) _Payment_molliePaymentId(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_molliePaymentId(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -3910,7 +3911,7 @@ func (ec *executionContext) _Payment_mollie_payment_id(ctx context.Context, fiel
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_mollie_payment_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_molliePaymentId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4008,8 +4009,8 @@ func (ec *executionContext) fieldContext_Payment_description(_ context.Context, 
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_cancel_url(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_cancel_url(ctx, field)
+func (ec *executionContext) _Payment_cancelUrl(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_cancelUrl(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4036,7 +4037,7 @@ func (ec *executionContext) _Payment_cancel_url(ctx context.Context, field graph
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_cancel_url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_cancelUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4049,8 +4050,8 @@ func (ec *executionContext) fieldContext_Payment_cancel_url(_ context.Context, f
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_webhook_url(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_webhook_url(ctx, field)
+func (ec *executionContext) _Payment_webhookUrl(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_webhookUrl(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4077,7 +4078,7 @@ func (ec *executionContext) _Payment_webhook_url(ctx context.Context, field grap
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_webhook_url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_webhookUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4131,8 +4132,8 @@ func (ec *executionContext) fieldContext_Payment_country_code(_ context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_restrict_payment_methods_to_country(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_restrict_payment_methods_to_country(ctx, field)
+func (ec *executionContext) _Payment_restrictPaymentMethodsToCountry(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_restrictPaymentMethodsToCountry(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4159,7 +4160,7 @@ func (ec *executionContext) _Payment_restrict_payment_methods_to_country(ctx con
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_restrict_payment_methods_to_country(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_restrictPaymentMethodsToCountry(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4172,8 +4173,8 @@ func (ec *executionContext) fieldContext_Payment_restrict_payment_methods_to_cou
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_profile_id(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_profile_id(ctx, field)
+func (ec *executionContext) _Payment_profileId(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_profileId(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4200,7 +4201,7 @@ func (ec *executionContext) _Payment_profile_id(ctx context.Context, field graph
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_profile_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_profileId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4213,8 +4214,8 @@ func (ec *executionContext) fieldContext_Payment_profile_id(_ context.Context, f
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_settlement_id(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_settlement_id(ctx, field)
+func (ec *executionContext) _Payment_settlementId(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_settlementId(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4241,7 +4242,7 @@ func (ec *executionContext) _Payment_settlement_id(ctx context.Context, field gr
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_settlement_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_settlementId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4254,8 +4255,8 @@ func (ec *executionContext) fieldContext_Payment_settlement_id(_ context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_order_id(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_order_id(ctx, field)
+func (ec *executionContext) _Payment_orderId(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_orderId(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4285,7 +4286,7 @@ func (ec *executionContext) _Payment_order_id(ctx context.Context, field graphql
 	return ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_order_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_orderId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4298,8 +4299,8 @@ func (ec *executionContext) fieldContext_Payment_order_id(_ context.Context, fie
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_is_cancelable(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_is_cancelable(ctx, field)
+func (ec *executionContext) _Payment_isCancelable(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_isCancelable(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4329,7 +4330,7 @@ func (ec *executionContext) _Payment_is_cancelable(ctx context.Context, field gr
 	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_is_cancelable(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_isCancelable(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4547,8 +4548,8 @@ func (ec *executionContext) fieldContext_Payment_links(_ context.Context, field 
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_created_at(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_created_at(ctx, field)
+func (ec *executionContext) _Payment_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_createdAt(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4578,7 +4579,7 @@ func (ec *executionContext) _Payment_created_at(ctx context.Context, field graph
 	return ec.marshalNDateTime2timeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_created_at(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4591,8 +4592,8 @@ func (ec *executionContext) fieldContext_Payment_created_at(_ context.Context, f
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_authorized_at(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_authorized_at(ctx, field)
+func (ec *executionContext) _Payment_authorizedAt(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_authorizedAt(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4619,7 +4620,7 @@ func (ec *executionContext) _Payment_authorized_at(ctx context.Context, field gr
 	return ec.marshalODateTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_authorized_at(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_authorizedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4632,8 +4633,8 @@ func (ec *executionContext) fieldContext_Payment_authorized_at(_ context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_paid_at(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_paid_at(ctx, field)
+func (ec *executionContext) _Payment_paidAt(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_paidAt(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4660,7 +4661,7 @@ func (ec *executionContext) _Payment_paid_at(ctx context.Context, field graphql.
 	return ec.marshalODateTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_paid_at(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_paidAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4673,8 +4674,8 @@ func (ec *executionContext) fieldContext_Payment_paid_at(_ context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_canceled_at(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_canceled_at(ctx, field)
+func (ec *executionContext) _Payment_canceledAt(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_canceledAt(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4701,7 +4702,7 @@ func (ec *executionContext) _Payment_canceled_at(ctx context.Context, field grap
 	return ec.marshalODateTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_canceled_at(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_canceledAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4714,8 +4715,8 @@ func (ec *executionContext) fieldContext_Payment_canceled_at(_ context.Context, 
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_expires_at(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_expires_at(ctx, field)
+func (ec *executionContext) _Payment_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_expiresAt(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4742,7 +4743,7 @@ func (ec *executionContext) _Payment_expires_at(ctx context.Context, field graph
 	return ec.marshalODateTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_expires_at(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4755,8 +4756,8 @@ func (ec *executionContext) fieldContext_Payment_expires_at(_ context.Context, f
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_expired_at(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_expired_at(ctx, field)
+func (ec *executionContext) _Payment_expiredAt(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_expiredAt(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4783,7 +4784,7 @@ func (ec *executionContext) _Payment_expired_at(ctx context.Context, field graph
 	return ec.marshalODateTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_expired_at(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_expiredAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4796,8 +4797,8 @@ func (ec *executionContext) fieldContext_Payment_expired_at(_ context.Context, f
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_failed_at(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_failed_at(ctx, field)
+func (ec *executionContext) _Payment_failedAt(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_failedAt(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4824,7 +4825,7 @@ func (ec *executionContext) _Payment_failed_at(ctx context.Context, field graphq
 	return ec.marshalODateTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_failed_at(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_failedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4878,8 +4879,8 @@ func (ec *executionContext) fieldContext_Payment_amount(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_amount_refunded(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_amount_refunded(ctx, field)
+func (ec *executionContext) _Payment_amountRefunded(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_amountRefunded(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4906,7 +4907,7 @@ func (ec *executionContext) _Payment_amount_refunded(ctx context.Context, field 
 	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_amount_refunded(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_amountRefunded(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4919,8 +4920,8 @@ func (ec *executionContext) fieldContext_Payment_amount_refunded(_ context.Conte
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_amount_remaining(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_amount_remaining(ctx, field)
+func (ec *executionContext) _Payment_amountRemaining(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_amountRemaining(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4947,7 +4948,7 @@ func (ec *executionContext) _Payment_amount_remaining(ctx context.Context, field
 	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_amount_remaining(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_amountRemaining(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -4960,8 +4961,8 @@ func (ec *executionContext) fieldContext_Payment_amount_remaining(_ context.Cont
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_amount_captured(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_amount_captured(ctx, field)
+func (ec *executionContext) _Payment_amountCaptured(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_amountCaptured(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -4988,7 +4989,7 @@ func (ec *executionContext) _Payment_amount_captured(ctx context.Context, field 
 	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_amount_captured(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_amountCaptured(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -5001,8 +5002,8 @@ func (ec *executionContext) fieldContext_Payment_amount_captured(_ context.Conte
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_amount_charged_back(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_amount_charged_back(ctx, field)
+func (ec *executionContext) _Payment_amountChargedBack(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_amountChargedBack(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -5029,7 +5030,7 @@ func (ec *executionContext) _Payment_amount_charged_back(ctx context.Context, fi
 	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_amount_charged_back(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_amountChargedBack(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -5042,8 +5043,8 @@ func (ec *executionContext) fieldContext_Payment_amount_charged_back(_ context.C
 	return fc, nil
 }
 
-func (ec *executionContext) _Payment_settlement_amount(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Payment_settlement_amount(ctx, field)
+func (ec *executionContext) _Payment_settlementAmount(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Payment_settlementAmount(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -5070,7 +5071,7 @@ func (ec *executionContext) _Payment_settlement_amount(ctx context.Context, fiel
 	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Payment_settlement_amount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Payment_settlementAmount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Payment",
 		Field:      field,
@@ -10183,7 +10184,7 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"orderType", "isOnlinePayment", "addressID", "addressExtra", "orderNote", "orderExtra", "items"}
+	fieldsInOrder := [...]string{"orderType", "isOnlinePayment", "addressId", "addressExtra", "orderNote", "orderExtra", "preferredReadyTime", "items"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10204,8 +10205,8 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 				return it, err
 			}
 			it.IsOnlinePayment = data
-		case "addressID":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addressID"))
+		case "addressId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addressId"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
@@ -10227,11 +10228,18 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 			it.OrderNote = data
 		case "orderExtra":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("orderExtra"))
-			data, err := ec.unmarshalOJSON2map(ctx, v)
+			data, err := ec.unmarshalOOrderExtraInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderExtraInputᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.OrderExtra = data
+		case "preferredReadyTime":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("preferredReadyTime"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PreferredReadyTime = data
 		case "items":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("items"))
 			data, err := ec.unmarshalNCreateOrderItemInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCreateOrderItemInputᚄ(ctx, v)
@@ -10252,15 +10260,15 @@ func (ec *executionContext) unmarshalInputCreateOrderItemInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"productID", "quantity"}
+	fieldsInOrder := [...]string{"productId", "quantity"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "productID":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productID"))
+		case "productId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
 			data, err := ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
 			if err != nil {
 				return it, err
@@ -10363,6 +10371,40 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Image = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputOrderExtraInput(ctx context.Context, obj any) (model.OrderExtraInput, error) {
+	var it model.OrderExtraInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"name", "options"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "options":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("options"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Options = data
 		}
 	}
 
@@ -11070,8 +11112,8 @@ func (ec *executionContext) _Payment(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "resource":
 			out.Values[i] = ec._Payment_resource(ctx, field, obj)
-		case "mollie_payment_id":
-			out.Values[i] = ec._Payment_mollie_payment_id(ctx, field, obj)
+		case "molliePaymentId":
+			out.Values[i] = ec._Payment_molliePaymentId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -11082,25 +11124,25 @@ func (ec *executionContext) _Payment(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "description":
 			out.Values[i] = ec._Payment_description(ctx, field, obj)
-		case "cancel_url":
-			out.Values[i] = ec._Payment_cancel_url(ctx, field, obj)
-		case "webhook_url":
-			out.Values[i] = ec._Payment_webhook_url(ctx, field, obj)
+		case "cancelUrl":
+			out.Values[i] = ec._Payment_cancelUrl(ctx, field, obj)
+		case "webhookUrl":
+			out.Values[i] = ec._Payment_webhookUrl(ctx, field, obj)
 		case "country_code":
 			out.Values[i] = ec._Payment_country_code(ctx, field, obj)
-		case "restrict_payment_methods_to_country":
-			out.Values[i] = ec._Payment_restrict_payment_methods_to_country(ctx, field, obj)
-		case "profile_id":
-			out.Values[i] = ec._Payment_profile_id(ctx, field, obj)
-		case "settlement_id":
-			out.Values[i] = ec._Payment_settlement_id(ctx, field, obj)
-		case "order_id":
-			out.Values[i] = ec._Payment_order_id(ctx, field, obj)
+		case "restrictPaymentMethodsToCountry":
+			out.Values[i] = ec._Payment_restrictPaymentMethodsToCountry(ctx, field, obj)
+		case "profileId":
+			out.Values[i] = ec._Payment_profileId(ctx, field, obj)
+		case "settlementId":
+			out.Values[i] = ec._Payment_settlementId(ctx, field, obj)
+		case "orderId":
+			out.Values[i] = ec._Payment_orderId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "is_cancelable":
-			out.Values[i] = ec._Payment_is_cancelable(ctx, field, obj)
+		case "isCancelable":
+			out.Values[i] = ec._Payment_isCancelable(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -11114,35 +11156,35 @@ func (ec *executionContext) _Payment(ctx context.Context, sel ast.SelectionSet, 
 			out.Values[i] = ec._Payment_metadata(ctx, field, obj)
 		case "links":
 			out.Values[i] = ec._Payment_links(ctx, field, obj)
-		case "created_at":
-			out.Values[i] = ec._Payment_created_at(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._Payment_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "authorized_at":
-			out.Values[i] = ec._Payment_authorized_at(ctx, field, obj)
-		case "paid_at":
-			out.Values[i] = ec._Payment_paid_at(ctx, field, obj)
-		case "canceled_at":
-			out.Values[i] = ec._Payment_canceled_at(ctx, field, obj)
-		case "expires_at":
-			out.Values[i] = ec._Payment_expires_at(ctx, field, obj)
-		case "expired_at":
-			out.Values[i] = ec._Payment_expired_at(ctx, field, obj)
-		case "failed_at":
-			out.Values[i] = ec._Payment_failed_at(ctx, field, obj)
+		case "authorizedAt":
+			out.Values[i] = ec._Payment_authorizedAt(ctx, field, obj)
+		case "paidAt":
+			out.Values[i] = ec._Payment_paidAt(ctx, field, obj)
+		case "canceledAt":
+			out.Values[i] = ec._Payment_canceledAt(ctx, field, obj)
+		case "expiresAt":
+			out.Values[i] = ec._Payment_expiresAt(ctx, field, obj)
+		case "expiredAt":
+			out.Values[i] = ec._Payment_expiredAt(ctx, field, obj)
+		case "failedAt":
+			out.Values[i] = ec._Payment_failedAt(ctx, field, obj)
 		case "amount":
 			out.Values[i] = ec._Payment_amount(ctx, field, obj)
-		case "amount_refunded":
-			out.Values[i] = ec._Payment_amount_refunded(ctx, field, obj)
-		case "amount_remaining":
-			out.Values[i] = ec._Payment_amount_remaining(ctx, field, obj)
-		case "amount_captured":
-			out.Values[i] = ec._Payment_amount_captured(ctx, field, obj)
-		case "amount_charged_back":
-			out.Values[i] = ec._Payment_amount_charged_back(ctx, field, obj)
-		case "settlement_amount":
-			out.Values[i] = ec._Payment_settlement_amount(ctx, field, obj)
+		case "amountRefunded":
+			out.Values[i] = ec._Payment_amountRefunded(ctx, field, obj)
+		case "amountRemaining":
+			out.Values[i] = ec._Payment_amountRemaining(ctx, field, obj)
+		case "amountCaptured":
+			out.Values[i] = ec._Payment_amountCaptured(ctx, field, obj)
+		case "amountChargedBack":
+			out.Values[i] = ec._Payment_amountChargedBack(ctx, field, obj)
+		case "settlementAmount":
+			out.Values[i] = ec._Payment_settlementAmount(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12560,6 +12602,11 @@ func (ec *executionContext) marshalNOrder2ᚖtsbᚑserviceᚋinternalᚋapiᚋgr
 	return ec._Order(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNOrderExtraInput2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderExtraInput(ctx context.Context, v any) (*model.OrderExtraInput, error) {
+	res, err := ec.unmarshalInputOrderExtraInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNOrderItem2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.OrderItem) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -13377,6 +13424,24 @@ func (ec *executionContext) marshalOOrder2ᚕᚖtsbᚑserviceᚋinternalᚋapi�
 	return ret
 }
 
+func (ec *executionContext) unmarshalOOrderExtraInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderExtraInputᚄ(ctx context.Context, v any) ([]*model.OrderExtraInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]*model.OrderExtraInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNOrderExtraInput2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderExtraInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
 func (ec *executionContext) unmarshalOOrderStatusEnum2ᚖtsbᚑserviceᚋinternalᚋmodulesᚋorderᚋdomainᚐOrderStatus(ctx context.Context, v any) (*domain.OrderStatus, error) {
 	if v == nil {
 		return nil, nil
@@ -13406,6 +13471,42 @@ func (ec *executionContext) marshalOStreet2ᚖtsbᚑserviceᚋinternalᚋapiᚋg
 		return graphql.Null
 	}
 	return ec._Street(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) {
