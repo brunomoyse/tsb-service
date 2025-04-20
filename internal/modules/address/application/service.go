@@ -6,11 +6,14 @@ import (
 )
 
 type AddressService interface {
-	SearchStreetNames(ctx context.Context, query string) ([]domain.Street, error)
+	SearchStreetNames(ctx context.Context, query string) ([]*domain.Street, error)
 	GetDistinctHouseNumbers(ctx context.Context, streetID string) ([]string, error)
 	GetBoxNumbers(ctx context.Context, streetID string, houseNumber string) ([]*string, error)
 	GetFinalAddress(ctx context.Context, streetID string, houseNumber string, boxNumber *string) (*domain.Address, error)
 	GetAddressByID(ctx context.Context, ID string) (*domain.Address, error)
+
+	BatchGetAddressesByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.Address, error)
+	BatchGetAddressesByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Address, error)
 }
 
 type addressService struct {
@@ -23,7 +26,7 @@ func NewAddressService(repo domain.AddressRepository) AddressService {
 	}
 }
 
-func (s *addressService) SearchStreetNames(ctx context.Context, query string) ([]domain.Street, error) {
+func (s *addressService) SearchStreetNames(ctx context.Context, query string) ([]*domain.Street, error) {
 	streetNames, err := s.repo.SearchStreetNames(ctx, query)
 	if err != nil {
 		return nil, err
@@ -53,4 +56,12 @@ func (s *addressService) GetFinalAddress(ctx context.Context, streetID string, h
 
 func (s *addressService) GetAddressByID(ctx context.Context, ID string) (*domain.Address, error) {
 	return s.repo.GetAddressByID(ctx, ID)
+}
+
+func (s *addressService) BatchGetAddressesByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.Address, error) {
+	return s.repo.BatchGetAddressesByOrderIDs(ctx, orderIDs)
+}
+
+func (s *addressService) BatchGetAddressesByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Address, error) {
+	return s.repo.BatchGetAddressesByUserIDs(ctx, userIDs)
 }

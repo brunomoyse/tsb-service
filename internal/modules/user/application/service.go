@@ -33,6 +33,8 @@ type UserService interface {
 	UpdateEmailVerifiedAt(ctx context.Context, userID string) (*domain.User, error)
 	InvalidateRefreshToken(ctx context.Context, refreshToken string) error
 	VerifyUserEmail(ctx context.Context, userID string) error
+
+	BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error)
 }
 
 type userService struct {
@@ -292,6 +294,10 @@ func (s *userService) validateRefreshToken(tokenString, secret string) (*domain.
 	return claims, nil
 }
 
+func (s *userService) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error) {
+	return s.repo.BatchGetUsersByOrderIDs(ctx, orderIDs)
+}
+
 func generateSalt() (string, error) {
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
@@ -307,34 +313,41 @@ func hashPassword(password string, salt string) string {
 }
 
 func generateTokens(user domain.User, jwtSecret string) (string, string, error) {
-	// Access Token
+	// build the base RegisteredClaims
+	baseRC := jwt.RegisteredClaims{
+		Subject:   user.ID.String(),
+		ExpiresAt: jwt.NewNumericDate(time.Now()), // we'll override per-token
+	}
+
+	// if the user is an admin, include "admin" in the Audience
+	if user.IsAdmin {
+		baseRC.Audience = jwt.ClaimStrings{"admin"}
+	}
+
+	// Access Token (15m)
+	accessRC := baseRC
+	accessRC.ExpiresAt = jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
 	accessClaims := domain.JwtClaims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
-			Subject:   user.ID.String(),
-		},
-		Type: "access",
-		ID:   uuid.NewString(),
+		RegisteredClaims: accessRC,
+		Type:             "access",
+		ID:               uuid.NewString(),
 	}
-
-	// Refresh Token
-	refreshClaims := domain.JwtClaims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
-			Subject:   user.ID.String(),
-		},
-		Type: "refresh",
-		ID:   uuid.NewString(),
-	}
-
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	accessTokenString, err := accessToken.SignedString([]byte(jwtSecret))
+	at := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
+	accessTokenString, err := at.SignedString([]byte(jwtSecret))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to sign access token: %w", err)
 	}
 
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	refreshTokenString, err := refreshToken.SignedString([]byte(jwtSecret))
+	// Refresh Token (7d)
+	refreshRC := baseRC
+	refreshRC.ExpiresAt = jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour))
+	refreshClaims := domain.JwtClaims{
+		RegisteredClaims: refreshRC,
+		Type:             "refresh",
+		ID:               uuid.NewString(),
+	}
+	rt := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
+	refreshTokenString, err := rt.SignedString([]byte(jwtSecret))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to sign refresh token: %w", err)
 	}

@@ -1,0 +1,98 @@
+scalar Upload
+
+type Product {
+    id: ID!
+    createdAt: DateTime!
+    price: String!
+    code: String
+    slug: String!
+    pieceCount: Int
+    isVisible: Boolean!
+    isAvailable: Boolean!
+    isHalal: Boolean!
+    isVegan: Boolean!
+
+    # Generated based on Accept-Language header
+    name: String!
+    description: String
+
+    category: ProductCategory!
+
+    # Admin only
+    translations: [Translation!]!
+}
+
+type Translation {
+    language: String!,
+    name: String!,
+    description: String
+}
+
+type ProductCategory {
+    id: ID!
+    order: Int!
+
+    # Generated based on Accept-Language header
+    name: String!
+
+    products: [Product!]!
+
+    # Admin only
+    translations: [Translation!]!
+}
+
+input CreateProductInput {
+    price: String!
+    code: String
+    pieceCount: Int
+    isVisible: Boolean!
+    isAvailable: Boolean!
+    isHalal: Boolean!
+    isVegan: Boolean!
+    categoryID: ID!
+
+    # Translations
+    translations: [TranslationInput!]!
+
+    image: Upload
+}
+
+input UpdateProductInput {
+    price: String
+    code: String
+    pieceCount: Int
+    isVisible: Boolean
+    isAvailable: Boolean
+    isHalal: Boolean
+    isVegan: Boolean
+    categoryID: ID
+
+    # Translations
+    translations: [TranslationInput!]
+
+    image: Upload
+}
+
+input TranslationInput {
+    language: String!
+    name: String!
+    description: String
+}
+
+extend type Query {
+    products: [Product!]!
+    product(id: ID!): Product!
+    productCategories: [ProductCategory!]!
+    productCategory(id: ID!): ProductCategory!
+}
+
+extend type Mutation {
+    createProduct (
+        input: CreateProductInput!
+    ): Product! @admin
+
+    updateProduct(
+        id: ID!
+        input: UpdateProductInput!
+    ): Product! @admin
+}

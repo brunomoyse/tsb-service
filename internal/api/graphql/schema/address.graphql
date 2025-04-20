@@ -1,0 +1,28 @@
+type Address {
+    id: String! # BeST
+    postcode: String!
+    municipalityName: String!
+    streetName: String!
+    houseNumber: String!
+    boxNumber: String
+    distance: Float!
+}
+
+type Street {
+    id: String!
+    streetName: String!
+    municipalityName: String!
+    postcode: String!
+}
+
+extend type Query {
+    streets(query: String!): [Street]!
+    houseNumbers(streetId: String!): [String!]!
+    boxNumbers(streetId: String!, houseNumber: String!): [String]!
+    address(id: String!): Address!
+    addressByLocation(
+        streetID: String!
+        houseNumber: String!
+        boxNumber: String
+    ): Address!
+}

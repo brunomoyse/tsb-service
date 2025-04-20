@@ -1,0 +1,27 @@
+type User {
+    id: ID!
+    email: String!
+    firstName: String!
+    lastName: String!
+    phoneNumber: String
+    address: Address
+    orders: [Order!]
+}
+
+input UpdateUserInput {
+    firstName: String
+    lastName: String
+    email: String
+    phoneNumber: String
+    addressId: String
+}
+
+extend type Query {
+    me: User! @auth
+}
+
+extend type Mutation {
+    updateMe (
+        input: UpdateUserInput!
+    ): User! @auth
+}
