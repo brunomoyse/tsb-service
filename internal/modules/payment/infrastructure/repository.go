@@ -7,6 +7,7 @@ import (
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 	"time"
 	"tsb-service/internal/modules/payment/domain"
@@ -261,4 +262,25 @@ func (r *PaymentRepository) FindByExternalID(ctx context.Context, paymentID stri
 	}
 
 	return &payment, nil
+}
+
+func (r *PaymentRepository) FindByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.MolliePayment, error) {
+	const query = `
+		SELECT *
+		FROM mollie_payments
+		WHERE order_id = ANY($1::uuid[])
+	`
+
+	var payments []*domain.MolliePayment
+	err := r.db.SelectContext(ctx, &payments, query, pq.Array(orderIDs))
+	if err != nil {
+		return nil, fmt.Errorf("failed to find payments by order IDs: %w", err)
+	}
+
+	paymentsMap := make(map[string][]*domain.MolliePayment)
+	for _, payment := range payments {
+		paymentsMap[payment.OrderID.String()] = append(paymentsMap[payment.OrderID.String()], payment)
+	}
+
+	return paymentsMap, nil
 }

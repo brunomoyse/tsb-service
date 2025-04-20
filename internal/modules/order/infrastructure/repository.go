@@ -221,15 +221,15 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 	return orders, nil
 }
 
-func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []uuid.UUID) (map[uuid.UUID][]domain.OrderProductRaw, error) {
+func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.OrderProductRaw, error) {
 	if len(orderIDs) == 0 {
-		// Return an empty map if nothing was requested
-		return make(map[uuid.UUID][]domain.OrderProductRaw), nil
+		// must be []*domain.OrderProductRaw, not []domain.OrderProductRaw
+		return make(map[string][]*domain.OrderProductRaw), nil
 	}
 
-	// Build a query with an IN clause using sqlx.In for parameter expansion
+	// build an IN (…) query, expand args with sqlx.In, then rebind for your driver
 	query, args, err := sqlx.In(`
-        SELECT 
+        SELECT
             order_id,
             product_id,
             quantity,
@@ -241,12 +241,10 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []uuid.UU
 	if err != nil {
 		return nil, fmt.Errorf("failed to build IN query: %w", err)
 	}
-
-	// Rebind the query for the current driver
 	query = r.db.Rebind(query)
 
-	// Define a struct that matches the selected columns
-	var rows []struct {
+	// temp struct to hold each row (including the order_id)
+	type rawRow struct {
 		OrderID    uuid.UUID       `db:"order_id"`
 		ProductID  uuid.UUID       `db:"product_id"`
 		Quantity   int64           `db:"quantity"`
@@ -254,24 +252,53 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []uuid.UU
 		TotalPrice decimal.Decimal `db:"total_price"`
 	}
 
-	// Execute the query
+	var rows []rawRow
 	if err := r.db.SelectContext(ctx, &rows, query, args...); err != nil {
 		return nil, fmt.Errorf("failed to select order products: %w", err)
 	}
 
-	// Initialize the result map
-	productsByOrder := make(map[uuid.UUID][]domain.OrderProductRaw)
-
-	// Populate the map: orderID -> slice of OrderProductRaw
+	// now group into map[string][]*domain.OrderProductRaw
+	result := make(map[string][]*domain.OrderProductRaw, len(rows))
 	for _, row := range rows {
-		op := domain.OrderProductRaw{
+		op := &domain.OrderProductRaw{
 			ProductID:  row.ProductID,
 			Quantity:   row.Quantity,
 			UnitPrice:  row.UnitPrice,
 			TotalPrice: row.TotalPrice,
 		}
-		productsByOrder[row.OrderID] = append(productsByOrder[row.OrderID], op)
+		// key by the string form of the order UUID
+		result[row.OrderID.String()] = append(result[row.OrderID.String()], op)
 	}
 
-	return productsByOrder, nil
+	return result, nil
+}
+
+func (r *OrderRepository) FindByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error) {
+	// 1) Expand the IN clause
+	query, args, err := sqlx.In(`
+        SELECT *
+        FROM orders
+        WHERE user_id IN (?)
+        ORDER BY created_at DESC
+    `, userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2) Rebind for the specific driver (?, $1, etc)
+	query = r.db.Rebind(query)
+
+	// 3) Fetch into a slice
+	var orders []domain.Order
+	if err := r.db.SelectContext(ctx, &orders, query, args...); err != nil {
+		return nil, err
+	}
+
+	// 4) Group by user_id
+	result := make(map[string][]*domain.Order, len(userIDs))
+	for _, o := range orders {
+		result[o.UserID.String()] = append(result[o.UserID.String()], &o)
+	}
+
+	return result, nil
 }
