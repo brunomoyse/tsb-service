@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
-	"time"
 	"tsb-service/internal/modules/order/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
-	"tsb-service/pkg/sse"
 )
 
 type OrderService interface {
@@ -40,19 +38,6 @@ func (s *orderService) CreateOrder(ctx context.Context, o *domain.Order, op *[]d
 		return nil, nil, fmt.Errorf("failed to save order: %w", err)
 	}
 
-	// Construct an event payload for the orderCreated event.
-	eventPayload := fmt.Sprintf(
-		`{"event": "orderCreated", "orderID": "%s", "timestamp": "%s"}`,
-		order.ID.String(),
-		time.Now().Format(time.RFC3339),
-	)
-
-	go func() {
-		time.Sleep(1 * time.Second)
-		// Trigger the event sending via the SSE hub.
-		sse.Hub.Broadcast(eventPayload)
-	}()
-
 	return order, orderProducts, nil
 }
 
@@ -74,19 +59,6 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID,
 	if err := s.repo.Update(ctx, order); err != nil {
 		return err
 	}
-
-	// Construct an event payload (as JSON)
-	eventPayload := fmt.Sprintf(
-		`{"event": "orderUpdated", "orderID": "%s", "timestamp": "%s"}`,
-		orderID,
-		time.Now().Format(time.RFC3339),
-	)
-
-	go func() {
-		time.Sleep(1 * time.Second)
-		// Trigger the event sending via the SSE hub.
-		sse.Hub.Broadcast(eventPayload)
-	}()
 
 	return nil
 }

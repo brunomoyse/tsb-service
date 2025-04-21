@@ -154,41 +154,60 @@ func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o
 }
 
 // prepareOrderConfirmedData prepares the data for order confirmed emails.
-func prepareOrderConfirmedData(u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order, a *addressDomain.Address) (interface{}, error) {
+func prepareOrderConfirmedData(
+	u userDomain.User,
+	op []orderDomain.OrderProduct,
+	o orderDomain.Order,
+	a *addressDomain.Address,
+) (interface{}, error) {
 	type OrderProductView struct {
 		Name       string
 		Quantity   int64
 		TotalPrice string
 	}
-
-	var orderViews []OrderProductView
-	for _, item := range op {
-		orderViews = append(orderViews, OrderProductView{
-			Name:       fmt.Sprintf("%s - %s", item.Product.CategoryName, item.Product.Name),
+	type AddressView struct {
+		StreetName       string
+		HouseNumber      string
+		BoxNumber        string
+		MunicipalityName string
+		Postcode         string
+	}
+	// 1) build product lines
+	orderViews := make([]OrderProductView, len(op))
+	subtotal := decimal.Zero
+	for i, item := range op {
+		orderViews[i] = OrderProductView{
+			Name:       fmt.Sprintf("%s – %s", item.Product.CategoryName, item.Product.Name),
 			Quantity:   item.Quantity,
 			TotalPrice: utils.FormatDecimal(item.TotalPrice),
-		})
-	}
-
-	subtotal := decimal.NewFromInt(0)
-	for _, item := range op {
+		}
 		subtotal = subtotal.Add(item.TotalPrice)
 	}
 
-	var boxNumber string
-	if a != nil && a.BoxNumber != nil {
-		boxNumber = *a.BoxNumber
+	// 2) delivery fee & discount
+	var deliveryFee, discount decimal.Decimal
+	if o.DeliveryFee != nil {
+		deliveryFee = *o.DeliveryFee
 	}
+	discount = o.DiscountAmount
 
-	// Prepare address fields safely.
-	var streetName, houseNumber, municipalityName, postcode string
+	// 3) maybe build AddressView
+	var addrView *AddressView
 	if a != nil {
-		streetName = a.StreetName
-		houseNumber = a.HouseNumber
-		municipalityName = a.MunicipalityName
-		postcode = a.Postcode
+		box := ""
+		if a.BoxNumber != nil {
+			box = *a.BoxNumber
+		}
+		addrView = &AddressView{
+			StreetName:       a.StreetName,
+			HouseNumber:      a.HouseNumber,
+			BoxNumber:        box,
+			MunicipalityName: a.MunicipalityName,
+			Postcode:         a.Postcode,
+		}
 	}
 
+	// 4) assemble data
 	data := struct {
 		UserName         string
 		OrderItems       []OrderProductView
@@ -199,36 +218,20 @@ func prepareOrderConfirmedData(u userDomain.User, op []orderDomain.OrderProduct,
 		TotalPrice       string
 		StatusLink       string
 		DeliveryTime     string
-		Address          struct {
-			StreetName       string
-			HouseNumber      string
-			BoxNumber        string
-			MunicipalityName string
-			Postcode         string
-		}
+		Address          *AddressView
 	}{
-		UserName:         fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		UserName:         u.FirstName + " " + u.LastName,
 		OrderItems:       orderViews,
 		OrderType:        string(o.OrderType),
 		SubtotalPrice:    utils.FormatDecimal(subtotal),
-		TakeawayDiscount: utils.FormatDecimal(decimal.NewFromFloat(0)), // @TODO: adjust discount
-		DeliveryFee:      utils.FormatDecimal(*o.DeliveryFee),
+		TakeawayDiscount: utils.FormatDecimal(discount),
+		DeliveryFee:      utils.FormatDecimal(deliveryFee),
 		TotalPrice:       utils.FormatDecimal(o.TotalPrice),
-		StatusLink:       fmt.Sprintf("%s/me?followOrder=%s", os.Getenv("APP_BASE_URL"), o.ID),
-		DeliveryTime:     "19:30", // @TODO: Implement when o.EstimatedDeliveryTime is available
-		Address: struct {
-			StreetName       string
-			HouseNumber      string
-			BoxNumber        string
-			MunicipalityName string
-			Postcode         string
-		}{
-			StreetName:       streetName,
-			HouseNumber:      houseNumber,
-			BoxNumber:        boxNumber,
-			MunicipalityName: municipalityName,
-			Postcode:         postcode,
-		},
+		StatusLink: fmt.Sprintf("%s/me?followOrder=%s",
+			os.Getenv("APP_BASE_URL"), o.ID,
+		),
+		DeliveryTime: "19:30", // @TODO: Implement when o.EstimatedDeliveryTime is available
+		Address:      addrView,
 	}
 
 	return data, nil
