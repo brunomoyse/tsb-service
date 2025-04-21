@@ -1,7 +1,7 @@
 
 # tsb-service
 
-**tsb-service**, a RESTful API built with **Go** (Golang) to serve as the backend of a **webshop** for a restaurant. The API provides essential functionalities for handling orders, managing products with multi-language support, and processing payments via **Mollie**.
+**tsb-service**, a GraphQL API built with **Go** (Golang) to serve as the backend of a **webshop** for a restaurant. The API provides essential functionalities for handling orders, managing products with multi-language support, and processing payments via **Mollie**.
 
 ## 🎯 Features
 
