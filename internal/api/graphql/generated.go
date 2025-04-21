@@ -171,7 +171,7 @@ type ComplexityRoot struct {
 		HouseNumbers      func(childComplexity int, streetID string) int
 		Me                func(childComplexity int) int
 		MyOrder           func(childComplexity int, id uuid.UUID) int
-		MyOrders          func(childComplexity int) int
+		MyOrders          func(childComplexity int, first *int, page *int) int
 		Order             func(childComplexity int, id uuid.UUID) int
 		Orders            func(childComplexity int) int
 		Product           func(childComplexity int, id uuid.UUID) int
@@ -243,7 +243,7 @@ type QueryResolver interface {
 	AddressByLocation(ctx context.Context, streetID string, houseNumber string, boxNumber *string) (*model.Address, error)
 	Orders(ctx context.Context) ([]*model.Order, error)
 	Order(ctx context.Context, id uuid.UUID) (*model.Order, error)
-	MyOrders(ctx context.Context) ([]*model.Order, error)
+	MyOrders(ctx context.Context, first *int, page *int) ([]*model.Order, error)
 	MyOrder(ctx context.Context, id uuid.UUID) (*model.Order, error)
 	Products(ctx context.Context) ([]*model.Product, error)
 	Product(ctx context.Context, id uuid.UUID) (*model.Product, error)
@@ -965,7 +965,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.Query.MyOrders(childComplexity), true
+		args, err := ec.field_Query_myOrders_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.MyOrders(childComplexity, args["first"].(*int), args["page"].(*int)), true
 
 	case "Query.order":
 		if e.complexity.Query.Order == nil {
@@ -1654,6 +1659,47 @@ func (ec *executionContext) field_Query_myOrder_argsID(
 	}
 
 	var zeroVal uuid.UUID
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_myOrders_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_myOrders_argsFirst(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
+	arg1, err := ec.field_Query_myOrders_argsPage(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["page"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Query_myOrders_argsFirst(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+	if tmp, ok := rawArgs["first"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_myOrders_argsPage(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*int, error) {
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("page"))
+	if tmp, ok := rawArgs["page"]; ok {
+		return ec.unmarshalOInt2ᚖint(ctx, tmp)
+	}
+
+	var zeroVal *int
 	return zeroVal, nil
 }
 
@@ -6516,7 +6562,7 @@ func (ec *executionContext) _Query_myOrders(ctx context.Context, field graphql.C
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		directive0 := func(rctx context.Context) (any, error) {
 			ctx = rctx // use context from middleware stack in children
-			return ec.resolvers.Query().MyOrders(rctx)
+			return ec.resolvers.Query().MyOrders(rctx, fc.Args["first"].(*int), fc.Args["page"].(*int))
 		}
 
 		directive1 := func(ctx context.Context) (any, error) {
@@ -6554,7 +6600,7 @@ func (ec *executionContext) _Query_myOrders(ctx context.Context, field graphql.C
 	return ec.marshalNOrder2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_myOrders(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_myOrders(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -6599,6 +6645,17 @@ func (ec *executionContext) fieldContext_Query_myOrders(_ context.Context, field
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Order", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_myOrders_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
