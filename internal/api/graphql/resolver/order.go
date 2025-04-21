@@ -182,18 +182,6 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 	}
 
-	// 10) Map to GraphQL model
-	gql := ToGQLOrder(order)
-	gql.Items = make([]*model.OrderItem, len(*itemsRaw))
-	for i, ir := range *itemsRaw {
-		gql.Items[i] = &model.OrderItem{
-			ProductID:  ir.ProductID,
-			Quantity:   int(ir.Quantity),
-			UnitPrice:  ir.UnitPrice.String(),
-			TotalPrice: ir.TotalPrice.String(),
-		}
-	}
-
 	// Handle payment creation if needed.
 	if input.IsOnlinePayment {
 		molliePayment, err := r.PaymentService.CreatePayment(ctx, *order, items)
@@ -201,9 +189,9 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			return nil, fmt.Errorf("failed to create payment: %w", err)
 		}
 	} else {
-		// If offline payment, set the order status to pending.
+		// If offline payment, send the notification e-mail already
 		go func() {
-			user, err := r.UserService.GetUserByID(context.Background(), userID)
+			user, err := r.UserService.GetUserByID(context.Background(), order.UserID.String())
 			if err != nil {
 				log.Printf("failed to retrieve user: %v", err)
 				return
@@ -216,7 +204,10 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}()
 	}
 
-	// 10) Publish subscription
+	// 10) Map to GraphQL model
+	gql := ToGQLOrder(order)
+
+	// 11) Publish subscription
 	r.Broker.Publish("orderCreated", gql)
 
 	return gql, nil
@@ -230,9 +221,82 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	}
 
 	// Fetch the updated order
-	o, _, err := r.OrderService.GetOrderByID(ctx, id)
+	o, opRaw, err := r.OrderService.GetOrderByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get order: %w", err)
+	}
+
+	// If new status is "CONFIRMED", send the confirmation email
+	if o.OrderStatus == orderDomain.OrderStatusConfirmed {
+		go func() {
+			type OrderProduct struct {
+				Product    productDomain.Product
+				Quantity   int64
+				UnitPrice  decimal.Decimal
+				TotalPrice decimal.Decimal
+			}
+
+			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
+			if err != nil {
+				log.Printf("failed to retrieve user: %v", err)
+				return
+			}
+
+			// 1) collect product IDs as strings
+			raws := *opRaw
+			ids := make([]string, len(raws))
+			for i, ir := range raws {
+				ids[i] = ir.ProductID.String()
+			}
+
+			// 2) fetch all products in one go
+			prodDetailsSlice, err := r.ProductService.GetProductsByIDs(context.Background(), ids)
+			if err != nil {
+				log.Printf("failed to retrieve products: %v", err)
+				return // or return err if you’re in a function that can
+			}
+
+			// 3) build a map for quick lookup
+			prodMap := make(map[uuid.UUID]productDomain.ProductOrderDetails, len(prodDetailsSlice))
+			for _, pd := range prodDetailsSlice {
+				prodMap[pd.ID] = *pd
+			}
+
+			// 4) enrich raws into your final items
+			items := make([]orderDomain.OrderProduct, len(raws))
+			for i, ir := range raws {
+				pd, ok := prodMap[ir.ProductID]
+				if !ok {
+					log.Printf("missing product details for %s", ir.ProductID)
+					return
+				}
+				items[i] = orderDomain.OrderProduct{
+					Product: orderDomain.Product{
+						ID:           pd.ID,
+						Code:         pd.Code,
+						CategoryName: pd.CategoryName,
+						Name:         pd.Name,
+					},
+					Quantity:   ir.Quantity,
+					UnitPrice:  ir.UnitPrice,
+					TotalPrice: ir.TotalPrice,
+				}
+			}
+
+			var address *addressDomain.Address
+			if o.AddressID != nil {
+				address, err = r.AddressService.GetAddressByID(context.Background(), *o.AddressID)
+				if err != nil {
+					log.Printf("failed to retrieve address: %v", err)
+					return
+				}
+			}
+
+			err = es.SendOrderConfirmedEmail(*user, "fr", *o, items, address)
+			if err != nil {
+				log.Printf("failed to send order pending email: %v", err)
+			}
+		}()
 	}
 
 	// Map the order to the GraphQL model
