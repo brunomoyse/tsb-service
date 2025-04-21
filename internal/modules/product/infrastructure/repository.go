@@ -655,35 +655,37 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 	return products, nil
 }
 
-func (r *ProductRepository) FindCategoriesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Category, error) {
+func (r *ProductRepository) FindCategoriesByProductIDs(
+	ctx context.Context,
+	productIDs []string,
+) (map[string][]*domain.Category, error) {
+	// 1) Query without language‑filter so we get every translation row
 	query := `
-		SELECT 
-			p.id AS product_id,
-			pc.id AS category_id,
-			pc.order AS category_order,
-			pct.language AS language,
-			pct.name AS category_name
-		FROM products p
-		JOIN product_categories pc ON p.category_id = pc.id
-		JOIN product_category_translations pct ON pc.id = pct.product_category_id
-		WHERE p.id = ANY($1)
-		AND pct.language = $2
-	`
-
-	rows, err := r.db.QueryxContext(ctx, query, pq.Array(productIDs), "fr")
+    SELECT 
+        p.id               AS product_id,
+        pc.id              AS category_id,
+        pc.order           AS category_order,
+        pct.language       AS language,
+        pct.name           AS category_name
+    FROM products p
+    JOIN product_categories pc ON p.category_id = pc.id
+    JOIN product_category_translations pct ON pc.id = pct.product_category_id
+    WHERE p.id = ANY($1)
+    `
+	rows, err := r.db.QueryxContext(ctx, query, pq.Array(productIDs))
 	if err != nil {
 		log.Printf("FindCategoriesByProductIDs: Query failed: %v", err)
 		return nil, err
 	}
-	defer func(rows *sqlx.Rows) {
+	defer func() {
 		if err := rows.Close(); err != nil {
 			log.Printf("FindCategoriesByProductIDs: Error closing rows: %v", err)
 		}
-	}(rows)
+	}()
 
-	result := make(map[string][]*domain.Category)
+	// 2) Temp structure: productID → (categoryID → *domain.Category)
+	temp := make(map[string]map[uuid.UUID]*domain.Category)
 
-	// Use a temporary struct to scan query results.
 	for rows.Next() {
 		var cr struct {
 			ProductID     uuid.UUID `db:"product_id"`
@@ -692,31 +694,48 @@ func (r *ProductRepository) FindCategoriesByProductIDs(ctx context.Context, prod
 			Language      string    `db:"language"`
 			CategoryName  string    `db:"category_name"`
 		}
-
 		if err := rows.StructScan(&cr); err != nil {
 			log.Printf("FindCategoriesByProductIDs: Error scanning row: %v", err)
 			return nil, err
 		}
 
-		// Build a domain.Category with its translation.
-		cat := &domain.Category{
-			ID:    cr.CategoryID,
-			Order: cr.CategoryOrder,
-			Translations: []domain.Translation{
-				{
-					Language: cr.Language,
-					Name:     cr.CategoryName,
-				},
-			},
+		pid := cr.ProductID.String()
+		if _, ok := temp[pid]; !ok {
+			temp[pid] = make(map[uuid.UUID]*domain.Category)
 		}
 
-		// Since each product has a single category, simply set a slice containing the category.
-		result[cr.ProductID.String()] = []*domain.Category{cat}
+		catMap := temp[pid]
+		if cat, exists := catMap[cr.CategoryID]; exists {
+			// we've already seen this category → just append another translation
+			cat.Translations = append(cat.Translations, domain.Translation{
+				Language: cr.Language,
+				Name:     cr.CategoryName,
+			})
+		} else {
+			// first time we see this category for this product
+			catMap[cr.CategoryID] = &domain.Category{
+				ID:    cr.CategoryID,
+				Order: cr.CategoryOrder,
+				Translations: []domain.Translation{{
+					Language: cr.Language,
+					Name:     cr.CategoryName,
+				}},
+			}
+		}
 	}
-
 	if err := rows.Err(); err != nil {
 		log.Printf("FindCategoriesByProductIDs: Row iteration error: %v", err)
 		return nil, err
+	}
+
+	// 3) Flatten to the desired result type: map[string][]*domain.Category
+	result := make(map[string][]*domain.Category, len(temp))
+	for pid, catsByID := range temp {
+		slice := make([]*domain.Category, 0, len(catsByID))
+		for _, cat := range catsByID {
+			slice = append(slice, cat)
+		}
+		result[pid] = slice
 	}
 
 	return result, nil
