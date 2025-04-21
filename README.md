@@ -1,7 +1,7 @@
 
 # tsb-service
 
-**tsb-service**, a RESTful API built with **Go** (Golang) to serve as the backend of a **webshop** for a restaurant. The API provides essential functionalities for handling orders, managing products with multi-language support, and processing payments via **Mollie**.
+**tsb-service**, a GraphQL API built with **Go** (Golang) to serve as the backend of a **webshop** for a restaurant. The API provides essential functionalities for handling orders, managing products with multi-language support, and processing payments via **Mollie**.
 
 ## 🎯 Features
 
@@ -9,7 +9,7 @@
 - **Payment Integration with Mollie**: Seamlessly process payments using Mollie, a leading payment provider in Europe.
 - **Multi-language Product Listings**: Support for multiple languages through the `product_translations` table, allowing you to list products in various languages without needing to modify the code.
 - **Product Editing**: Easily update product information such as names, descriptions, and prices, allowing the restaurant to manage its menu dynamically.
-- **Real-time Delivery Tracking**: Server-side evnts for real-time order status updates.
+- **Real-time Delivery Tracking**: GraphQL subscription through WS channel for real-time order status updates.
 - **GPS Delivery Tracking with Teltonika Trackers (Future Feature)**: Real-time tracking of delivery vehicles using Teltonika GPS trackers, allowing customers to follow their orders on a map.
 
 ---
@@ -68,14 +68,14 @@ This will start the API locally on `http://localhost:8080` (or another port you 
 
 ### Order Management
 
-- **Create Order**: `POST /orders`
-- **Get Orders**: `GET /orders`
-- **Get Order by ID**: `GET /orders/{id}`
+- **Create Order**
+- **Get Orders**
+- **Get Order by ID**
   
 ### Product Management (Multi-language Supported)
 
-- **Get Products**: `GET /products` (Returns products based on the user's language using the `product_translations` table, supporting multiple languages without code changes)
-- **Edit Products**: `PUT /products/{id}` (Update product information dynamically)
+- **Get Products**: Returns products based on the user's language using the `product_translations` table, supporting multiple languages without code changes
+- **Edit Products**: Update product information dynamically
 
 ### Payment Integration
 
