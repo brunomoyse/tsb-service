@@ -478,13 +478,26 @@ func (r *queryResolver) Order(ctx context.Context, id uuid.UUID) (*model.Order, 
 }
 
 // MyOrders is the resolver for the myOrders field.
-func (r *queryResolver) MyOrders(ctx context.Context) ([]*model.Order, error) {
+func (r *queryResolver) MyOrders(ctx context.Context, first *int, page *int) ([]*model.Order, error) {
+	const (
+		defaultFirst = 5
+		defaultPage  = 1
+	)
+	f := defaultFirst
+	if first != nil && *first > 0 {
+		f = *first
+	}
+	p := defaultPage
+	if page != nil && *page > 0 {
+		p = *page
+	}
+
 	userID := utils.GetUserID(ctx)
 
 	// Cast userID to uuid.UUID
 	userUUID, err := uuid.Parse(userID)
 
-	o, err := r.OrderService.GetPaginatedOrders(ctx, 1, 20, &userUUID)
+	o, err := r.OrderService.GetPaginatedOrders(ctx, p, f, &userUUID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %w", err)
 	}
