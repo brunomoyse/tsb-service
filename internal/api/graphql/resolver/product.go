@@ -24,15 +24,17 @@ import (
 func (r *mutationResolver) CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error) {
 	userLang := utils.GetLang(ctx)
 
-	// 1. Persist the product first
-	price, err := decimal.NewFromString(input.Price)
+	// normalize comma decimal separator
+	clean := strings.ReplaceAll(strings.TrimSpace(input.Price), ",", ".")
+	p, err := decimal.NewFromString(clean)
 	if err != nil {
 		return nil, fmt.Errorf("invalid price format: %w", err)
 	}
+
 	prod, err := r.ProductService.CreateProduct(
 		ctx,
 		input.CategoryID,
-		price,
+		p,
 		input.Code,
 		input.PieceCount,
 		input.IsVisible,
@@ -238,22 +240,6 @@ func (r *productCategoryResolver) Translations(ctx context.Context, obj *model.P
 	return translations, nil
 }
 
-// Products is the resolver for the products field.
-func (r *queryResolver) Products(ctx context.Context) ([]*model.Product, error) {
-	userLang := utils.GetLang(ctx)
-
-	p, err := r.ProductService.GetProducts(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get products: %w", err)
-	}
-
-	products := Map(p, func(product *domain.Product) *model.Product {
-		return ToGQLProduct(product, userLang)
-	})
-
-	return products, nil
-}
-
 // Product is the resolver for the product field.
 func (r *queryResolver) Product(ctx context.Context, id uuid.UUID) (*model.Product, error) {
 	userLang := utils.GetLang(ctx)
@@ -274,21 +260,20 @@ func (r *queryResolver) Product(ctx context.Context, id uuid.UUID) (*model.Produ
 	return product, nil
 }
 
-// ProductCategories is the resolver for the productCategories field.
-func (r *queryResolver) ProductCategories(ctx context.Context) ([]*model.ProductCategory, error) {
+// Products is the resolver for the products field.
+func (r *queryResolver) Products(ctx context.Context) ([]*model.Product, error) {
 	userLang := utils.GetLang(ctx)
 
-	c, err := r.ProductService.GetCategories(ctx)
-
+	p, err := r.ProductService.GetProducts(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get categories: %w", err)
+		return nil, fmt.Errorf("failed to get products: %w", err)
 	}
 
-	categories := Map(c, func(cat *domain.Category) *model.ProductCategory {
-		return ToGQLProductCategory(cat, userLang)
+	products := Map(p, func(product *domain.Product) *model.Product {
+		return ToGQLProduct(product, userLang)
 	})
 
-	return categories, nil
+	return products, nil
 }
 
 // ProductCategory is the resolver for the productCategory field.
@@ -308,6 +293,23 @@ func (r *queryResolver) ProductCategory(ctx context.Context, id uuid.UUID) (*mod
 	category := ToGQLProductCategory(c, userLang)
 
 	return category, nil
+}
+
+// ProductCategories is the resolver for the productCategories field.
+func (r *queryResolver) ProductCategories(ctx context.Context) ([]*model.ProductCategory, error) {
+	userLang := utils.GetLang(ctx)
+
+	c, err := r.ProductService.GetCategories(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get categories: %w", err)
+	}
+
+	categories := Map(c, func(cat *domain.Category) *model.ProductCategory {
+		return ToGQLProductCategory(cat, userLang)
+	})
+
+	return categories, nil
 }
 
 // Product returns graphql1.ProductResolver implementation.

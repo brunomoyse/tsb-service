@@ -1,16 +1,17 @@
 scalar Upload
 
 type Product {
-    id: ID!
-    createdAt: DateTime!
-    price: String!
     code: String
-    slug: String!
-    pieceCount: Int
-    isVisible: Boolean!
+    createdAt: DateTime!
+    id: ID!
     isAvailable: Boolean!
+    #isDiscountable: Boolean!
     isHalal: Boolean!
     isVegan: Boolean!
+    isVisible: Boolean!
+    pieceCount: Int
+    price: String!
+    slug: String!
 
     # Generated based on Accept-Language header
     name: String!
@@ -23,16 +24,15 @@ type Product {
 }
 
 type Translation {
-    language: String!,
-    name: String!,
     description: String
+    language: String!
+    name: String!
 }
 
 type ProductCategory {
     id: ID!
     order: Int!
 
-    # Generated based on Accept-Language header
     name: String!
 
     products: [Product!]!
@@ -42,14 +42,15 @@ type ProductCategory {
 }
 
 input CreateProductInput {
-    price: String!
+    categoryId: ID!
     code: String
-    pieceCount: Int
-    isVisible: Boolean!
     isAvailable: Boolean!
+    isDiscountable: Boolean!
     isHalal: Boolean!
     isVegan: Boolean!
-    categoryID: ID!
+    isVisible: Boolean!
+    pieceCount: Int
+    price: String!
 
     # Translations
     translations: [TranslationInput!]!
@@ -58,14 +59,14 @@ input CreateProductInput {
 }
 
 input UpdateProductInput {
-    price: String
+    categoryID: ID
     code: String
-    pieceCount: Int
-    isVisible: Boolean
     isAvailable: Boolean
     isHalal: Boolean
     isVegan: Boolean
-    categoryID: ID
+    isVisible: Boolean
+    pieceCount: Int
+    price: String
 
     # Translations
     translations: [TranslationInput!]
@@ -74,16 +75,17 @@ input UpdateProductInput {
 }
 
 input TranslationInput {
+    description: String
     language: String!
     name: String!
-    description: String
 }
 
 extend type Query {
-    products: [Product!]!
     product(id: ID!): Product!
-    productCategories: [ProductCategory!]!
+    products: [Product!]!
+
     productCategory(id: ID!): ProductCategory!
+    productCategories: [ProductCategory!]!
 }
 
 extend type Mutation {

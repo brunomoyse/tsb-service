@@ -245,10 +245,10 @@ type QueryResolver interface {
 	Order(ctx context.Context, id uuid.UUID) (*model.Order, error)
 	MyOrders(ctx context.Context, first *int, page *int) ([]*model.Order, error)
 	MyOrder(ctx context.Context, id uuid.UUID) (*model.Order, error)
-	Products(ctx context.Context) ([]*model.Product, error)
 	Product(ctx context.Context, id uuid.UUID) (*model.Product, error)
-	ProductCategories(ctx context.Context) ([]*model.ProductCategory, error)
+	Products(ctx context.Context) ([]*model.Product, error)
 	ProductCategory(ctx context.Context, id uuid.UUID) (*model.ProductCategory, error)
+	ProductCategories(ctx context.Context) ([]*model.ProductCategory, error)
 	Me(ctx context.Context) (*model.User, error)
 }
 type SubscriptionResolver interface {
@@ -2510,26 +2510,26 @@ func (ec *executionContext) fieldContext_Mutation_createProduct(ctx context.Cont
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Product_id(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Product_createdAt(ctx, field)
-			case "price":
-				return ec.fieldContext_Product_price(ctx, field)
 			case "code":
 				return ec.fieldContext_Product_code(ctx, field)
-			case "slug":
-				return ec.fieldContext_Product_slug(ctx, field)
-			case "pieceCount":
-				return ec.fieldContext_Product_pieceCount(ctx, field)
-			case "isVisible":
-				return ec.fieldContext_Product_isVisible(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Product_createdAt(ctx, field)
+			case "id":
+				return ec.fieldContext_Product_id(ctx, field)
 			case "isAvailable":
 				return ec.fieldContext_Product_isAvailable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isVegan":
 				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVisible":
+				return ec.fieldContext_Product_isVisible(ctx, field)
+			case "pieceCount":
+				return ec.fieldContext_Product_pieceCount(ctx, field)
+			case "price":
+				return ec.fieldContext_Product_price(ctx, field)
+			case "slug":
+				return ec.fieldContext_Product_slug(ctx, field)
 			case "name":
 				return ec.fieldContext_Product_name(ctx, field)
 			case "description":
@@ -2617,26 +2617,26 @@ func (ec *executionContext) fieldContext_Mutation_updateProduct(ctx context.Cont
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Product_id(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Product_createdAt(ctx, field)
-			case "price":
-				return ec.fieldContext_Product_price(ctx, field)
 			case "code":
 				return ec.fieldContext_Product_code(ctx, field)
-			case "slug":
-				return ec.fieldContext_Product_slug(ctx, field)
-			case "pieceCount":
-				return ec.fieldContext_Product_pieceCount(ctx, field)
-			case "isVisible":
-				return ec.fieldContext_Product_isVisible(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Product_createdAt(ctx, field)
+			case "id":
+				return ec.fieldContext_Product_id(ctx, field)
 			case "isAvailable":
 				return ec.fieldContext_Product_isAvailable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isVegan":
 				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVisible":
+				return ec.fieldContext_Product_isVisible(ctx, field)
+			case "pieceCount":
+				return ec.fieldContext_Product_pieceCount(ctx, field)
+			case "price":
+				return ec.fieldContext_Product_price(ctx, field)
+			case "slug":
+				return ec.fieldContext_Product_slug(ctx, field)
 			case "name":
 				return ec.fieldContext_Product_name(ctx, field)
 			case "description":
@@ -3630,26 +3630,26 @@ func (ec *executionContext) fieldContext_OrderItem_product(_ context.Context, fi
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Product_id(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Product_createdAt(ctx, field)
-			case "price":
-				return ec.fieldContext_Product_price(ctx, field)
 			case "code":
 				return ec.fieldContext_Product_code(ctx, field)
-			case "slug":
-				return ec.fieldContext_Product_slug(ctx, field)
-			case "pieceCount":
-				return ec.fieldContext_Product_pieceCount(ctx, field)
-			case "isVisible":
-				return ec.fieldContext_Product_isVisible(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Product_createdAt(ctx, field)
+			case "id":
+				return ec.fieldContext_Product_id(ctx, field)
 			case "isAvailable":
 				return ec.fieldContext_Product_isAvailable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isVegan":
 				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVisible":
+				return ec.fieldContext_Product_isVisible(ctx, field)
+			case "pieceCount":
+				return ec.fieldContext_Product_pieceCount(ctx, field)
+			case "price":
+				return ec.fieldContext_Product_price(ctx, field)
+			case "slug":
+				return ec.fieldContext_Product_slug(ctx, field)
 			case "name":
 				return ec.fieldContext_Product_name(ctx, field)
 			case "description":
@@ -5130,8 +5130,8 @@ func (ec *executionContext) fieldContext_Payment_settlementAmount(_ context.Cont
 	return fc, nil
 }
 
-func (ec *executionContext) _Product_id(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Product_id(ctx, field)
+func (ec *executionContext) _Product_code(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Product_code(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -5144,31 +5144,28 @@ func (ec *executionContext) _Product_id(ctx context.Context, field graphql.Colle
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.ID, nil
+		return obj.Code, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(uuid.UUID)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Product_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Product_code(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Product",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -5218,8 +5215,8 @@ func (ec *executionContext) fieldContext_Product_createdAt(_ context.Context, fi
 	return fc, nil
 }
 
-func (ec *executionContext) _Product_price(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Product_price(ctx, field)
+func (ec *executionContext) _Product_id(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Product_id(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -5232,7 +5229,7 @@ func (ec *executionContext) _Product_price(ctx context.Context, field graphql.Co
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Price, nil
+		return obj.ID, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5244,189 +5241,19 @@ func (ec *executionContext) _Product_price(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(uuid.UUID)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Product_price(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Product_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Product",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Product_code(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Product_code(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Code, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Product_code(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Product",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Product_slug(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Product_slug(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Slug, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Product_slug(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Product",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Product_pieceCount(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Product_pieceCount(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.PieceCount, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*int)
-	fc.Result = res
-	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Product_pieceCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Product",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Product_isVisible(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Product_isVisible(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.IsVisible, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(bool)
-	fc.Result = res
-	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Product_isVisible(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Product",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	return fc, nil
@@ -5559,6 +5386,179 @@ func (ec *executionContext) fieldContext_Product_isVegan(_ context.Context, fiel
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Product_isVisible(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Product_isVisible(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsVisible, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Product_isVisible(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Product",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Product_pieceCount(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Product_pieceCount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PieceCount, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Product_pieceCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Product",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Product_price(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Product_price(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Price, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Product_price(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Product",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Product_slug(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Product_slug(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Slug, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Product_slug(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Product",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -5744,12 +5744,12 @@ func (ec *executionContext) fieldContext_Product_translations(_ context.Context,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
+			case "description":
+				return ec.fieldContext_Translation_description(ctx, field)
 			case "language":
 				return ec.fieldContext_Translation_language(ctx, field)
 			case "name":
 				return ec.fieldContext_Translation_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Translation_description(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Translation", field.Name)
 		},
@@ -5928,26 +5928,26 @@ func (ec *executionContext) fieldContext_ProductCategory_products(_ context.Cont
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Product_id(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Product_createdAt(ctx, field)
-			case "price":
-				return ec.fieldContext_Product_price(ctx, field)
 			case "code":
 				return ec.fieldContext_Product_code(ctx, field)
-			case "slug":
-				return ec.fieldContext_Product_slug(ctx, field)
-			case "pieceCount":
-				return ec.fieldContext_Product_pieceCount(ctx, field)
-			case "isVisible":
-				return ec.fieldContext_Product_isVisible(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Product_createdAt(ctx, field)
+			case "id":
+				return ec.fieldContext_Product_id(ctx, field)
 			case "isAvailable":
 				return ec.fieldContext_Product_isAvailable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isVegan":
 				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVisible":
+				return ec.fieldContext_Product_isVisible(ctx, field)
+			case "pieceCount":
+				return ec.fieldContext_Product_pieceCount(ctx, field)
+			case "price":
+				return ec.fieldContext_Product_price(ctx, field)
+			case "slug":
+				return ec.fieldContext_Product_slug(ctx, field)
 			case "name":
 				return ec.fieldContext_Product_name(ctx, field)
 			case "description":
@@ -6002,12 +6002,12 @@ func (ec *executionContext) fieldContext_ProductCategory_translations(_ context.
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
+			case "description":
+				return ec.fieldContext_Translation_description(ctx, field)
 			case "language":
 				return ec.fieldContext_Translation_language(ctx, field)
 			case "name":
 				return ec.fieldContext_Translation_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Translation_description(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Translation", field.Name)
 		},
@@ -6773,80 +6773,6 @@ func (ec *executionContext) fieldContext_Query_myOrder(ctx context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_products(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_products(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Products(rctx)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.([]*model.Product)
-	fc.Result = res
-	return ec.marshalNProduct2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductᚄ(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_products(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Product_id(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Product_createdAt(ctx, field)
-			case "price":
-				return ec.fieldContext_Product_price(ctx, field)
-			case "code":
-				return ec.fieldContext_Product_code(ctx, field)
-			case "slug":
-				return ec.fieldContext_Product_slug(ctx, field)
-			case "pieceCount":
-				return ec.fieldContext_Product_pieceCount(ctx, field)
-			case "isVisible":
-				return ec.fieldContext_Product_isVisible(ctx, field)
-			case "isAvailable":
-				return ec.fieldContext_Product_isAvailable(ctx, field)
-			case "isHalal":
-				return ec.fieldContext_Product_isHalal(ctx, field)
-			case "isVegan":
-				return ec.fieldContext_Product_isVegan(ctx, field)
-			case "name":
-				return ec.fieldContext_Product_name(ctx, field)
-			case "description":
-				return ec.fieldContext_Product_description(ctx, field)
-			case "category":
-				return ec.fieldContext_Product_category(ctx, field)
-			case "translations":
-				return ec.fieldContext_Product_translations(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Product", field.Name)
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Query_product(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_product(ctx, field)
 	if err != nil {
@@ -6886,26 +6812,26 @@ func (ec *executionContext) fieldContext_Query_product(ctx context.Context, fiel
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Product_id(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Product_createdAt(ctx, field)
-			case "price":
-				return ec.fieldContext_Product_price(ctx, field)
 			case "code":
 				return ec.fieldContext_Product_code(ctx, field)
-			case "slug":
-				return ec.fieldContext_Product_slug(ctx, field)
-			case "pieceCount":
-				return ec.fieldContext_Product_pieceCount(ctx, field)
-			case "isVisible":
-				return ec.fieldContext_Product_isVisible(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Product_createdAt(ctx, field)
+			case "id":
+				return ec.fieldContext_Product_id(ctx, field)
 			case "isAvailable":
 				return ec.fieldContext_Product_isAvailable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isVegan":
 				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVisible":
+				return ec.fieldContext_Product_isVisible(ctx, field)
+			case "pieceCount":
+				return ec.fieldContext_Product_pieceCount(ctx, field)
+			case "price":
+				return ec.fieldContext_Product_price(ctx, field)
+			case "slug":
+				return ec.fieldContext_Product_slug(ctx, field)
 			case "name":
 				return ec.fieldContext_Product_name(ctx, field)
 			case "description":
@@ -6932,8 +6858,8 @@ func (ec *executionContext) fieldContext_Query_product(ctx context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_productCategories(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_productCategories(ctx, field)
+func (ec *executionContext) _Query_products(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_products(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -6946,7 +6872,7 @@ func (ec *executionContext) _Query_productCategories(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().ProductCategories(rctx)
+		return ec.resolvers.Query().Products(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6958,12 +6884,12 @@ func (ec *executionContext) _Query_productCategories(ctx context.Context, field 
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*model.ProductCategory)
+	res := resTmp.([]*model.Product)
 	fc.Result = res
-	return ec.marshalNProductCategory2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductCategoryᚄ(ctx, field.Selections, res)
+	return ec.marshalNProduct2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_productCategories(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_products(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -6971,18 +6897,36 @@ func (ec *executionContext) fieldContext_Query_productCategories(_ context.Conte
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
+			case "code":
+				return ec.fieldContext_Product_code(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Product_createdAt(ctx, field)
 			case "id":
-				return ec.fieldContext_ProductCategory_id(ctx, field)
-			case "order":
-				return ec.fieldContext_ProductCategory_order(ctx, field)
+				return ec.fieldContext_Product_id(ctx, field)
+			case "isAvailable":
+				return ec.fieldContext_Product_isAvailable(ctx, field)
+			case "isHalal":
+				return ec.fieldContext_Product_isHalal(ctx, field)
+			case "isVegan":
+				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVisible":
+				return ec.fieldContext_Product_isVisible(ctx, field)
+			case "pieceCount":
+				return ec.fieldContext_Product_pieceCount(ctx, field)
+			case "price":
+				return ec.fieldContext_Product_price(ctx, field)
+			case "slug":
+				return ec.fieldContext_Product_slug(ctx, field)
 			case "name":
-				return ec.fieldContext_ProductCategory_name(ctx, field)
-			case "products":
-				return ec.fieldContext_ProductCategory_products(ctx, field)
+				return ec.fieldContext_Product_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Product_description(ctx, field)
+			case "category":
+				return ec.fieldContext_Product_category(ctx, field)
 			case "translations":
-				return ec.fieldContext_ProductCategory_translations(ctx, field)
+				return ec.fieldContext_Product_translations(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type ProductCategory", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type Product", field.Name)
 		},
 	}
 	return fc, nil
@@ -7051,6 +6995,62 @@ func (ec *executionContext) fieldContext_Query_productCategory(ctx context.Conte
 	if fc.Args, err = ec.field_Query_productCategory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_productCategories(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_productCategories(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().ProductCategories(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.ProductCategory)
+	fc.Result = res
+	return ec.marshalNProductCategory2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductCategoryᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_productCategories(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ProductCategory_id(ctx, field)
+			case "order":
+				return ec.fieldContext_ProductCategory_order(ctx, field)
+			case "name":
+				return ec.fieldContext_ProductCategory_name(ctx, field)
+			case "products":
+				return ec.fieldContext_ProductCategory_products(ctx, field)
+			case "translations":
+				return ec.fieldContext_ProductCategory_translations(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ProductCategory", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -7803,6 +7803,47 @@ func (ec *executionContext) fieldContext_Subscription_myOrderUpdated(ctx context
 	return fc, nil
 }
 
+func (ec *executionContext) _Translation_description(ctx context.Context, field graphql.CollectedField, obj *model.Translation) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Translation_description(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Description, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Translation_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Translation",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Translation_language(ctx context.Context, field graphql.CollectedField, obj *model.Translation) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Translation_language(ctx, field)
 	if err != nil {
@@ -7879,47 +7920,6 @@ func (ec *executionContext) _Translation_name(ctx context.Context, field graphql
 }
 
 func (ec *executionContext) fieldContext_Translation_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Translation",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Translation_description(ctx context.Context, field graphql.CollectedField, obj *model.Translation) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Translation_description(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Description, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Translation_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Translation",
 		Field:      field,
@@ -10351,20 +10351,20 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"price", "code", "pieceCount", "isVisible", "isAvailable", "isHalal", "isVegan", "categoryID", "translations", "image"}
+	fieldsInOrder := [...]string{"categoryId", "code", "isAvailable", "isDiscountable", "isHalal", "isVegan", "isVisible", "pieceCount", "price", "translations", "image"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "price":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("price"))
-			data, err := ec.unmarshalNString2string(ctx, v)
+		case "categoryId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("categoryId"))
+			data, err := ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Price = data
+			it.CategoryID = data
 		case "code":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("code"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -10372,20 +10372,6 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Code = data
-		case "pieceCount":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pieceCount"))
-			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.PieceCount = data
-		case "isVisible":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isVisible"))
-			data, err := ec.unmarshalNBoolean2bool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.IsVisible = data
 		case "isAvailable":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isAvailable"))
 			data, err := ec.unmarshalNBoolean2bool(ctx, v)
@@ -10393,6 +10379,13 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 				return it, err
 			}
 			it.IsAvailable = data
+		case "isDiscountable":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isDiscountable"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsDiscountable = data
 		case "isHalal":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isHalal"))
 			data, err := ec.unmarshalNBoolean2bool(ctx, v)
@@ -10407,13 +10400,27 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 				return it, err
 			}
 			it.IsVegan = data
-		case "categoryID":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("categoryID"))
-			data, err := ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		case "isVisible":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isVisible"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.CategoryID = data
+			it.IsVisible = data
+		case "pieceCount":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pieceCount"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PieceCount = data
+		case "price":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("price"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Price = data
 		case "translations":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("translations"))
 			data, err := ec.unmarshalNTranslationInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTranslationInputᚄ(ctx, v)
@@ -10475,13 +10482,20 @@ func (ec *executionContext) unmarshalInputTranslationInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"language", "name", "description"}
+	fieldsInOrder := [...]string{"description", "language", "name"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
+		case "description":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Description = data
 		case "language":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("language"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -10496,13 +10510,6 @@ func (ec *executionContext) unmarshalInputTranslationInput(ctx context.Context, 
 				return it, err
 			}
 			it.Name = data
-		case "description":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("description"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Description = data
 		}
 	}
 
@@ -10550,20 +10557,20 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"price", "code", "pieceCount", "isVisible", "isAvailable", "isHalal", "isVegan", "categoryID", "translations", "image"}
+	fieldsInOrder := [...]string{"categoryID", "code", "isAvailable", "isHalal", "isVegan", "isVisible", "pieceCount", "price", "translations", "image"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "price":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("price"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+		case "categoryID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("categoryID"))
+			data, err := ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Price = data
+			it.CategoryID = data
 		case "code":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("code"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -10571,20 +10578,6 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Code = data
-		case "pieceCount":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pieceCount"))
-			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.PieceCount = data
-		case "isVisible":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isVisible"))
-			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.IsVisible = data
 		case "isAvailable":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isAvailable"))
 			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
@@ -10606,13 +10599,27 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 				return it, err
 			}
 			it.IsVegan = data
-		case "categoryID":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("categoryID"))
-			data, err := ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+		case "isVisible":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isVisible"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.CategoryID = data
+			it.IsVisible = data
+		case "pieceCount":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pieceCount"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PieceCount = data
+		case "price":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("price"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Price = data
 		case "translations":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("translations"))
 			data, err := ec.unmarshalOTranslationInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTranslationInputᚄ(ctx, v)
@@ -11276,32 +11283,15 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Product")
-		case "id":
-			out.Values[i] = ec._Product_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
+		case "code":
+			out.Values[i] = ec._Product_code(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._Product_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
-		case "price":
-			out.Values[i] = ec._Product_price(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
-		case "code":
-			out.Values[i] = ec._Product_code(ctx, field, obj)
-		case "slug":
-			out.Values[i] = ec._Product_slug(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&out.Invalids, 1)
-			}
-		case "pieceCount":
-			out.Values[i] = ec._Product_pieceCount(ctx, field, obj)
-		case "isVisible":
-			out.Values[i] = ec._Product_isVisible(ctx, field, obj)
+		case "id":
+			out.Values[i] = ec._Product_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -11317,6 +11307,23 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "isVegan":
 			out.Values[i] = ec._Product_isVegan(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "isVisible":
+			out.Values[i] = ec._Product_isVisible(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "pieceCount":
+			out.Values[i] = ec._Product_pieceCount(ctx, field, obj)
+		case "price":
+			out.Values[i] = ec._Product_price(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "slug":
+			out.Values[i] = ec._Product_slug(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
@@ -11760,28 +11767,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "products":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_products(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "product":
 			field := field
 
@@ -11804,7 +11789,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "productCategories":
+		case "products":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -11813,7 +11798,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_productCategories(ctx, field)
+				res = ec._Query_products(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -11836,6 +11821,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_productCategory(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "productCategories":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_productCategories(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -11990,6 +11997,8 @@ func (ec *executionContext) _Translation(ctx context.Context, sel ast.SelectionS
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Translation")
+		case "description":
+			out.Values[i] = ec._Translation_description(ctx, field, obj)
 		case "language":
 			out.Values[i] = ec._Translation_language(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -12000,8 +12009,6 @@ func (ec *executionContext) _Translation(ctx context.Context, sel ast.SelectionS
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "description":
-			out.Values[i] = ec._Translation_description(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
