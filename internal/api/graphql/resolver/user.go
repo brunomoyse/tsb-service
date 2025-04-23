@@ -58,23 +58,26 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 // Address is the resolver for the address field.
 func (r *userResolver) Address(ctx context.Context, obj *model.User) (*model.Address, error) {
 	loader := addressApplication.GetUserAddressLoader(ctx)
-
 	if loader == nil {
 		return nil, fmt.Errorf("no user address loader found")
 	}
 
-	// Check for error while loading the address.
-	a, err := loader.Loader.Load(ctx, obj.ID.String())
+	// Load domain addresses
+	domainAddresses, err := loader.Loader.Load(ctx, obj.ID.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load user address: %w", err)
 	}
 
-	// Map the address to the GraphQL model
-	address := Map(a, func(address *addressDomain.Address) *model.Address {
-		return ToGQLAddress(address)
-	})
+	// If there are no addresses, return nil (and no error)
+	if len(domainAddresses) == 0 {
+		return nil, nil
+	}
 
-	return address[0], nil
+	// Map to GraphQL model and return the first one
+	gqlAddresses := Map(domainAddresses, func(a *addressDomain.Address) *model.Address {
+		return ToGQLAddress(a)
+	})
+	return gqlAddresses[0], nil
 }
 
 // Orders is the resolver for the orders field.
