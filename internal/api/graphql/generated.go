@@ -139,6 +139,12 @@ type ComplexityRoot struct {
 		WebhookURL                      func(childComplexity int) int
 	}
 
+	Position struct {
+		Latitude  func(childComplexity int) int
+		Longitude func(childComplexity int) int
+		Timestamp func(childComplexity int) int
+	}
+
 	Product struct {
 		Category     func(childComplexity int) int
 		Code         func(childComplexity int) int
@@ -189,9 +195,24 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
-		MyOrderUpdated func(childComplexity int, orderID uuid.UUID) int
-		OrderCreated   func(childComplexity int) int
-		OrderUpdated   func(childComplexity int) int
+		MyOrderUpdated  func(childComplexity int, orderID uuid.UUID) int
+		OrderCreated    func(childComplexity int) int
+		OrderUpdated    func(childComplexity int) int
+		PositionUpdated func(childComplexity int, deviceImei string) int
+	}
+
+	TeltonikaRecord struct {
+		Altitude   func(childComplexity int) int
+		Angle      func(childComplexity int) int
+		DeviceImei func(childComplexity int) int
+		EventID    func(childComplexity int) int
+		Io         func(childComplexity int) int
+		Latitude   func(childComplexity int) int
+		Longitude  func(childComplexity int) int
+		Priority   func(childComplexity int) int
+		Satellites func(childComplexity int) int
+		Speed      func(childComplexity int) int
+		Timestamp  func(childComplexity int) int
 	}
 
 	Translation struct {
@@ -255,6 +276,7 @@ type SubscriptionResolver interface {
 	OrderCreated(ctx context.Context) (<-chan *model.Order, error)
 	OrderUpdated(ctx context.Context) (<-chan *model.Order, error)
 	MyOrderUpdated(ctx context.Context, orderID uuid.UUID) (<-chan *model.Order, error)
+	PositionUpdated(ctx context.Context, deviceImei string) (<-chan *model.Position, error)
 }
 type UserResolver interface {
 	Address(ctx context.Context, obj *model.User) (*model.Address, error)
@@ -760,6 +782,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Payment.WebhookURL(childComplexity), true
 
+	case "Position.latitude":
+		if e.complexity.Position.Latitude == nil {
+			break
+		}
+
+		return e.complexity.Position.Latitude(childComplexity), true
+
+	case "Position.longitude":
+		if e.complexity.Position.Longitude == nil {
+			break
+		}
+
+		return e.complexity.Position.Longitude(childComplexity), true
+
+	case "Position.timestamp":
+		if e.complexity.Position.Timestamp == nil {
+			break
+		}
+
+		return e.complexity.Position.Timestamp(childComplexity), true
+
 	case "Product.category":
 		if e.complexity.Product.Category == nil {
 			break
@@ -1095,6 +1138,95 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Subscription.OrderUpdated(childComplexity), true
 
+	case "Subscription.positionUpdated":
+		if e.complexity.Subscription.PositionUpdated == nil {
+			break
+		}
+
+		args, err := ec.field_Subscription_positionUpdated_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Subscription.PositionUpdated(childComplexity, args["deviceImei"].(string)), true
+
+	case "TeltonikaRecord.altitude":
+		if e.complexity.TeltonikaRecord.Altitude == nil {
+			break
+		}
+
+		return e.complexity.TeltonikaRecord.Altitude(childComplexity), true
+
+	case "TeltonikaRecord.angle":
+		if e.complexity.TeltonikaRecord.Angle == nil {
+			break
+		}
+
+		return e.complexity.TeltonikaRecord.Angle(childComplexity), true
+
+	case "TeltonikaRecord.device_imei":
+		if e.complexity.TeltonikaRecord.DeviceImei == nil {
+			break
+		}
+
+		return e.complexity.TeltonikaRecord.DeviceImei(childComplexity), true
+
+	case "TeltonikaRecord.event_id":
+		if e.complexity.TeltonikaRecord.EventID == nil {
+			break
+		}
+
+		return e.complexity.TeltonikaRecord.EventID(childComplexity), true
+
+	case "TeltonikaRecord.io":
+		if e.complexity.TeltonikaRecord.Io == nil {
+			break
+		}
+
+		return e.complexity.TeltonikaRecord.Io(childComplexity), true
+
+	case "TeltonikaRecord.latitude":
+		if e.complexity.TeltonikaRecord.Latitude == nil {
+			break
+		}
+
+		return e.complexity.TeltonikaRecord.Latitude(childComplexity), true
+
+	case "TeltonikaRecord.longitude":
+		if e.complexity.TeltonikaRecord.Longitude == nil {
+			break
+		}
+
+		return e.complexity.TeltonikaRecord.Longitude(childComplexity), true
+
+	case "TeltonikaRecord.priority":
+		if e.complexity.TeltonikaRecord.Priority == nil {
+			break
+		}
+
+		return e.complexity.TeltonikaRecord.Priority(childComplexity), true
+
+	case "TeltonikaRecord.satellites":
+		if e.complexity.TeltonikaRecord.Satellites == nil {
+			break
+		}
+
+		return e.complexity.TeltonikaRecord.Satellites(childComplexity), true
+
+	case "TeltonikaRecord.speed":
+		if e.complexity.TeltonikaRecord.Speed == nil {
+			break
+		}
+
+		return e.complexity.TeltonikaRecord.Speed(childComplexity), true
+
+	case "TeltonikaRecord.timestamp":
+		if e.complexity.TeltonikaRecord.Timestamp == nil {
+			break
+		}
+
+		return e.complexity.TeltonikaRecord.Timestamp(childComplexity), true
+
 	case "Translation.description":
 		if e.complexity.Translation.Description == nil {
 			break
@@ -1294,7 +1426,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
-//go:embed "schema/address.graphql" "schema/directive.graphql" "schema/order.graphql" "schema/payment.graphql" "schema/product.graphql" "schema/user.graphql"
+//go:embed "schema/address.graphql" "schema/directive.graphql" "schema/order.graphql" "schema/payment.graphql" "schema/product.graphql" "schema/tracker.graphql" "schema/user.graphql"
 var sourcesFS embed.FS
 
 func sourceData(filename string) string {
@@ -1311,6 +1443,7 @@ var sources = []*ast.Source{
 	{Name: "schema/order.graphql", Input: sourceData("schema/order.graphql"), BuiltIn: false},
 	{Name: "schema/payment.graphql", Input: sourceData("schema/payment.graphql"), BuiltIn: false},
 	{Name: "schema/product.graphql", Input: sourceData("schema/product.graphql"), BuiltIn: false},
+	{Name: "schema/tracker.graphql", Input: sourceData("schema/tracker.graphql"), BuiltIn: false},
 	{Name: "schema/user.graphql", Input: sourceData("schema/user.graphql"), BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -1815,6 +1948,29 @@ func (ec *executionContext) field_Subscription_myOrderUpdated_argsOrderID(
 	}
 
 	var zeroVal uuid.UUID
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Subscription_positionUpdated_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Subscription_positionUpdated_argsDeviceImei(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["deviceImei"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Subscription_positionUpdated_argsDeviceImei(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (string, error) {
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("deviceImei"))
+	if tmp, ok := rawArgs["deviceImei"]; ok {
+		return ec.unmarshalNString2string(ctx, tmp)
+	}
+
+	var zeroVal string
 	return zeroVal, nil
 }
 
@@ -5130,6 +5286,138 @@ func (ec *executionContext) fieldContext_Payment_settlementAmount(_ context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Position_longitude(ctx context.Context, field graphql.CollectedField, obj *model.Position) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Position_longitude(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Longitude, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Position_longitude(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Position",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Position_latitude(ctx context.Context, field graphql.CollectedField, obj *model.Position) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Position_latitude(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Latitude, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Position_latitude(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Position",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Position_timestamp(ctx context.Context, field graphql.CollectedField, obj *model.Position) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Position_timestamp(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Timestamp, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNDateTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Position_timestamp(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Position",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Product_code(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Product_code(ctx, field)
 	if err != nil {
@@ -7799,6 +8087,567 @@ func (ec *executionContext) fieldContext_Subscription_myOrderUpdated(ctx context
 	if fc.Args, err = ec.field_Subscription_myOrderUpdated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_positionUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	fc, err := ec.fieldContext_Subscription_positionUpdated(ctx, field)
+	if err != nil {
+		return nil
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = nil
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Subscription().PositionUpdated(rctx, fc.Args["deviceImei"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return nil
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return nil
+	}
+	return func(ctx context.Context) graphql.Marshaler {
+		select {
+		case res, ok := <-resTmp.(<-chan *model.Position):
+			if !ok {
+				return nil
+			}
+			return graphql.WriterFunc(func(w io.Writer) {
+				w.Write([]byte{'{'})
+				graphql.MarshalString(field.Alias).MarshalGQL(w)
+				w.Write([]byte{':'})
+				ec.marshalNPosition2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐPosition(ctx, field.Selections, res).MarshalGQL(w)
+				w.Write([]byte{'}'})
+			})
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func (ec *executionContext) fieldContext_Subscription_positionUpdated(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "longitude":
+				return ec.fieldContext_Position_longitude(ctx, field)
+			case "latitude":
+				return ec.fieldContext_Position_latitude(ctx, field)
+			case "timestamp":
+				return ec.fieldContext_Position_timestamp(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Position", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_positionUpdated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TeltonikaRecord_device_imei(ctx context.Context, field graphql.CollectedField, obj *model.TeltonikaRecord) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TeltonikaRecord_device_imei(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DeviceImei, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TeltonikaRecord_device_imei(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TeltonikaRecord",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TeltonikaRecord_timestamp(ctx context.Context, field graphql.CollectedField, obj *model.TeltonikaRecord) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TeltonikaRecord_timestamp(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Timestamp, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNDateTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TeltonikaRecord_timestamp(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TeltonikaRecord",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TeltonikaRecord_priority(ctx context.Context, field graphql.CollectedField, obj *model.TeltonikaRecord) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TeltonikaRecord_priority(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Priority, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TeltonikaRecord_priority(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TeltonikaRecord",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TeltonikaRecord_longitude(ctx context.Context, field graphql.CollectedField, obj *model.TeltonikaRecord) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TeltonikaRecord_longitude(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Longitude, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TeltonikaRecord_longitude(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TeltonikaRecord",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TeltonikaRecord_latitude(ctx context.Context, field graphql.CollectedField, obj *model.TeltonikaRecord) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TeltonikaRecord_latitude(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Latitude, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TeltonikaRecord_latitude(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TeltonikaRecord",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TeltonikaRecord_altitude(ctx context.Context, field graphql.CollectedField, obj *model.TeltonikaRecord) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TeltonikaRecord_altitude(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Altitude, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TeltonikaRecord_altitude(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TeltonikaRecord",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TeltonikaRecord_angle(ctx context.Context, field graphql.CollectedField, obj *model.TeltonikaRecord) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TeltonikaRecord_angle(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Angle, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TeltonikaRecord_angle(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TeltonikaRecord",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TeltonikaRecord_satellites(ctx context.Context, field graphql.CollectedField, obj *model.TeltonikaRecord) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TeltonikaRecord_satellites(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Satellites, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TeltonikaRecord_satellites(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TeltonikaRecord",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TeltonikaRecord_speed(ctx context.Context, field graphql.CollectedField, obj *model.TeltonikaRecord) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TeltonikaRecord_speed(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Speed, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TeltonikaRecord_speed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TeltonikaRecord",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TeltonikaRecord_event_id(ctx context.Context, field graphql.CollectedField, obj *model.TeltonikaRecord) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TeltonikaRecord_event_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EventID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TeltonikaRecord_event_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TeltonikaRecord",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TeltonikaRecord_io(ctx context.Context, field graphql.CollectedField, obj *model.TeltonikaRecord) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TeltonikaRecord_io(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Io, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(map[string]any)
+	fc.Result = res
+	return ec.marshalNJSON2map(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TeltonikaRecord_io(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TeltonikaRecord",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type JSON does not have child fields")
+		},
 	}
 	return fc, nil
 }
@@ -11272,6 +12121,55 @@ func (ec *executionContext) _Payment(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
+var positionImplementors = []string{"Position"}
+
+func (ec *executionContext) _Position(ctx context.Context, sel ast.SelectionSet, obj *model.Position) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, positionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Position")
+		case "longitude":
+			out.Values[i] = ec._Position_longitude(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "latitude":
+			out.Values[i] = ec._Position_latitude(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "timestamp":
+			out.Values[i] = ec._Position_timestamp(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var productImplementors = []string{"Product"}
 
 func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, obj *model.Product) graphql.Marshaler {
@@ -11981,9 +12879,100 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_orderUpdated(ctx, fields[0])
 	case "myOrderUpdated":
 		return ec._Subscription_myOrderUpdated(ctx, fields[0])
+	case "positionUpdated":
+		return ec._Subscription_positionUpdated(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
+}
+
+var teltonikaRecordImplementors = []string{"TeltonikaRecord"}
+
+func (ec *executionContext) _TeltonikaRecord(ctx context.Context, sel ast.SelectionSet, obj *model.TeltonikaRecord) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, teltonikaRecordImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TeltonikaRecord")
+		case "device_imei":
+			out.Values[i] = ec._TeltonikaRecord_device_imei(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "timestamp":
+			out.Values[i] = ec._TeltonikaRecord_timestamp(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "priority":
+			out.Values[i] = ec._TeltonikaRecord_priority(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "longitude":
+			out.Values[i] = ec._TeltonikaRecord_longitude(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "latitude":
+			out.Values[i] = ec._TeltonikaRecord_latitude(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "altitude":
+			out.Values[i] = ec._TeltonikaRecord_altitude(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "angle":
+			out.Values[i] = ec._TeltonikaRecord_angle(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "satellites":
+			out.Values[i] = ec._TeltonikaRecord_satellites(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "speed":
+			out.Values[i] = ec._TeltonikaRecord_speed(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "event_id":
+			out.Values[i] = ec._TeltonikaRecord_event_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "io":
+			out.Values[i] = ec._TeltonikaRecord_io(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
 }
 
 var translationImplementors = []string{"Translation"}
@@ -12608,6 +13597,27 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 	return res
 }
 
+func (ec *executionContext) unmarshalNJSON2map(ctx context.Context, v any) (map[string]any, error) {
+	res, err := graphql.UnmarshalMap(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNJSON2map(ctx context.Context, sel ast.SelectionSet, v map[string]any) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	res := graphql.MarshalMap(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) marshalNOrder2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrder(ctx context.Context, sel ast.SelectionSet, v model.Order) graphql.Marshaler {
 	return ec._Order(ctx, sel, &v)
 }
@@ -12749,6 +13759,20 @@ func (ec *executionContext) unmarshalNOrderTypeEnum2tsbᚑserviceᚋinternalᚋa
 
 func (ec *executionContext) marshalNOrderTypeEnum2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderTypeEnum(ctx context.Context, sel ast.SelectionSet, v model.OrderTypeEnum) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) marshalNPosition2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐPosition(ctx context.Context, sel ast.SelectionSet, v model.Position) graphql.Marshaler {
+	return ec._Position(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPosition2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐPosition(ctx context.Context, sel ast.SelectionSet, v *model.Position) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Position(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNProduct2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProduct(ctx context.Context, sel ast.SelectionSet, v model.Product) graphql.Marshaler {

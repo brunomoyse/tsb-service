@@ -1,0 +1,23 @@
+extend type Subscription {
+    positionUpdated(deviceImei: String!): Position!
+}
+
+type Position {
+    longitude: Float!
+    latitude: Float!
+    timestamp: DateTime!
+}
+
+type TeltonikaRecord {
+    device_imei: String!
+    timestamp: DateTime!
+    priority: String!
+    longitude: Float!
+    latitude: Float!
+    altitude: Int!
+    angle: Int!
+    satellites: Int!
+    speed: Int!
+    event_id: Int!
+    io: JSON!
+}
