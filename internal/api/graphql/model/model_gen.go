@@ -123,6 +123,12 @@ type Payment struct {
 	SettlementAmount                *float64       `json:"settlementAmount,omitempty"`
 }
 
+type Position struct {
+	Longitude float64   `json:"longitude"`
+	Latitude  float64   `json:"latitude"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
 type Product struct {
 	Code         *string          `json:"code,omitempty"`
 	CreatedAt    time.Time        `json:"createdAt"`
@@ -159,6 +165,20 @@ type Street struct {
 }
 
 type Subscription struct {
+}
+
+type TeltonikaRecord struct {
+	DeviceImei string         `json:"device_imei"`
+	Timestamp  time.Time      `json:"timestamp"`
+	Priority   string         `json:"priority"`
+	Longitude  float64        `json:"longitude"`
+	Latitude   float64        `json:"latitude"`
+	Altitude   int            `json:"altitude"`
+	Angle      int            `json:"angle"`
+	Satellites int            `json:"satellites"`
+	Speed      int            `json:"speed"`
+	EventID    int            `json:"event_id"`
+	Io         map[string]any `json:"io"`
 }
 
 type Translation struct {
