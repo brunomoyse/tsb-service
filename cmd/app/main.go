@@ -99,7 +99,7 @@ func main() {
 	productService := productApplication.NewProductService(productRepo)
 	userService := userApplication.NewUserService(userRepo)
 
-	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService)
+	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService, broker)
 	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
 
 	// Gin HTTP setup
