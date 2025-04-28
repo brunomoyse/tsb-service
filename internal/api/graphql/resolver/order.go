@@ -105,6 +105,10 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		if addr == nil {
 			return nil, fmt.Errorf("address not found")
 		}
+		if addr.Distance >= 9000 {
+			return nil, fmt.Errorf("address too far for delivery")
+		}
+
 		var dFee int64
 		switch {
 		case addr.Distance < 4000:
@@ -120,7 +124,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		case addr.Distance < 9000:
 			dFee = 5
 		default:
-			dFee = 0
+			dFee = 10
 		}
 		fee = decimal.NewFromInt(dFee)
 		total = total.Add(fee)
