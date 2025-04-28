@@ -1,25 +1,23 @@
 package main
 
 import (
-	"context"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	// gRPC proto package
+	"tsb-service/internal/api/event"
+	pb "tsb-service/internal/api/eventpb"
 
 	gqlMiddleware "tsb-service/internal/api/graphql/middleware"
 	"tsb-service/internal/api/graphql/resolver"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
-	"tsb-service/internal/modules/telemetry"
 	"tsb-service/pkg/pubsub"
-	"tsb-service/pkg/rabbit"
 	"tsb-service/services/email/scaleway"
 
 	orderApplication "tsb-service/internal/modules/order/application"
@@ -40,44 +38,34 @@ import (
 )
 
 func main() {
-	// ───── 1) DB ────────────────────────────────────────────────────────────────
+	// DB connection
 	dbConn, err := db.ConnectDatabase()
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
 	defer dbConn.Close()
 
-	// ───── 2) RabbitMQ consumer (but don't start the loop yet) ────────────────
-	amqpURI := os.Getenv("RABBITMQ_URL")
-	if amqpURI == "" {
-		amqpURI = "amqp://guest:guest@localhost:5672/"
-	}
-	queue := os.Getenv("QUEUE_NAME")
-	if queue == "" {
-		queue = "teltonika.records"
-	}
-
-	consumer, err := rabbit.NewConsumer(amqpURI, queue)
-	if err != nil {
-		log.Fatalf("Failed to start consumer: %s", err)
-	}
-
-	// ───── 3) Shutdown context (shared by HTTP & telemetry) ───────────────────
-	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	// ───── 4) PubSub broker (used by GraphQL & telemetry) ─────────────────────
+	// PubSub broker (used by GraphQL & telemetry)
 	broker := pubsub.NewBroker()
 
-	// Start telemetry > broker pump
+	// Start gRPC server in its own goroutine
 	go func() {
-		if err := telemetry.StartTelemetryConsumer(ctx, consumer, broker); err != nil {
-			log.Printf("telemetry consumer stopped: %v", err)
+		lis, err := net.Listen("tcp", ":50051")
+		if err != nil {
+			log.Fatalf("gRPC listen failed: %v", err)
+		}
+		grpcServer := grpc.NewServer()
+
+		// Register the EventService
+		pb.RegisterEventServiceServer(grpcServer, event.NewServer(broker))
+		log.Println("gRPC server listening on :50051")
+
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("gRPC serve error: %v", err)
 		}
 	}()
 
-	// ───── 5) ENV checks & third-party setup ──────────────────────────────────
+	// ENV checks & third-party setup
 	mollieApiKey := os.Getenv("MOLLIE_API_TOKEN")
 	if mollieApiKey == "" {
 		log.Fatal("MOLLIE_API_TOKEN is required")
@@ -98,7 +86,7 @@ func main() {
 		log.Fatalf("Failed to initialize Mollie client: %v", err)
 	}
 
-	// ───── 6) Repos / services / handlers ─────────────────────────────────────
+	// Repos / services / handlers
 	addressRepo := addressInfrastructure.NewAddressRepository(dbConn)
 	orderRepo := orderInfrastructure.NewOrderRepository(dbConn)
 	paymentRepo := paymentInfrastructure.NewPaymentRepository(dbConn)
@@ -114,7 +102,7 @@ func main() {
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService)
 	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
 
-	// ───── 7) Gin HTTP setup ──────────────────────────────────────────────────
+	// Gin HTTP setup
 	router := gin.Default()
 	router.RedirectTrailingSlash = true
 	router.RedirectFixedPath = true
@@ -163,29 +151,14 @@ func main() {
 	api.GET("/oauth/google", userHandler.GoogleAuthHandler)
 	api.GET("/oauth/google/callback", userHandler.GoogleAuthCallbackHandler)
 
-	// ───── 8) HTTP server ─────────────────────────────────────────────────────
+	// HTTP server
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: router,
 	}
 
-	go func() {
-		log.Println("HTTP server listening on :8080")
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server error: %v", err)
-		}
-	}()
-
-	// ───── 9) Wait for shutdown signal ────────────────────────────────────────
-	<-ctx.Done()
-	log.Println("Shutdown signal received")
-
-	// Graceful HTTP shutdown
-	shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(shutCtx); err != nil {
-		log.Printf("HTTP server Shutdown: %v", err)
+	log.Println("HTTP server listening on :8080")
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Server error: %v", err)
 	}
-
-	log.Println("Exited cleanly")
 }
