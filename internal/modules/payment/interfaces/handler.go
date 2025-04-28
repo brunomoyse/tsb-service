@@ -13,6 +13,7 @@ import (
 	productApplication "tsb-service/internal/modules/product/application"
 	productDomain "tsb-service/internal/modules/product/domain"
 	userApplication "tsb-service/internal/modules/user/application"
+	"tsb-service/pkg/pubsub"
 	es "tsb-service/services/email/scaleway"
 )
 
@@ -21,6 +22,7 @@ type PaymentHandler struct {
 	orderService   orderApplication.OrderService
 	userService    userApplication.UserService
 	productService productApplication.ProductService
+	broker         *pubsub.Broker
 }
 
 func NewPaymentHandler(
@@ -28,12 +30,14 @@ func NewPaymentHandler(
 	orderService orderApplication.OrderService,
 	userService userApplication.UserService,
 	productService productApplication.ProductService,
+	broker *pubsub.Broker,
 ) *PaymentHandler {
 	return &PaymentHandler{
 		service:        service,
 		orderService:   orderService,
 		userService:    userService,
 		productService: productService,
+		broker:         broker,
 	}
 }
 
@@ -129,6 +133,9 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 				log.Printf("failed to retrieve user: %v", err)
 				return
 			}
+
+			h.broker.Publish("orderUpdated", order)
+
 			err = es.SendOrderPendingEmail(*u, "fr", *order, orderProductsResponse)
 			if err != nil {
 				log.Printf("failed to send order pending email: %v", err)
