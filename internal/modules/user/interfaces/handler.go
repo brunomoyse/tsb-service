@@ -210,9 +210,9 @@ func (h *UserHandler) LoginHandler(c *gin.Context) {
 		address, _ = h.addressService.GetAddressByID(c.Request.Context(), *user.AddressID)
 	}
 
-	c.SetCookie("access_token", *accessToken, 15*60, "/", "", true, true) // 15 minutes
-	c.SetCookie("refresh_token", *refreshToken, 7*24*3600, "/", "", true, true)
-	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetSameSite(http.SameSiteNoneMode)
+	c.SetCookie("access_token", *accessToken, 15*60, "/", os.Getenv("SESSION_COOKIE_DOMAIN"), true, true)
+	c.SetCookie("refresh_token", *refreshToken, 7*24*3600, "/", os.Getenv("SESSION_COOKIE_DOMAIN"), true, true)
 
 	c.JSON(http.StatusOK, NewLoginResponse(user, address))
 }
@@ -382,9 +382,9 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	}
 
 	// Set tokens as cookies and redirect.
-	c.SetCookie("access_token", accessToken, 15*60, "/", "", true, true)
-	c.SetCookie("refresh_token", refreshToken, 7*24*3600, "/", "", true, true)
-	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetSameSite(http.SameSiteNoneMode)
+	c.SetCookie("access_token", accessToken, 15*60, "/", os.Getenv("SESSION_COOKIE_DOMAIN"), true, true)
+	c.SetCookie("refresh_token", refreshToken, 7*24*3600, "/", os.Getenv("SESSION_COOKIE_DOMAIN"), true, true)
 	c.Redirect(http.StatusFound, os.Getenv("REDIRECT_LOGIN_SUCCESSFUL"))
 }
 
@@ -408,9 +408,9 @@ func (h *UserHandler) RefreshTokenHandler(c *gin.Context) {
 	}
 
 	// 3. Set new cookies
-	c.SetCookie("access_token", newAccessToken, 15*60, "/", "", true, true)
-	c.SetCookie("refresh_token", newRefreshToken, 7*24*3600, "/", "", true, true)
-	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetSameSite(http.SameSiteNoneMode)
+	c.SetCookie("access_token", newAccessToken, 15*60, "/", os.Getenv("SESSION_COOKIE_DOMAIN"), true, true)
+	c.SetCookie("refresh_token", newRefreshToken, 7*24*3600, "/", os.Getenv("SESSION_COOKIE_DOMAIN"), true, true)
 
 	// 4. Return minimal user data
 	c.JSON(http.StatusOK, gin.H{

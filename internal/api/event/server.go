@@ -2,6 +2,7 @@ package event
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"tsb-service/internal/api/graphql/model"
@@ -45,6 +46,8 @@ func (s *Server) StreamEvents(stream pb.EventService_StreamEventsServer) error {
 			Latitude:  rec.Latitude,
 			Timestamp: rec.Timestamp,
 		}
+
+		fmt.Println(pos)
 
 		s.Broker.Publish(rec.DeviceImei, pos)
 
