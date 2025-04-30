@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"os"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	"tsb-service/internal/modules/payment/domain"
@@ -33,24 +34,54 @@ func NewPaymentService(repo domain.PaymentRepository, mollieClient mollie.Client
 }
 
 func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct) (*domain.MolliePayment, error) {
-	// Preallocate slice with exact length.
-	paymentLines := make([]mollie.PaymentLines, len(op))
+	var lines []mollie.PaymentLines
 
-	for i, line := range op {
-		var description string
-		if line.Product.Code != nil && *line.Product.Code != "" {
-			description = fmt.Sprintf("%s - %s %s", *line.Product.Code, line.Product.CategoryName, line.Product.Name)
-		} else {
-			description = fmt.Sprintf("%s %s", line.Product.CategoryName, line.Product.Name)
-		}
-		paymentLines[i] = mollie.PaymentLines{
-			Description:  description,
+	// line items
+	for _, line := range op {
+		lines = append(lines, mollie.PaymentLines{
+			Type:         "physical",
+			Description:  describe(line.Product),
 			Quantity:     int(line.Quantity),
 			QuantityUnit: "pcs",
-			UnitPrice:    &mollie.Amount{Value: line.UnitPrice.StringFixed(2), Currency: "EUR"},
-			TotalAmount:  &mollie.Amount{Value: line.TotalPrice.StringFixed(2), Currency: "EUR"},
-		}
+			UnitPrice:    amt(line.UnitPrice),
+			TotalAmount:  amt(line.TotalPrice),
+		})
 	}
+
+	// shipping fee
+	if o.DeliveryFee != nil && !o.DeliveryFee.IsZero() {
+		lines = append(lines, mollie.PaymentLines{
+			Type:        "shipping_fee",
+			Description: "Frais de livraison",
+			Quantity:    1,
+			UnitPrice:   amt(*o.DeliveryFee),
+			TotalAmount: amt(*o.DeliveryFee),
+		})
+	}
+
+	// discount
+	if o.DiscountAmount.Cmp(decimal.Zero) > 0 {
+		neg := o.DiscountAmount.Neg() // make it negative
+
+		lines = append(lines, mollie.PaymentLines{
+			Type:        "discount",
+			Description: "Réduction",
+			Quantity:    1,
+			UnitPrice:   amt(neg),
+			TotalAmount: amt(neg),
+		})
+	}
+
+	// online payment surcharge (if any)
+	//if o.IsOnlinePayment {
+	//	// adjust Type/Description as needed
+	//	lines = append(lines, mollie.PaymentLines{
+	//		Type:        "surcharge",
+	//		Description: "Online payment fee",
+	//		UnitPrice:   amt(decimal.Zero), // or actual surcharge amount
+	//		TotalAmount: amt(decimal.Zero),
+	//	})
+	//}
 
 	// Retrieve base URLs from environment variables.
 	appBaseUrl := os.Getenv("APP_BASE_URL")
@@ -78,7 +109,7 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 		RedirectURL: redirectEndpoint,
 		WebhookURL:  webhookUrl,
 		Locale:      locale,
-		Lines:       paymentLines,
+		Lines:       lines,
 	}
 
 	// Create the payment via the Mollie client.
@@ -135,4 +166,20 @@ func (s *paymentService) GetPaymentByOrderID(ctx context.Context, orderID uuid.U
 
 func (s *paymentService) BatchGetPaymentsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.MolliePayment, error) {
 	return s.repo.FindByOrderIDs(ctx, orderIDs)
+}
+
+// helper to build a *mollie.Amount from a decimal.Decimal
+func amt(d decimal.Decimal) *mollie.Amount {
+	return &mollie.Amount{
+		Value:    d.StringFixed(2),
+		Currency: "EUR",
+	}
+}
+
+// build description for a line item
+func describe(p orderDomain.Product) string {
+	if p.Code != nil && *p.Code != "" {
+		return fmt.Sprintf("%s ‒ %s %s", *p.Code, p.CategoryName, p.Name)
+	}
+	return fmt.Sprintf("%s %s", p.CategoryName, p.Name)
 }
