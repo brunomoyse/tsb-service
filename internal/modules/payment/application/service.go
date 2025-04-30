@@ -15,6 +15,7 @@ import (
 
 type PaymentService interface {
 	CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct, u userDomain.User, a *addressDomain.Address) (*domain.MolliePayment, error)
+	CreateFullRefund(ctx context.Context, externalPaymentID string) (*mollie.Refund, error)
 	UpdatePaymentStatus(ctx context.Context, externalMolliePaymentID string) error
 	GetPaymentByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error)
 	GetExternalPaymentByID(ctx context.Context, externalMolliePaymentID string) (*mollie.Response, *mollie.Payment, error)
@@ -137,6 +138,42 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 		return nil, err
 	}
 	return payment, nil
+}
+
+func (s *paymentService) CreateFullRefund(ctx context.Context, externalPaymentID string) (*mollie.Refund, error) {
+	// Check if the payment is paid
+	payment, err := s.GetPaymentByExternalID(ctx, externalPaymentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find payment: %w", err)
+	}
+
+	if payment.Status != mollie.Paid {
+		return nil, fmt.Errorf("payment is not paid: %s", payment.Status)
+	}
+
+	// Create a refund request
+	refundRequest := mollie.CreatePaymentRefund{
+		Amount: amt(payment.Amount),
+	}
+
+	// Create the refund via the Mollie client
+	res, refund, err := s.mollieClient.Refunds.CreatePaymentRefund(ctx, externalPaymentID, refundRequest, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create refund: %w", err)
+	}
+
+	// If 200/201 OK, the refund was created successfully
+	if res.StatusCode != 200 && res.StatusCode != 201 {
+		return nil, fmt.Errorf("failed to create refund: %s", res.Status)
+	}
+
+	// Save the refund to the database
+	err = s.repo.MarkAsRefund(ctx, externalPaymentID, refund.Amount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to mark payment as refunded: %w", err)
+	}
+
+	return refund, nil
 }
 
 func (s *paymentService) UpdatePaymentStatus(ctx context.Context, externalMolliePaymentID string) error {
