@@ -7,12 +7,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"os"
+	addressDomain "tsb-service/internal/modules/address/domain"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	"tsb-service/internal/modules/payment/domain"
+	userDomain "tsb-service/internal/modules/user/domain"
 )
 
 type PaymentService interface {
-	CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct) (*domain.MolliePayment, error)
+	CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct, u userDomain.User, a *addressDomain.Address) (*domain.MolliePayment, error)
 	UpdatePaymentStatus(ctx context.Context, externalMolliePaymentID string) error
 	GetPaymentByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error)
 	GetExternalPaymentByID(ctx context.Context, externalMolliePaymentID string) (*mollie.Response, *mollie.Payment, error)
@@ -33,13 +35,13 @@ func NewPaymentService(repo domain.PaymentRepository, mollieClient mollie.Client
 	}
 }
 
-func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct) (*domain.MolliePayment, error) {
+func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct, u userDomain.User, a *addressDomain.Address) (*domain.MolliePayment, error) {
 	var lines []mollie.PaymentLines
 
 	// line items
 	for _, line := range op {
 		lines = append(lines, mollie.PaymentLines{
-			Type:         "physical",
+			Type:         mollie.PhysicalProductLine,
 			Description:  describe(line.Product),
 			Quantity:     int(line.Quantity),
 			QuantityUnit: "pcs",
@@ -51,7 +53,7 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 	// shipping fee
 	if o.DeliveryFee != nil && !o.DeliveryFee.IsZero() {
 		lines = append(lines, mollie.PaymentLines{
-			Type:        "shipping_fee",
+			Type:        mollie.ShippingFeeLine,
 			Description: "Frais de livraison",
 			Quantity:    1,
 			UnitPrice:   amt(*o.DeliveryFee),
@@ -64,7 +66,7 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 		neg := o.DiscountAmount.Neg() // make it negative
 
 		lines = append(lines, mollie.PaymentLines{
-			Type:        "discount",
+			Type:        mollie.DiscountProductLine,
 			Description: "Réduction",
 			Quantity:    1,
 			UnitPrice:   amt(neg),
@@ -82,6 +84,15 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 	//		TotalAmount: amt(decimal.Zero),
 	//	})
 	//}
+
+	address := &mollie.Address{
+		GivenName:       u.FirstName,
+		FamilyName:      u.LastName,
+		StreetAndNumber: a.StreetName + " " + a.HouseNumber,
+		PostalCode:      a.Postcode,
+		City:            a.MunicipalityName,
+		Country:         "Belgium",
+	}
 
 	// Retrieve base URLs from environment variables.
 	appBaseUrl := os.Getenv("APP_BASE_URL")
@@ -105,11 +116,13 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 			Value:    o.TotalPrice.StringFixed(2),
 			Currency: "EUR",
 		},
-		Description: "Tokyo Sushi Bar",
-		RedirectURL: redirectEndpoint,
-		WebhookURL:  webhookUrl,
-		Locale:      locale,
-		Lines:       lines,
+		Description:     "Tokyo Sushi Bar",
+		RedirectURL:     redirectEndpoint,
+		WebhookURL:      webhookUrl,
+		Locale:          locale,
+		Lines:           lines,
+		ShippingAddress: address,
+		BillingAddress:  address,
 	}
 
 	// Create the payment via the Mollie client.
