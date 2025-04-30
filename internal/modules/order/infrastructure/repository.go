@@ -40,6 +40,17 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 	for _, prod := range *op {
 		computedTotal = computedTotal.Add(prod.TotalPrice)
 	}
+
+	// Add delivery fee if applicable.
+	if o.DeliveryFee != nil {
+		computedTotal = computedTotal.Add(*o.DeliveryFee)
+	}
+
+	// Add discount amount if applicable.
+	if o.DiscountAmount != decimal.Zero {
+		computedTotal = computedTotal.Sub(o.DiscountAmount)
+	}
+
 	o.TotalPrice = computedTotal
 
 	// Marshal OrderExtras to JSON (for the order_extra column).
