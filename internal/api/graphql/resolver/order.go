@@ -186,21 +186,31 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 	}
 
+	user, err := r.UserService.GetUserByID(ctx, order.UserID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve user: %w", err)
+	}
+
 	// Handle payment creation if needed.
 	if input.IsOnlinePayment {
-		molliePayment, err := r.PaymentService.CreatePayment(ctx, *order, items)
+		address := &addressDomain.Address{}
+		if odType == orderDomain.OrderTypeDelivery {
+			if input.AddressID == nil {
+				return nil, fmt.Errorf("addressID required for delivery")
+			}
+
+			address, err = r.AddressService.GetAddressByID(ctx, *input.AddressID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to retrieve address: %w", err)
+			}
+		}
+		molliePayment, err := r.PaymentService.CreatePayment(ctx, *order, items, *user, address)
 		if err != nil || molliePayment == nil {
 			return nil, fmt.Errorf("failed to create payment: %w", err)
 		}
 	} else {
 		// If offline payment, send the notification e-mail already
 		go func() {
-			user, err := r.UserService.GetUserByID(context.Background(), order.UserID.String())
-			if err != nil {
-				log.Printf("failed to retrieve user: %v", err)
-				return
-			}
-
 			err = es.SendOrderPendingEmail(*user, "fr", *order, items)
 			if err != nil {
 				log.Printf("failed to send order pending email: %v", err)
