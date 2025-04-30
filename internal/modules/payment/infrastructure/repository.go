@@ -96,7 +96,7 @@ func (r *PaymentRepository) Save(ctx context.Context, external mollie.Payment, o
 	domainPayment := &domain.MolliePayment{
 		Resource:                        &external.Resource,
 		MolliePaymentID:                 external.ID,
-		Status:                          external.Status,
+		Status:                          mollie.OrderStatus(external.Status),
 		Description:                     &external.Description,
 		CancelURL:                       &external.CancelURL,
 		WebhookURL:                      &external.WebhookURL,
@@ -207,6 +207,21 @@ func (r *PaymentRepository) Save(ctx context.Context, external mollie.Payment, o
 	}
 
 	return domainPayment, nil
+}
+
+func (r *PaymentRepository) MarkAsRefund(ctx context.Context, externalPaymentID string, amount *mollie.Amount) error {
+	const query = `
+		UPDATE mollie_payments
+		SET amount_refunded = $1
+		WHERE mollie_payment_id = $2;
+	`
+
+	_, err := r.db.ExecContext(ctx, query, amount.Value, externalPaymentID)
+	if err != nil {
+		return fmt.Errorf("failed to mark payment as refunded: %w", err)
+	}
+
+	return nil
 }
 
 func (r *PaymentRepository) RefreshStatus(ctx context.Context, externalPayment mollie.Payment) (*uuid.UUID, error) {
