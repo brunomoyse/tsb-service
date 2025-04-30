@@ -283,3 +283,8 @@ func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomai
 
 	return nil
 }
+
+func SendOrderCancelledEmail(user userDomain.User, lang string, order orderDomain.Order) error {
+	// @TODO: To implement
+	return nil
+}

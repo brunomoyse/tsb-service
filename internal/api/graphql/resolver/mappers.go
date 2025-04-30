@@ -100,7 +100,7 @@ func ToGQLPayment(p *paymentDomain.MolliePayment) *model.Payment {
 		ID:        p.ID,
 		CreatedAt: p.CreatedAt,
 		OrderID:   p.OrderID,
-		Status:    p.Status,
+		Status:    string(p.Status),
 		Links:     links,
 	}
 }

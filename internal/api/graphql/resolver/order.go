@@ -313,6 +313,30 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		}()
 	}
 
+	// If new status is "CANCELED", refund & send the cancellation email
+	if o.OrderStatus == orderDomain.OrderStatusCancelled {
+		payment, err := r.PaymentService.GetPaymentByOrderID(ctx, o.ID)
+		if err != nil && payment != nil {
+			_, err = r.PaymentService.CreateFullRefund(ctx, payment.MolliePaymentID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initiate refund: %w", err)
+			}
+		}
+
+		go func() {
+			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
+			if err != nil {
+				log.Printf("failed to retrieve user: %v", err)
+				return
+			}
+
+			err = es.SendOrderCancelledEmail(*user, "fr", *o)
+			if err != nil {
+				log.Printf("failed to send order canceled email: %v", err)
+			}
+		}()
+	}
+
 	// Map the order to the GraphQL model
 	order := ToGQLOrder(o)
 
