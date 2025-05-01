@@ -297,7 +297,7 @@ func (e *executableSchema) Schema() *ast.Schema {
 	return parsedSchema
 }
 
-func (e *executableSchema) Complexity(typeName, field string, childComplexity int, rawArgs map[string]any) (int, bool) {
+func (e *executableSchema) Complexity(ctx context.Context, typeName, field string, childComplexity int, rawArgs map[string]any) (int, bool) {
 	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
@@ -356,7 +356,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Mutation_createOrder_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_createOrder_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -368,7 +368,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Mutation_createProduct_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_createProduct_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -380,7 +380,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Mutation_updateMe_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_updateMe_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -392,7 +392,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Mutation_updateOrder_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_updateOrder_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -404,7 +404,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Mutation_updateProduct_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_updateProduct_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -941,7 +941,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Query_address_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_address_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -953,7 +953,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Query_addressByLocation_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_addressByLocation_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -965,7 +965,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Query_boxNumbers_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_boxNumbers_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -977,7 +977,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Query_houseNumbers_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_houseNumbers_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -996,7 +996,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Query_myOrder_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_myOrder_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -1008,7 +1008,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Query_myOrders_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_myOrders_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -1020,7 +1020,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Query_order_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_order_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -1039,7 +1039,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Query_product_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_product_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -1058,7 +1058,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Query_productCategory_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_productCategory_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -1077,7 +1077,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Query_streets_args(context.TODO(), rawArgs)
+		args, err := ec.field_Query_streets_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -1117,7 +1117,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Subscription_myOrderUpdated_args(context.TODO(), rawArgs)
+		args, err := ec.field_Subscription_myOrderUpdated_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
@@ -1143,7 +1143,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_Subscription_positionUpdated_args(context.TODO(), rawArgs)
+		args, err := ec.field_Subscription_positionUpdated_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
