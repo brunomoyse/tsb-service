@@ -92,7 +92,7 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 		StreetAndNumber: a.StreetName + " " + a.HouseNumber,
 		PostalCode:      a.Postcode,
 		City:            a.MunicipalityName,
-		Country:         "Belgium",
+		Country:         "BE",
 	}
 
 	// Retrieve base URLs from environment variables.
