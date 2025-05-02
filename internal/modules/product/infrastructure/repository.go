@@ -289,24 +289,41 @@ func (r *ProductRepository) FindAll(ctx context.Context) ([]*domain.Product, err
 func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error) {
 	lang := utils.GetLang(ctx)
 
+	// 1) Quick availability check
+	var unavailable []string
+	availCheck := `
+        SELECT id
+          FROM products
+         WHERE id = ANY($1)
+           AND NOT is_available
+    `
+	if err := r.db.SelectContext(ctx, &unavailable, availCheck, pq.Array(productIDs)); err != nil {
+		return nil, err
+	}
+	if len(unavailable) > 0 {
+		return nil, fmt.Errorf("some products are not available: %v", unavailable)
+	}
+
+	// 2) Now fetch the full details, knowing they’re all available
 	query := `
-		SELECT 
-			p.id,
-			p.code,
-			p.price,
-			pct.name AS category_name,
-			pt.name AS name
-		FROM products p
-		LEFT JOIN product_translations pt ON p.id = pt.product_id
-		LEFT JOIN product_category_translations pct ON p.category_id = pct.product_category_id
-		WHERE p.id = ANY($1)
-		AND pt.language = $2
-		AND pct.language = $2
-		ORDER BY p.code;
-	`
+        SELECT 
+            p.id,
+            p.code,
+            p.price,
+            pct.name AS category_name,
+            pt.name  AS name
+        FROM products p
+        LEFT JOIN product_translations pt 
+          ON p.id = pt.product_id
+        LEFT JOIN product_category_translations pct 
+          ON p.category_id = pct.product_category_id
+        WHERE p.id = ANY($1)
+          AND pt.language = $2
+          AND pct.language = $2
+        ORDER BY p.code;
+    `
 	var products []*domain.ProductOrderDetails
-	err := r.db.SelectContext(ctx, &products, query, pq.Array(productIDs), lang)
-	if err != nil {
+	if err := r.db.SelectContext(ctx, &products, query, pq.Array(productIDs), lang); err != nil {
 		return nil, err
 	}
 	return products, nil
