@@ -106,7 +106,8 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 		return nil, fmt.Errorf("MOLLIE_WEBHOOK_URL is required")
 	}
 
-	redirectEndpoint := appBaseUrl + "/order-completed/" + o.ID.String()
+	redirectUrl := appBaseUrl + "/order-completed/" + o.ID.String()
+	cancelUrl := appBaseUrl + "/checkout"
 
 	// Determine locale based on user language.
 	locale := mollie.Locale("fr_FR")
@@ -118,7 +119,8 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 			Currency: "EUR",
 		},
 		Description:     "Tokyo Sushi Bar",
-		RedirectURL:     redirectEndpoint,
+		CancelURL:       cancelUrl,
+		RedirectURL:     redirectUrl,
 		WebhookURL:      webhookUrl,
 		Locale:          locale,
 		Lines:           lines,
