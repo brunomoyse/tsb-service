@@ -146,20 +146,21 @@ type ComplexityRoot struct {
 	}
 
 	Product struct {
-		Category     func(childComplexity int) int
-		Code         func(childComplexity int) int
-		CreatedAt    func(childComplexity int) int
-		Description  func(childComplexity int) int
-		ID           func(childComplexity int) int
-		IsAvailable  func(childComplexity int) int
-		IsHalal      func(childComplexity int) int
-		IsVegan      func(childComplexity int) int
-		IsVisible    func(childComplexity int) int
-		Name         func(childComplexity int) int
-		PieceCount   func(childComplexity int) int
-		Price        func(childComplexity int) int
-		Slug         func(childComplexity int) int
-		Translations func(childComplexity int) int
+		Category       func(childComplexity int) int
+		Code           func(childComplexity int) int
+		CreatedAt      func(childComplexity int) int
+		Description    func(childComplexity int) int
+		ID             func(childComplexity int) int
+		IsAvailable    func(childComplexity int) int
+		IsDiscountable func(childComplexity int) int
+		IsHalal        func(childComplexity int) int
+		IsVegan        func(childComplexity int) int
+		IsVisible      func(childComplexity int) int
+		Name           func(childComplexity int) int
+		PieceCount     func(childComplexity int) int
+		Price          func(childComplexity int) int
+		Slug           func(childComplexity int) int
+		Translations   func(childComplexity int) int
 	}
 
 	ProductCategory struct {
@@ -844,6 +845,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Product.IsAvailable(childComplexity), true
+
+	case "Product.isDiscountable":
+		if e.complexity.Product.IsDiscountable == nil {
+			break
+		}
+
+		return e.complexity.Product.IsDiscountable(childComplexity), true
 
 	case "Product.isHalal":
 		if e.complexity.Product.IsHalal == nil {
@@ -2674,6 +2682,8 @@ func (ec *executionContext) fieldContext_Mutation_createProduct(ctx context.Cont
 				return ec.fieldContext_Product_id(ctx, field)
 			case "isAvailable":
 				return ec.fieldContext_Product_isAvailable(ctx, field)
+			case "isDiscountable":
+				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isVegan":
@@ -2781,6 +2791,8 @@ func (ec *executionContext) fieldContext_Mutation_updateProduct(ctx context.Cont
 				return ec.fieldContext_Product_id(ctx, field)
 			case "isAvailable":
 				return ec.fieldContext_Product_isAvailable(ctx, field)
+			case "isDiscountable":
+				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isVegan":
@@ -3794,6 +3806,8 @@ func (ec *executionContext) fieldContext_OrderItem_product(_ context.Context, fi
 				return ec.fieldContext_Product_id(ctx, field)
 			case "isAvailable":
 				return ec.fieldContext_Product_isAvailable(ctx, field)
+			case "isDiscountable":
+				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isVegan":
@@ -5591,6 +5605,50 @@ func (ec *executionContext) fieldContext_Product_isAvailable(_ context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Product_isDiscountable(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Product_isDiscountable(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsDiscountable, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Product_isDiscountable(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Product",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Product_isHalal(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Product_isHalal(ctx, field)
 	if err != nil {
@@ -6224,6 +6282,8 @@ func (ec *executionContext) fieldContext_ProductCategory_products(_ context.Cont
 				return ec.fieldContext_Product_id(ctx, field)
 			case "isAvailable":
 				return ec.fieldContext_Product_isAvailable(ctx, field)
+			case "isDiscountable":
+				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isVegan":
@@ -7108,6 +7168,8 @@ func (ec *executionContext) fieldContext_Query_product(ctx context.Context, fiel
 				return ec.fieldContext_Product_id(ctx, field)
 			case "isAvailable":
 				return ec.fieldContext_Product_isAvailable(ctx, field)
+			case "isDiscountable":
+				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isVegan":
@@ -7193,6 +7255,8 @@ func (ec *executionContext) fieldContext_Query_products(_ context.Context, field
 				return ec.fieldContext_Product_id(ctx, field)
 			case "isAvailable":
 				return ec.fieldContext_Product_isAvailable(ctx, field)
+			case "isDiscountable":
+				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isVegan":
@@ -11200,7 +11264,7 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"categoryId", "code", "isAvailable", "isDiscountable", "isHalal", "isVegan", "isVisible", "pieceCount", "price", "translations", "image"}
+	fieldsInOrder := [...]string{"categoryId", "code", "image", "isAvailable", "isDiscountable", "isHalal", "isVegan", "isVisible", "pieceCount", "price", "translations"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11221,6 +11285,13 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Code = data
+		case "image":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("image"))
+			data, err := ec.unmarshalOUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Image = data
 		case "isAvailable":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isAvailable"))
 			data, err := ec.unmarshalNBoolean2bool(ctx, v)
@@ -11277,13 +11348,6 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Translations = data
-		case "image":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("image"))
-			data, err := ec.unmarshalOUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Image = data
 		}
 	}
 
@@ -11406,7 +11470,7 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"categoryID", "code", "isAvailable", "isHalal", "isVegan", "isVisible", "pieceCount", "price", "translations", "image"}
+	fieldsInOrder := [...]string{"categoryID", "code", "image", "isAvailable", "isDiscountable", "isHalal", "isVegan", "isVisible", "pieceCount", "price", "translations"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11427,6 +11491,13 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Code = data
+		case "image":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("image"))
+			data, err := ec.unmarshalOUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Image = data
 		case "isAvailable":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isAvailable"))
 			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
@@ -11434,6 +11505,13 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 				return it, err
 			}
 			it.IsAvailable = data
+		case "isDiscountable":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isDiscountable"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsDiscountable = data
 		case "isHalal":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isHalal"))
 			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
@@ -11476,13 +11554,6 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Translations = data
-		case "image":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("image"))
-			data, err := ec.unmarshalOUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚐUpload(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.Image = data
 		}
 	}
 
@@ -12195,6 +12266,11 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "isAvailable":
 			out.Values[i] = ec._Product_isAvailable(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "isDiscountable":
+			out.Values[i] = ec._Product_isDiscountable(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}

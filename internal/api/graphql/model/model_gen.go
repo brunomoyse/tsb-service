@@ -43,6 +43,7 @@ type CreateOrderItemInput struct {
 type CreateProductInput struct {
 	CategoryID     uuid.UUID           `json:"categoryId"`
 	Code           *string             `json:"code,omitempty"`
+	Image          *graphql.Upload     `json:"image,omitempty"`
 	IsAvailable    bool                `json:"isAvailable"`
 	IsDiscountable bool                `json:"isDiscountable"`
 	IsHalal        bool                `json:"isHalal"`
@@ -51,7 +52,6 @@ type CreateProductInput struct {
 	PieceCount     *int                `json:"pieceCount,omitempty"`
 	Price          string              `json:"price"`
 	Translations   []*TranslationInput `json:"translations"`
-	Image          *graphql.Upload     `json:"image,omitempty"`
 }
 
 type Mutation struct {
@@ -131,20 +131,21 @@ type Position struct {
 }
 
 type Product struct {
-	Code         *string          `json:"code,omitempty"`
-	CreatedAt    time.Time        `json:"createdAt"`
-	ID           uuid.UUID        `json:"id"`
-	IsAvailable  bool             `json:"isAvailable"`
-	IsHalal      bool             `json:"isHalal"`
-	IsVegan      bool             `json:"isVegan"`
-	IsVisible    bool             `json:"isVisible"`
-	PieceCount   *int             `json:"pieceCount,omitempty"`
-	Price        string           `json:"price"`
-	Slug         string           `json:"slug"`
-	Name         string           `json:"name"`
-	Description  *string          `json:"description,omitempty"`
-	Category     *ProductCategory `json:"category"`
-	Translations []*Translation   `json:"translations"`
+	Code           *string          `json:"code,omitempty"`
+	CreatedAt      time.Time        `json:"createdAt"`
+	ID             uuid.UUID        `json:"id"`
+	IsAvailable    bool             `json:"isAvailable"`
+	IsDiscountable bool             `json:"isDiscountable"`
+	IsHalal        bool             `json:"isHalal"`
+	IsVegan        bool             `json:"isVegan"`
+	IsVisible      bool             `json:"isVisible"`
+	PieceCount     *int             `json:"pieceCount,omitempty"`
+	Price          string           `json:"price"`
+	Slug           string           `json:"slug"`
+	Name           string           `json:"name"`
+	Description    *string          `json:"description,omitempty"`
+	Category       *ProductCategory `json:"category"`
+	Translations   []*Translation   `json:"translations"`
 }
 
 type ProductCategory struct {
@@ -200,16 +201,17 @@ type UpdateOrderInput struct {
 }
 
 type UpdateProductInput struct {
-	CategoryID   *uuid.UUID          `json:"categoryID,omitempty"`
-	Code         *string             `json:"code,omitempty"`
-	IsAvailable  *bool               `json:"isAvailable,omitempty"`
-	IsHalal      *bool               `json:"isHalal,omitempty"`
-	IsVegan      *bool               `json:"isVegan,omitempty"`
-	IsVisible    *bool               `json:"isVisible,omitempty"`
-	PieceCount   *int                `json:"pieceCount,omitempty"`
-	Price        *string             `json:"price,omitempty"`
-	Translations []*TranslationInput `json:"translations,omitempty"`
-	Image        *graphql.Upload     `json:"image,omitempty"`
+	CategoryID     *uuid.UUID          `json:"categoryID,omitempty"`
+	Code           *string             `json:"code,omitempty"`
+	Image          *graphql.Upload     `json:"image,omitempty"`
+	IsAvailable    *bool               `json:"isAvailable,omitempty"`
+	IsDiscountable *bool               `json:"isDiscountable,omitempty"`
+	IsHalal        *bool               `json:"isHalal,omitempty"`
+	IsVegan        *bool               `json:"isVegan,omitempty"`
+	IsVisible      *bool               `json:"isVisible,omitempty"`
+	PieceCount     *int                `json:"pieceCount,omitempty"`
+	Price          *string             `json:"price,omitempty"`
+	Translations   []*TranslationInput `json:"translations,omitempty"`
 }
 
 type UpdateUserInput struct {

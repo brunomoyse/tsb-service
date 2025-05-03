@@ -10,19 +10,20 @@ import (
 
 // Product represents the core product aggregate.
 type Product struct {
-	ID           uuid.UUID       `db:"id" json:"id"`
-	Price        decimal.Decimal `db:"price" json:"price"`
-	Code         *string         `db:"code" json:"code"`
-	Slug         *string         `db:"slug" json:"slug"`
-	PieceCount   *int            `db:"piece_count" json:"pieceCount"`
-	IsVisible    bool            `db:"is_visible" json:"isVisible"`
-	IsAvailable  bool            `db:"is_available" json:"isAvailable"`
-	IsHalal      bool            `db:"is_halal" json:"isHalal"`
-	IsVegan      bool            `db:"is_vegan" json:"isVegan"`
-	CategoryID   uuid.UUID       `db:"category_id" json:"categoryId"`
-	CreatedAt    time.Time       `db:"created_at" json:"createdAt"`
-	UpdatedAt    time.Time       `db:"updated_at" json:"updatedAt"`
-	Translations []Translation   `json:"translations"`
+	ID             uuid.UUID       `db:"id" json:"id"`
+	Price          decimal.Decimal `db:"price" json:"price"`
+	Code           *string         `db:"code" json:"code"`
+	Slug           *string         `db:"slug" json:"slug"`
+	PieceCount     *int            `db:"piece_count" json:"pieceCount"`
+	IsVisible      bool            `db:"is_visible" json:"isVisible"`
+	IsAvailable    bool            `db:"is_available" json:"isAvailable"`
+	IsHalal        bool            `db:"is_halal" json:"isHalal"`
+	IsVegan        bool            `db:"is_vegan" json:"isVegan"`
+	IsDiscountable bool            `db:"is_discountable" json:"isDiscountable"`
+	CategoryID     uuid.UUID       `db:"category_id" json:"categoryId"`
+	CreatedAt      time.Time       `db:"created_at" json:"createdAt"`
+	UpdatedAt      time.Time       `db:"updated_at" json:"updatedAt"`
+	Translations   []Translation   `json:"translations"`
 }
 
 type ProductOrderDetails struct {

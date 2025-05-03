@@ -86,15 +86,6 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 	//	})
 	//}
 
-	address := &mollie.Address{
-		GivenName:       u.FirstName,
-		FamilyName:      u.LastName,
-		StreetAndNumber: a.StreetName + " " + a.HouseNumber,
-		PostalCode:      a.Postcode,
-		City:            a.MunicipalityName,
-		Country:         "BE",
-	}
-
 	// Retrieve base URLs from environment variables.
 	appBaseUrl := os.Getenv("APP_BASE_URL")
 	if appBaseUrl == "" {
@@ -118,14 +109,30 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 			Value:    o.TotalPrice.StringFixed(2),
 			Currency: "EUR",
 		},
-		Description:     "Tokyo Sushi Bar",
-		CancelURL:       cancelUrl,
-		RedirectURL:     redirectUrl,
-		WebhookURL:      webhookUrl,
-		Locale:          locale,
-		Lines:           lines,
-		ShippingAddress: address,
-		BillingAddress:  address,
+		Description: "Tokyo Sushi Bar",
+		CancelURL:   cancelUrl,
+		RedirectURL: redirectUrl,
+		WebhookURL:  webhookUrl,
+		Locale:      locale,
+		Lines:       lines,
+	}
+
+	// If delivery push addresses
+	if o.OrderType == orderDomain.OrderTypeDelivery {
+		address := &mollie.Address{
+			GivenName:       u.FirstName,
+			FamilyName:      u.LastName,
+			StreetAndNumber: a.StreetName + " " + a.HouseNumber,
+			PostalCode:      a.Postcode,
+			City:            a.MunicipalityName,
+			Country:         "BE",
+		}
+		
+		paymentRequest.ShippingAddress = address
+		paymentRequest.BillingAddress = address
+	} else {
+		paymentRequest.ShippingAddress = nil
+		paymentRequest.BillingAddress = nil
 	}
 
 	// Create the payment via the Mollie client.

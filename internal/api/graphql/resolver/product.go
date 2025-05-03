@@ -41,6 +41,7 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 		input.IsAvailable,
 		input.IsHalal,
 		input.IsVegan,
+		input.IsDiscountable,
 		toDomainTranslations(input.Translations),
 	)
 
