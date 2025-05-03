@@ -1,0 +1,5 @@
+Bonjour {{.UserName}},
+
+Nous sommes désolés de vous informer que votre commande a été annulée. Si vous avez déjà effectué le paiement, un remboursement a été déclenché, et vous recevrez votre argent très bientôt.
+
+Veuillez accepter nos excuses pour ce désagrément. Pour toute question complémentaire, contactez directement le restaurant au 04 222 98 88.

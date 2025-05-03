@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>订单已取消 | 东京寿司吧</title>
+    <style>
+        /* Base styling */
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background: #f2f2f2;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            overflow: hidden;
+            padding: 30px;
+        }
+        .container img {
+            display: block;
+            margin: 0 auto 20px;
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .content {
+            margin-bottom: 20px;
+        }
+        .content p {
+            line-height: 1.6;
+            margin: 16px 0;
+        }
+        .content p.lead {
+            font-size: 18px;
+            color: #444;
+        }
+        .footer {
+            background-color: #fafafa;
+            padding: 20px 0;
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- 餐厅标志 -->
+    <img alt="Logo" src="https://nuagemagique.dev/icons/tsb-logo.svg" />
+
+    <div class="content">
+        <p class="lead">您好 {{.UserName}}，</p>
+        <p>我们很遗憾地通知您，您的订单已被 <strong>取消</strong>。</p>
+        <p>如果您已完成付款，退款已开始处理，您将很快收到退款。</p>
+        <p>对给您带来的不便，我们深表歉意。</p>
+        <p>如需进一步帮助，请随时拨打电话 <strong>04 222 98 88</strong> 联系餐厅。</p>
+    </div>
+
+    <div class="footer">
+        <p>如果您并未下此订单，请忽略此邮件。</p>
+        <p>© 2025 东京寿司吧。保留所有权利。</p>
+    </div>
+</div>
+</body>
+</html>
