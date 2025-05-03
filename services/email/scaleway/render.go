@@ -153,6 +153,16 @@ func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o
 	return data, nil
 }
 
+func prepareOrderCanceledData(u userDomain.User) (interface{}, error) {
+	data := struct {
+		UserName string
+	}{
+		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+	}
+
+	return data, nil
+}
+
 // prepareOrderConfirmedData prepares the data for order confirmed emails.
 func prepareOrderConfirmedData(
 	u userDomain.User,
@@ -277,6 +287,24 @@ func renderOrderPendingEmailHTML(path string, u userDomain.User, op []orderDomai
 // renderOrderPendingEmailText renders the plain text version of the order pending email.
 func renderOrderPendingEmailText(path string, u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (string, error) {
 	data, err := prepareOrderPendingData(u, op, o)
+	if err != nil {
+		return "", err
+	}
+	return renderEmail(path, data, loadTextTemplate)
+}
+
+// renderOrderCanceledEmailHTML renders the HTML version of the order canceled email.
+func renderOrderCanceledEmailHTML(path string, u userDomain.User) (string, error) {
+	data, err := prepareOrderCanceledData(u)
+	if err != nil {
+		return "", err
+	}
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+// renderOrderCanceledEmailText renders the plain text version of the order canceled email.
+func renderOrderCanceledEmailText(path string, u userDomain.User) (string, error) {
+	data, err := prepareOrderCanceledData(u)
 	if err != nil {
 		return "", err
 	}

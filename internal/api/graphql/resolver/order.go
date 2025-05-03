@@ -142,7 +142,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			}
 		}
 	}
-	
+
 	var extras []orderDomain.OrderExtra
 	if input.OrderExtra != nil {
 		extras = make([]orderDomain.OrderExtra, len(input.OrderExtra))
@@ -344,7 +344,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
-			err = es.SendOrderCancelledEmail(*user, "fr", *o)
+			err = es.SendOrderCanceledEmail(*user, "fr")
 			if err != nil {
 				log.Printf("failed to send order canceled email: %v", err)
 			}
