@@ -5,7 +5,7 @@ type Product {
     createdAt: DateTime!
     id: ID!
     isAvailable: Boolean!
-    #isDiscountable: Boolean!
+    isDiscountable: Boolean!
     isHalal: Boolean!
     isVegan: Boolean!
     isVisible: Boolean!
@@ -44,6 +44,7 @@ type ProductCategory {
 input CreateProductInput {
     categoryId: ID!
     code: String
+    image: Upload
     isAvailable: Boolean!
     isDiscountable: Boolean!
     isHalal: Boolean!
@@ -51,27 +52,21 @@ input CreateProductInput {
     isVisible: Boolean!
     pieceCount: Int
     price: String!
-
-    # Translations
     translations: [TranslationInput!]!
-
-    image: Upload
 }
 
 input UpdateProductInput {
     categoryID: ID
     code: String
+    image: Upload
     isAvailable: Boolean
+    isDiscountable: Boolean
     isHalal: Boolean
     isVegan: Boolean
     isVisible: Boolean
     pieceCount: Int
     price: String
-
-    # Translations
     translations: [TranslationInput!]
-
-    image: Upload
 }
 
 input TranslationInput {
