@@ -8,6 +8,7 @@ type Order {
     discountAmount: String!
     deliveryFee: String
     totalPrice: String!
+    preferredReadyTime: DateTime
     estimatedReadyTime: DateTime
     addressExtra: String
     orderNote: String
@@ -56,7 +57,7 @@ input CreateOrderInput {
     addressExtra: String
     orderNote: String
     orderExtra: [OrderExtraInput!]
-    preferredReadyTime: String
+    preferredReadyTime: DateTime
     items: [CreateOrderItemInput!]!
 }
 

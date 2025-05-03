@@ -77,6 +77,7 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		DiscountAmount:     o.DiscountAmount.String(),
 		DeliveryFee:        deliveryFeeStr,
 		TotalPrice:         o.TotalPrice.String(),
+		PreferredReadyTime: o.PreferredReadyTime,
 		EstimatedReadyTime: o.EstimatedReadyTime,
 		AddressExtra:       o.AddressExtra,
 		OrderNote:          o.OrderNote,

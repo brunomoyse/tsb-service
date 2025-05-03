@@ -142,7 +142,9 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 			}
 		} else if externalPayment.Status == "cancelled" || externalPayment.Status == "failed" || externalPayment.Status == "expired" {
 			log.Printf("payment status is not 'paid': %s", externalPayment.Status)
-			err = h.orderService.UpdateOrderStatus(context.Background(), payment.OrderID, domain.OrderStatusCancelled)
+			canceledStatus := domain.OrderStatusCanceled
+
+			err = h.orderService.UpdateOrder(context.Background(), payment.OrderID, &canceledStatus, nil)
 			if err != nil {
 				log.Printf("failed to update order status: %v", err)
 				return

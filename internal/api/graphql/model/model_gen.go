@@ -31,7 +31,7 @@ type CreateOrderInput struct {
 	AddressExtra       *string                 `json:"addressExtra,omitempty"`
 	OrderNote          *string                 `json:"orderNote,omitempty"`
 	OrderExtra         []*OrderExtraInput      `json:"orderExtra,omitempty"`
-	PreferredReadyTime *string                 `json:"preferredReadyTime,omitempty"`
+	PreferredReadyTime *time.Time              `json:"preferredReadyTime,omitempty"`
 	Items              []*CreateOrderItemInput `json:"items"`
 }
 
@@ -67,6 +67,7 @@ type Order struct {
 	DiscountAmount     string             `json:"discountAmount"`
 	DeliveryFee        *string            `json:"deliveryFee,omitempty"`
 	TotalPrice         string             `json:"totalPrice"`
+	PreferredReadyTime *time.Time         `json:"preferredReadyTime,omitempty"`
 	EstimatedReadyTime *time.Time         `json:"estimatedReadyTime,omitempty"`
 	AddressExtra       *string            `json:"addressExtra,omitempty"`
 	OrderNote          *string            `json:"orderNote,omitempty"`

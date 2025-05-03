@@ -161,6 +161,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		input.AddressID,
 		input.AddressExtra,
 		input.OrderNote,
+		input.PreferredReadyTime,
 		extras,
 		&fee,
 		totalDiscount,
@@ -243,7 +244,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 // UpdateOrder is the resolver for the updateOrder field.
 func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input model.UpdateOrderInput) (*model.Order, error) {
-	err := r.OrderService.UpdateOrderStatus(ctx, id, *input.Status)
+	err := r.OrderService.UpdateOrder(ctx, id, input.Status, input.EstimatedReadyTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update order status: %w", err)
 	}
@@ -328,7 +329,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	}
 
 	// If new status is "CANCELED", refund & send the cancellation email
-	if o.OrderStatus == orderDomain.OrderStatusCancelled {
+	if o.OrderStatus == orderDomain.OrderStatusCanceled {
 		payment, err := r.PaymentService.GetPaymentByOrderID(ctx, o.ID)
 		if err != nil && payment != nil {
 			_, err = r.PaymentService.CreateFullRefund(ctx, payment.MolliePaymentID)

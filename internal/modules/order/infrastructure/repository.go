@@ -69,12 +69,12 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 	const orderQuery = `
 		INSERT INTO orders (
 			user_id, order_status, order_type, is_online_payment, 
-			discount_amount, delivery_fee, total_price, estimated_ready_time, 
+			discount_amount, delivery_fee, total_price, preferred_ready_time, estimated_ready_time, 
 			address_id, address_extra, order_note, order_extra
 		) VALUES (
 			$1, $2, $3, $4, 
 			$5, $6, $7, $8, 
-			$9, $10, $11, $12
+			$9, $10, $11, $12, $13
 		)
 		RETURNING id, created_at, updated_at;
 	`
@@ -93,6 +93,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		o.DiscountAmount,
 		o.DeliveryFee,
 		o.TotalPrice,
+		o.PreferredReadyTime,
 		o.EstimatedReadyTime,
 		o.AddressID,
 		o.AddressExtra,
@@ -139,10 +140,10 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 func (r *OrderRepository) Update(ctx context.Context, order *domain.Order) error {
 	query := `
 		UPDATE orders
-		SET order_status = $1, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $2;
+		SET order_status = $1, estimated_ready_time = $2, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $3;
 	`
-	if _, err := r.db.ExecContext(ctx, query, order.OrderStatus, order.ID); err != nil {
+	if _, err := r.db.ExecContext(ctx, query, order.OrderStatus, order.EstimatedReadyTime, order.ID); err != nil {
 		return fmt.Errorf("failed to update order: %w", err)
 	}
 	return nil

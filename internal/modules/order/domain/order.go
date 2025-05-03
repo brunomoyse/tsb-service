@@ -18,7 +18,7 @@ const (
 	OrderStatusPickedUp       OrderStatus = "PICKED_UP"
 	OrderStatusOutForDelivery OrderStatus = "OUT_FOR_DELIVERY"
 	OrderStatusDelivered      OrderStatus = "DELIVERED"
-	OrderStatusCancelled      OrderStatus = "CANCELLED"
+	OrderStatusCanceled       OrderStatus = "CANCELLED"
 	OrderStatusFailed         OrderStatus = "FAILED"
 )
 
@@ -39,6 +39,7 @@ type Order struct {
 	DiscountAmount     decimal.Decimal  `db:"discount_amount" json:"discountAmount"`
 	DeliveryFee        *decimal.Decimal `db:"delivery_fee" json:"deliveryFee,omitempty"`
 	TotalPrice         decimal.Decimal  `db:"total_price" json:"totalPrice"`
+	PreferredReadyTime *time.Time       `db:"preferred_ready_time" json:"preferredReadyTime,omitempty"`
 	EstimatedReadyTime *time.Time       `db:"estimated_ready_time" json:"estimatedReadyTime,omitempty"`
 	AddressID          *string          `db:"address_id" json:"addressId,omitempty"`
 	AddressExtra       *string          `db:"address_extra" json:"addressExtra,omitempty"`
@@ -83,6 +84,7 @@ func NewOrder(
 	addressID *string,
 	addressExtra *string,
 	orderNote *string,
+	preferredReadyTime *time.Time,
 	orderExtra []OrderExtra,
 	deliveryFee *decimal.Decimal,
 	discountAmount decimal.Decimal,
@@ -90,16 +92,17 @@ func NewOrder(
 	orderExtraJSON, _ := json.Marshal(orderExtra)
 
 	return &Order{
-		ID:              uuid.Nil,
-		UserID:          userID,
-		OrderStatus:     OrderStatusPending,
-		OrderType:       orderType,
-		IsOnlinePayment: isOnlinePayment,
-		AddressID:       addressID,
-		AddressExtra:    addressExtra,
-		OrderNote:       orderNote,
-		OrderExtra:      orderExtraJSON,
-		DeliveryFee:     deliveryFee,
-		DiscountAmount:  discountAmount,
+		ID:                 uuid.Nil,
+		UserID:             userID,
+		OrderStatus:        OrderStatusPending,
+		OrderType:          orderType,
+		IsOnlinePayment:    isOnlinePayment,
+		AddressID:          addressID,
+		AddressExtra:       addressExtra,
+		OrderNote:          orderNote,
+		PreferredReadyTime: preferredReadyTime,
+		OrderExtra:         orderExtraJSON,
+		DeliveryFee:        deliveryFee,
+		DiscountAmount:     discountAmount,
 	}
 }
