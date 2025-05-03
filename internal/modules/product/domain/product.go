@@ -27,11 +27,12 @@ type Product struct {
 }
 
 type ProductOrderDetails struct {
-	ID           uuid.UUID       `db:"id" json:"id"`
-	Code         *string         `db:"code" json:"code"`
-	CategoryName string          `db:"category_name" json:"categoryName"`
-	Name         string          `db:"name" json:"name"`
-	Price        decimal.Decimal `db:"price" json:"price"`
+	ID             uuid.UUID       `db:"id" json:"id"`
+	Code           *string         `db:"code" json:"code"`
+	CategoryName   string          `db:"category_name" json:"categoryName"`
+	Name           string          `db:"name" json:"name"`
+	Price          decimal.Decimal `db:"price" json:"price"`
+	IsDiscountable bool            `db:"is_discountable" json:"isDiscountable"`
 }
 
 func NewProduct(price decimal.Decimal, categoryID uuid.UUID, isVisible bool, isAvailable bool, translations []Translation) (*Product, error) {

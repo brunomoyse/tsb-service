@@ -85,6 +85,7 @@ func NewOrder(
 	orderNote *string,
 	orderExtra []OrderExtra,
 	deliveryFee *decimal.Decimal,
+	discountAmount decimal.Decimal,
 ) *Order {
 	orderExtraJSON, _ := json.Marshal(orderExtra)
 
@@ -99,5 +100,6 @@ func NewOrder(
 		OrderNote:       orderNote,
 		OrderExtra:      orderExtraJSON,
 		DeliveryFee:     deliveryFee,
+		DiscountAmount:  discountAmount,
 	}
 }

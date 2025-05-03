@@ -315,6 +315,7 @@ func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) 
             p.id,
             p.code,
             p.price,
+            p.is_discountable,
             pct.name AS category_name,
             pt.name  AS name
         FROM products p
