@@ -91,6 +91,7 @@ type ComplexityRoot struct {
 		OrderExtra         func(childComplexity int) int
 		OrderNote          func(childComplexity int) int
 		Payment            func(childComplexity int) int
+		PreferredReadyTime func(childComplexity int) int
 		Status             func(childComplexity int) int
 		TotalPrice         func(childComplexity int) int
 		Type               func(childComplexity int) int
@@ -502,6 +503,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Order.Payment(childComplexity), true
+
+	case "Order.preferredReadyTime":
+		if e.complexity.Order.PreferredReadyTime == nil {
+			break
+		}
+
+		return e.complexity.Order.PreferredReadyTime(childComplexity), true
 
 	case "Order.status":
 		if e.complexity.Order.Status == nil {
@@ -1434,7 +1442,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
-//go:embed "schema/address.graphql" "schema/directive.graphql" "schema/order.graphql" "schema/payment.graphql" "schema/product.graphql" "schema/tracker.graphql" "schema/user.graphql"
+//go:embed "schema/address.graphql" "schema/directive.graphql" "schema/order.graphql" "schema/payment.graphql" "schema/product.graphql" "schema/scalar.graphql" "schema/tracker.graphql" "schema/user.graphql"
 var sourcesFS embed.FS
 
 func sourceData(filename string) string {
@@ -1451,6 +1459,7 @@ var sources = []*ast.Source{
 	{Name: "schema/order.graphql", Input: sourceData("schema/order.graphql"), BuiltIn: false},
 	{Name: "schema/payment.graphql", Input: sourceData("schema/payment.graphql"), BuiltIn: false},
 	{Name: "schema/product.graphql", Input: sourceData("schema/product.graphql"), BuiltIn: false},
+	{Name: "schema/scalar.graphql", Input: sourceData("schema/scalar.graphql"), BuiltIn: false},
 	{Name: "schema/tracker.graphql", Input: sourceData("schema/tracker.graphql"), BuiltIn: false},
 	{Name: "schema/user.graphql", Input: sourceData("schema/user.graphql"), BuiltIn: false},
 }
@@ -2466,6 +2475,8 @@ func (ec *executionContext) fieldContext_Mutation_createOrder(ctx context.Contex
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
+			case "preferredReadyTime":
+				return ec.fieldContext_Order_preferredReadyTime(ctx, field)
 			case "estimatedReadyTime":
 				return ec.fieldContext_Order_estimatedReadyTime(ctx, field)
 			case "addressExtra":
@@ -2579,6 +2590,8 @@ func (ec *executionContext) fieldContext_Mutation_updateOrder(ctx context.Contex
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
+			case "preferredReadyTime":
+				return ec.fieldContext_Order_preferredReadyTime(ctx, field)
 			case "estimatedReadyTime":
 				return ec.fieldContext_Order_estimatedReadyTime(ctx, field)
 			case "addressExtra":
@@ -3312,6 +3325,47 @@ func (ec *executionContext) fieldContext_Order_totalPrice(_ context.Context, fie
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Order_preferredReadyTime(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Order_preferredReadyTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PreferredReadyTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalODateTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Order_preferredReadyTime(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Order",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
 		},
 	}
 	return fc, nil
@@ -6759,6 +6813,8 @@ func (ec *executionContext) fieldContext_Query_orders(_ context.Context, field g
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
+			case "preferredReadyTime":
+				return ec.fieldContext_Order_preferredReadyTime(ctx, field)
 			case "estimatedReadyTime":
 				return ec.fieldContext_Order_estimatedReadyTime(ctx, field)
 			case "addressExtra":
@@ -6861,6 +6917,8 @@ func (ec *executionContext) fieldContext_Query_order(ctx context.Context, field 
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
+			case "preferredReadyTime":
+				return ec.fieldContext_Order_preferredReadyTime(ctx, field)
 			case "estimatedReadyTime":
 				return ec.fieldContext_Order_estimatedReadyTime(ctx, field)
 			case "addressExtra":
@@ -6974,6 +7032,8 @@ func (ec *executionContext) fieldContext_Query_myOrders(ctx context.Context, fie
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
+			case "preferredReadyTime":
+				return ec.fieldContext_Order_preferredReadyTime(ctx, field)
 			case "estimatedReadyTime":
 				return ec.fieldContext_Order_estimatedReadyTime(ctx, field)
 			case "addressExtra":
@@ -7087,6 +7147,8 @@ func (ec *executionContext) fieldContext_Query_myOrder(ctx context.Context, fiel
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
+			case "preferredReadyTime":
+				return ec.fieldContext_Order_preferredReadyTime(ctx, field)
 			case "estimatedReadyTime":
 				return ec.fieldContext_Order_estimatedReadyTime(ctx, field)
 			case "addressExtra":
@@ -7889,6 +7951,8 @@ func (ec *executionContext) fieldContext_Subscription_orderCreated(_ context.Con
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
+			case "preferredReadyTime":
+				return ec.fieldContext_Order_preferredReadyTime(ctx, field)
 			case "estimatedReadyTime":
 				return ec.fieldContext_Order_estimatedReadyTime(ctx, field)
 			case "addressExtra":
@@ -8005,6 +8069,8 @@ func (ec *executionContext) fieldContext_Subscription_orderUpdated(_ context.Con
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
+			case "preferredReadyTime":
+				return ec.fieldContext_Order_preferredReadyTime(ctx, field)
 			case "estimatedReadyTime":
 				return ec.fieldContext_Order_estimatedReadyTime(ctx, field)
 			case "addressExtra":
@@ -8121,6 +8187,8 @@ func (ec *executionContext) fieldContext_Subscription_myOrderUpdated(ctx context
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
+			case "preferredReadyTime":
+				return ec.fieldContext_Order_preferredReadyTime(ctx, field)
 			case "estimatedReadyTime":
 				return ec.fieldContext_Order_estimatedReadyTime(ctx, field)
 			case "addressExtra":
@@ -9173,6 +9241,8 @@ func (ec *executionContext) fieldContext_User_orders(_ context.Context, field gr
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
+			case "preferredReadyTime":
+				return ec.fieldContext_Order_preferredReadyTime(ctx, field)
 			case "estimatedReadyTime":
 				return ec.fieldContext_Order_estimatedReadyTime(ctx, field)
 			case "addressExtra":
@@ -11205,7 +11275,7 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 			it.OrderExtra = data
 		case "preferredReadyTime":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("preferredReadyTime"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			data, err := ec.unmarshalODateTime2ᚖtimeᚐTime(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -11819,6 +11889,8 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "preferredReadyTime":
+			out.Values[i] = ec._Order_preferredReadyTime(ctx, field, obj)
 		case "estimatedReadyTime":
 			out.Values[i] = ec._Order_estimatedReadyTime(ctx, field, obj)
 		case "addressExtra":

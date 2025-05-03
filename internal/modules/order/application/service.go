@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
+	"time"
 	"tsb-service/internal/modules/order/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
 )
@@ -12,7 +13,7 @@ import (
 type OrderService interface {
 	CreateOrder(ctx context.Context, order *domain.Order, orderProducts *[]domain.OrderProductRaw) (*domain.Order, *[]domain.OrderProductRaw, error)
 	GetPaginatedOrders(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*domain.Order, error)
-	UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) error
+	UpdateOrder(ctx context.Context, orderID uuid.UUID, newStatus *domain.OrderStatus, estimatedReadyTime *time.Time) error
 	GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error)
 
 	BatchGetOrderProductsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.OrderProductRaw, error)
@@ -45,22 +46,24 @@ func (s *orderService) GetPaginatedOrders(ctx context.Context, page int, limit i
 	return s.repo.FindPaginated(ctx, page, limit, userID)
 }
 
-func (s *orderService) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, newStatus domain.OrderStatus) error {
+func (s *orderService) UpdateOrder(ctx context.Context, orderID uuid.UUID, newStatus *domain.OrderStatus, estimatedReadyTime *time.Time) error {
 	// Retrieve the order
 	order, _, err := s.repo.FindByID(ctx, orderID)
 	if err != nil {
 		return err
 	}
 
-	// Update the status in the order struct
-	order.OrderStatus = newStatus
-
-	// Update the order in the repository
-	if err := s.repo.Update(ctx, order); err != nil {
-		return err
+	// Check if there a new status
+	if newStatus != nil {
+		order.OrderStatus = *newStatus
 	}
 
-	return nil
+	// Check if there is a new estimated ready time
+	if estimatedReadyTime != nil {
+		order.EstimatedReadyTime = estimatedReadyTime
+	}
+
+	return s.repo.Update(ctx, order)
 }
 
 func (s *orderService) GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error) {
