@@ -68,7 +68,7 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 
 		lines = append(lines, mollie.PaymentLines{
 			Type:        mollie.DiscountProductLine,
-			Description: "Réduction",
+			Description: "Remise à emporter",
 			Quantity:    1,
 			UnitPrice:   amt(neg),
 			TotalAmount: amt(neg),
@@ -127,7 +127,7 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 			City:            a.MunicipalityName,
 			Country:         "BE",
 		}
-		
+
 		paymentRequest.ShippingAddress = address
 		paymentRequest.BillingAddress = address
 	} else {

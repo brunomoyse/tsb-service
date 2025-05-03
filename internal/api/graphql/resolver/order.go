@@ -130,6 +130,19 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		total = total.Add(fee)
 	}
 
+	// Compute total discount if any
+	totalDiscount := decimal.Zero
+	// Loop through the items and check if any discount is applicable (isDiscountable property)
+	if odType == orderDomain.OrderTypePickUp {
+		for _, p := range products {
+			if p.IsDiscountable {
+				// Assuming a discount of 10%
+				discount := p.Price.Mul(decimal.NewFromFloat(0.10))
+				totalDiscount = totalDiscount.Add(discount)
+			}
+		}
+	}
+	
 	var extras []orderDomain.OrderExtra
 	if input.OrderExtra != nil {
 		extras = make([]orderDomain.OrderExtra, len(input.OrderExtra))
@@ -150,6 +163,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		input.OrderNote,
 		extras,
 		&fee,
+		totalDiscount,
 	)
 
 	// 8) Persist via service
