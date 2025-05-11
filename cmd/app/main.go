@@ -4,6 +4,7 @@ import (
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 	"log"
 	"net"
@@ -38,6 +39,11 @@ import (
 )
 
 func main() {
+	// Load .env file
+	if err := godotenv.Load(); err != nil {
+		panic("Warning: .env file not found")
+	}
+
 	// DB connection
 	dbConn, err := db.ConnectDatabase()
 	if err != nil {
