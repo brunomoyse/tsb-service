@@ -244,7 +244,12 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 // UpdateOrder is the resolver for the updateOrder field.
 func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input model.UpdateOrderInput) (*model.Order, error) {
-	err := r.OrderService.UpdateOrder(ctx, id, input.Status, input.EstimatedReadyTime)
+	oldOrder, _, err := r.OrderService.GetOrderByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order: %w", err)
+	}
+
+	err = r.OrderService.UpdateOrder(ctx, id, input.Status, input.EstimatedReadyTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update order status: %w", err)
 	}
@@ -255,8 +260,8 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
 
-	// If new status is "CONFIRMED", send the confirmation email
-	if o.OrderStatus == orderDomain.OrderStatusConfirmed {
+	// If new status is "CONFIRMED" or "PREPARING", send the confirmation email
+	if oldOrder.OrderStatus == orderDomain.OrderStatusPending && (o.OrderStatus == orderDomain.OrderStatusConfirmed || o.OrderStatus == orderDomain.OrderStatusPreparing) {
 		go func() {
 			type OrderProduct struct {
 				Product    productDomain.Product
