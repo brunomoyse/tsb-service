@@ -6,16 +6,10 @@ import (
 	"os"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
 func ConnectDatabase() (*sqlx.DB, error) {
-	// Load .env file
-	if err := godotenv.Load(); err != nil {
-		log.Printf("Warning: error loading .env file: %v", err)
-	}
-
 	// Construct connection string
 	dbHost := os.Getenv("DB_HOST")
 	dbPort := os.Getenv("DB_PORT")
