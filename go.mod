@@ -13,7 +13,7 @@ require (
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.33
-	github.com/sendgrid/sendgrid-go v3.16.0+incompatible
+	github.com/sendgrid/sendgrid-go v3.16.1+incompatible
 	github.com/shopspring/decimal v1.4.0
 	github.com/vektah/gqlparser/v2 v2.5.27
 	golang.org/x/oauth2 v0.30.0
