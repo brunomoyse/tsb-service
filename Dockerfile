@@ -1,24 +1,28 @@
 # Step 1: Use the official Golang image to create a build stage
-FROM golang:1.24-alpine3.21 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine3.22 AS builder
 
-# Step 2: Set the Current Working Directory inside the container
+# Step 2: Set build arguments for cross-compilation
+ARG TARGETOS
+ARG TARGETARCH
+
+# Step 3: Set the Current Working Directory inside the container
 WORKDIR /app
 
-# Step 3: Copy go.mod and go.sum files to the workspace
+# Step 4: Copy go.mod and go.sum files to the workspace
 COPY go.mod go.sum ./
 
-# Step 4: Download all the dependencies
+# Step 5: Download all the dependencies
 RUN go mod download
 
-# Step 5: Copy the source code into the container
+# Step 6: Copy the source code into the container
 COPY . .
 
-# Step 6: Build the Go app
+# Step 7: Build the Go app with cross-compilation support
 ENV GIN_MODE=release
-RUN go build -o tsb-service cmd/app/main.go
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-service cmd/app/main.go
 
 # Step 7: Use base alpine image to create the final image
-FROM alpine:latest
+FROM alpine:3.22
 
 # Step 8: Set the working directory and environment variables
 WORKDIR /app
