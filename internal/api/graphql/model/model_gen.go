@@ -170,6 +170,22 @@ type Street struct {
 type Subscription struct {
 }
 
+type SyncEvent struct {
+	Provider        SyncProvider `json:"provider"`
+	Status          SyncStatus   `json:"status"`
+	Message         string       `json:"message"`
+	CategoriesCount int          `json:"categoriesCount"`
+	ProductsCount   int          `json:"productsCount"`
+	Timestamp       time.Time    `json:"timestamp"`
+}
+
+type SyncMenuResult struct {
+	Success         bool   `json:"success"`
+	Message         string `json:"message"`
+	CategoriesCount int    `json:"categoriesCount"`
+	ProductsCount   int    `json:"productsCount"`
+}
+
 type TeltonikaRecord struct {
 	DeviceImei string         `json:"device_imei"`
 	Timestamp  time.Time      `json:"timestamp"`
@@ -283,6 +299,118 @@ func (e *OrderTypeEnum) UnmarshalJSON(b []byte) error {
 }
 
 func (e OrderTypeEnum) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type SyncProvider string
+
+const (
+	SyncProviderDeliveroo SyncProvider = "DELIVEROO"
+)
+
+var AllSyncProvider = []SyncProvider{
+	SyncProviderDeliveroo,
+}
+
+func (e SyncProvider) IsValid() bool {
+	switch e {
+	case SyncProviderDeliveroo:
+		return true
+	}
+	return false
+}
+
+func (e SyncProvider) String() string {
+	return string(e)
+}
+
+func (e *SyncProvider) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = SyncProvider(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid SyncProvider", str)
+	}
+	return nil
+}
+
+func (e SyncProvider) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *SyncProvider) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e SyncProvider) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type SyncStatus string
+
+const (
+	SyncStatusStarted    SyncStatus = "STARTED"
+	SyncStatusInProgress SyncStatus = "IN_PROGRESS"
+	SyncStatusSuccess    SyncStatus = "SUCCESS"
+	SyncStatusError      SyncStatus = "ERROR"
+)
+
+var AllSyncStatus = []SyncStatus{
+	SyncStatusStarted,
+	SyncStatusInProgress,
+	SyncStatusSuccess,
+	SyncStatusError,
+}
+
+func (e SyncStatus) IsValid() bool {
+	switch e {
+	case SyncStatusStarted, SyncStatusInProgress, SyncStatusSuccess, SyncStatusError:
+		return true
+	}
+	return false
+}
+
+func (e SyncStatus) String() string {
+	return string(e)
+}
+
+func (e *SyncStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = SyncStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid SyncStatus", str)
+	}
+	return nil
+}
+
+func (e SyncStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *SyncStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e SyncStatus) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

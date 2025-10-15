@@ -36,6 +36,7 @@ import (
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/oauth2"
+	"tsb-service/services/deliveroo"
 )
 
 func main() {
@@ -108,6 +109,21 @@ func main() {
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService, broker)
 	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
 
+	// Deliveroo service setup (optional - only if credentials are provided)
+	var deliverooService *deliveroo.Service
+	deliverooClientID := os.Getenv("DELIVEROO_CLIENT_ID")
+	deliverooClientSecret := os.Getenv("DELIVEROO_CLIENT_SECRET")
+	deliverooBrandID := os.Getenv("DELIVEROO_BRAND_ID")
+	deliverooMenuID := os.Getenv("DELIVEROO_MENU_ID")
+
+	if deliverooClientID != "" && deliverooClientSecret != "" && deliverooBrandID != "" && deliverooMenuID != "" {
+		deliverooService = deliveroo.NewService(deliverooClientID, deliverooClientSecret, deliverooBrandID, deliverooMenuID, "EUR")
+		log.Println("Deliveroo service initialized successfully")
+	} else {
+		log.Println("Deliveroo credentials not configured - menu sync will not be available")
+		deliverooService = nil
+	}
+
 	// Gin HTTP setup
 	router := gin.Default()
 	router.RedirectTrailingSlash = true
@@ -140,6 +156,7 @@ func main() {
 	rootResolver := resolver.NewResolver(
 		broker,
 		addressService, orderService, paymentService, productService, userService,
+		deliverooService,
 	)
 	graphqlHandler := resolver.GraphQLHandler(rootResolver)
 	optionalAuth := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)
