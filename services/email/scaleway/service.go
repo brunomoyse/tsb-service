@@ -248,12 +248,12 @@ func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomai
 	// Determine the template path based on the user's language.
 	path := fmt.Sprintf("templates/%s/order-confirmed", lang)
 
-	htmlContent, err := renderOrderConfirmedEmailHTML(path, user, op, order, address)
+	htmlContent, err := renderOrderConfirmedEmailHTML(path, user, op, order, address, lang)
 	if err != nil {
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
 
-	plainTextContent, err := renderOrderConfirmedEmailText(path, user, op, order, address)
+	plainTextContent, err := renderOrderConfirmedEmailText(path, user, op, order, address, lang)
 	if err != nil {
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
