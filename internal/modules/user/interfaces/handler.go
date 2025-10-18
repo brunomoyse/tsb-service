@@ -5,21 +5,19 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/golang-jwt/jwt/v4"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
-	addressApplication "tsb-service/internal/modules/address/application"
-	addressDomain "tsb-service/internal/modules/address/domain"
-
-	"tsb-service/internal/modules/user/application"
-	"tsb-service/internal/modules/user/domain"
-
-	"tsb-service/pkg/oauth2"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
+
+	addressApplication "tsb-service/internal/modules/address/application"
+	addressDomain "tsb-service/internal/modules/address/domain"
+	"tsb-service/internal/modules/user/application"
+	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/oauth2"
 )
 
 type UserHandler struct {
@@ -220,15 +218,7 @@ func (h *UserHandler) LoginHandler(c *gin.Context) {
 func (h *UserHandler) LogoutHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// Ensure POST method for security
-	if c.Request.Method != http.MethodPost {
-		c.JSON(http.StatusMethodNotAllowed, gin.H{
-			"error": "Method not allowed. Use POST for logout",
-		})
-		return
-	}
-
-	// Retrieve and validate refresh token
+	// Retrieve and invalidate refresh token
 	refreshToken, _ := c.Cookie("refresh_token")
 	if refreshToken != "" {
 		if err := h.service.InvalidateRefreshToken(ctx, refreshToken); err != nil {
@@ -238,11 +228,6 @@ func (h *UserHandler) LogoutHandler(c *gin.Context) {
 			})
 			return
 		}
-
-		// Audit log the logout event
-		// if userID, err := h.service.GetUserIDFromToken(ctx, refreshToken); err == nil {
-		// 	log.Printf("User %s logged out", userID)
-		// }
 	}
 
 	// Security headers
@@ -253,35 +238,19 @@ func (h *UserHandler) LogoutHandler(c *gin.Context) {
 	c.Header("X-Frame-Options", "DENY")
 	c.Header("X-XSS-Protection", "1; mode=block")
 
-	// Clear cookies with security headers
+	// Clear authentication cookies
 	domain := ""
 	if parsedURL, err := url.Parse(os.Getenv("APP_BASE_URL")); err == nil {
 		domain = parsedURL.Hostname()
 	}
 
+	c.SetCookie("access_token", "", -1, "/", domain, true, true)
 	c.SetCookie("refresh_token", "", -1, "/", domain, true, true)
-	c.SetCookie("auth", "", -1, "/", domain, true, true)
 
-	// Validate and sanitize redirect URL
-	baseURL := os.Getenv("APP_BASE_URL")
-	parsedBaseURL, err := url.Parse(baseURL)
-	if err != nil || parsedBaseURL.Scheme == "" || parsedBaseURL.Host == "" {
-		log.Printf("Invalid APP_BASE_URL: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Server configuration error. Please contact support.",
-		})
-		return
-	}
-
-	// Construct safe redirect URL
-	redirectURL := parsedBaseURL.String()
-	if !strings.HasSuffix(redirectURL, "/") {
-		redirectURL += "/"
-	}
-	redirectURL += "login"
-
-	// Perform secure redirect
-	c.Redirect(http.StatusSeeOther, redirectURL)
+	// Return success response
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Logged out successfully",
+	})
 }
 
 func (h *UserHandler) GoogleAuthHandler(c *gin.Context) {

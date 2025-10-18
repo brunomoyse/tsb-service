@@ -3,6 +3,8 @@ package infrastructure
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/lib/pq"
 	"tsb-service/internal/modules/user/domain"
 
@@ -112,11 +114,41 @@ func (r *UserRepository) UpdateEmailVerifiedAt(ctx context.Context, userID strin
 	return r.FindByID(ctx, userID)
 }
 
-func (r *UserRepository) InvalidateRefreshToken(ctx context.Context, refreshToken string) error {
-	// @TODO: Implement refresh_tokens in DB + add check in RefreshTokenHandler.
-	// query := `DELETE FROM refresh_tokens WHERE token = $1`
-	// _, err := r.db.ExecContext(ctx, query, refreshToken)
-	return nil
+func (r *UserRepository) StoreRefreshToken(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt int64) error {
+	query := `
+		INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+		VALUES ($1, $2, $3)
+	`
+	expiresAtTime := time.Unix(expiresAt, 0)
+	_, err := r.db.ExecContext(ctx, query, userID, tokenHash, expiresAtTime)
+	return err
+}
+
+func (r *UserRepository) InvalidateRefreshToken(ctx context.Context, tokenHash string) error {
+	query := `
+		UPDATE refresh_tokens
+		SET revoked_at = NOW()
+		WHERE token_hash = $1 AND revoked_at IS NULL
+	`
+	_, err := r.db.ExecContext(ctx, query, tokenHash)
+	return err
+}
+
+func (r *UserRepository) IsRefreshTokenValid(ctx context.Context, tokenHash string) (bool, error) {
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM refresh_tokens
+			WHERE token_hash = $1
+			AND revoked_at IS NULL
+			AND expires_at > NOW()
+		)
+	`
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, tokenHash).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 func (r *UserRepository) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error) {
