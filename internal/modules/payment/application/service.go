@@ -17,6 +17,7 @@ type PaymentService interface {
 	CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct, u userDomain.User, a *addressDomain.Address) (*domain.MolliePayment, error)
 	CreateFullRefund(ctx context.Context, externalPaymentID string) (*mollie.Refund, error)
 	UpdatePaymentStatus(ctx context.Context, externalMolliePaymentID string) error
+	UpdatePaymentStatusByOrderID(ctx context.Context, orderID uuid.UUID, status string) (*domain.MolliePayment, error)
 	GetPaymentByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error)
 	GetExternalPaymentByID(ctx context.Context, externalMolliePaymentID string) (*mollie.Response, *mollie.Payment, error)
 	GetPaymentByExternalID(ctx context.Context, externalMolliePaymentID string) (*domain.MolliePayment, error)
@@ -199,6 +200,19 @@ func (s *paymentService) UpdatePaymentStatus(ctx context.Context, externalMollie
 	}
 
 	return nil
+}
+
+func (s *paymentService) UpdatePaymentStatusByOrderID(ctx context.Context, orderID uuid.UUID, status string) (*domain.MolliePayment, error) {
+	// Convert string status to mollie.OrderStatus
+	mollieStatus := mollie.OrderStatus(status)
+
+	// Update the payment status in the database
+	payment, err := s.repo.UpdateStatusByOrderID(ctx, orderID, mollieStatus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update payment status: %w", err)
+	}
+
+	return payment, nil
 }
 
 func (s *paymentService) GetExternalPaymentByID(ctx context.Context, externalMolliePaymentID string) (*mollie.Response, *mollie.Payment, error) {
