@@ -4,12 +4,32 @@ A comprehensive Go client for Deliveroo Developer APIs with built-in retry logic
 
 ## Features
 
-- **Complete API Coverage**: Orders, Menu, and Authentication APIs
+### Core Infrastructure
+- **Complete Orders API Coverage**: V1 & V2 endpoints with pagination support
+- **Webhook Handling**: Secure HMAC-SHA256 signature verification for order and rider events
 - **Automatic Retry**: Exponential backoff for 429 (rate limit) and 5xx errors
 - **OAuth Token Caching**: Automatic token refresh with expiry management
 - **Idempotency**: Automatic idempotency key generation for safe retries
 - **Thread-Safe**: Concurrent request handling with proper synchronization
 - **Sandbox Support**: Easy toggle between production and sandbox environments
+
+### Orders API
+- **Order Retrieval**: Get single orders or paginated lists with filtering (V2)
+- **Order Management**: Accept, reject, or confirm orders with reasons
+- **Sync Status**: Report POS integration success/failure to Deliveroo
+- **Prep Stages**: Real-time kitchen progress updates (in_kitchen → ready_for_collection → collected)
+- **Webhook Events**: Receive new orders and status updates in real-time
+- **Rider Tracking**: Monitor rider assignment, arrival, and collection
+
+### Menu API
+- **Menu Sync**: Upload and retrieve menus with multi-language support
+- **Category Management**: Organize items into categories
+- **Item Management**: Full product details with modifiers, pricing, and nutritional info
+
+### Webhook Configuration
+- **Order Events Webhook**: Configure URL for new orders and status updates
+- **Rider Events Webhook**: Configure URL for rider status updates
+- **Sites Configuration**: Manage webhook types per site (POS vs Order Events)
 
 ## Installation
 
@@ -95,10 +115,10 @@ func main() {
 
 ### DeliverooAdapter Methods
 
-#### Order Management
+#### Order Management (V1 & V2)
 
 ##### ListOrders
-List orders with optional filtering.
+List orders with optional filtering (deprecated, use GetOrdersV2).
 
 ```go
 orders, err := adapter.ListOrders(ctx, status, since, outletID)
@@ -112,53 +132,133 @@ Parameters:
 
 Returns: `[]Order, error`
 
-##### AcknowledgeOrder
+##### GetOrderV2
+Retrieve a single order by ID (V2 API).
+
+```go
+order, err := adapter.GetOrderV2(ctx, orderID)
+```
+
+Parameters:
+- `ctx`: Context
+- `orderID`: The unique order ID (format: `{market}:{uuid}`)
+
+Returns: `*Order, error`
+
+##### GetOrdersV2
+Retrieve orders for a restaurant with pagination support (V2 API).
+
+```go
+req := GetOrdersV2Request{
+    StartDate:  &startDate,
+    EndDate:    &endDate,
+    LiveOrders: false,
+}
+resp, err := adapter.GetOrdersV2(ctx, brandID, restaurantID, req)
+```
+
+Parameters:
+- `ctx`: Context
+- `brandID`: Your brand ID
+- `restaurantID`: The restaurant/site ID
+- `req`: Request with filters (start_date, end_date, cursor, live_orders)
+
+Returns: `*GetOrdersV2Response, error` (includes pagination cursor)
+
+##### UpdateOrder
+Accept, reject, or confirm an order (V1 PATCH endpoint).
+
+```go
+req := UpdateOrderRequest{
+    Status: OrderUpdateAccepted,
+}
+err := adapter.UpdateOrder(ctx, orderID, req)
+```
+
+Parameters:
+- `ctx`: Context
+- `orderID`: The unique order ID
+- `req`: Update request (status: accepted/rejected/confirmed, optional reject_reason and notes)
+
+Returns: `error`
+
+**Note**: This replaces the deprecated `AcceptOrder` and `AcknowledgeOrder` methods for new integrations.
+
+##### AcknowledgeOrder (Deprecated)
 Acknowledge receipt of an order.
 
 ```go
 err := adapter.AcknowledgeOrder(ctx, orderID)
 ```
 
-Parameters:
-- `ctx`: Context
-- `orderID`: The unique order ID
-
-Returns: `error`
-
-##### AcceptOrder
+##### AcceptOrder (Deprecated)
 Accept an order with preparation time.
 
 ```go
 err := adapter.AcceptOrder(ctx, orderID, prepMinutes)
 ```
 
-Parameters:
-- `ctx`: Context
-- `orderID`: The unique order ID
-- `prepMinutes`: Preparation time in minutes
-
-Returns: `error`
-
-##### UpdateOrderStatus
+##### UpdateOrderStatus (Deprecated)
 Update the status of an order.
 
 ```go
 err := adapter.UpdateOrderStatus(ctx, orderID, status, readyAt, pickupAt)
 ```
 
+#### Sync Status
+
+##### CreateSyncStatus
+Tell Deliveroo if an order was successfully sent to your POS system.
+
+```go
+req := CreateSyncStatusRequest{
+    Status:     SyncStatusSucceeded,
+    OccurredAt: time.Now(),
+}
+err := adapter.CreateSyncStatus(ctx, orderID, req)
+```
+
 Parameters:
 - `ctx`: Context
 - `orderID`: The unique order ID
-- `status`: New order status
-- `readyAt`: Time when order is ready (optional, pass `nil`)
-- `pickupAt`: Time when order was picked up (optional, pass `nil`)
+- `req`: Sync status (succeeded/failed, optional reason and notes)
 
 Returns: `error`
 
+**Important**: Must be called within 3 minutes of receiving an order, or Deliveroo will notify staff to manually enter the order.
+
+#### Preparation Stages
+
+##### CreatePrepStage
+Update the preparation stage of an order for better tracking.
+
+```go
+req := CreatePrepStageRequest{
+    Stage:      PrepStageInKitchen,
+    OccurredAt: time.Now(),
+}
+err := adapter.CreatePrepStage(ctx, orderID, req)
+```
+
+Parameters:
+- `ctx`: Context
+- `orderID`: The unique order ID
+- `req`: Prep stage (in_kitchen, ready_for_collection_soon, ready_for_collection, collected)
+
+Returns: `error`
+
+**Stages**:
+- `PrepStageInKitchen`: Cooking has started
+- `PrepStageReadyForCollectionSoon`: Food is max 60s from being ready
+- `PrepStageReadyForCollection`: Food is cooked and packaged
+- `PrepStageCollected`: Order has been collected
+
+**Optional delay**: Can request 0, 2, 4, 6, 8, or 10 minutes additional prep time with `in_kitchen` stage.
+
 #### Menu Management
 
-##### PullMenu
-Retrieve the current menu from Deliveroo.
+##### PullMenu (V1)
+Retrieve the current menu from Deliveroo (API-created menus only).
 
 ```go
 menu, err := adapter.PullMenu(ctx, brandID, menuID)
@@ -171,7 +271,7 @@ Parameters:
 
 Returns: `*MenuUploadRequest, error`
 
-##### PushMenu
+##### PushMenu (V1)
 Upload/update a menu on Deliveroo.
 
 ```go
@@ -185,6 +285,342 @@ Parameters:
 - `menu`: Menu data structure
 
 Returns: `error`
+
+**Rate Limits**: 1 req/min per site; 10 req/10s for payloads >5MB
+**Size Limit**: 10MB (recommend <9MB for optimal performance)
+
+##### GetMenuV2
+Retrieve menu for a specific site (V2 - works with Menu Manager).
+
+```go
+menu, err := adapter.GetMenuV2(ctx, brandID, siteID)
+```
+
+Parameters:
+- `ctx`: Context
+- `brandID`: Your brand ID
+- `siteID`: Site/location ID
+
+Returns: `*MenuUploadRequest, error`
+
+**Note**: V2 works with both Menu Manager and API-created menus
+
+#### Item Unavailability Management (V2)
+
+##### GetItemUnavailabilitiesV2
+Retrieve currently unavailable items for a site.
+
+```go
+unavailabilities, err := adapter.GetItemUnavailabilitiesV2(ctx, brandID, siteID)
+```
+
+Parameters:
+- `ctx`: Context
+- `brandID`: Your brand ID
+- `siteID`: Site/location ID
+
+Returns: `*GetItemUnavailabilitiesResponse, error`
+
+Response contains:
+- `UnavailableIDs`: Items sold out for the day
+- `HiddenIDs`: Items hidden indefinitely
+
+##### UpdateItemUnavailabilitiesV2
+Update individual item unavailabilities.
+
+```go
+req := UpdateItemUnavailabilitiesRequest{
+    ItemUnavailabilities: []ItemUnavailability{
+        {ItemID: "chicken-breast", Status: StatusUnavailable},
+        {ItemID: "salmon", Status: StatusAvailable},
+    },
+}
+err := adapter.UpdateItemUnavailabilitiesV2(ctx, brandID, siteID, req)
+```
+
+Parameters:
+- `ctx`: Context
+- `brandID`: Your brand ID
+- `siteID`: Site/location ID
+- `req`: Array of item status updates
+
+Returns: `error`
+
+**Statuses**:
+- `StatusAvailable`: Item visible and orderable
+- `StatusUnavailable`: Greyed out, "sold out for the day"
+- `StatusHidden`: Completely hidden from menu
+
+##### ReplaceItemUnavailabilitiesV2
+Replace ALL item unavailabilities (bulk update).
+
+```go
+req := ReplaceAllUnavailabilitiesRequest{
+    UnavailableIDs: []string{"item-1", "item-2"},
+    HiddenIDs:      []string{"item-3"},
+}
+err := adapter.ReplaceItemUnavailabilitiesV2(ctx, brandID, siteID, req)
+```
+
+Parameters:
+- `ctx`: Context
+- `brandID`: Your brand ID
+- `siteID`: Site/location ID
+- `req`: Complete list of unavailable/hidden items
+
+Returns: `error`
+
+**Warning**: This clears all previous unavailabilities
+
+#### PLU (Price Look-Up) Management
+
+##### UpdatePLUs
+Update PLU mappings between menu items and POS system IDs.
+
+```go
+mappings := UpdatePLUsRequest{
+    {ItemID: "burger-classic", PLU: "1001"},
+    {ItemID: "burger-cheese", PLU: "1002"},
+}
+err := adapter.UpdatePLUs(ctx, brandID, menuID, mappings)
+```
+
+Parameters:
+- `ctx`: Context
+- `brandID`: Your brand ID
+- `menuID`: The menu ID
+- `mappings`: Array of item ID to PLU code mappings
+
+Returns: `error`
+
+#### V3 Async Upload (Large Menus)
+
+For menus larger than 5MB, use the async upload workflow:
+
+##### GetMenuUploadURLV3
+Get presigned S3 URL for uploading large menus.
+
+```go
+uploadResp, err := adapter.GetMenuUploadURLV3(ctx, brandID, menuID)
+```
+
+Returns: `*MenuUploadURLResponse, error` (includes S3 upload URL)
+
+##### UploadMenuToS3
+Upload menu directly to S3.
+
+```go
+err := adapter.UploadMenuToS3(ctx, uploadResp.UploadURL, menu)
+```
+
+Parameters:
+- `ctx`: Context
+- `uploadURL`: Presigned S3 URL from GetMenuUploadURLV3
+- `menu`: Menu data
+
+Returns: `error`
+
+##### PublishMenuJob
+Create job to publish menu to live.
+
+```go
+req := PublishMenuJobRequest{
+    Action: JobActionPublishMenuToLive,
+    Params: PublishMenuJobParams{
+        BrandID: brandID,
+        MenuID:  menuID,
+        Version: &version,
+    },
+}
+job, err := adapter.PublishMenuJob(ctx, brandID, req)
+```
+
+Returns: `*JobResponse, error` (includes job ID for tracking)
+
+##### GetJobStatus
+Check status of async job.
+
+```go
+status, err := adapter.GetJobStatus(ctx, brandID, jobID)
+```
+
+Returns: `*JobResponse, error`
+
+**Job Statuses**: `pending`, `running`, `completed`, `failed`
+
+**Complete V3 Workflow**:
+1. Get upload URL → 2. Upload to S3 → 3. Publish job → 4. Poll job status
+
+#### Menu Webhooks
+
+##### GetMenuEventsWebhook
+Retrieve configured menu events webhook URL.
+
+```go
+config, err := adapter.GetMenuEventsWebhook(ctx)
+```
+
+Returns: `*WebhookConfig, error`
+
+##### SetMenuEventsWebhook
+Configure menu events webhook URL.
+
+```go
+err := adapter.SetMenuEventsWebhook(ctx, "https://your-server.com/webhooks/menu-events")
+```
+
+Parameters:
+- `ctx`: Context
+- `webhookURL`: Your webhook endpoint (or empty string to remove)
+
+Returns: `error`
+
+#### Webhook Configuration
+
+##### GetOrderEventsWebhook
+Retrieve the current order events webhook URL.
+
+```go
+config, err := adapter.GetOrderEventsWebhook(ctx)
+```
+
+Returns: `*WebhookConfig, error`
+
+##### SetOrderEventsWebhook
+Configure the order events webhook URL.
+
+```go
+err := adapter.SetOrderEventsWebhook(ctx, "https://your-server.com/webhooks/order-events")
+```
+
+Parameters:
+- `ctx`: Context
+- `webhookURL`: Your webhook endpoint URL (or empty string to remove)
+
+Returns: `error`
+
+##### GetRiderEventsWebhook
+Retrieve the current rider events webhook URL.
+
+```go
+config, err := adapter.GetRiderEventsWebhook(ctx)
+```
+
+Returns: `*WebhookConfig, error`
+
+##### SetRiderEventsWebhook
+Configure the rider events webhook URL.
+
+```go
+err := adapter.SetRiderEventsWebhook(ctx, "https://your-server.com/webhooks/rider-events")
+```
+
+Parameters:
+- `ctx`: Context
+- `webhookURL`: Your webhook endpoint URL (or empty string to remove)
+
+Returns: `error`
+
+##### GetSitesConfig
+Retrieve webhook configuration for all sites under a brand.
+
+```go
+config, err := adapter.GetSitesConfig(ctx, brandID)
+```
+
+Parameters:
+- `ctx`: Context
+- `brandID`: Your brand ID
+
+Returns: `*SitesConfig, error`
+
+##### SetSitesConfig
+Configure which webhook type sites should use.
+
+```go
+config := SitesConfig{
+    Sites: []SiteConfig{
+        {
+            LocationID:           "site-123",
+            OrdersAPIWebhookType: WebhookTypeOrderEvents,
+        },
+    },
+}
+err := adapter.SetSitesConfig(ctx, brandID, config)
+```
+
+Parameters:
+- `ctx`: Context
+- `brandID`: Your brand ID
+- `config`: Sites configuration
+
+Returns: `error`
+
+**Webhook Types**:
+- `WebhookTypePOS`: Legacy POS webhook
+- `WebhookTypeOrderEvents`: New Order Events webhook (recommended)
+- `WebhookTypePOSAndOrderEvents`: Both webhooks
+
+## Webhook Handling
+
+### Setting Up Webhooks
+
+```go
+// Create webhook handler with your secret
+webhookHandler := deliveroo.NewWebhookHandler("your-webhook-secret")
+
+// Setup HTTP handler for order events
+http.HandleFunc("/webhooks/order-events", func(w http.ResponseWriter, r *http.Request) {
+    event, err := webhookHandler.ParseOrderEvent(r)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    // Process the event
+    switch event.Event {
+    case deliveroo.OrderEventNew:
+        // Handle new order
+        order := event.Body.Order
+        log.Printf("New order: %s", order.DisplayID)
+
+    case deliveroo.OrderEventStatusUpdate:
+        // Handle status update
+        order := event.Body.Order
+        log.Printf("Order %s status: %s", order.DisplayID, order.Status)
+    }
+
+    w.WriteHeader(http.StatusOK)
+})
+
+// Setup HTTP handler for rider events
+http.HandleFunc("/webhooks/rider-events", func(w http.ResponseWriter, r *http.Request) {
+    event, err := webhookHandler.ParseRiderEvent(r)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    // Process rider updates
+    for _, rider := range event.Body.Riders {
+        if len(rider.StatusLog) > 0 {
+            status := rider.StatusLog[len(rider.StatusLog)-1]
+            log.Printf("Rider %s: %s", event.Body.OrderID, status.Status)
+        }
+    }
+
+    w.WriteHeader(http.StatusOK)
+})
+```
+
+### Webhook Security
+
+All webhooks are signed with HMAC-SHA256. The `WebhookHandler` automatically verifies signatures using:
+- Header: `x-deliveroo-hmac-sha256` (the signature)
+- Header: `x-deliveroo-sequence-guid` (used in signature generation)
+- Your webhook secret (provided by Deliveroo)
+
+**Never skip signature verification in production!**
 
 ## Order Status Values
 
@@ -226,6 +662,346 @@ if err != nil {
     // All retries exhausted or non-retryable error
     log.Printf("Failed to list orders: %v", err)
     return
+}
+```
+
+## Complete Order Workflow
+
+Here's the recommended end-to-end workflow for processing Deliveroo orders:
+
+### 1. Setup Webhooks
+
+```go
+adapter := deliveroo.NewAdapter(deliveroo.AdapterConfig{
+    ClientID:     os.Getenv("DELIVEROO_CLIENT_ID"),
+    ClientSecret: os.Getenv("DELIVEROO_CLIENT_SECRET"),
+    UseSandbox:   false,
+})
+
+// Configure webhook URLs
+adapter.SetOrderEventsWebhook(ctx, "https://your-server.com/webhooks/order-events")
+adapter.SetRiderEventsWebhook(ctx, "https://your-server.com/webhooks/rider-events")
+```
+
+### 2. Receive Order via Webhook
+
+```go
+webhookHandler := deliveroo.NewWebhookHandler(os.Getenv("DELIVEROO_WEBHOOK_SECRET"))
+
+http.HandleFunc("/webhooks/order-events", func(w http.ResponseWriter, r *http.Request) {
+    event, err := webhookHandler.ParseOrderEvent(r)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    if event.Event == deliveroo.OrderEventNew {
+        order := event.Body.Order
+
+        // Process order asynchronously
+        go processNewOrder(adapter, order)
+    }
+
+    w.WriteHeader(http.StatusOK)
+})
+```
+
+### 3. Process the Order
+
+```go
+func processNewOrder(adapter *deliveroo.DeliverooAdapter, order deliveroo.Order) {
+    ctx := context.Background()
+
+    // Step 1: Send to POS system
+    err := sendToPOS(order)
+
+    // Step 2: Report sync status
+    if err != nil {
+        // Failed to send to POS
+        reason := deliveroo.SyncReasonWebhookFailed
+        notes := err.Error()
+        adapter.CreateSyncStatus(ctx, order.ID, deliveroo.CreateSyncStatusRequest{
+            Status:     deliveroo.SyncStatusFailed,
+            Reason:     &reason,
+            Notes:      &notes,
+            OccurredAt: time.Now(),
+        })
+        return
+    }
+
+    // Successfully sent to POS
+    adapter.CreateSyncStatus(ctx, order.ID, deliveroo.CreateSyncStatusRequest{
+        Status:     deliveroo.SyncStatusSucceeded,
+        OccurredAt: time.Now(),
+    })
+
+    // Step 3: Accept the order
+    adapter.UpdateOrder(ctx, order.ID, deliveroo.UpdateOrderRequest{
+        Status: deliveroo.OrderUpdateAccepted,
+    })
+
+    // Step 4: Update prep stages as cooking progresses
+    updatePrepStages(adapter, order.ID)
+}
+
+func updatePrepStages(adapter *deliveroo.DeliverooAdapter, orderID string) {
+    ctx := context.Background()
+
+    // Cooking started
+    adapter.CreatePrepStage(ctx, orderID, deliveroo.CreatePrepStageRequest{
+        Stage:      deliveroo.PrepStageInKitchen,
+        OccurredAt: time.Now(),
+    })
+
+    // Wait for food to be almost ready (this would be event-driven in real app)
+    time.Sleep(15 * time.Minute)
+
+    // Almost ready (60 seconds out)
+    adapter.CreatePrepStage(ctx, orderID, deliveroo.CreatePrepStageRequest{
+        Stage:      deliveroo.PrepStageReadyForCollectionSoon,
+        OccurredAt: time.Now(),
+    })
+
+    time.Sleep(1 * time.Minute)
+
+    // Ready for pickup
+    adapter.CreatePrepStage(ctx, orderID, deliveroo.CreatePrepStageRequest{
+        Stage:      deliveroo.PrepStageReadyForCollection,
+        OccurredAt: time.Now(),
+    })
+}
+```
+
+### 4. Track Rider Status
+
+```go
+http.HandleFunc("/webhooks/rider-events", func(w http.ResponseWriter, r *http.Request) {
+    event, err := webhookHandler.ParseRiderEvent(r)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    for _, rider := range event.Body.Riders {
+        if len(rider.StatusLog) > 0 {
+            status := rider.StatusLog[len(rider.StatusLog)-1]
+
+            switch status.Status {
+            case deliveroo.RiderAssigned:
+                log.Printf("Rider assigned to order %s, ETA: %s",
+                    event.Body.OrderID, rider.EstimatedArrivalTime)
+
+            case deliveroo.RiderArrived:
+                log.Printf("Rider arrived for order %s", event.Body.OrderID)
+                // Notify kitchen to prepare for handoff
+
+            case deliveroo.RiderConfirmedAtRestaurant:
+                log.Printf("Rider ready to collect order %s", event.Body.OrderID)
+                // Mark as collected
+                adapter.CreatePrepStage(ctx, event.Body.OrderID,
+                    deliveroo.CreatePrepStageRequest{
+                        Stage:      deliveroo.PrepStageCollected,
+                        OccurredAt: time.Now(),
+                    })
+            }
+        }
+    }
+
+    w.WriteHeader(http.StatusOK)
+})
+```
+
+### 5. Handle Scheduled Orders
+
+Scheduled orders require an additional confirmation step:
+
+```go
+// When you receive a scheduled order
+if !order.ASAP && order.ConfirmAt != nil {
+    // Accept the order first
+    adapter.UpdateOrder(ctx, order.ID, deliveroo.UpdateOrderRequest{
+        Status: deliveroo.OrderUpdateAccepted,
+    })
+
+    // Wait until confirm_at time, then confirm
+    waitUntil(*order.ConfirmAt)
+
+    adapter.UpdateOrder(ctx, order.ID, deliveroo.UpdateOrderRequest{
+        Status: deliveroo.OrderUpdateConfirmed,
+    })
+
+    // Now start cooking
+    adapter.CreatePrepStage(ctx, order.ID, deliveroo.CreatePrepStageRequest{
+        Stage:      deliveroo.PrepStageInKitchen,
+        OccurredAt: time.Now(),
+    })
+}
+```
+
+### 6. Reject Orders When Necessary
+
+```go
+// If you can't fulfill the order
+reason := deliveroo.RejectReasonIngredientUnavailable
+notes := "Out of chicken breast"
+
+adapter.UpdateOrder(ctx, order.ID, deliveroo.UpdateOrderRequest{
+    Status:       deliveroo.OrderUpdateRejected,
+    RejectReason: &reason,
+    Notes:        &notes,
+})
+```
+
+## Menu API Usage Examples
+
+### Daily Stock Management
+
+```go
+// Mark items as sold out for the day
+req := deliveroo.UpdateItemUnavailabilitiesRequest{
+    ItemUnavailabilities: []deliveroo.ItemUnavailability{
+        {ItemID: "chicken-breast", Status: deliveroo.StatusUnavailable},
+        {ItemID: "salmon", Status: deliveroo.StatusUnavailable},
+    },
+}
+adapter.UpdateItemUnavailabilitiesV2(ctx, brandID, siteID, req)
+
+// Later: mark them available again when restocked
+restockReq := deliveroo.UpdateItemUnavailabilitiesRequest{
+    ItemUnavailabilities: []deliveroo.ItemUnavailability{
+        {ItemID: "chicken-breast", Status: deliveroo.StatusAvailable},
+    },
+}
+adapter.UpdateItemUnavailabilitiesV2(ctx, brandID, siteID, restockReq)
+```
+
+### Bulk Unavailability Reset (End of Day)
+
+```go
+// Clear all unavailabilities at midnight for new day
+req := deliveroo.ReplaceAllUnavailabilitiesRequest{
+    UnavailableIDs: []string{}, // Clear all sold out items
+    HiddenIDs:      []string{}, // Clear all hidden items
+}
+adapter.ReplaceItemUnavailabilitiesV2(ctx, brandID, siteID, req)
+```
+
+### POS Integration with PLU Codes
+
+```go
+// Synchronize menu items with your POS system
+mappings := deliveroo.UpdatePLUsRequest{
+    {ItemID: "burger-classic", PLU: "1001"},
+    {ItemID: "burger-cheese", PLU: "1002"},
+    {ItemID: "fries-regular", PLU: "2001"},
+}
+adapter.UpdatePLUs(ctx, brandID, menuID, mappings)
+```
+
+### Large Menu Upload (V3 Async)
+
+```go
+// For menus >5MB, use async workflow
+// Step 1: Get S3 upload URL
+uploadResp, _ := adapter.GetMenuUploadURLV3(ctx, brandID, menuID)
+
+// Step 2: Upload directly to S3
+adapter.UploadMenuToS3(ctx, uploadResp.UploadURL, largeMenu)
+
+// Step 3: Publish to live
+publishReq := deliveroo.PublishMenuJobRequest{
+    Action: deliveroo.JobActionPublishMenuToLive,
+    Params: deliveroo.PublishMenuJobParams{
+        BrandID: brandID,
+        MenuID:  menuID,
+        Version: &uploadResp.Version,
+    },
+}
+job, _ := adapter.PublishMenuJob(ctx, brandID, publishReq)
+
+// Step 4: Poll until complete
+for {
+    time.Sleep(5 * time.Second)
+    status, _ := adapter.GetJobStatus(ctx, brandID, job.ID)
+
+    if status.Status == deliveroo.JobStatusCompleted {
+        fmt.Println("✓ Menu published!")
+        break
+    } else if status.Status == deliveroo.JobStatusFailed {
+        fmt.Printf("✗ Failed: %s\n", *status.Error)
+        break
+    }
+}
+```
+
+### Real-Time Inventory Synchronization
+
+```go
+// When an order depletes stock to zero
+func onOrderReceived(itemID string, remainingStock int) {
+    if remainingStock == 0 {
+        // Immediately mark as unavailable
+        req := deliveroo.UpdateItemUnavailabilitiesRequest{
+            ItemUnavailabilities: []deliveroo.ItemUnavailability{
+                {ItemID: itemID, Status: deliveroo.StatusUnavailable},
+            },
+        }
+        adapter.UpdateItemUnavailabilitiesV2(ctx, brandID, siteID, req)
+    }
+}
+```
+
+### Menu Webhook Handling
+
+```go
+// Setup webhook to receive menu upload results
+http.HandleFunc("/webhooks/menu-events", func(w http.ResponseWriter, r *http.Request) {
+    handler := deliveroo.NewWebhookHandler(webhookSecret)
+    event, err := handler.ParseMenuEvent(r)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    result := event.Body.MenuUploadResult
+    if result.HTTPStatus == 200 {
+        log.Printf("✓ Menu %s uploaded successfully", result.MenuID)
+    } else {
+        log.Printf("✗ Menu upload failed: %v", result.Errors)
+    }
+
+    w.WriteHeader(http.StatusOK)
+})
+```
+
+### Automated Inventory Management
+
+```go
+// Daily morning inventory check
+func morningInventoryCheck() {
+    // Get current unavailabilities
+    current, _ := adapter.GetItemUnavailabilitiesV2(ctx, brandID, siteID)
+
+    // Check actual stock levels
+    outOfStock := checkInventory() // Your inventory system
+
+    // Update only changed items
+    var updates []deliveroo.ItemUnavailability
+    for _, itemID := range outOfStock {
+        if !contains(current.UnavailableIDs, itemID) {
+            updates = append(updates, deliveroo.ItemUnavailability{
+                ItemID: itemID,
+                Status: deliveroo.StatusUnavailable,
+            })
+        }
+    }
+
+    if len(updates) > 0 {
+        req := deliveroo.UpdateItemUnavailabilitiesRequest{
+            ItemUnavailabilities: updates,
+        }
+        adapter.UpdateItemUnavailabilitiesV2(ctx, brandID, siteID, req)
+    }
 }
 ```
 

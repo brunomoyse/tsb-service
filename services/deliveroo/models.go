@@ -270,3 +270,369 @@ type EnergyRange struct {
 	Low  int `json:"low"`
 	High int `json:"high"`
 }
+
+// ============================================================================
+// Webhook Models
+// ============================================================================
+
+// OrderEventType represents the type of order event
+type OrderEventType string
+
+const (
+	OrderEventNew          OrderEventType = "order.new"
+	OrderEventStatusUpdate OrderEventType = "order.status_update"
+)
+
+// RiderEventType represents the type of rider event
+type RiderEventType string
+
+const (
+	RiderEventStatusUpdate RiderEventType = "rider.status_update"
+)
+
+// OrderEventWebhook represents an incoming order event webhook
+type OrderEventWebhook struct {
+	Event OrderEventType     `json:"event"`
+	Body  OrderEventBody     `json:"body"`
+}
+
+// OrderEventBody contains the order data in the webhook
+type OrderEventBody struct {
+	Order Order `json:"order"`
+}
+
+// RiderEventWebhook represents an incoming rider event webhook
+type RiderEventWebhook struct {
+	Event RiderEventType `json:"event"`
+	Body  RiderEventBody `json:"body"`
+}
+
+// RiderEventBody contains rider status information
+type RiderEventBody struct {
+	OrderID     string       `json:"order_id"`
+	StackedWith []string     `json:"stacked_with"`
+	Riders      []RiderInfo  `json:"riders"`
+}
+
+// RiderStatus represents rider status values
+type RiderStatus string
+
+const (
+	RiderAssigned              RiderStatus = "rider_assigned"
+	RiderArrived               RiderStatus = "rider_arrived"
+	RiderConfirmedAtRestaurant RiderStatus = "rider_confirmed_at_restaurant"
+	RiderUnassigned            RiderStatus = "rider_unassigned"
+	RiderInTransit             RiderStatus = "rider_in_transit"
+)
+
+// RiderInfo contains rider information
+type RiderInfo struct {
+	EstimatedArrivalTime string             `json:"estimated_arrival_time"`
+	At                   string             `json:"at"`
+	AccuracyInMeters     int                `json:"accuracy_in_meters"`
+	Lat                  float64            `json:"lat"`
+	Lon                  float64            `json:"lon"`
+	FullName             string             `json:"full_name"`
+	ContactNumber        string             `json:"contact_number"`
+	BridgeCode           string             `json:"bridge_code"`
+	BridgeNumber         string             `json:"bridge_number"`
+	StatusLog            []RiderStatusLog   `json:"status_log"`
+}
+
+// RiderStatusLog represents a rider status change entry
+type RiderStatusLog struct {
+	At     string      `json:"at"`
+	Status RiderStatus `json:"status"`
+}
+
+// ============================================================================
+// Sync Status Models
+// ============================================================================
+
+// SyncStatus represents the sync status of an order
+type SyncStatus string
+
+const (
+	SyncStatusSucceeded SyncStatus = "succeeded"
+	SyncStatusFailed    SyncStatus = "failed"
+)
+
+// SyncStatusReason represents why a sync failed
+type SyncStatusReason string
+
+const (
+	SyncReasonPriceMismatched       SyncStatusReason = "price_mismatched"
+	SyncReasonPOSItemIDMismatched   SyncStatusReason = "pos_item_id_mismatched"
+	SyncReasonPOSItemIDNotFound     SyncStatusReason = "pos_item_id_not_found"
+	SyncReasonItemsOutOfStock       SyncStatusReason = "items_out_of_stock"
+	SyncReasonLocationOffline       SyncStatusReason = "location_offline"
+	SyncReasonLocationNotSupported  SyncStatusReason = "location_not_supported"
+	SyncReasonUnsupportedOrderType  SyncStatusReason = "unsupported_order_type"
+	SyncReasonNoWebhookURL          SyncStatusReason = "no_webhook_url"
+	SyncReasonWebhookFailed         SyncStatusReason = "webhook_failed"
+	SyncReasonTimedOut              SyncStatusReason = "timed_out"
+	SyncReasonOther                 SyncStatusReason = "other"
+	SyncReasonNoSyncConfirmation    SyncStatusReason = "no_sync_confirmation"
+)
+
+// CreateSyncStatusRequest represents the request to create a sync status
+type CreateSyncStatusRequest struct {
+	Status     SyncStatus       `json:"status"`
+	Reason     *SyncStatusReason `json:"reason,omitempty"`
+	Notes      *string          `json:"notes,omitempty"`
+	OccurredAt time.Time        `json:"occurred_at"`
+}
+
+// ============================================================================
+// Prep Stage Models
+// ============================================================================
+
+// PrepStage represents the preparation stage of an order
+type PrepStage string
+
+const (
+	PrepStageInKitchen              PrepStage = "in_kitchen"
+	PrepStageReadyForCollection     PrepStage = "ready_for_collection"
+	PrepStageReadyForCollectionSoon PrepStage = "ready_for_collection_soon"
+	PrepStageCollected              PrepStage = "collected"
+)
+
+// CreatePrepStageRequest represents the request to create a prep stage
+type CreatePrepStageRequest struct {
+	Stage      PrepStage `json:"stage"`
+	OccurredAt time.Time `json:"occurred_at"`
+	Delay      *int      `json:"delay,omitempty"` // Optional: 0, 2, 4, 6, 8, or 10
+}
+
+// ============================================================================
+// Update Order Models (PATCH /v1/orders/{order_id})
+// ============================================================================
+
+// OrderUpdateStatus represents the status to update an order to
+type OrderUpdateStatus string
+
+const (
+	OrderUpdateAccepted  OrderUpdateStatus = "accepted"
+	OrderUpdateRejected  OrderUpdateStatus = "rejected"
+	OrderUpdateConfirmed OrderUpdateStatus = "confirmed"
+)
+
+// RejectReason represents why an order was rejected
+type RejectReason string
+
+const (
+	RejectReasonClosingEarly         RejectReason = "closing_early"
+	RejectReasonBusy                 RejectReason = "busy"
+	RejectReasonIngredientUnavailable RejectReason = "ingredient_unavailable"
+	RejectReasonOther                RejectReason = "other"
+)
+
+// UpdateOrderRequest represents the request to update an order status
+type UpdateOrderRequest struct {
+	Status       OrderUpdateStatus `json:"status"`
+	RejectReason *RejectReason     `json:"reject_reason,omitempty"`
+	Notes        *string           `json:"notes,omitempty"`
+}
+
+// ============================================================================
+// V2 Orders API Models
+// ============================================================================
+
+// GetOrdersV2Request represents query parameters for V2 orders list
+type GetOrdersV2Request struct {
+	StartDate  *time.Time
+	EndDate    *time.Time
+	Cursor     *string
+	LiveOrders bool
+}
+
+// GetOrdersV2Response represents the V2 orders list response
+type GetOrdersV2Response struct {
+	Orders []Order `json:"orders"`
+	Next   *string `json:"next,omitempty"`
+}
+
+// ============================================================================
+// Webhook Configuration Models
+// ============================================================================
+
+// WebhookConfig represents webhook configuration
+type WebhookConfig struct {
+	WebhookURL string `json:"webhook_url"`
+}
+
+// WebhookType represents the type of webhook
+type WebhookType string
+
+const (
+	WebhookTypePOS             WebhookType = "POS"
+	WebhookTypeOrderEvents     WebhookType = "ORDER_EVENTS"
+	WebhookTypePOSAndOrderEvents WebhookType = "POS_AND_ORDER_EVENTS"
+)
+
+// SiteConfig represents site webhook configuration
+type SiteConfig struct {
+	LocationID          string      `json:"location_id"`
+	Name                string      `json:"name,omitempty"`
+	OrdersAPIWebhookType WebhookType `json:"orders_api_webhook_type"`
+}
+
+// SitesConfig represents multiple site configurations
+type SitesConfig struct {
+	Sites []SiteConfig `json:"sites"`
+}
+
+// ============================================================================
+// Menu API - Item Unavailability Models
+// ============================================================================
+
+// UnavailabilityStatus represents the availability status of a menu item
+type UnavailabilityStatus string
+
+const (
+	StatusAvailable   UnavailabilityStatus = "available"   // Item is visible and orderable
+	StatusUnavailable UnavailabilityStatus = "unavailable" // Greyed out, "sold out for the day"
+	StatusHidden      UnavailabilityStatus = "hidden"      // Completely hidden from menu
+)
+
+// ItemUnavailability represents the unavailability status of a single item
+type ItemUnavailability struct {
+	ItemID string               `json:"item_id"`
+	Status UnavailabilityStatus `json:"status"`
+}
+
+// UpdateItemUnavailabilitiesRequest represents request to update individual items
+type UpdateItemUnavailabilitiesRequest struct {
+	ItemUnavailabilities []ItemUnavailability `json:"item_unavailabilities"`
+}
+
+// ReplaceAllUnavailabilitiesRequest represents request to replace all unavailabilities
+type ReplaceAllUnavailabilitiesRequest struct {
+	UnavailableIDs []string `json:"unavailable_ids"` // Items sold out for the day
+	HiddenIDs      []string `json:"hidden_ids"`      // Items hidden indefinitely
+}
+
+// GetItemUnavailabilitiesResponse represents response from get unavailabilities
+type GetItemUnavailabilitiesResponse struct {
+	UnavailableIDs []string `json:"unavailable_ids"`
+	HiddenIDs      []string `json:"hidden_ids"`
+}
+
+// ============================================================================
+// Menu API - PLU (Price Look-Up) Models
+// ============================================================================
+
+// PLUMapping represents a mapping between a menu item and a POS PLU code
+type PLUMapping struct {
+	ItemID string `json:"item_id"` // Menu item ID
+	PLU    string `json:"plu"`     // POS system identifier
+}
+
+// UpdatePLUsRequest represents request to update PLU mappings
+type UpdatePLUsRequest []PLUMapping
+
+// UpdatePLUsResponse represents response from PLU update
+type UpdatePLUsResponse struct {
+	Status string `json:"status"` // "OK"
+}
+
+// ============================================================================
+// Menu API - V3 Async Upload Models
+// ============================================================================
+
+// MenuUploadURLResponse represents response from V3 menu upload URL request
+type MenuUploadURLResponse struct {
+	ID        string `json:"id"`         // Menu ID
+	UploadURL string `json:"upload_url"` // Presigned S3 URL
+	Version   string `json:"version"`    // Menu version
+}
+
+// JobAction represents the type of job to execute
+type JobAction string
+
+const (
+	JobActionPublishMenuToLive JobAction = "publish_menu_to_live"
+)
+
+// PublishMenuJobRequest represents request to publish a menu
+type PublishMenuJobRequest struct {
+	Action JobAction               `json:"action"`
+	Params PublishMenuJobParams    `json:"params"`
+}
+
+// PublishMenuJobParams represents parameters for menu publish job
+type PublishMenuJobParams struct {
+	BrandID string  `json:"brand_id"`
+	MenuID  string  `json:"menu_id"`
+	Version *string `json:"version,omitempty"` // Optional
+}
+
+// JobStatus represents the status of an async job
+type JobStatus string
+
+const (
+	JobStatusPending   JobStatus = "pending"
+	JobStatusRunning   JobStatus = "running"
+	JobStatusCompleted JobStatus = "completed"
+	JobStatusFailed    JobStatus = "failed"
+)
+
+// JobResponse represents response from job creation or status check
+type JobResponse struct {
+	ID     string    `json:"id"`
+	Status JobStatus `json:"status"`
+	Action JobAction `json:"action"`
+	Params struct {
+		BrandID string  `json:"brand_id"`
+		MenuID  string  `json:"menu_id"`
+		Version *string `json:"version,omitempty"`
+	} `json:"params"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	Error     *string    `json:"error,omitempty"` // Present if status is failed
+}
+
+// MenuV3Response represents V3 menu metadata response
+type MenuV3Response struct {
+	ID        string `json:"id"`
+	Version   string `json:"version"`
+	UploadURL string `json:"upload_url,omitempty"`
+}
+
+// ============================================================================
+// Menu API - Webhook Models
+// ============================================================================
+
+// MenuEventType represents the type of menu event
+type MenuEventType string
+
+const (
+	MenuEventUploadResult MenuEventType = "menu.upload_result"
+)
+
+// MenuWebhookEvent represents an incoming menu webhook event
+type MenuWebhookEvent struct {
+	Event MenuEventType    `json:"event"`
+	Body  MenuEventBody    `json:"body"`
+}
+
+// MenuEventBody contains the menu event data
+type MenuEventBody struct {
+	MenuUploadResult MenuUploadResult `json:"menu_upload_result"`
+}
+
+// MenuUploadResult represents the result of a menu upload
+type MenuUploadResult struct {
+	HTTPStatus int             `json:"http_status"` // 200=success, 400=invalid, 500=error
+	BrandID    string          `json:"brand_id"`
+	MenuID     string          `json:"menu_id"`
+	SiteIDs    []string        `json:"site_ids"`
+	Errors     []MenuError     `json:"errors,omitempty"`
+}
+
+// MenuError represents an error in menu upload
+type MenuError struct {
+	Code    string  `json:"code"`
+	Message string  `json:"message"`
+	Field   *string `json:"field,omitempty"`
+}
