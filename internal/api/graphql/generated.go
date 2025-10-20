@@ -74,6 +74,7 @@ type ComplexityRoot struct {
 		SyncMenuWithDeliveroo func(childComplexity int) int
 		UpdateMe              func(childComplexity int, input model.UpdateUserInput) int
 		UpdateOrder           func(childComplexity int, id uuid.UUID, input model.UpdateOrderInput) int
+		UpdatePaymentStatus   func(childComplexity int, orderID uuid.UUID, status string) int
 		UpdateProduct         func(childComplexity int, id uuid.UUID, input model.UpdateProductInput) int
 	}
 
@@ -254,6 +255,7 @@ type ComplexityRoot struct {
 type MutationResolver interface {
 	CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error)
 	UpdateOrder(ctx context.Context, id uuid.UUID, input model.UpdateOrderInput) (*model.Order, error)
+	UpdatePaymentStatus(ctx context.Context, orderID uuid.UUID, status string) (*model.Payment, error)
 	CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error)
 	UpdateProduct(ctx context.Context, id uuid.UUID, input model.UpdateProductInput) (*model.Product, error)
 	SyncMenuWithDeliveroo(ctx context.Context) (*model.SyncMenuResult, error)
@@ -416,6 +418,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.UpdateOrder(childComplexity, args["id"].(uuid.UUID), args["input"].(model.UpdateOrderInput)), true
+	case "Mutation.updatePaymentStatus":
+		if e.complexity.Mutation.UpdatePaymentStatus == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updatePaymentStatus_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UpdatePaymentStatus(childComplexity, args["orderId"].(uuid.UUID), args["status"].(string)), true
 	case "Mutation.updateProduct":
 		if e.complexity.Mutation.UpdateProduct == nil {
 			break
@@ -1493,6 +1506,22 @@ func (ec *executionContext) field_Mutation_updateOrder_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_updatePaymentStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "orderId", ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["orderId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "status", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["status"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_updateProduct_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2105,6 +2134,124 @@ func (ec *executionContext) fieldContext_Mutation_updateOrder(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateOrder_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updatePaymentStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_updatePaymentStatus,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().UpdatePaymentStatus(ctx, fc.Args["orderId"].(uuid.UUID), fc.Args["status"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.directives.Admin == nil {
+					var zeroVal *model.Payment
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNPayment2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐPayment,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updatePaymentStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Payment_id(ctx, field)
+			case "resource":
+				return ec.fieldContext_Payment_resource(ctx, field)
+			case "molliePaymentId":
+				return ec.fieldContext_Payment_molliePaymentId(ctx, field)
+			case "status":
+				return ec.fieldContext_Payment_status(ctx, field)
+			case "description":
+				return ec.fieldContext_Payment_description(ctx, field)
+			case "cancelUrl":
+				return ec.fieldContext_Payment_cancelUrl(ctx, field)
+			case "webhookUrl":
+				return ec.fieldContext_Payment_webhookUrl(ctx, field)
+			case "country_code":
+				return ec.fieldContext_Payment_country_code(ctx, field)
+			case "restrictPaymentMethodsToCountry":
+				return ec.fieldContext_Payment_restrictPaymentMethodsToCountry(ctx, field)
+			case "profileId":
+				return ec.fieldContext_Payment_profileId(ctx, field)
+			case "settlementId":
+				return ec.fieldContext_Payment_settlementId(ctx, field)
+			case "orderId":
+				return ec.fieldContext_Payment_orderId(ctx, field)
+			case "isCancelable":
+				return ec.fieldContext_Payment_isCancelable(ctx, field)
+			case "mode":
+				return ec.fieldContext_Payment_mode(ctx, field)
+			case "locale":
+				return ec.fieldContext_Payment_locale(ctx, field)
+			case "method":
+				return ec.fieldContext_Payment_method(ctx, field)
+			case "metadata":
+				return ec.fieldContext_Payment_metadata(ctx, field)
+			case "links":
+				return ec.fieldContext_Payment_links(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Payment_createdAt(ctx, field)
+			case "authorizedAt":
+				return ec.fieldContext_Payment_authorizedAt(ctx, field)
+			case "paidAt":
+				return ec.fieldContext_Payment_paidAt(ctx, field)
+			case "canceledAt":
+				return ec.fieldContext_Payment_canceledAt(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_Payment_expiresAt(ctx, field)
+			case "expiredAt":
+				return ec.fieldContext_Payment_expiredAt(ctx, field)
+			case "failedAt":
+				return ec.fieldContext_Payment_failedAt(ctx, field)
+			case "amount":
+				return ec.fieldContext_Payment_amount(ctx, field)
+			case "amountRefunded":
+				return ec.fieldContext_Payment_amountRefunded(ctx, field)
+			case "amountRemaining":
+				return ec.fieldContext_Payment_amountRemaining(ctx, field)
+			case "amountCaptured":
+				return ec.fieldContext_Payment_amountCaptured(ctx, field)
+			case "amountChargedBack":
+				return ec.fieldContext_Payment_amountChargedBack(ctx, field)
+			case "settlementAmount":
+				return ec.fieldContext_Payment_settlementAmount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Payment", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updatePaymentStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -9282,6 +9429,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "updatePaymentStatus":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updatePaymentStatus(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createProduct":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createProduct(ctx, field)
@@ -11531,6 +11685,20 @@ func (ec *executionContext) unmarshalNOrderTypeEnum2tsbᚑserviceᚋinternalᚋa
 
 func (ec *executionContext) marshalNOrderTypeEnum2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderTypeEnum(ctx context.Context, sel ast.SelectionSet, v model.OrderTypeEnum) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) marshalNPayment2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐPayment(ctx context.Context, sel ast.SelectionSet, v model.Payment) graphql.Marshaler {
+	return ec._Payment(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPayment2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐPayment(ctx context.Context, sel ast.SelectionSet, v *model.Payment) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Payment(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNPosition2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐPosition(ctx context.Context, sel ast.SelectionSet, v model.Position) graphql.Marshaler {

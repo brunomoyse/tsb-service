@@ -78,9 +78,9 @@
         </p>
         <p>
             {{if eq .OrderType "DELIVERY"}}
-            Votre commande sera livrée le <strong>{{.DeliveryTime}}</strong> (heure estimée).
+            Votre commande sera livrée le <strong>{{.EstimatedReadyTime}}</strong> (heure estimée).
             {{else if eq .OrderType "PICKUP"}}
-            Votre commande sera disponible pour retrait le <strong>{{.DeliveryTime}}</strong> (heure estimée).
+            Votre commande sera disponible pour retrait le <strong>{{.EstimatedReadyTime}}</strong> (heure estimée).
             {{end}}
         </p>
         {{if .Address}}

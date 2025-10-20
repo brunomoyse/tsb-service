@@ -31,3 +31,7 @@ type Payment {
     amountChargedBack: Float
     settlementAmount: Float
 }
+
+extend type Mutation {
+    updatePaymentStatus(orderId: ID!, status: String!): Payment! @admin
+}

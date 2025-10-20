@@ -166,13 +166,18 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 
 	// Fetch order products
 	query = `
-		SELECT 
+		SELECT
 			op.product_id,
 			op.quantity,
 			op.unit_price,
 			op.total_price
 		FROM order_product op
+		JOIN products p ON op.product_id = p.id
+		JOIN product_categories pc ON p.category_id = pc.id
+		JOIN product_category_translations pct ON pc.id = pct.product_category_id AND pct.language = 'fr'
+		JOIN product_translations pt ON p.id = pt.product_id AND pt.language = 'fr'
 		WHERE op.order_id = $1
+		ORDER BY p.code ASC, pct.name ASC, pt.name ASC
 	`
 
 	var orderProducts []domain.OrderProductRaw
@@ -239,16 +244,21 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 		return make(map[string][]*domain.OrderProductRaw), nil
 	}
 
-	// build an IN (…) query, expand args with sqlx.In, then rebind for your driver
+	// build an IN (…) query with JOIN to products for sorting, expand args with sqlx.In, then rebind for your driver
 	query, args, err := sqlx.In(`
         SELECT
-            order_id,
-            product_id,
-            quantity,
-            unit_price,
-            total_price
-        FROM order_product
-        WHERE order_id IN (?)
+            op.order_id,
+            op.product_id,
+            op.quantity,
+            op.unit_price,
+            op.total_price
+        FROM order_product op
+        JOIN products p ON op.product_id = p.id
+        JOIN product_categories pc ON p.category_id = pc.id
+        JOIN product_category_translations pct ON pc.id = pct.product_category_id AND pct.language = 'fr'
+        JOIN product_translations pt ON p.id = pt.product_id AND pt.language = 'fr'
+        WHERE op.order_id IN (?)
+        ORDER BY p.code ASC, pct.name ASC, pt.name ASC
     `, orderIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build IN query: %w", err)

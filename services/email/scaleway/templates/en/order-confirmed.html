@@ -95,9 +95,9 @@
         <p>Thank you for ordering at <strong>Tokyo Sushi Bar</strong>! We are pleased to inform you that your order has been confirmed by the restaurant.</p>
         <p>
             {{if eq .OrderType "DELIVERY"}}
-            Your order will be delivered to you at {{.DeliveryTime}}.
+            Your order will be delivered on <strong>{{.EstimatedReadyTime}}</strong> (estimated time).
             {{else if eq .OrderType "PICKUP"}}
-            Your order will be available for pickup at {{.DeliveryTime}}.
+            Your order will be available for pickup on <strong>{{.EstimatedReadyTime}}</strong> (estimated time).
             {{end}}
         </p>
 
