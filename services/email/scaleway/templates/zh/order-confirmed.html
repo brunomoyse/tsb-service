@@ -76,9 +76,9 @@
         <p>感谢您在 <strong>Tokyo Sushi Bar</strong> 下单！我们很高兴地通知您，您的订单已由餐厅确认。</p>
         <p>
             {{if eq .OrderType "DELIVERY"}}
-            您的订单将于 {{.DeliveryTime}} 送达。
+            您的订单将于 <strong>{{.EstimatedReadyTime}}</strong> 送达（预计时间）。
             {{else if eq .OrderType "PICKUP"}}
-            您的订单将于 {{.DeliveryTime}} 可自取。
+            您的订单将于 <strong>{{.EstimatedReadyTime}}</strong> 可自取（预计时间）。
             {{end}}
         </p>
         <h3>订单摘要</h3>

@@ -3,20 +3,23 @@ package application
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"log"
 	"os"
 	"time"
+
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
+	"golang.org/x/crypto/argon2"
+
 	"tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/utils"
 	es "tsb-service/services/email/scaleway"
-
-	"github.com/golang-jwt/jwt/v4"
-	"golang.org/x/crypto/argon2"
 )
 
 type UserService interface {
@@ -141,6 +144,13 @@ func (s *userService) Login(ctx context.Context, email string, password string, 
 		return nil, nil, nil, err
 	}
 
+	// Store refresh token hash
+	tokenHash := hashToken(refreshToken)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour).Unix()
+	if err := s.repo.StoreRefreshToken(ctx, user.ID, tokenHash, expiresAt); err != nil {
+		log.Printf("Failed to store refresh token: %v", err)
+	}
+
 	return user, &accessToken, &refreshToken, nil
 }
 
@@ -149,7 +159,8 @@ func (s *userService) InvalidateRefreshToken(ctx context.Context, refreshToken s
 		return fmt.Errorf("refresh token is empty")
 	}
 
-	if err := s.repo.InvalidateRefreshToken(ctx, refreshToken); err != nil {
+	tokenHash := hashToken(refreshToken)
+	if err := s.repo.InvalidateRefreshToken(ctx, tokenHash); err != nil {
 		return fmt.Errorf("failed to invalidate refresh token: %w", err)
 	}
 
@@ -169,7 +180,19 @@ func (s *userService) GetUserByGoogleID(ctx context.Context, googleID string) (*
 }
 
 func (s *userService) GenerateTokens(ctx context.Context, user domain.User, jwtSecret string) (string, string, error) {
-	return generateTokens(user, jwtSecret)
+	accessToken, refreshToken, err := generateTokens(user, jwtSecret)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Store refresh token hash
+	tokenHash := hashToken(refreshToken)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour).Unix()
+	if err := s.repo.StoreRefreshToken(ctx, user.ID, tokenHash, expiresAt); err != nil {
+		log.Printf("Failed to store refresh token: %v", err)
+	}
+
+	return accessToken, refreshToken, nil
 }
 
 func (s *userService) UpdateGoogleID(ctx context.Context, userID string, googleID string) (*domain.User, error) {
@@ -214,16 +237,21 @@ func (s *userService) RefreshToken(
 	oldRefreshToken string,
 	jwtSecret string,
 ) (string, string, *domain.User, error) {
-	// 1. Validate refresh token
+	// 1. Validate refresh token JWT
 	claims, err := s.validateRefreshToken(oldRefreshToken, jwtSecret)
 	if err != nil {
 		return "", "", nil, err
 	}
 
-	// @TODO: 2. Check token revocation
-	//if s.isTokenRevoked(claims.ID) {
-	//	return "", "", nil, fmt.Errorf("token revoked")
-	//}
+	// 2. Check token revocation in database
+	tokenHash := hashToken(oldRefreshToken)
+	isValid, err := s.repo.IsRefreshTokenValid(ctx, tokenHash)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to validate token: %w", err)
+	}
+	if !isValid {
+		return "", "", nil, fmt.Errorf("token revoked or expired")
+	}
 
 	// 3. Get user
 	user, err := s.repo.FindByID(ctx, claims.Subject)
@@ -237,11 +265,17 @@ func (s *userService) RefreshToken(
 		return "", "", nil, fmt.Errorf("failed to generate tokens")
 	}
 
-	// @TODO: 5. Revoke old refresh token
-	// s.revokeToken(claims.ID)
+	// 5. Revoke old refresh token
+	if err := s.repo.InvalidateRefreshToken(ctx, tokenHash); err != nil {
+		log.Printf("Failed to revoke old refresh token: %v", err)
+	}
 
-	// @TODO: 6. Store new refresh token
-	//s.storeRefreshToken(refreshToken)
+	// 6. Store new refresh token
+	newTokenHash := hashToken(refreshToken)
+	expiresAt := time.Now().Add(7 * 24 * time.Hour).Unix()
+	if err := s.repo.StoreRefreshToken(ctx, user.ID, newTokenHash, expiresAt); err != nil {
+		log.Printf("Failed to store new refresh token: %v", err)
+	}
 
 	return accessToken, refreshToken, user, nil
 }
@@ -377,16 +411,7 @@ func generateEmailVerificationJWT(user domain.User, jwtSecret string) (string, e
 	return tokenString, nil
 }
 
-// @TODO
-//func (s *userService) storeRefreshToken(token string) error {
-//	claims, _ := parseTokenWithoutValidation(token) // Extract claims
-//	return s.repo.StoreToken(claims.ID, claims.Subject, claims.ExpiresAt)
-//}
-//
-//func (s *userService) isTokenRevoked(tokenID string) bool {
-//	return s.repo.IsTokenRevoked(tokenID)
-//}
-//
-//func (s *userService) revokeToken(tokenID string) {
-//	s.repo.RevokeToken(tokenID)
-//}
+func hashToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(hash[:])
+}

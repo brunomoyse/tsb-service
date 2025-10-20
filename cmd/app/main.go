@@ -165,12 +165,12 @@ func main() {
 	api.GET("/graphql", middleware.AuthMiddleware(jwtSecret), graphqlHandler)
 
 	// Other endpoints
-	api.POST("payments/webhook", paymentHandler.UpdatePaymentStatusHandler)
+	api.POST("/payments/webhook", paymentHandler.UpdatePaymentStatusHandler)
 	api.POST("/login", userHandler.LoginHandler)
 	api.POST("/register", userHandler.RegisterHandler)
 	api.GET("/verify", userHandler.VerifyEmailHandler)
 	api.POST("/tokens/refresh", userHandler.RefreshTokenHandler)
-	api.GET("/tokens/revoke", userHandler.LogoutHandler)
+	api.POST("/logout", userHandler.LogoutHandler)
 	api.GET("/oauth/google", userHandler.GoogleAuthHandler)
 	api.GET("/oauth/google/callback", userHandler.GoogleAuthCallbackHandler)
 

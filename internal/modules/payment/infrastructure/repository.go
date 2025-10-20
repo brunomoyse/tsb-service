@@ -245,6 +245,23 @@ func (r *PaymentRepository) RefreshStatus(ctx context.Context, externalPayment m
 	return &orderID, nil
 }
 
+func (r *PaymentRepository) UpdateStatusByOrderID(ctx context.Context, orderID uuid.UUID, status mollie.OrderStatus) (*domain.MolliePayment, error) {
+	const query = `
+		UPDATE mollie_payments
+		SET status = $1
+		WHERE order_id = $2
+		RETURNING *;
+	`
+
+	var payment domain.MolliePayment
+	err := r.db.GetContext(ctx, &payment, query, status, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update payment status by order ID: %w", err)
+	}
+
+	return &payment, nil
+}
+
 func (r *PaymentRepository) FindByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error) {
 	const query = `
 		SELECT *
