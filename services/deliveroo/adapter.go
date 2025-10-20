@@ -433,3 +433,553 @@ func (a *DeliverooAdapter) PushMenu(ctx context.Context, brandID, menuID string,
 
 	return nil
 }
+
+// ============================================================================
+// Additional Order Management Endpoints
+// ============================================================================
+
+// CreateSyncStatus tells Deliveroo if an order was successfully sent to the POS system
+func (a *DeliverooAdapter) CreateSyncStatus(ctx context.Context, orderID string, req CreateSyncStatusRequest) error {
+	url := fmt.Sprintf("%s/v1/orders/%s/sync_status", a.getBaseURL("order"), orderID)
+
+	resp, err := a.doRequest(ctx, http.MethodPost, url, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create sync status: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("create sync status failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// CreatePrepStage updates the preparation stage of an order
+func (a *DeliverooAdapter) CreatePrepStage(ctx context.Context, orderID string, req CreatePrepStageRequest) error {
+	url := fmt.Sprintf("%s/v1/orders/%s/prep_stage", a.getBaseURL("order"), orderID)
+
+	resp, err := a.doRequest(ctx, http.MethodPost, url, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create prep stage: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("create prep stage failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// UpdateOrder accepts, rejects, or confirms an order (V1 PATCH endpoint)
+func (a *DeliverooAdapter) UpdateOrder(ctx context.Context, orderID string, req UpdateOrderRequest) error {
+	url := fmt.Sprintf("%s/v1/orders/%s", a.getBaseURL("order"), orderID)
+
+	resp, err := a.doRequest(ctx, http.MethodPatch, url, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to update order: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("update order failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// GetOrderV2 retrieves a single order by ID using V2 API
+func (a *DeliverooAdapter) GetOrderV2(ctx context.Context, orderID string) (*Order, error) {
+	url := fmt.Sprintf("%s/v2/orders/%s", a.getBaseURL("order"), orderID)
+
+	resp, err := a.doRequest(ctx, http.MethodGet, url, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get order failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var order Order
+	if err := json.NewDecoder(resp.Body).Decode(&order); err != nil {
+		return nil, fmt.Errorf("failed to decode order response: %w", err)
+	}
+
+	return &order, nil
+}
+
+// GetOrdersV2 retrieves orders for a restaurant with pagination support
+func (a *DeliverooAdapter) GetOrdersV2(ctx context.Context, brandID, restaurantID string, req GetOrdersV2Request) (*GetOrdersV2Response, error) {
+	url := fmt.Sprintf("%s/v2/brand/%s/restaurant/%s/orders", a.getBaseURL("order"), brandID, restaurantID)
+
+	// Build query parameters
+	queryParams := ""
+	if req.StartDate != nil {
+		queryParams += fmt.Sprintf("?start_date=%s", req.StartDate.Format(time.RFC3339))
+	}
+	if req.EndDate != nil {
+		if queryParams == "" {
+			queryParams += "?"
+		} else {
+			queryParams += "&"
+		}
+		queryParams += fmt.Sprintf("end_date=%s", req.EndDate.Format(time.RFC3339))
+	}
+	if req.Cursor != nil {
+		if queryParams == "" {
+			queryParams += "?"
+		} else {
+			queryParams += "&"
+		}
+		queryParams += fmt.Sprintf("cursor=%s", *req.Cursor)
+	}
+	if req.LiveOrders {
+		if queryParams == "" {
+			queryParams += "?"
+		} else {
+			queryParams += "&"
+		}
+		queryParams += "live_orders=true"
+	}
+
+	url += queryParams
+
+	resp, err := a.doRequest(ctx, http.MethodGet, url, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get orders: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get orders failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var ordersResp GetOrdersV2Response
+	if err := json.NewDecoder(resp.Body).Decode(&ordersResp); err != nil {
+		return nil, fmt.Errorf("failed to decode orders response: %w", err)
+	}
+
+	return &ordersResp, nil
+}
+
+// ============================================================================
+// Webhook Configuration Endpoints
+// ============================================================================
+
+// GetOrderEventsWebhook retrieves the order events webhook URL
+func (a *DeliverooAdapter) GetOrderEventsWebhook(ctx context.Context) (*WebhookConfig, error) {
+	url := fmt.Sprintf("%s/v1/integrator/webhooks/order-events", a.getBaseURL("order"))
+
+	resp, err := a.doRequest(ctx, http.MethodGet, url, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order events webhook: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get order events webhook failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var config WebhookConfig
+	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return nil, fmt.Errorf("failed to decode webhook config response: %w", err)
+	}
+
+	return &config, nil
+}
+
+// SetOrderEventsWebhook sets the order events webhook URL
+func (a *DeliverooAdapter) SetOrderEventsWebhook(ctx context.Context, webhookURL string) error {
+	url := fmt.Sprintf("%s/v1/integrator/webhooks/order-events", a.getBaseURL("order"))
+
+	req := WebhookConfig{WebhookURL: webhookURL}
+
+	resp, err := a.doRequest(ctx, http.MethodPut, url, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to set order events webhook: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("set order events webhook failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// GetRiderEventsWebhook retrieves the rider events webhook URL
+func (a *DeliverooAdapter) GetRiderEventsWebhook(ctx context.Context) (*WebhookConfig, error) {
+	url := fmt.Sprintf("%s/v1/integrator/webhooks/rider-events", a.getBaseURL("order"))
+
+	resp, err := a.doRequest(ctx, http.MethodGet, url, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rider events webhook: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get rider events webhook failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var config WebhookConfig
+	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return nil, fmt.Errorf("failed to decode webhook config response: %w", err)
+	}
+
+	return &config, nil
+}
+
+// SetRiderEventsWebhook sets the rider events webhook URL
+func (a *DeliverooAdapter) SetRiderEventsWebhook(ctx context.Context, webhookURL string) error {
+	url := fmt.Sprintf("%s/v1/integrator/webhooks/rider-events", a.getBaseURL("order"))
+
+	req := WebhookConfig{WebhookURL: webhookURL}
+
+	resp, err := a.doRequest(ctx, http.MethodPut, url, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to set rider events webhook: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("set rider events webhook failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// GetSitesConfig retrieves the webhook configuration for sites under a brand
+func (a *DeliverooAdapter) GetSitesConfig(ctx context.Context, brandID string) (*SitesConfig, error) {
+	url := fmt.Sprintf("%s/v1/integrator/brands/%s/sites-config", a.getBaseURL("order"), brandID)
+
+	resp, err := a.doRequest(ctx, http.MethodGet, url, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sites config: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get sites config failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var config SitesConfig
+	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return nil, fmt.Errorf("failed to decode sites config response: %w", err)
+	}
+
+	return &config, nil
+}
+
+// SetSitesConfig sets the webhook configuration for sites under a brand
+func (a *DeliverooAdapter) SetSitesConfig(ctx context.Context, brandID string, config SitesConfig) error {
+	url := fmt.Sprintf("%s/v1/integrator/brands/%s/sites-config", a.getBaseURL("order"), brandID)
+
+	resp, err := a.doRequest(ctx, http.MethodPut, url, config, nil)
+	if err != nil {
+		return fmt.Errorf("failed to set sites config: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("set sites config failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// ============================================================================
+// Menu API - V2 Item Unavailability Endpoints
+// ============================================================================
+
+// GetItemUnavailabilitiesV2 retrieves unavailable items for a site (V2)
+func (a *DeliverooAdapter) GetItemUnavailabilitiesV2(ctx context.Context, brandID, siteID string) (*GetItemUnavailabilitiesResponse, error) {
+	url := fmt.Sprintf("%s/v2/brands/%s/sites/%s/menu/item_unavailabilities", a.getBaseURL("menu"), brandID, siteID)
+
+	resp, err := a.doRequest(ctx, http.MethodGet, url, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get item unavailabilities: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get item unavailabilities failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var unavailabilities GetItemUnavailabilitiesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&unavailabilities); err != nil {
+		return nil, fmt.Errorf("failed to decode unavailabilities response: %w", err)
+	}
+
+	return &unavailabilities, nil
+}
+
+// ReplaceItemUnavailabilitiesV2 replaces ALL item unavailabilities for a site (V2)
+func (a *DeliverooAdapter) ReplaceItemUnavailabilitiesV2(ctx context.Context, brandID, siteID string, req ReplaceAllUnavailabilitiesRequest) error {
+	url := fmt.Sprintf("%s/v2/brands/%s/sites/%s/menu/item_unavailabilities", a.getBaseURL("menu"), brandID, siteID)
+
+	resp, err := a.doRequest(ctx, http.MethodPut, url, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to replace item unavailabilities: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("replace item unavailabilities failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// UpdateItemUnavailabilitiesV2 updates individual item unavailabilities for a site (V2)
+func (a *DeliverooAdapter) UpdateItemUnavailabilitiesV2(ctx context.Context, brandID, siteID string, req UpdateItemUnavailabilitiesRequest) error {
+	url := fmt.Sprintf("%s/v2/brands/%s/sites/%s/menu/item_unavailabilities", a.getBaseURL("menu"), brandID, siteID)
+
+	resp, err := a.doRequest(ctx, http.MethodPost, url, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to update item unavailabilities: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("update item unavailabilities failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// ============================================================================
+// Menu API - PLU Management
+// ============================================================================
+
+// UpdatePLUs updates PLU (Price Look-Up) mappings for menu items
+func (a *DeliverooAdapter) UpdatePLUs(ctx context.Context, brandID, menuID string, mappings UpdatePLUsRequest) error {
+	url := fmt.Sprintf("%s/v1/brands/%s/menus/%s/plus", a.getBaseURL("menu"), brandID, menuID)
+
+	resp, err := a.doRequest(ctx, http.MethodPost, url, mappings, nil)
+	if err != nil {
+		return fmt.Errorf("failed to update PLUs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("update PLUs failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// ============================================================================
+// Menu API - V2 Menu Retrieval
+// ============================================================================
+
+// GetMenuV2 retrieves menu for a specific site (V2 - works with Menu Manager)
+func (a *DeliverooAdapter) GetMenuV2(ctx context.Context, brandID, siteID string) (*MenuUploadRequest, error) {
+	url := fmt.Sprintf("%s/v2/brands/%s/sites/%s/menu", a.getBaseURL("menu"), brandID, siteID)
+
+	resp, err := a.doRequest(ctx, http.MethodGet, url, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get menu: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get menu failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var menu MenuUploadRequest
+	if err := json.NewDecoder(resp.Body).Decode(&menu); err != nil {
+		return nil, fmt.Errorf("failed to decode menu response: %w", err)
+	}
+
+	return &menu, nil
+}
+
+// ============================================================================
+// Menu API - V3 Async Upload
+// ============================================================================
+
+// GetMenuUploadURLV3 gets a presigned S3 URL for uploading large menus
+func (a *DeliverooAdapter) GetMenuUploadURLV3(ctx context.Context, brandID, menuID string) (*MenuUploadURLResponse, error) {
+	url := fmt.Sprintf("%s/v3/brands/%s/menus/%s", a.getBaseURL("menu"), brandID, menuID)
+
+	resp, err := a.doRequest(ctx, http.MethodPut, url, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get menu upload URL: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get menu upload URL failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var uploadResp MenuUploadURLResponse
+	if err := json.NewDecoder(resp.Body).Decode(&uploadResp); err != nil {
+		return nil, fmt.Errorf("failed to decode upload URL response: %w", err)
+	}
+
+	return &uploadResp, nil
+}
+
+// GetMenuV3 fetches menu metadata from V3 API
+func (a *DeliverooAdapter) GetMenuV3(ctx context.Context, brandID, menuID string) (*MenuV3Response, error) {
+	url := fmt.Sprintf("%s/v3/brands/%s/menus/%s", a.getBaseURL("menu"), brandID, menuID)
+
+	resp, err := a.doRequest(ctx, http.MethodGet, url, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get menu V3: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get menu V3 failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var menu MenuV3Response
+	if err := json.NewDecoder(resp.Body).Decode(&menu); err != nil {
+		return nil, fmt.Errorf("failed to decode menu V3 response: %w", err)
+	}
+
+	return &menu, nil
+}
+
+// PublishMenuJob creates a job to publish menu to live
+func (a *DeliverooAdapter) PublishMenuJob(ctx context.Context, brandID string, req PublishMenuJobRequest) (*JobResponse, error) {
+	url := fmt.Sprintf("%s/v3/brands/%s/jobs", a.getBaseURL("menu"), brandID)
+
+	resp, err := a.doRequest(ctx, http.MethodPost, url, req, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create publish job: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("create publish job failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var jobResp JobResponse
+	if err := json.NewDecoder(resp.Body).Decode(&jobResp); err != nil {
+		return nil, fmt.Errorf("failed to decode job response: %w", err)
+	}
+
+	return &jobResp, nil
+}
+
+// GetJobStatus checks the status of an async job
+func (a *DeliverooAdapter) GetJobStatus(ctx context.Context, brandID, jobID string) (*JobResponse, error) {
+	url := fmt.Sprintf("%s/v3/brands/%s/jobs/%s", a.getBaseURL("menu"), brandID, jobID)
+
+	resp, err := a.doRequest(ctx, http.MethodGet, url, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get job status: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get job status failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var jobResp JobResponse
+	if err := json.NewDecoder(resp.Body).Decode(&jobResp); err != nil {
+		return nil, fmt.Errorf("failed to decode job status response: %w", err)
+	}
+
+	return &jobResp, nil
+}
+
+// UploadMenuToS3 uploads menu data directly to S3 presigned URL
+func (a *DeliverooAdapter) UploadMenuToS3(ctx context.Context, uploadURL string, menu *MenuUploadRequest) error {
+	jsonData, err := json.Marshal(menu)
+	if err != nil {
+		return fmt.Errorf("failed to marshal menu: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create S3 upload request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to upload to S3: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("S3 upload failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// ============================================================================
+// Menu API - Webhook Configuration
+// ============================================================================
+
+// GetMenuEventsWebhook retrieves the menu events webhook URL
+func (a *DeliverooAdapter) GetMenuEventsWebhook(ctx context.Context) (*WebhookConfig, error) {
+	url := fmt.Sprintf("%s/v1/integrator/webhooks/menu-events", a.getBaseURL("menu"))
+
+	resp, err := a.doRequest(ctx, http.MethodGet, url, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get menu events webhook: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get menu events webhook failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var config WebhookConfig
+	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return nil, fmt.Errorf("failed to decode webhook config response: %w", err)
+	}
+
+	return &config, nil
+}
+
+// SetMenuEventsWebhook sets the menu events webhook URL
+func (a *DeliverooAdapter) SetMenuEventsWebhook(ctx context.Context, webhookURL string) error {
+	url := fmt.Sprintf("%s/v1/integrator/webhooks/menu-events", a.getBaseURL("menu"))
+
+	req := WebhookConfig{WebhookURL: webhookURL}
+
+	resp, err := a.doRequest(ctx, http.MethodPut, url, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to set menu events webhook: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("set menu events webhook failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
