@@ -318,22 +318,22 @@ type ProductToCreate struct {
 }
 
 type ProductToDelete struct {
-	ID     uuid.UUID `json:"id"`
-	Name   string    `json:"name"`
-	Reason string    `json:"reason"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Reason string `json:"reason"`
 }
 
 type ProductToUpdate struct {
-	ID                  uuid.UUID `json:"id"`
-	Name                string    `json:"name"`
-	CurrentPrice        float64   `json:"currentPrice"`
-	NewPrice            *float64  `json:"newPrice,omitempty"`
-	CurrentDescription  *string   `json:"currentDescription,omitempty"`
-	NewDescription      *string   `json:"newDescription,omitempty"`
-	CurrentAvailability bool      `json:"currentAvailability"`
-	NewAvailability     *bool     `json:"newAvailability,omitempty"`
-	CurrentVisibility   bool      `json:"currentVisibility"`
-	NewVisibility       *bool     `json:"newVisibility,omitempty"`
+	ID                  string   `json:"id"`
+	Name                string   `json:"name"`
+	CurrentPrice        float64  `json:"currentPrice"`
+	NewPrice            *float64 `json:"newPrice,omitempty"`
+	CurrentDescription  *string  `json:"currentDescription,omitempty"`
+	NewDescription      *string  `json:"newDescription,omitempty"`
+	CurrentAvailability bool     `json:"currentAvailability"`
+	NewAvailability     *bool    `json:"newAvailability,omitempty"`
+	CurrentVisibility   bool     `json:"currentVisibility"`
+	NewVisibility       *bool    `json:"newVisibility,omitempty"`
 }
 
 type Query struct {

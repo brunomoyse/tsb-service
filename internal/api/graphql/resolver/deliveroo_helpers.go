@@ -257,9 +257,10 @@ func convertServicePreviewToGraphQL(preview *deliveroo.MenuSyncPreview) *model.M
 		}
 	}
 
+	// Convert items to update
 	for i, item := range preview.ToUpdate {
 		result.ToUpdate[i] = &model.ProductToUpdate{
-			ID:                  uuid.MustParse(item.ID),
+			ID:                  item.ID,
 			Name:                item.Name,
 			CurrentPrice:        item.CurrentPrice,
 			NewPrice:            item.NewPrice,
@@ -272,9 +273,10 @@ func convertServicePreviewToGraphQL(preview *deliveroo.MenuSyncPreview) *model.M
 		}
 	}
 
+	// Convert items to delete
 	for i, item := range preview.ToDelete {
 		result.ToDelete[i] = &model.ProductToDelete{
-			ID:     uuid.MustParse(item.ID),
+			ID:     item.ID,
 			Name:   item.Name,
 			Reason: item.Reason,
 		}

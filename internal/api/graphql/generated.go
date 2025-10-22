@@ -10088,7 +10088,7 @@ func (ec *executionContext) _ProductToDelete_id(ctx context.Context, field graph
 			return obj.ID, nil
 		},
 		nil,
-		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		ec.marshalNString2string,
 		true,
 		true,
 	)
@@ -10101,7 +10101,7 @@ func (ec *executionContext) fieldContext_ProductToDelete_id(_ context.Context, f
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -10175,7 +10175,7 @@ func (ec *executionContext) _ProductToUpdate_id(ctx context.Context, field graph
 			return obj.ID, nil
 		},
 		nil,
-		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		ec.marshalNString2string,
 		true,
 		true,
 	)
@@ -10188,7 +10188,7 @@ func (ec *executionContext) fieldContext_ProductToUpdate_id(_ context.Context, f
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
