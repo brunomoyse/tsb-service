@@ -19,11 +19,13 @@ const (
 	AuthBaseURL       = "https://auth.developers.deliveroo.com"
 	OrderAPIBaseURL   = "https://api.developers.deliveroo.com/order"
 	MenuAPIBaseURL    = "https://api.developers.deliveroo.com/menu"
+	SiteAPIBaseURL    = "https://api.developers.deliveroo.com/site"
 
 	// Sandbox URLs (can be toggled via config)
 	AuthSandboxURL    = "https://auth-sandbox.developers.deliveroo.com"
 	OrderSandboxURL   = "https://api-sandbox.developers.deliveroo.com/order"
 	MenuSandboxURL    = "https://api-sandbox.developers.deliveroo.com/menu"
+	SiteSandboxURL    = "https://api-sandbox.developers.deliveroo.com/site"
 
 	// Retry configuration
 	MaxRetries        = 3
@@ -83,6 +85,8 @@ func (a *DeliverooAdapter) getBaseURL(apiType string) string {
 			return OrderSandboxURL
 		case "menu":
 			return MenuSandboxURL
+		case "site":
+			return SiteSandboxURL
 		}
 	}
 
@@ -93,6 +97,8 @@ func (a *DeliverooAdapter) getBaseURL(apiType string) string {
 		return OrderAPIBaseURL
 	case "menu":
 		return MenuAPIBaseURL
+	case "site":
+		return SiteAPIBaseURL
 	}
 
 	return ""
@@ -107,22 +113,16 @@ type tokenResponse struct {
 
 // getAccessToken retrieves a new OAuth2 access token
 func (a *DeliverooAdapter) getAccessToken(ctx context.Context) error {
-	payload := map[string]string{
-		"grant_type": "client_credentials",
-	}
-
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal token request: %w", err)
-	}
+	// OAuth2 token endpoint expects application/x-www-form-urlencoded
+	data := "grant_type=client_credentials"
 
 	url := fmt.Sprintf("%s/oauth2/token", a.getBaseURL("auth"))
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBufferString(data))
 	if err != nil {
 		return fmt.Errorf("failed to create token request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.SetBasicAuth(a.clientID, a.clientSecret)
 
 	resp, err := a.httpClient.Do(req)
