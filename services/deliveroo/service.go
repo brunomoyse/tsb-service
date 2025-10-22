@@ -13,7 +13,7 @@ type Service struct {
 	brandID  string
 	menuID   string
 	currency string
-	outletID string
+	siteID   string
 }
 
 // NewService creates a new Deliveroo sync service
@@ -34,7 +34,7 @@ type ServiceConfig struct {
 	ClientSecret string
 	BrandID      string
 	MenuID       string
-	OutletID     string
+	SiteID       string
 	Currency     string
 	UseSandbox   bool
 }
@@ -52,7 +52,7 @@ func NewServiceWithConfig(config ServiceConfig) *Service {
 		brandID:  config.BrandID,
 		menuID:   config.MenuID,
 		currency: config.Currency,
-		outletID: config.OutletID,
+		siteID:   config.SiteID,
 	}
 }
 
@@ -94,6 +94,49 @@ func (s *Service) SyncMenu(ctx context.Context, categories []*domain.Category, p
 	log.Printf("Successfully synced %d categories and %d items to Deliveroo",
 		len(deliverooMenu.Menu.Categories), len(deliverooMenu.Menu.Items))
 
+	// Sync unavailabilities (requires siteID)
+	if s.siteID != "" {
+		if err := s.syncUnavailabilities(ctx, products); err != nil {
+			log.Printf("Warning: failed to sync unavailabilities: %v", err)
+			// Don't fail the entire sync if unavailabilities fail
+		} else {
+			log.Printf("Successfully synced item availabilities")
+		}
+	} else {
+		log.Printf("Skipping unavailability sync (no siteID configured)")
+	}
+
+	return nil
+}
+
+// syncUnavailabilities syncs product availability/visibility to Deliveroo
+func (s *Service) syncUnavailabilities(ctx context.Context, products []*domain.Product) error {
+	unavailableIDs := []string{}
+	hiddenIDs := []string{}
+
+	for _, product := range products {
+		productID := product.ID.String()
+
+		if !product.IsVisible {
+			// Hidden products are completely hidden from the menu
+			hiddenIDs = append(hiddenIDs, productID)
+		} else if !product.IsAvailable {
+			// Unavailable but visible products are shown as "sold out"
+			unavailableIDs = append(unavailableIDs, productID)
+		}
+		// If both IsVisible=true and IsAvailable=true, the item is available (don't add to any list)
+	}
+
+	req := ReplaceAllUnavailabilitiesRequest{
+		UnavailableIDs: unavailableIDs,
+		HiddenIDs:      hiddenIDs,
+	}
+
+	if err := s.adapter.ReplaceItemUnavailabilitiesV2(ctx, s.brandID, s.siteID, req); err != nil {
+		return fmt.Errorf("failed to replace unavailabilities: %w", err)
+	}
+
+	log.Printf("Synced unavailabilities: %d unavailable, %d hidden", len(unavailableIDs), len(hiddenIDs))
 	return nil
 }
 
@@ -151,10 +194,36 @@ func (s *Service) convertToDeliverooMenuUpload(categories []*domain.Category, pr
 		})
 	}
 
-	// Get site IDs (use outletID if configured, otherwise empty)
+	// Get site IDs (use siteID if configured, otherwise empty)
 	siteIDs := []string{}
-	if s.outletID != "" {
-		siteIDs = append(siteIDs, s.outletID)
+	if s.siteID != "" {
+		siteIDs = append(siteIDs, s.siteID)
+	}
+
+	// Collect all category IDs for the 24/7 mealtime
+	categoryIDs := make([]string, len(deliverooCategories))
+	for i, cat := range deliverooCategories {
+		categoryIDs[i] = cat.ID
+	}
+
+	// Create a 24/7 mealtime (all day, every day)
+	// Note: Deliveroo requires a cover photo for mealtimes
+	allDayMealtime := Mealtime{
+		ID:   "all-day",
+		Name: map[string]string{"fr": "Toute la journée"},
+		Image: &ImageInfo{
+			URL: "https://d1sq9yypil8nox.cloudfront.net/images/mealtime-cover.jpg",
+		},
+		CategoryIDs: categoryIDs,
+		Schedule: []MealtimeSchedule{
+			{DayOfWeek: 0, TimePeriods: []TimePeriod{{Start: "00:00", End: "23:59"}}}, // Monday
+			{DayOfWeek: 1, TimePeriods: []TimePeriod{{Start: "00:00", End: "23:59"}}}, // Tuesday
+			{DayOfWeek: 2, TimePeriods: []TimePeriod{{Start: "00:00", End: "23:59"}}}, // Wednesday
+			{DayOfWeek: 3, TimePeriods: []TimePeriod{{Start: "00:00", End: "23:59"}}}, // Thursday
+			{DayOfWeek: 4, TimePeriods: []TimePeriod{{Start: "00:00", End: "23:59"}}}, // Friday
+			{DayOfWeek: 5, TimePeriods: []TimePeriod{{Start: "00:00", End: "23:59"}}}, // Saturday
+			{DayOfWeek: 6, TimePeriods: []TimePeriod{{Start: "00:00", End: "23:59"}}}, // Sunday
+		},
 	}
 
 	return &MenuUploadRequest{
@@ -162,6 +231,7 @@ func (s *Service) convertToDeliverooMenuUpload(categories []*domain.Category, pr
 		Menu: MenuContent{
 			Categories: deliverooCategories,
 			Items:      deliverooItems,
+			Mealtimes:  []Mealtime{allDayMealtime},
 		},
 		SiteIDs: siteIDs,
 	}, nil
@@ -193,11 +263,19 @@ func (s *Service) convertProductToNewItem(product *domain.Product) (*Item, error
 	// Build allergies (empty for now, can be extended)
 	allergies := []string{}
 
+	// Construct image URL from product slug if available
+	var image *ImageInfo
+	if product.Slug != nil && *product.Slug != "" {
+		imageURL := "https://d1sq9yypil8nox.cloudfront.net/images/thumbnails/" + *product.Slug + ".png"
+		image = &ImageInfo{URL: imageURL}
+	}
+
 	return &Item{
 		ID:                        product.ID.String(),
 		Name:                      map[string]string{"fr": translation.Name},
 		Description:               description,
 		OperationalName:           translation.Name,
+		Image:                     image,
 		PriceInfo:                 PriceInfo{Price: priceCents},
 		PLU:                       product.ID.String(), // Use product UUID as PLU for direct database lookup
 		TaxRate:                   "0",
@@ -249,24 +327,24 @@ type ProductToDelete struct {
 }
 
 // PreviewMenuSync compares local menu with Deliveroo menu and returns differences
-// If outletID (siteID) is configured, uses V2 API; otherwise uses V1 with menuID
+// If siteID is configured, uses V2 API; otherwise uses V1 with menuID
 func (s *Service) PreviewMenuSync(ctx context.Context, categories []*domain.Category, products []*domain.Product) (*MenuSyncPreview, error) {
-	log.Printf("Previewing menu sync differences (brand: %s, menu/site: %s/%s)", s.brandID, s.menuID, s.outletID)
+	log.Printf("Previewing menu sync differences (brand: %s, menu/site: %s/%s)", s.brandID, s.menuID, s.siteID)
 
 	// Fetch current Deliveroo menu - prefer V2 API with siteID if available
 	var deliverooMenu *MenuUploadRequest
 	var err error
 
-	if s.outletID != "" {
+	if s.siteID != "" {
 		// Use V2 API with siteID (recommended)
-		log.Printf("Using V2 API to fetch menu for site: %s", s.outletID)
-		deliverooMenu, err = s.adapter.GetMenuV2(ctx, s.brandID, s.outletID)
+		log.Printf("Using V2 API to fetch menu for site: %s", s.siteID)
+		deliverooMenu, err = s.adapter.GetMenuV2(ctx, s.brandID, s.siteID)
 	} else if s.menuID != "" {
 		// Fallback to V1 API with menuID
 		log.Printf("Using V1 API to fetch menu: %s", s.menuID)
 		deliverooMenu, err = s.adapter.PullMenu(ctx, s.brandID, s.menuID)
 	} else {
-		return nil, fmt.Errorf("either menuID or outletID (siteID) must be configured")
+		return nil, fmt.Errorf("either menuID or siteID must be configured")
 	}
 
 	if err != nil {
@@ -298,6 +376,12 @@ func (s *Service) PreviewMenuSync(ctx context.Context, categories []*domain.Cate
 	localCategories := make(map[string]Category)
 	for _, cat := range localMenu.Menu.Categories {
 		localCategories[cat.ID] = cat
+	}
+
+	// Build product map for easy lookup
+	productMap := make(map[string]*domain.Product)
+	for _, product := range products {
+		productMap[product.ID.String()] = product
 	}
 
 	preview := &MenuSyncPreview{
@@ -332,13 +416,21 @@ func (s *Service) PreviewMenuSync(ctx context.Context, categories []*domain.Cate
 				name = n
 			}
 
+			// Get actual availability from product
+			isAvailable := true
+			isVisible := true
+			if product, ok := productMap[id]; ok {
+				isAvailable = product.IsAvailable
+				isVisible = product.IsVisible
+			}
+
 			preview.ToCreate = append(preview.ToCreate, &ProductToCreate{
 				Name:        name,
 				Price:       float64(localItem.PriceInfo.Price) / 100.0,
 				Description: description,
 				Category:    categoryName,
-				IsAvailable: true,  // Default to true for new items
-				IsVisible:   true,  // Default to true for new items
+				IsAvailable: isAvailable,
+				IsVisible:   isVisible,
 			})
 		}
 	}
