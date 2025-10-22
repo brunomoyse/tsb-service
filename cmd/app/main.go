@@ -1,15 +1,16 @@
 package main
 
 import (
+	"log"
+	"net"
+	"net/http"
+	"os"
+
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
-	"log"
-	"net"
-	"net/http"
-	"os"
 	// gRPC proto package
 	"tsb-service/internal/api/event"
 	pb "tsb-service/internal/api/eventpb"
@@ -115,10 +116,31 @@ func main() {
 	deliverooClientSecret := os.Getenv("DELIVEROO_CLIENT_SECRET")
 	deliverooBrandID := os.Getenv("DELIVEROO_BRAND_ID")
 	deliverooMenuID := os.Getenv("DELIVEROO_MENU_ID")
+	deliverooOutletID := os.Getenv("DELIVEROO_OUTLET_ID")
+	deliverooUseSandbox := os.Getenv("DELIVEROO_USE_SANDBOX") == "true"
 
-	if deliverooClientID != "" && deliverooClientSecret != "" && deliverooBrandID != "" && deliverooMenuID != "" {
-		deliverooService = deliveroo.NewService(deliverooClientID, deliverooClientSecret, deliverooBrandID, deliverooMenuID, "EUR")
-		log.Println("Deliveroo service initialized successfully")
+	if deliverooClientID != "" && deliverooClientSecret != "" && deliverooBrandID != "" {
+		deliverooService = deliveroo.NewServiceWithConfig(deliveroo.ServiceConfig{
+			ClientID:     deliverooClientID,
+			ClientSecret: deliverooClientSecret,
+			BrandID:      deliverooBrandID,
+			MenuID:       deliverooMenuID,
+			OutletID:     deliverooOutletID,
+			Currency:     "EUR",
+			UseSandbox:   deliverooUseSandbox,
+		})
+
+		envType := "production"
+		if deliverooUseSandbox {
+			envType = "sandbox"
+		}
+		log.Printf("Deliveroo service initialized successfully (%s environment)", envType)
+
+		if deliverooOutletID != "" {
+			log.Printf("  - Using V2 API with outletID: %s", deliverooOutletID)
+		} else if deliverooMenuID != "" {
+			log.Printf("  - Using V1 API with menuID: %s", deliverooMenuID)
+		}
 	} else {
 		log.Println("Deliveroo credentials not configured - menu sync will not be available")
 		deliverooService = nil

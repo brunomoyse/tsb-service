@@ -18,6 +18,8 @@ type Order {
     customer: User!
     payment: Payment
     items: [OrderItem!]!
+
+    # Note: source and platformData are extended in deliveroo.graphql
 }
 
 type OrderItem {

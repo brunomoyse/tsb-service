@@ -92,6 +92,7 @@ type SyncMenuResult {
 
 enum SyncProvider {
     DELIVEROO
+    UBER
 }
 
 enum SyncStatus {
