@@ -262,7 +262,7 @@ func (a *DeliverooAdapter) doRequest(ctx context.Context, method, url string, bo
 }
 
 // ListOrders retrieves orders with filtering options
-func (a *DeliverooAdapter) ListOrders(ctx context.Context, status OrderStatus, since *time.Time, outletID string) ([]Order, error) {
+func (a *DeliverooAdapter) ListOrders(ctx context.Context, status OrderStatus, since *time.Time, siteID string) ([]Order, error) {
 	url := fmt.Sprintf("%s/v2/orders", a.getBaseURL("order"))
 
 	// Build query parameters
@@ -278,13 +278,13 @@ func (a *DeliverooAdapter) ListOrders(ctx context.Context, status OrderStatus, s
 		}
 		queryParams += fmt.Sprintf("since=%s", since.Format(time.RFC3339))
 	}
-	if outletID != "" {
+	if siteID != "" {
 		if queryParams == "" {
 			queryParams += "?"
 		} else {
 			queryParams += "&"
 		}
-		queryParams += fmt.Sprintf("location_id=%s", outletID)
+		queryParams += fmt.Sprintf("location_id=%s", siteID)
 	}
 
 	url += queryParams

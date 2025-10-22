@@ -88,7 +88,7 @@ func main() {
         ClientSecret: "your-client-secret",
         BrandID:      "your-brand-id",
         MenuID:       "your-menu-id",
-        OutletID:     "your-outlet-id",
+        SiteID:     "your-outlet-id",
         Currency:     "EUR",
         UseSandbox:   false,
     })
@@ -121,14 +121,14 @@ func main() {
 List orders with optional filtering (deprecated, use GetOrdersV2).
 
 ```go
-orders, err := adapter.ListOrders(ctx, status, since, outletID)
+orders, err := adapter.ListOrders(ctx, status, since, siteID)
 ```
 
 Parameters:
 - `ctx`: Context
 - `status`: Filter by order status (e.g., `OrderStatusPlaced`, `OrderStatusAccepted`)
 - `since`: Filter orders after this time (optional, pass `nil` for all)
-- `outletID`: Filter by outlet/location ID (optional, pass `""` for all)
+- `siteID`: Filter by outlet/location ID (optional, pass `""` for all)
 
 Returns: `[]Order, error`
 
@@ -1013,7 +1013,7 @@ Complete order processing workflow:
 
 ```go
 // 1. List new orders
-orders, err := adapter.ListOrders(ctx, deliveroo.OrderStatusPlaced, nil, outletID)
+orders, err := adapter.ListOrders(ctx, deliveroo.OrderStatusPlaced, nil, siteID)
 if err != nil {
     log.Fatal(err)
 }
@@ -1156,7 +1156,7 @@ DELIVEROO_CLIENT_ID=your-client-id
 DELIVEROO_CLIENT_SECRET=your-client-secret
 DELIVEROO_BRAND_ID=your-brand-id
 DELIVEROO_MENU_ID=your-menu-id
-DELIVEROO_OUTLET_ID=your-outlet-id
+DELIVEROO_SITE_ID=your-outlet-id
 DELIVEROO_CURRENCY=EUR
 DELIVEROO_USE_SANDBOX=false
 ```

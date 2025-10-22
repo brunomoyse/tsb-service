@@ -16,11 +16,11 @@ func ExampleOrderWorkflow() {
 	})
 
 	ctx := context.Background()
-	outletID := "your-outlet-id"
+	siteID := "your-outlet-id"
 
 	// Step 1: List new placed orders
 	log.Println("Fetching new orders...")
-	orders, err := adapter.ListOrders(ctx, OrderStatusPlaced, nil, outletID)
+	orders, err := adapter.ListOrders(ctx, OrderStatusPlaced, nil, siteID)
 	if err != nil {
 		log.Fatalf("Failed to list orders: %v", err)
 	}
