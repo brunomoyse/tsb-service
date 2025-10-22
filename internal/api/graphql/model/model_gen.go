@@ -14,6 +14,12 @@ import (
 	"github.com/google/uuid"
 )
 
+type AcceptOrderInput struct {
+	Source  OrderSource `json:"source"`
+	OrderID uuid.UUID   `json:"orderId"`
+	Notes   *string     `json:"notes,omitempty"`
+}
+
 type Address struct {
 	ID               string  `json:"id"`
 	Postcode         string  `json:"postcode"`
@@ -54,6 +60,27 @@ type CreateProductInput struct {
 	Translations   []*TranslationInput `json:"translations"`
 }
 
+type ItemUnavailability struct {
+	ItemID uuid.UUID              `json:"itemId"`
+	Status ItemAvailabilityStatus `json:"status"`
+}
+
+type ItemUnavailabilityList struct {
+	UnavailableIds []uuid.UUID `json:"unavailableIds"`
+	HiddenIds      []uuid.UUID `json:"hiddenIds"`
+}
+
+type MenuSyncPreview struct {
+	ToCreate []*ProductToCreate `json:"toCreate"`
+	ToUpdate []*ProductToUpdate `json:"toUpdate"`
+	ToDelete []*ProductToDelete `json:"toDelete"`
+}
+
+type MonetaryAmount struct {
+	Fractional   int    `json:"fractional"`
+	CurrencyCode string `json:"currencyCode"`
+}
+
 type Mutation struct {
 }
 
@@ -76,6 +103,8 @@ type Order struct {
 	Customer           *User              `json:"customer"`
 	Payment            *Payment           `json:"payment,omitempty"`
 	Items              []*OrderItem       `json:"items"`
+	Source             OrderSource        `json:"source"`
+	PlatformData       *PlatformOrder     `json:"platformData,omitempty"`
 }
 
 type OrderExtraInput struct {
@@ -89,6 +118,16 @@ type OrderItem struct {
 	UnitPrice  string    `json:"unitPrice"`
 	Quantity   int       `json:"quantity"`
 	TotalPrice string    `json:"totalPrice"`
+}
+
+type PLUMapping struct {
+	ItemID uuid.UUID `json:"itemId"`
+	Plu    string    `json:"plu"`
+}
+
+type PLUMappingInput struct {
+	ItemID uuid.UUID `json:"itemId"`
+	Plu    string    `json:"plu"`
 }
 
 type Payment struct {
@@ -125,6 +164,118 @@ type Payment struct {
 	SettlementAmount                *float64       `json:"settlementAmount,omitempty"`
 }
 
+type PlatformAddress struct {
+	Street       string  `json:"street"`
+	Number       string  `json:"number"`
+	PostalCode   string  `json:"postalCode"`
+	City         string  `json:"city"`
+	AddressLine1 string  `json:"addressLine1"`
+	AddressLine2 *string `json:"addressLine2,omitempty"`
+	Latitude     float64 `json:"latitude"`
+	Longitude    float64 `json:"longitude"`
+}
+
+type PlatformCustomer struct {
+	FirstName            *string `json:"firstName,omitempty"`
+	ContactNumber        *string `json:"contactNumber,omitempty"`
+	ContactAccessCode    *string `json:"contactAccessCode,omitempty"`
+	OrderFrequencyAtSite *string `json:"orderFrequencyAtSite,omitempty"`
+}
+
+type PlatformDeliveryDetails struct {
+	DeliveryFee         *MonetaryAmount  `json:"deliveryFee"`
+	Address             *PlatformAddress `json:"address,omitempty"`
+	EstimatedDeliveryAt *time.Time       `json:"estimatedDeliveryAt,omitempty"`
+}
+
+type PlatformOrder struct {
+	Source               OrderSource              `json:"source"`
+	PlatformOrderID      uuid.UUID                `json:"platformOrderId"`
+	OrderNumber          string                   `json:"orderNumber"`
+	DisplayID            string                   `json:"displayId"`
+	LocationID           string                   `json:"locationId"`
+	BrandID              string                   `json:"brandId"`
+	Status               PlatformOrderStatus      `json:"status"`
+	FulfillmentType      FulfillmentType          `json:"fulfillmentType"`
+	OrderNotes           *string                  `json:"orderNotes,omitempty"`
+	CutleryNotes         *string                  `json:"cutleryNotes,omitempty"`
+	Asap                 bool                     `json:"asap"`
+	PrepareFor           time.Time                `json:"prepareFor"`
+	StartPreparingAt     time.Time                `json:"startPreparingAt"`
+	ConfirmAt            *time.Time               `json:"confirmAt,omitempty"`
+	TableNumber          *string                  `json:"tableNumber,omitempty"`
+	Subtotal             *MonetaryAmount          `json:"subtotal"`
+	TotalPrice           *MonetaryAmount          `json:"totalPrice"`
+	PartnerOrderSubtotal *MonetaryAmount          `json:"partnerOrderSubtotal"`
+	PartnerOrderTotal    *MonetaryAmount          `json:"partnerOrderTotal"`
+	OfferDiscount        *MonetaryAmount          `json:"offerDiscount"`
+	CashDue              *MonetaryAmount          `json:"cashDue,omitempty"`
+	BagFee               *MonetaryAmount          `json:"bagFee,omitempty"`
+	Surcharge            *MonetaryAmount          `json:"surcharge,omitempty"`
+	Items                []*PlatformOrderItem     `json:"items"`
+	Delivery             *PlatformDeliveryDetails `json:"delivery,omitempty"`
+	Customer             *PlatformCustomer        `json:"customer,omitempty"`
+	StatusLog            []*PlatformStatusLogItem `json:"statusLog"`
+	Promotions           []*PlatformPromotion     `json:"promotions,omitempty"`
+	IsTabletless         bool                     `json:"isTabletless"`
+}
+
+type PlatformOrderFilter struct {
+	Source         *OrderSource         `json:"source,omitempty"`
+	Status         *PlatformOrderStatus `json:"status,omitempty"`
+	StartDate      *time.Time           `json:"startDate,omitempty"`
+	EndDate        *time.Time           `json:"endDate,omitempty"`
+	LiveOrdersOnly *bool                `json:"liveOrdersOnly,omitempty"`
+	Cursor         *string              `json:"cursor,omitempty"`
+}
+
+type PlatformOrderItem struct {
+	PosItemID       *string              `json:"posItemId,omitempty"`
+	Name            string               `json:"name"`
+	OperationalName string               `json:"operationalName"`
+	UnitPrice       *MonetaryAmount      `json:"unitPrice"`
+	TotalPrice      *MonetaryAmount      `json:"totalPrice"`
+	MenuUnitPrice   *MonetaryAmount      `json:"menuUnitPrice"`
+	Quantity        int                  `json:"quantity"`
+	Modifiers       []*PlatformOrderItem `json:"modifiers,omitempty"`
+	DiscountAmount  *MonetaryAmount      `json:"discountAmount,omitempty"`
+}
+
+type PlatformOrdersConnection struct {
+	Orders     []*PlatformOrder `json:"orders"`
+	NextCursor *string          `json:"nextCursor,omitempty"`
+	HasMore    bool             `json:"hasMore"`
+}
+
+type PlatformPromotion struct {
+	ID     uuid.UUID       `json:"id"`
+	Name   string          `json:"name"`
+	Amount *MonetaryAmount `json:"amount"`
+}
+
+type PlatformRiderInfo struct {
+	EstimatedArrivalTime *time.Time            `json:"estimatedArrivalTime,omitempty"`
+	FullName             string                `json:"fullName"`
+	ContactNumber        *string               `json:"contactNumber,omitempty"`
+	BridgeCode           *string               `json:"bridgeCode,omitempty"`
+	BridgeNumber         *string               `json:"bridgeNumber,omitempty"`
+	Lat                  *float64              `json:"lat,omitempty"`
+	Lon                  *float64              `json:"lon,omitempty"`
+	AccuracyInMeters     *int                  `json:"accuracyInMeters,omitempty"`
+	StatusLog            []*RiderStatusLogItem `json:"statusLog"`
+}
+
+type PlatformRiderUpdate struct {
+	OrderID     uuid.UUID            `json:"orderId"`
+	Riders      []*PlatformRiderInfo `json:"riders"`
+	StackedWith []uuid.UUID          `json:"stackedWith"`
+}
+
+type PlatformStatusLogItem struct {
+	At     time.Time           `json:"at"`
+	Status PlatformOrderStatus `json:"status"`
+}
+
 type Position struct {
 	Longitude float64   `json:"longitude"`
 	Latitude  float64   `json:"latitude"`
@@ -157,7 +308,52 @@ type ProductCategory struct {
 	Translations []*Translation `json:"translations"`
 }
 
+type ProductToCreate struct {
+	Name        string  `json:"name"`
+	Price       float64 `json:"price"`
+	Description *string `json:"description,omitempty"`
+	Category    string  `json:"category"`
+	IsAvailable bool    `json:"isAvailable"`
+	IsVisible   bool    `json:"isVisible"`
+}
+
+type ProductToDelete struct {
+	ID     uuid.UUID `json:"id"`
+	Name   string    `json:"name"`
+	Reason string    `json:"reason"`
+}
+
+type ProductToUpdate struct {
+	ID                  uuid.UUID `json:"id"`
+	Name                string    `json:"name"`
+	CurrentPrice        float64   `json:"currentPrice"`
+	NewPrice            *float64  `json:"newPrice,omitempty"`
+	CurrentDescription  *string   `json:"currentDescription,omitempty"`
+	NewDescription      *string   `json:"newDescription,omitempty"`
+	CurrentAvailability bool      `json:"currentAvailability"`
+	NewAvailability     *bool     `json:"newAvailability,omitempty"`
+	CurrentVisibility   bool      `json:"currentVisibility"`
+	NewVisibility       *bool     `json:"newVisibility,omitempty"`
+}
+
 type Query struct {
+}
+
+type RejectOrderInput struct {
+	Source  OrderSource `json:"source"`
+	OrderID uuid.UUID   `json:"orderId"`
+	Reason  string      `json:"reason"`
+	Notes   *string     `json:"notes,omitempty"`
+}
+
+type ReplaceAllUnavailabilitiesInput struct {
+	UnavailableIds []uuid.UUID `json:"unavailableIds"`
+	HiddenIds      []uuid.UUID `json:"hiddenIds"`
+}
+
+type RiderStatusLogItem struct {
+	At     time.Time   `json:"at"`
+	Status RiderStatus `json:"status"`
 }
 
 type Street struct {
@@ -212,9 +408,25 @@ type TranslationInput struct {
 	Name        string  `json:"name"`
 }
 
+type UpdateItemAvailabilityInput struct {
+	ItemID uuid.UUID              `json:"itemId"`
+	Status ItemAvailabilityStatus `json:"status"`
+}
+
 type UpdateOrderInput struct {
 	Status             *domain.OrderStatus `json:"status,omitempty"`
 	EstimatedReadyTime *time.Time          `json:"estimatedReadyTime,omitempty"`
+}
+
+type UpdatePLUsInput struct {
+	Mappings []*PLUMappingInput `json:"mappings"`
+}
+
+type UpdatePrepStageInput struct {
+	Source  OrderSource `json:"source"`
+	OrderID uuid.UUID   `json:"orderId"`
+	Stage   PrepStage   `json:"stage"`
+	Delay   *int        `json:"delay,omitempty"`
 }
 
 type UpdateProductInput struct {
@@ -247,6 +459,181 @@ type User struct {
 	PhoneNumber *string   `json:"phoneNumber,omitempty"`
 	Address     *Address  `json:"address,omitempty"`
 	Orders      []*Order  `json:"orders,omitempty"`
+}
+
+type FulfillmentType string
+
+const (
+	FulfillmentTypePlatformDelivery   FulfillmentType = "PLATFORM_DELIVERY"
+	FulfillmentTypeRestaurantDelivery FulfillmentType = "RESTAURANT_DELIVERY"
+	FulfillmentTypeCustomerPickup     FulfillmentType = "CUSTOMER_PICKUP"
+	FulfillmentTypeTableService       FulfillmentType = "TABLE_SERVICE"
+	FulfillmentTypeAutonomous         FulfillmentType = "AUTONOMOUS"
+)
+
+var AllFulfillmentType = []FulfillmentType{
+	FulfillmentTypePlatformDelivery,
+	FulfillmentTypeRestaurantDelivery,
+	FulfillmentTypeCustomerPickup,
+	FulfillmentTypeTableService,
+	FulfillmentTypeAutonomous,
+}
+
+func (e FulfillmentType) IsValid() bool {
+	switch e {
+	case FulfillmentTypePlatformDelivery, FulfillmentTypeRestaurantDelivery, FulfillmentTypeCustomerPickup, FulfillmentTypeTableService, FulfillmentTypeAutonomous:
+		return true
+	}
+	return false
+}
+
+func (e FulfillmentType) String() string {
+	return string(e)
+}
+
+func (e *FulfillmentType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FulfillmentType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FulfillmentType", str)
+	}
+	return nil
+}
+
+func (e FulfillmentType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *FulfillmentType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e FulfillmentType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type ItemAvailabilityStatus string
+
+const (
+	ItemAvailabilityStatusAvailable   ItemAvailabilityStatus = "AVAILABLE"
+	ItemAvailabilityStatusUnavailable ItemAvailabilityStatus = "UNAVAILABLE"
+	ItemAvailabilityStatusHidden      ItemAvailabilityStatus = "HIDDEN"
+)
+
+var AllItemAvailabilityStatus = []ItemAvailabilityStatus{
+	ItemAvailabilityStatusAvailable,
+	ItemAvailabilityStatusUnavailable,
+	ItemAvailabilityStatusHidden,
+}
+
+func (e ItemAvailabilityStatus) IsValid() bool {
+	switch e {
+	case ItemAvailabilityStatusAvailable, ItemAvailabilityStatusUnavailable, ItemAvailabilityStatusHidden:
+		return true
+	}
+	return false
+}
+
+func (e ItemAvailabilityStatus) String() string {
+	return string(e)
+}
+
+func (e *ItemAvailabilityStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ItemAvailabilityStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ItemAvailabilityStatus", str)
+	}
+	return nil
+}
+
+func (e ItemAvailabilityStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ItemAvailabilityStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ItemAvailabilityStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type OrderSource string
+
+const (
+	OrderSourceTokyo     OrderSource = "TOKYO"
+	OrderSourceDeliveroo OrderSource = "DELIVEROO"
+	OrderSourceUber      OrderSource = "UBER"
+)
+
+var AllOrderSource = []OrderSource{
+	OrderSourceTokyo,
+	OrderSourceDeliveroo,
+	OrderSourceUber,
+}
+
+func (e OrderSource) IsValid() bool {
+	switch e {
+	case OrderSourceTokyo, OrderSourceDeliveroo, OrderSourceUber:
+		return true
+	}
+	return false
+}
+
+func (e OrderSource) String() string {
+	return string(e)
+}
+
+func (e *OrderSource) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = OrderSource(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid OrderSource", str)
+	}
+	return nil
+}
+
+func (e OrderSource) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *OrderSource) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e OrderSource) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }
 
 type OrderTypeEnum string
@@ -304,19 +691,206 @@ func (e OrderTypeEnum) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+type PlatformOrderStatus string
+
+const (
+	PlatformOrderStatusPending   PlatformOrderStatus = "PENDING"
+	PlatformOrderStatusPlaced    PlatformOrderStatus = "PLACED"
+	PlatformOrderStatusAccepted  PlatformOrderStatus = "ACCEPTED"
+	PlatformOrderStatusConfirmed PlatformOrderStatus = "CONFIRMED"
+	PlatformOrderStatusRejected  PlatformOrderStatus = "REJECTED"
+	PlatformOrderStatusCanceled  PlatformOrderStatus = "CANCELED"
+	PlatformOrderStatusDelivered PlatformOrderStatus = "DELIVERED"
+)
+
+var AllPlatformOrderStatus = []PlatformOrderStatus{
+	PlatformOrderStatusPending,
+	PlatformOrderStatusPlaced,
+	PlatformOrderStatusAccepted,
+	PlatformOrderStatusConfirmed,
+	PlatformOrderStatusRejected,
+	PlatformOrderStatusCanceled,
+	PlatformOrderStatusDelivered,
+}
+
+func (e PlatformOrderStatus) IsValid() bool {
+	switch e {
+	case PlatformOrderStatusPending, PlatformOrderStatusPlaced, PlatformOrderStatusAccepted, PlatformOrderStatusConfirmed, PlatformOrderStatusRejected, PlatformOrderStatusCanceled, PlatformOrderStatusDelivered:
+		return true
+	}
+	return false
+}
+
+func (e PlatformOrderStatus) String() string {
+	return string(e)
+}
+
+func (e *PlatformOrderStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = PlatformOrderStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid PlatformOrderStatus", str)
+	}
+	return nil
+}
+
+func (e PlatformOrderStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *PlatformOrderStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e PlatformOrderStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type PrepStage string
+
+const (
+	PrepStageInKitchen              PrepStage = "IN_KITCHEN"
+	PrepStageReadyForCollectionSoon PrepStage = "READY_FOR_COLLECTION_SOON"
+	PrepStageReadyForCollection     PrepStage = "READY_FOR_COLLECTION"
+	PrepStageCollected              PrepStage = "COLLECTED"
+)
+
+var AllPrepStage = []PrepStage{
+	PrepStageInKitchen,
+	PrepStageReadyForCollectionSoon,
+	PrepStageReadyForCollection,
+	PrepStageCollected,
+}
+
+func (e PrepStage) IsValid() bool {
+	switch e {
+	case PrepStageInKitchen, PrepStageReadyForCollectionSoon, PrepStageReadyForCollection, PrepStageCollected:
+		return true
+	}
+	return false
+}
+
+func (e PrepStage) String() string {
+	return string(e)
+}
+
+func (e *PrepStage) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = PrepStage(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid PrepStage", str)
+	}
+	return nil
+}
+
+func (e PrepStage) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *PrepStage) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e PrepStage) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type RiderStatus string
+
+const (
+	RiderStatusRiderAssigned              RiderStatus = "RIDER_ASSIGNED"
+	RiderStatusRiderArrived               RiderStatus = "RIDER_ARRIVED"
+	RiderStatusRiderConfirmedAtRestaurant RiderStatus = "RIDER_CONFIRMED_AT_RESTAURANT"
+	RiderStatusRiderUnassigned            RiderStatus = "RIDER_UNASSIGNED"
+	RiderStatusRiderInTransit             RiderStatus = "RIDER_IN_TRANSIT"
+)
+
+var AllRiderStatus = []RiderStatus{
+	RiderStatusRiderAssigned,
+	RiderStatusRiderArrived,
+	RiderStatusRiderConfirmedAtRestaurant,
+	RiderStatusRiderUnassigned,
+	RiderStatusRiderInTransit,
+}
+
+func (e RiderStatus) IsValid() bool {
+	switch e {
+	case RiderStatusRiderAssigned, RiderStatusRiderArrived, RiderStatusRiderConfirmedAtRestaurant, RiderStatusRiderUnassigned, RiderStatusRiderInTransit:
+		return true
+	}
+	return false
+}
+
+func (e RiderStatus) String() string {
+	return string(e)
+}
+
+func (e *RiderStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RiderStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RiderStatus", str)
+	}
+	return nil
+}
+
+func (e RiderStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *RiderStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e RiderStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
 type SyncProvider string
 
 const (
 	SyncProviderDeliveroo SyncProvider = "DELIVEROO"
+	SyncProviderUber      SyncProvider = "UBER"
 )
 
 var AllSyncProvider = []SyncProvider{
 	SyncProviderDeliveroo,
+	SyncProviderUber,
 }
 
 func (e SyncProvider) IsValid() bool {
 	switch e {
-	case SyncProviderDeliveroo:
+	case SyncProviderDeliveroo, SyncProviderUber:
 		return true
 	}
 	return false
