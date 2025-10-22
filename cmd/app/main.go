@@ -116,7 +116,7 @@ func main() {
 	deliverooClientSecret := os.Getenv("DELIVEROO_CLIENT_SECRET")
 	deliverooBrandID := os.Getenv("DELIVEROO_BRAND_ID")
 	deliverooMenuID := os.Getenv("DELIVEROO_MENU_ID")
-	deliverooOutletID := os.Getenv("DELIVEROO_OUTLET_ID")
+	deliverooSiteID := os.Getenv("DELIVEROO_SITE_ID")
 	deliverooUseSandbox := os.Getenv("DELIVEROO_USE_SANDBOX") == "true"
 
 	if deliverooClientID != "" && deliverooClientSecret != "" && deliverooBrandID != "" {
@@ -125,7 +125,7 @@ func main() {
 			ClientSecret: deliverooClientSecret,
 			BrandID:      deliverooBrandID,
 			MenuID:       deliverooMenuID,
-			OutletID:     deliverooOutletID,
+			SiteID:     deliverooSiteID,
 			Currency:     "EUR",
 			UseSandbox:   deliverooUseSandbox,
 		})
@@ -136,8 +136,8 @@ func main() {
 		}
 		log.Printf("Deliveroo service initialized successfully (%s environment)", envType)
 
-		if deliverooOutletID != "" {
-			log.Printf("  - Using V2 API with outletID: %s", deliverooOutletID)
+		if deliverooSiteID != "" {
+			log.Printf("  - Using V2 API with siteID: %s", deliverooSiteID)
 		} else if deliverooMenuID != "" {
 			log.Printf("  - Using V1 API with menuID: %s", deliverooMenuID)
 		}
