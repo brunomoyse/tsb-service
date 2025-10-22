@@ -19,15 +19,19 @@ import (
 	productApplication "tsb-service/internal/modules/product/application"
 	userApplication "tsb-service/internal/modules/user/application"
 	"tsb-service/pkg/pubsub"
+	"tsb-service/services/deliveroo"
 )
 
+const SyncEventTopic = "sync_events"
+
 type Resolver struct {
-	Broker         *pubsub.Broker
-	AddressService addressApplication.AddressService
-	OrderService   orderApplication.OrderService
-	PaymentService paymentApplication.PaymentService
-	ProductService productApplication.ProductService
-	UserService    userApplication.UserService
+	Broker           *pubsub.Broker
+	AddressService   addressApplication.AddressService
+	OrderService     orderApplication.OrderService
+	PaymentService   paymentApplication.PaymentService
+	ProductService   productApplication.ProductService
+	UserService      userApplication.UserService
+	DeliverooService *deliveroo.Service
 }
 
 // NewResolver constructs the Resolver with required services.
@@ -38,14 +42,16 @@ func NewResolver(
 	paymentService paymentApplication.PaymentService,
 	productService productApplication.ProductService,
 	userService userApplication.UserService,
+	deliverooService *deliveroo.Service,
 ) *Resolver {
 	return &Resolver{
-		Broker:         broker,
-		AddressService: addressService,
-		OrderService:   orderService,
-		PaymentService: paymentService,
-		ProductService: productService,
-		UserService:    userService,
+		Broker:           broker,
+		AddressService:   addressService,
+		OrderService:     orderService,
+		PaymentService:   paymentService,
+		ProductService:   productService,
+		UserService:      userService,
+		DeliverooService: deliverooService,
 	}
 }
 

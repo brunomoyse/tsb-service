@@ -1,15 +1,16 @@
 package main
 
 import (
+	"log"
+	"net"
+	"net/http"
+	"os"
+
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
-	"log"
-	"net"
-	"net/http"
-	"os"
 	// gRPC proto package
 	"tsb-service/internal/api/event"
 	pb "tsb-service/internal/api/eventpb"
@@ -36,6 +37,7 @@ import (
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/oauth2"
+	"tsb-service/services/deliveroo"
 )
 
 func main() {
@@ -108,6 +110,42 @@ func main() {
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService, broker)
 	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
 
+	// Deliveroo service setup (optional - only if credentials are provided)
+	var deliverooService *deliveroo.Service
+	deliverooClientID := os.Getenv("DELIVEROO_CLIENT_ID")
+	deliverooClientSecret := os.Getenv("DELIVEROO_CLIENT_SECRET")
+	deliverooBrandID := os.Getenv("DELIVEROO_BRAND_ID")
+	deliverooMenuID := os.Getenv("DELIVEROO_MENU_ID")
+	deliverooSiteID := os.Getenv("DELIVEROO_SITE_ID")
+	deliverooUseSandbox := os.Getenv("DELIVEROO_USE_SANDBOX") == "true"
+
+	if deliverooClientID != "" && deliverooClientSecret != "" && deliverooBrandID != "" {
+		deliverooService = deliveroo.NewServiceWithConfig(deliveroo.ServiceConfig{
+			ClientID:     deliverooClientID,
+			ClientSecret: deliverooClientSecret,
+			BrandID:      deliverooBrandID,
+			MenuID:       deliverooMenuID,
+			SiteID:     deliverooSiteID,
+			Currency:     "EUR",
+			UseSandbox:   deliverooUseSandbox,
+		})
+
+		envType := "production"
+		if deliverooUseSandbox {
+			envType = "sandbox"
+		}
+		log.Printf("Deliveroo service initialized successfully (%s environment)", envType)
+
+		if deliverooSiteID != "" {
+			log.Printf("  - Using V2 API with siteID: %s", deliverooSiteID)
+		} else if deliverooMenuID != "" {
+			log.Printf("  - Using V1 API with menuID: %s", deliverooMenuID)
+		}
+	} else {
+		log.Println("Deliveroo credentials not configured - menu sync will not be available")
+		deliverooService = nil
+	}
+
 	// Gin HTTP setup
 	router := gin.Default()
 	router.RedirectTrailingSlash = true
@@ -140,6 +178,7 @@ func main() {
 	rootResolver := resolver.NewResolver(
 		broker,
 		addressService, orderService, paymentService, productService, userService,
+		deliverooService,
 	)
 	graphqlHandler := resolver.GraphQLHandler(rootResolver)
 	optionalAuth := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)
