@@ -10,6 +10,7 @@ import (
 	"time"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
+	"tsb-service/internal/modules/order/domain"
 	"tsb-service/services/deliveroo"
 
 	"github.com/google/uuid"
@@ -364,6 +365,41 @@ func (r *mutationResolver) SyncMenuToPlatform(ctx context.Context, source model.
 	}
 }
 
+// PlatformData is the resolver for the platformData field.
+func (r *orderResolver) PlatformData(ctx context.Context, obj *model.Order) (*model.PlatformOrder, error) {
+	// Only platform orders have platform data
+	if obj.Source == model.OrderSourceTokyo {
+		return nil, nil
+	}
+
+	// Get the domain order to access PlatformData JSONB field
+	domainOrder, _, err := r.OrderService.GetOrderByID(ctx, obj.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order: %w", err)
+	}
+
+	if domainOrder == nil || domainOrder.PlatformData.IsNull() {
+		return nil, nil
+	}
+
+	// Unmarshal based on source
+	switch obj.Source {
+	case model.OrderSourceDeliveroo:
+		var deliverooOrder deliveroo.Order
+		if err := domainOrder.PlatformData.Unmarshal(&deliverooOrder); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal Deliveroo platform data: %w", err)
+		}
+		return convertDeliverooOrderToPlatformOrder(&deliverooOrder, model.OrderSourceDeliveroo), nil
+
+	case model.OrderSourceUber:
+		// Uber Eats integration not yet implemented
+		return nil, nil
+
+	default:
+		return nil, nil
+	}
+}
+
 // PlatformOrders is the resolver for the platformOrders field.
 func (r *queryResolver) PlatformOrders(ctx context.Context, source model.OrderSource, brandID *uuid.UUID, restaurantID *uuid.UUID, filter *model.PlatformOrderFilter) (*model.PlatformOrdersConnection, error) {
 	if r.DeliverooService == nil {
@@ -535,26 +571,33 @@ func (r *subscriptionResolver) PlatformOrderUpdates(ctx context.Context, source 
 	// Create a channel for order updates
 	ch := make(chan *model.PlatformOrder, 1)
 
-	// Subscribe to platform order events
-	topic := fmt.Sprintf("platform_order_updates:%s:%s", source, restaurantID)
+	// Subscribe to new platform orders for this source
+	newOrdersTopic := fmt.Sprintf("platformOrder:new:%s", source)
 
 	go func() {
 		defer close(ch)
 
-		// Subscribe to events from the broker
-		eventCh := r.Broker.Subscribe(topic)
-		defer r.Broker.Unsubscribe(topic, eventCh)
+		// Subscribe to new orders from the broker
+		eventCh := r.Broker.Subscribe(newOrdersTopic)
+		defer r.Broker.Unsubscribe(newOrdersTopic, eventCh)
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case event := <-eventCh:
-				if platformOrder, ok := event.(*model.PlatformOrder); ok {
-					select {
-					case ch <- platformOrder:
-					case <-ctx.Done():
-						return
+				// Convert domain.Order to PlatformOrder
+				if order, ok := event.(*domain.Order); ok {
+					if !order.PlatformData.IsNull() {
+						var deliverooOrder deliveroo.Order
+						if err := order.PlatformData.Unmarshal(&deliverooOrder); err == nil {
+							platformOrder := convertDeliverooOrderToPlatformOrder(&deliverooOrder, source)
+							select {
+							case ch <- platformOrder:
+							case <-ctx.Done():
+								return
+							}
+						}
 					}
 				}
 			}
@@ -569,8 +612,10 @@ func (r *subscriptionResolver) PlatformRiderUpdates(ctx context.Context, source 
 	// Create a channel for rider updates
 	ch := make(chan *model.PlatformRiderUpdate, 1)
 
-	// Subscribe to platform rider events
-	topic := fmt.Sprintf("platform_rider_updates:%s:%s", source, restaurantID)
+	// Subscribe to all rider updates (we'll filter by source in the handler)
+	// Topic format: platformRider:update:{orderId}
+	// Since we don't know order IDs in advance, we subscribe to a wildcard topic
+	topic := "platformRider:update:*"
 
 	go func() {
 		defer close(ch)
@@ -584,11 +629,33 @@ func (r *subscriptionResolver) PlatformRiderUpdates(ctx context.Context, source 
 			case <-ctx.Done():
 				return
 			case event := <-eventCh:
-				if riderUpdate, ok := event.(*model.PlatformRiderUpdate); ok {
-					select {
-					case ch <- riderUpdate:
-					case <-ctx.Done():
-						return
+				// Event is a map[string]interface{} with orderId and riders
+				if riderData, ok := event.(map[string]interface{}); ok {
+					// Convert to PlatformRiderUpdate
+					if riders, ok := riderData["riders"].([]deliveroo.RiderInfo); ok {
+						// Convert riders to model riders
+						var modelRiders []*model.PlatformRiderInfo
+						for _, rider := range riders {
+							modelRiders = append(modelRiders, convertDeliverooRiderToPlatformRider(&rider))
+						}
+
+						// Get order ID
+						var orderID uuid.UUID
+						if id, ok := riderData["orderId"].(uuid.UUID); ok {
+							orderID = id
+						}
+
+						riderUpdate := &model.PlatformRiderUpdate{
+							OrderID:     orderID,
+							Riders:      modelRiders,
+							StackedWith: []uuid.UUID{}, // Empty for now, would need to get from rider data
+						}
+
+						select {
+						case ch <- riderUpdate:
+						case <-ctx.Done():
+							return
+						}
 					}
 				}
 			}

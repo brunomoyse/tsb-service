@@ -305,3 +305,64 @@ func convertGraphQLPlatformStatusToDeliveroo(status model.PlatformOrderStatus) s
 		return "pending"
 	}
 }
+
+// convertDeliverooRiderToPlatformRider converts a Deliveroo rider to a GraphQL platform rider
+func convertDeliverooRiderToPlatformRider(rider *deliveroo.RiderInfo) *model.PlatformRiderInfo {
+	if rider == nil {
+		return nil
+	}
+
+	var statusLog []*model.RiderStatusLogItem
+	for _, log := range rider.StatusLog {
+		// Parse the "at" timestamp
+		logTime, err := time.Parse(time.RFC3339, log.At)
+		if err != nil {
+			// If parsing fails, use current time as fallback
+			logTime = time.Now()
+		}
+
+		statusLog = append(statusLog, &model.RiderStatusLogItem{
+			At:     logTime,
+			Status: convertDeliverooRiderStatus(log.Status),
+		})
+	}
+
+	// Parse estimated arrival time if present
+	var eta *time.Time
+	if rider.EstimatedArrivalTime != "" {
+		etaTime, err := time.Parse(time.RFC3339, rider.EstimatedArrivalTime)
+		if err == nil {
+			eta = &etaTime
+		}
+	}
+
+	return &model.PlatformRiderInfo{
+		EstimatedArrivalTime: eta,
+		FullName:             rider.FullName,
+		ContactNumber:        &rider.ContactNumber,
+		BridgeCode:           &rider.BridgeCode,
+		BridgeNumber:         &rider.BridgeNumber,
+		Lat:                  &rider.Lat,
+		Lon:                  &rider.Lon,
+		AccuracyInMeters:     &rider.AccuracyInMeters,
+		StatusLog:            statusLog,
+	}
+}
+
+// convertDeliverooRiderStatus converts Deliveroo rider status to platform rider status
+func convertDeliverooRiderStatus(status deliveroo.RiderStatus) model.RiderStatus {
+	switch status {
+	case deliveroo.RiderAssigned:
+		return model.RiderStatusRiderAssigned
+	case deliveroo.RiderArrived:
+		return model.RiderStatusRiderArrived
+	case deliveroo.RiderConfirmedAtRestaurant:
+		return model.RiderStatusRiderConfirmedAtRestaurant
+	case deliveroo.RiderUnassigned:
+		return model.RiderStatusRiderUnassigned
+	case deliveroo.RiderInTransit:
+		return model.RiderStatusRiderInTransit
+	default:
+		return model.RiderStatusRiderAssigned
+	}
+}
