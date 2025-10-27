@@ -473,6 +473,70 @@ func (r *orderResolver) Items(ctx context.Context, obj *model.Order) ([]*model.O
 	return items, nil
 }
 
+// DisplayCustomerName is the resolver for the displayCustomerName field.
+func (r *orderResolver) DisplayCustomerName(ctx context.Context, obj *model.Order) (string, error) {
+	// For Tokyo orders, get customer from User relation
+	if obj.Source == model.OrderSourceTokyo {
+		customer, err := r.Customer(ctx, obj)
+		if err != nil {
+			return "Guest", nil
+		}
+		if customer != nil {
+			return fmt.Sprintf("%s %s", customer.FirstName, customer.LastName), nil
+		}
+		return "Guest", nil
+	}
+
+	// For platform orders (Deliveroo/Uber), get from PlatformData
+	platformData, err := r.PlatformData(ctx, obj)
+	if err != nil || platformData == nil {
+		return "Guest", nil
+	}
+
+	if platformData.Customer != nil && platformData.Customer.FirstName != nil {
+		return *platformData.Customer.FirstName, nil
+	}
+
+	return "Guest", nil
+}
+
+// DisplayAddress is the resolver for the displayAddress field.
+func (r *orderResolver) DisplayAddress(ctx context.Context, obj *model.Order) (string, error) {
+	// For Tokyo orders, get address from Address relation
+	if obj.Source == model.OrderSourceTokyo {
+		address, err := r.Address(ctx, obj)
+		if err != nil {
+			return "N/A", nil
+		}
+		if address != nil {
+			// Format: "Street HouseNumber BoxNumber, Postcode Municipality"
+			addressStr := fmt.Sprintf("%s %s", address.StreetName, address.HouseNumber)
+			if address.BoxNumber != nil && *address.BoxNumber != "" {
+				addressStr += fmt.Sprintf(" %s", *address.BoxNumber)
+			}
+			addressStr += fmt.Sprintf(", %s %s", address.Postcode, address.MunicipalityName)
+			return addressStr, nil
+		}
+		return "Pickup", nil
+	}
+
+	// For platform orders (Deliveroo/Uber), get from PlatformData
+	platformData, err := r.PlatformData(ctx, obj)
+	if err != nil || platformData == nil {
+		return "N/A", nil
+	}
+
+	// Check if it's a delivery order with address
+	if platformData.Delivery != nil && platformData.Delivery.Address != nil {
+		addr := platformData.Delivery.Address
+		// Format: "AddressLine1, PostalCode City"
+		return fmt.Sprintf("%s, %s %s", addr.AddressLine1, addr.PostalCode, addr.City), nil
+	}
+
+	// If no delivery address, it's likely pickup
+	return "Pickup", nil
+}
+
 // Product is the resolver for the product field.
 func (r *orderItemResolver) Product(ctx context.Context, obj *model.OrderItem) (*model.Product, error) {
 	userLang := utils.GetLang(ctx)
