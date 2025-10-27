@@ -85,26 +85,28 @@ type Mutation struct {
 }
 
 type Order struct {
-	ID                 uuid.UUID          `json:"id"`
-	CreatedAt          time.Time          `json:"createdAt"`
-	UpdatedAt          time.Time          `json:"updatedAt"`
-	Status             domain.OrderStatus `json:"status"`
-	Type               OrderTypeEnum      `json:"type"`
-	IsOnlinePayment    bool               `json:"isOnlinePayment"`
-	DiscountAmount     string             `json:"discountAmount"`
-	DeliveryFee        *string            `json:"deliveryFee,omitempty"`
-	TotalPrice         string             `json:"totalPrice"`
-	PreferredReadyTime *time.Time         `json:"preferredReadyTime,omitempty"`
-	EstimatedReadyTime *time.Time         `json:"estimatedReadyTime,omitempty"`
-	AddressExtra       *string            `json:"addressExtra,omitempty"`
-	OrderNote          *string            `json:"orderNote,omitempty"`
-	OrderExtra         map[string]any     `json:"orderExtra,omitempty"`
-	Address            *Address           `json:"address,omitempty"`
-	Customer           *User              `json:"customer"`
-	Payment            *Payment           `json:"payment,omitempty"`
-	Items              []*OrderItem       `json:"items"`
-	Source             OrderSource        `json:"source"`
-	PlatformData       *PlatformOrder     `json:"platformData,omitempty"`
+	ID                  uuid.UUID          `json:"id"`
+	CreatedAt           time.Time          `json:"createdAt"`
+	UpdatedAt           time.Time          `json:"updatedAt"`
+	Status              domain.OrderStatus `json:"status"`
+	Type                OrderTypeEnum      `json:"type"`
+	IsOnlinePayment     bool               `json:"isOnlinePayment"`
+	DiscountAmount      string             `json:"discountAmount"`
+	DeliveryFee         *string            `json:"deliveryFee,omitempty"`
+	TotalPrice          string             `json:"totalPrice"`
+	PreferredReadyTime  *time.Time         `json:"preferredReadyTime,omitempty"`
+	EstimatedReadyTime  *time.Time         `json:"estimatedReadyTime,omitempty"`
+	AddressExtra        *string            `json:"addressExtra,omitempty"`
+	OrderNote           *string            `json:"orderNote,omitempty"`
+	OrderExtra          map[string]any     `json:"orderExtra,omitempty"`
+	Address             *Address           `json:"address,omitempty"`
+	Customer            *User              `json:"customer,omitempty"`
+	Payment             *Payment           `json:"payment,omitempty"`
+	Items               []*OrderItem       `json:"items"`
+	DisplayCustomerName string             `json:"displayCustomerName"`
+	DisplayAddress      string             `json:"displayAddress"`
+	Source              OrderSource        `json:"source"`
+	PlatformData        *PlatformOrder     `json:"platformData,omitempty"`
 }
 
 type OrderExtraInput struct {

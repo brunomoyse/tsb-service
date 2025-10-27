@@ -109,26 +109,28 @@ type ComplexityRoot struct {
 	}
 
 	Order struct {
-		Address            func(childComplexity int) int
-		AddressExtra       func(childComplexity int) int
-		CreatedAt          func(childComplexity int) int
-		Customer           func(childComplexity int) int
-		DeliveryFee        func(childComplexity int) int
-		DiscountAmount     func(childComplexity int) int
-		EstimatedReadyTime func(childComplexity int) int
-		ID                 func(childComplexity int) int
-		IsOnlinePayment    func(childComplexity int) int
-		Items              func(childComplexity int) int
-		OrderExtra         func(childComplexity int) int
-		OrderNote          func(childComplexity int) int
-		Payment            func(childComplexity int) int
-		PlatformData       func(childComplexity int) int
-		PreferredReadyTime func(childComplexity int) int
-		Source             func(childComplexity int) int
-		Status             func(childComplexity int) int
-		TotalPrice         func(childComplexity int) int
-		Type               func(childComplexity int) int
-		UpdatedAt          func(childComplexity int) int
+		Address             func(childComplexity int) int
+		AddressExtra        func(childComplexity int) int
+		CreatedAt           func(childComplexity int) int
+		Customer            func(childComplexity int) int
+		DeliveryFee         func(childComplexity int) int
+		DiscountAmount      func(childComplexity int) int
+		DisplayAddress      func(childComplexity int) int
+		DisplayCustomerName func(childComplexity int) int
+		EstimatedReadyTime  func(childComplexity int) int
+		ID                  func(childComplexity int) int
+		IsOnlinePayment     func(childComplexity int) int
+		Items               func(childComplexity int) int
+		OrderExtra          func(childComplexity int) int
+		OrderNote           func(childComplexity int) int
+		Payment             func(childComplexity int) int
+		PlatformData        func(childComplexity int) int
+		PreferredReadyTime  func(childComplexity int) int
+		Source              func(childComplexity int) int
+		Status              func(childComplexity int) int
+		TotalPrice          func(childComplexity int) int
+		Type                func(childComplexity int) int
+		UpdatedAt           func(childComplexity int) int
 	}
 
 	OrderItem struct {
@@ -455,6 +457,10 @@ type OrderResolver interface {
 	Customer(ctx context.Context, obj *model.Order) (*model.User, error)
 	Payment(ctx context.Context, obj *model.Order) (*model.Payment, error)
 	Items(ctx context.Context, obj *model.Order) ([]*model.OrderItem, error)
+	DisplayCustomerName(ctx context.Context, obj *model.Order) (string, error)
+	DisplayAddress(ctx context.Context, obj *model.Order) (string, error)
+
+	PlatformData(ctx context.Context, obj *model.Order) (*model.PlatformOrder, error)
 }
 type OrderItemResolver interface {
 	Product(ctx context.Context, obj *model.OrderItem) (*model.Product, error)
@@ -830,6 +836,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Order.DiscountAmount(childComplexity), true
+	case "Order.displayAddress":
+		if e.complexity.Order.DisplayAddress == nil {
+			break
+		}
+
+		return e.complexity.Order.DisplayAddress(childComplexity), true
+	case "Order.displayCustomerName":
+		if e.complexity.Order.DisplayCustomerName == nil {
+			break
+		}
+
+		return e.complexity.Order.DisplayCustomerName(childComplexity), true
 	case "Order.estimatedReadyTime":
 		if e.complexity.Order.EstimatedReadyTime == nil {
 			break
@@ -4388,6 +4406,10 @@ func (ec *executionContext) fieldContext_Mutation_createOrder(ctx context.Contex
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "displayCustomerName":
+				return ec.fieldContext_Order_displayCustomerName(ctx, field)
+			case "displayAddress":
+				return ec.fieldContext_Order_displayAddress(ctx, field)
 			case "source":
 				return ec.fieldContext_Order_source(ctx, field)
 			case "platformData":
@@ -4484,6 +4506,10 @@ func (ec *executionContext) fieldContext_Mutation_updateOrder(ctx context.Contex
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "displayCustomerName":
+				return ec.fieldContext_Order_displayCustomerName(ctx, field)
+			case "displayAddress":
+				return ec.fieldContext_Order_displayAddress(ctx, field)
 			case "source":
 				return ec.fieldContext_Order_source(ctx, field)
 			case "platformData":
@@ -5379,9 +5405,9 @@ func (ec *executionContext) _Order_customer(ctx context.Context, field graphql.C
 			return ec.resolvers.Order().Customer(ctx, obj)
 		},
 		nil,
-		ec.marshalNUser2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUser,
+		ec.marshalOUser2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUser,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -5548,6 +5574,64 @@ func (ec *executionContext) fieldContext_Order_items(_ context.Context, field gr
 	return fc, nil
 }
 
+func (ec *executionContext) _Order_displayCustomerName(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Order_displayCustomerName,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Order().DisplayCustomerName(ctx, obj)
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Order_displayCustomerName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Order",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Order_displayAddress(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Order_displayAddress,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Order().DisplayAddress(ctx, obj)
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Order_displayAddress(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Order",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Order_source(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5584,7 +5668,7 @@ func (ec *executionContext) _Order_platformData(ctx context.Context, field graph
 		field,
 		ec.fieldContext_Order_platformData,
 		func(ctx context.Context) (any, error) {
-			return obj.PlatformData, nil
+			return ec.resolvers.Order().PlatformData(ctx, obj)
 		},
 		nil,
 		ec.marshalOPlatformOrder2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐPlatformOrder,
@@ -5597,8 +5681,8 @@ func (ec *executionContext) fieldContext_Order_platformData(_ context.Context, f
 	fc = &graphql.FieldContext{
 		Object:     "Order",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "source":
@@ -11133,6 +11217,10 @@ func (ec *executionContext) fieldContext_Query_orders(_ context.Context, field g
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "displayCustomerName":
+				return ec.fieldContext_Order_displayCustomerName(ctx, field)
+			case "displayAddress":
+				return ec.fieldContext_Order_displayAddress(ctx, field)
 			case "source":
 				return ec.fieldContext_Order_source(ctx, field)
 			case "platformData":
@@ -11218,6 +11306,10 @@ func (ec *executionContext) fieldContext_Query_order(ctx context.Context, field 
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "displayCustomerName":
+				return ec.fieldContext_Order_displayCustomerName(ctx, field)
+			case "displayAddress":
+				return ec.fieldContext_Order_displayAddress(ctx, field)
 			case "source":
 				return ec.fieldContext_Order_source(ctx, field)
 			case "platformData":
@@ -11314,6 +11406,10 @@ func (ec *executionContext) fieldContext_Query_myOrders(ctx context.Context, fie
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "displayCustomerName":
+				return ec.fieldContext_Order_displayCustomerName(ctx, field)
+			case "displayAddress":
+				return ec.fieldContext_Order_displayAddress(ctx, field)
 			case "source":
 				return ec.fieldContext_Order_source(ctx, field)
 			case "platformData":
@@ -11410,6 +11506,10 @@ func (ec *executionContext) fieldContext_Query_myOrder(ctx context.Context, fiel
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "displayCustomerName":
+				return ec.fieldContext_Order_displayCustomerName(ctx, field)
+			case "displayAddress":
+				return ec.fieldContext_Order_displayAddress(ctx, field)
 			case "source":
 				return ec.fieldContext_Order_source(ctx, field)
 			case "platformData":
@@ -12249,6 +12349,10 @@ func (ec *executionContext) fieldContext_Subscription_orderCreated(_ context.Con
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "displayCustomerName":
+				return ec.fieldContext_Order_displayCustomerName(ctx, field)
+			case "displayAddress":
+				return ec.fieldContext_Order_displayAddress(ctx, field)
 			case "source":
 				return ec.fieldContext_Order_source(ctx, field)
 			case "platformData":
@@ -12333,6 +12437,10 @@ func (ec *executionContext) fieldContext_Subscription_orderUpdated(_ context.Con
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "displayCustomerName":
+				return ec.fieldContext_Order_displayCustomerName(ctx, field)
+			case "displayAddress":
+				return ec.fieldContext_Order_displayAddress(ctx, field)
 			case "source":
 				return ec.fieldContext_Order_source(ctx, field)
 			case "platformData":
@@ -12418,6 +12526,10 @@ func (ec *executionContext) fieldContext_Subscription_myOrderUpdated(ctx context
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "displayCustomerName":
+				return ec.fieldContext_Order_displayCustomerName(ctx, field)
+			case "displayAddress":
+				return ec.fieldContext_Order_displayAddress(ctx, field)
 			case "source":
 				return ec.fieldContext_Order_source(ctx, field)
 			case "platformData":
@@ -13491,6 +13603,10 @@ func (ec *executionContext) fieldContext_User_orders(_ context.Context, field gr
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "displayCustomerName":
+				return ec.fieldContext_Order_displayCustomerName(ctx, field)
+			case "displayAddress":
+				return ec.fieldContext_Order_displayAddress(ctx, field)
 			case "source":
 				return ec.fieldContext_Order_source(ctx, field)
 			case "platformData":
@@ -16252,16 +16368,13 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 		case "customer":
 			field := field
 
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
 				res = ec._Order_customer(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
 				return res
 			}
 
@@ -16354,13 +16467,116 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "displayCustomerName":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Order_displayCustomerName(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "displayAddress":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Order_displayAddress(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "source":
 			out.Values[i] = ec._Order_source(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "platformData":
-			out.Values[i] = ec._Order_platformData(ctx, field, obj)
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Order_platformData(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -21251,6 +21467,13 @@ func (ec *executionContext) marshalOUpload2ᚖgithubᚗcomᚋ99designsᚋgqlgen�
 	_ = ctx
 	res := graphql.MarshalUpload(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOUser2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v *model.User) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._User(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {
