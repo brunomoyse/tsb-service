@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -35,46 +34,42 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		}
 	}()
 
-	// Calculate the total price of the order from order products.
-	computedTotal := decimal.NewFromInt(0)
-	for _, prod := range *op {
-		computedTotal = computedTotal.Add(prod.TotalPrice)
-	}
-
-	// Add delivery fee if applicable.
-	if o.DeliveryFee != nil {
-		computedTotal = computedTotal.Add(*o.DeliveryFee)
-	}
-
-	// Add discount amount if applicable.
-	if o.DiscountAmount != decimal.Zero {
-		computedTotal = computedTotal.Sub(o.DiscountAmount)
-	}
-
-	o.TotalPrice = computedTotal
-
-	// Marshal OrderExtras to JSON (for the order_extra column).
-	var orderExtraJSON []byte
-	if o.OrderExtra != nil {
-		orderExtraJSON, err = json.Marshal(o.OrderExtra)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to marshal order extras: %w", err)
+	// Calculate the total price of the order from order products only if order products exist.
+	// For platform orders, total price is already set from platform data.
+	if op != nil && len(*op) > 0 {
+		computedTotal := decimal.NewFromInt(0)
+		for _, prod := range *op {
+			computedTotal = computedTotal.Add(prod.TotalPrice)
 		}
-	} else {
-		// If there are no extras, use "null" (or "[]" if you prefer an empty array)
-		orderExtraJSON = []byte("null")
+
+		// Add delivery fee if applicable.
+		if o.DeliveryFee != nil {
+			computedTotal = computedTotal.Add(*o.DeliveryFee)
+		}
+
+		// Add discount amount if applicable.
+		if o.DiscountAmount != decimal.Zero {
+			computedTotal = computedTotal.Sub(o.DiscountAmount)
+		}
+
+		o.TotalPrice = computedTotal
 	}
+
+	// OrderExtra and PlatformData are NullableJSON, which handles nil automatically
+	// No need to marshal - they're already in the correct format for the database
 
 	// Insert the order record.
 	const orderQuery = `
 		INSERT INTO orders (
-			user_id, order_status, order_type, is_online_payment, 
-			discount_amount, delivery_fee, total_price, preferred_ready_time, estimated_ready_time, 
-			address_id, address_extra, order_note, order_extra
+			user_id, order_status, order_type, is_online_payment,
+			discount_amount, delivery_fee, total_price, preferred_ready_time, estimated_ready_time,
+			address_id, address_extra, order_note, order_extra,
+			source, platform_order_id, platform_data
 		) VALUES (
-			$1, $2, $3, $4, 
-			$5, $6, $7, $8, 
-			$9, $10, $11, $12, $13
+			$1, $2, $3, $4,
+			$5, $6, $7, $8, $9,
+			$10, $11, $12, $13,
+			$14, $15, $16
 		)
 		RETURNING id, created_at, updated_at;
 	`
@@ -98,7 +93,10 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		o.AddressID,
 		o.AddressExtra,
 		o.OrderNote,
-		string(orderExtraJSON), // convert []byte to string
+		o.OrderExtra,
+		o.Source,
+		o.PlatformOrderID,
+		o.PlatformData,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to insert order: %w", err)
@@ -109,23 +107,26 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 	o.CreatedAt = inserted.CreatedAt
 	o.UpdatedAt = inserted.UpdatedAt
 
-	// Insert each order product.
-	const orderProductQuery = `
-		INSERT INTO order_product (
-			order_id, product_id, unit_price, quantity, total_price
-		) VALUES (
-			$1, $2, $3, $4, $5
-		);
-	`
-	for _, prod := range *op {
-		if _, err = tx.ExecContext(ctx, orderProductQuery,
-			o.ID,
-			prod.ProductID,
-			prod.UnitPrice,
-			prod.Quantity,
-			prod.TotalPrice,
-		); err != nil {
-			return nil, nil, fmt.Errorf("failed to insert order product: %w", err)
+	// Insert each order product only if order products exist.
+	// Platform orders store their items in platform_data.
+	if op != nil && len(*op) > 0 {
+		const orderProductQuery = `
+			INSERT INTO order_product (
+				order_id, product_id, unit_price, quantity, total_price
+			) VALUES (
+				$1, $2, $3, $4, $5
+			);
+		`
+		for _, prod := range *op {
+			if _, err = tx.ExecContext(ctx, orderProductQuery,
+				o.ID,
+				prod.ProductID,
+				prod.UnitPrice,
+				prod.Quantity,
+				prod.TotalPrice,
+			); err != nil {
+				return nil, nil, fmt.Errorf("failed to insert order product: %w", err)
+			}
 		}
 	}
 
@@ -319,8 +320,27 @@ func (r *OrderRepository) FindByUserIDs(ctx context.Context, userIDs []string) (
 	// 4) Group by user_id
 	result := make(map[string][]*domain.Order, len(userIDs))
 	for _, o := range orders {
-		result[o.UserID.String()] = append(result[o.UserID.String()], &o)
+		if o.UserID != nil {
+			result[o.UserID.String()] = append(result[o.UserID.String()], &o)
+		}
 	}
 
 	return result, nil
+}
+
+// FindByPlatformOrderID retrieves an order by its platform order ID and source
+func (r *OrderRepository) FindByPlatformOrderID(ctx context.Context, platformOrderID string, source domain.OrderSource) (*domain.Order, error) {
+	query := `
+		SELECT *
+		FROM orders
+		WHERE platform_order_id = $1 AND source = $2
+		LIMIT 1
+	`
+
+	var order domain.Order
+	if err := r.db.GetContext(ctx, &order, query, platformOrderID, source); err != nil {
+		return nil, fmt.Errorf("failed to query order by platform ID: %w", err)
+	}
+
+	return &order, nil
 }
