@@ -17,6 +17,7 @@ import (
 
 	gqlMiddleware "tsb-service/internal/api/graphql/middleware"
 	"tsb-service/internal/api/graphql/resolver"
+	httpHandlers "tsb-service/internal/api/http"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
 	"tsb-service/pkg/pubsub"
@@ -110,6 +111,9 @@ func main() {
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService, broker)
 	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
 
+	// Deliveroo webhook handler (will be initialized if Deliveroo is configured)
+	var deliverooWebhookHandler *httpHandlers.DeliverooWebhookHandler
+
 	// Deliveroo service setup (optional - only if credentials are provided)
 	var deliverooService *deliveroo.Service
 	deliverooClientID := os.Getenv("DELIVEROO_CLIENT_ID")
@@ -141,6 +145,21 @@ func main() {
 		} else if deliverooMenuID != "" {
 			log.Printf("  - Using V1 API with menuID: %s", deliverooMenuID)
 		}
+
+		// Initialize Deliveroo webhook handler
+		deliverooWebhookSecret := os.Getenv("DELIVEROO_WEBHOOK_SECRET")
+		if deliverooWebhookSecret == "" {
+			log.Println("Warning: DELIVEROO_WEBHOOK_SECRET not set - webhook signature verification will fail")
+		}
+		deliverooWebhookHandler = httpHandlers.NewDeliverooWebhookHandler(
+			orderService,
+			deliverooService,
+			deliverooWebhookSecret,
+			broker,
+			addressRepo,
+			productRepo,
+		)
+		log.Println("Deliveroo webhook handler initialized")
 	} else {
 		log.Println("Deliveroo credentials not configured - menu sync will not be available")
 		deliverooService = nil
@@ -195,6 +214,14 @@ func main() {
 	api.POST("/logout", userHandler.LogoutHandler)
 	api.GET("/oauth/google", userHandler.GoogleAuthHandler)
 	api.GET("/oauth/google/callback", userHandler.GoogleAuthCallbackHandler)
+
+	// Deliveroo webhook endpoints (only registered if handler is initialized)
+	if deliverooWebhookHandler != nil {
+		webhooks := api.Group("/webhooks/deliveroo")
+		webhooks.POST("/orders", deliverooWebhookHandler.HandleOrderEvents)
+		webhooks.POST("/riders", deliverooWebhookHandler.HandleRiderEvents)
+		log.Println("Deliveroo webhook endpoints registered at /api/v1/webhooks/deliveroo")
+	}
 
 	// HTTP server
 	srv := &http.Server{
