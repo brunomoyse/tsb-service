@@ -169,6 +169,12 @@ models:
         resolver: true
       customer:
         resolver: true
+      platformData:
+        resolver: true
+      displayCustomerName:
+        resolver: true
+      displayAddress:
+        resolver: true
 
   OrderItem:
     fields:

@@ -12,6 +12,8 @@ type OrderRepository interface {
 	FindByID(ctx context.Context, orderID uuid.UUID) (*Order, *[]OrderProductRaw, error)
 	FindPaginated(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*Order, error)
 	FindByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*OrderProductRaw, error)
-
 	FindByUserIDs(ctx context.Context, userIDs []string) (map[string][]*Order, error)
+
+	// Platform order methods
+	FindByPlatformOrderID(ctx context.Context, platformOrderID string, source OrderSource) (*Order, error)
 }

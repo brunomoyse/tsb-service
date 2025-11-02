@@ -15,9 +15,15 @@ type Order {
     orderExtra: JSON
 
     address: Address
-    customer: User!
+    customer: User  # Nullable for platform orders (Deliveroo/Uber)
     payment: Payment
     items: [OrderItem!]!
+
+    # Computed helper fields for unified display
+    displayCustomerName: String!
+    displayAddress: String!
+
+    # Note: source and platformData are extended in deliveroo.graphql
 }
 
 type OrderItem {
