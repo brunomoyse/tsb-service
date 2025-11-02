@@ -361,21 +361,21 @@ func (h *DeliverooWebhookHandler) convertDeliverooItemsToOrderProducts(ctx conte
 
 	for _, item := range items {
 		// Try to parse the PosItemID as UUID (should match synced product IDs)
-		if item.PosItemID == "" {
+		if item.PosItemID == nil || *item.PosItemID == "" {
 			log.Printf("Skipping item without PosItemID: %s", item.Name)
 			continue
 		}
 
-		productID, err := uuid.Parse(item.PosItemID)
+		productID, err := uuid.Parse(*item.PosItemID)
 		if err != nil {
-			log.Printf("Invalid product UUID for item %s (PosItemID: %s): %v", item.Name, item.PosItemID, err)
+			log.Printf("Invalid product UUID for item %s (PosItemID: %s): %v", item.Name, *item.PosItemID, err)
 			continue
 		}
 
 		// Verify product exists in database
-		product, err := h.productRepo.GetByID(ctx, productID)
+		product, err := h.productRepo.FindByID(ctx, productID)
 		if err != nil {
-			log.Printf("Product not found for PosItemID %s: %v", item.PosItemID, err)
+			log.Printf("Product not found for PosItemID %s: %v", *item.PosItemID, err)
 			continue
 		}
 
