@@ -192,7 +192,7 @@ type PlatformDeliveryDetails struct {
 
 type PlatformOrder struct {
 	Source               OrderSource              `json:"source"`
-	PlatformOrderID      uuid.UUID                `json:"platformOrderId"`
+	PlatformOrderID      string                   `json:"platformOrderId"`
 	OrderNumber          string                   `json:"orderNumber"`
 	DisplayID            string                   `json:"displayId"`
 	LocationID           string                   `json:"locationId"`

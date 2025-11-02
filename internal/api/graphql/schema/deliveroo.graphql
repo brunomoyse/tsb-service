@@ -65,7 +65,7 @@ extend type Order {
 # Platform order contains platform-specific details from Deliveroo/Uber Eats
 type PlatformOrder {
   source: OrderSource!
-  platformOrderId: ID!
+  platformOrderId: String!
   orderNumber: String!
   displayId: String!
   locationId: String!

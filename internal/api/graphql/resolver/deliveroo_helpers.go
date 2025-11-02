@@ -13,7 +13,7 @@ import (
 func convertDeliverooOrderToPlatformOrder(order *deliveroo.Order, source model.OrderSource) *model.PlatformOrder {
 	platformOrder := &model.PlatformOrder{
 		Source:               source,
-		PlatformOrderID:      uuid.MustParse(order.ID),
+		PlatformOrderID:      order.ID,
 		OrderNumber:          order.OrderNumber,
 		DisplayID:            order.DisplayID,
 		LocationID:           order.LocationID,
