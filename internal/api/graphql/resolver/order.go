@@ -489,7 +489,11 @@ func (r *orderResolver) DisplayCustomerName(ctx context.Context, obj *model.Orde
 
 	// For platform orders (Deliveroo/Uber), get from PlatformData
 	platformData, err := r.PlatformData(ctx, obj)
-	if err != nil || platformData == nil {
+	if err != nil {
+		log.Printf("Error getting platform data for order %s: %v", obj.ID, err)
+		return "Guest", nil
+	}
+	if platformData == nil {
 		return "Guest", nil
 	}
 
@@ -522,7 +526,11 @@ func (r *orderResolver) DisplayAddress(ctx context.Context, obj *model.Order) (s
 
 	// For platform orders (Deliveroo/Uber), get from PlatformData
 	platformData, err := r.PlatformData(ctx, obj)
-	if err != nil || platformData == nil {
+	if err != nil {
+		log.Printf("Error getting platform data for order %s: %v", obj.ID, err)
+		return "N/A", nil
+	}
+	if platformData == nil {
 		return "N/A", nil
 	}
 
