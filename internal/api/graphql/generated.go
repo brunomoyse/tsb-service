@@ -7382,7 +7382,7 @@ func (ec *executionContext) _PlatformOrder_platformOrderId(ctx context.Context, 
 			return obj.PlatformOrderID, nil
 		},
 		nil,
-		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		ec.marshalNString2string,
 		true,
 		true,
 	)
@@ -7395,7 +7395,7 @@ func (ec *executionContext) fieldContext_PlatformOrder_platformOrderId(_ context
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
