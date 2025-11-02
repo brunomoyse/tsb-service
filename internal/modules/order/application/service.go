@@ -16,6 +16,12 @@ type OrderService interface {
 	UpdateOrder(ctx context.Context, orderID uuid.UUID, newStatus *domain.OrderStatus, estimatedReadyTime *time.Time) error
 	GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error)
 
+	// Platform order methods
+	CreatePlatformOrder(ctx context.Context, order *domain.Order) (*domain.Order, error)
+	CreatePlatformOrderWithProducts(ctx context.Context, order *domain.Order, orderProducts []domain.OrderProductRaw) (*domain.Order, error)
+	UpdatePlatformOrderStatus(ctx context.Context, platformOrderID string, source domain.OrderSource, newStatus domain.OrderStatus) (*domain.Order, error)
+	GetOrderByPlatformID(ctx context.Context, platformOrderID string, source domain.OrderSource) (*domain.Order, error)
+
 	BatchGetOrderProductsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.OrderProductRaw, error)
 	BatchGetOrdersByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error)
 }
@@ -76,4 +82,50 @@ func (s *orderService) BatchGetOrderProductsByOrderIDs(ctx context.Context, orde
 
 func (s *orderService) BatchGetOrdersByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error) {
 	return s.repo.FindByUserIDs(ctx, userIDs)
+}
+
+// CreatePlatformOrder creates an order from a platform (Deliveroo, Uber, etc.)
+func (s *orderService) CreatePlatformOrder(ctx context.Context, order *domain.Order) (*domain.Order, error) {
+	// Save platform order without order products (platform orders manage their own items)
+	createdOrder, _, err := s.repo.Save(ctx, order, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save platform order: %w", err)
+	}
+	return createdOrder, nil
+}
+
+// CreatePlatformOrderWithProducts creates an order from a platform with mapped order products
+func (s *orderService) CreatePlatformOrderWithProducts(ctx context.Context, order *domain.Order, orderProducts []domain.OrderProductRaw) (*domain.Order, error) {
+	// Save platform order with order products
+	createdOrder, _, err := s.repo.Save(ctx, order, &orderProducts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save platform order with products: %w", err)
+	}
+	return createdOrder, nil
+}
+
+// UpdatePlatformOrderStatus updates the status of a platform order
+func (s *orderService) UpdatePlatformOrderStatus(ctx context.Context, platformOrderID string, source domain.OrderSource, newStatus domain.OrderStatus) (*domain.Order, error) {
+	// Get the order by platform ID
+	order, err := s.repo.FindByPlatformOrderID(ctx, platformOrderID, source)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find platform order: %w", err)
+	}
+
+	// Update status
+	order.OrderStatus = newStatus
+	order.UpdatedAt = time.Now()
+
+	// Save
+	err = s.repo.Update(ctx, order)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update platform order: %w", err)
+	}
+
+	return order, nil
+}
+
+// GetOrderByPlatformID retrieves an order by its platform-specific order ID
+func (s *orderService) GetOrderByPlatformID(ctx context.Context, platformOrderID string, source domain.OrderSource) (*domain.Order, error) {
+	return s.repo.FindByPlatformOrderID(ctx, platformOrderID, source)
 }
