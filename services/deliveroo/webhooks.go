@@ -23,21 +23,16 @@ func NewWebhookHandler(webhookSecret string) *WebhookHandler {
 }
 
 // VerifySignature verifies the HMAC-SHA256 signature of a webhook request
+// According to Deliveroo docs: https://api-docs.deliveroo.com/docs/securing-webhooks
+// The signature is calculated as: HMAC-SHA256(secret, GUID + " " + payload)
 func (h *WebhookHandler) VerifySignature(payload []byte, sequenceGUID, receivedSignature string) bool {
-	// Compute HMAC-SHA256 using webhook secret and sequence GUID as key
-	mac := hmac.New(sha256.New, []byte(h.webhookSecret+sequenceGUID))
-	mac.Write(payload)
-	expectedSignature := hex.EncodeToString(mac.Sum(nil))
+	// Construct the message to sign: GUID + space + payload
+	message := sequenceGUID + " " + string(payload)
 
-	// Debug logging
-	if expectedSignature != receivedSignature {
-		fmt.Printf("DEBUG: Signature mismatch\n")
-		fmt.Printf("  Secret length: %d\n", len(h.webhookSecret))
-		fmt.Printf("  Sequence GUID: %s\n", sequenceGUID)
-		fmt.Printf("  Payload length: %d bytes\n", len(payload))
-		fmt.Printf("  Expected signature: %s\n", expectedSignature)
-		fmt.Printf("  Received signature: %s\n", receivedSignature)
-	}
+	// Compute HMAC-SHA256 using webhook secret as the key
+	mac := hmac.New(sha256.New, []byte(h.webhookSecret))
+	mac.Write([]byte(message))
+	expectedSignature := hex.EncodeToString(mac.Sum(nil))
 
 	// Constant-time comparison to prevent timing attacks
 	return hmac.Equal([]byte(expectedSignature), []byte(receivedSignature))
