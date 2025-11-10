@@ -6,7 +6,7 @@ toolchain go1.24.2
 
 require (
 	github.com/99designs/gqlgen v0.17.82
-	github.com/gin-contrib/cors v1.7.4
+	github.com/gin-contrib/cors v1.7.6
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/gosimple/slug v1.15.0
