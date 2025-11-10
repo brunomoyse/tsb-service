@@ -1,6 +1,10 @@
 package deliveroo
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
 
 // OrderStatus represents the status of an order
 type OrderStatus string
@@ -635,4 +639,66 @@ type MenuError struct {
 	Code    string  `json:"code"`
 	Message string  `json:"message"`
 	Field   *string `json:"field,omitempty"`
+}
+
+// UnmarshalJSON handles the case where Deliveroo sends errors as either an array or an object
+func (m *MenuUploadResult) UnmarshalJSON(data []byte) error {
+	type alias MenuUploadResult
+	aux := &struct {
+		Errors interface{} `json:"errors"`
+		*alias
+	}{
+		alias: (*alias)(m),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Handle errors field which can be either an array or an object
+	if aux.Errors != nil {
+		switch v := aux.Errors.(type) {
+		case []interface{}:
+			// It's already an array, marshal and unmarshal to MenuError structs
+			errorsData, err := json.Marshal(v)
+			if err != nil {
+				return fmt.Errorf("failed to marshal errors array: %w", err)
+			}
+			if err := json.Unmarshal(errorsData, &m.Errors); err != nil {
+				return fmt.Errorf("failed to unmarshal errors array: %w", err)
+			}
+
+		case map[string]interface{}:
+			// It's an object, convert to array of errors
+			// The object keys are field names, so we extract each error and add field info
+			errMap := v
+			m.Errors = make([]MenuError, 0, len(errMap))
+			for fieldName, errVal := range errMap {
+				if errObj, ok := errVal.(map[string]interface{}); ok {
+					var code, message string
+					if c, ok := errObj["code"].(string); ok {
+						code = c
+					}
+					if msg, ok := errObj["message"].(string); ok {
+						message = msg
+					}
+					field := fieldName
+					m.Errors = append(m.Errors, MenuError{
+						Code:    code,
+						Message: message,
+						Field:   &field,
+					})
+				}
+			}
+
+		case nil:
+			// No errors
+			m.Errors = []MenuError{}
+
+		default:
+			return fmt.Errorf("unexpected type for errors field: %T", v)
+		}
+	}
+
+	return nil
 }
