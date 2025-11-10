@@ -12,8 +12,8 @@ github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERo
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 h1:TngWCqHvy9oXAN6lEVMRuU21PR1EtLVZJmdB18Gu3Rw=
 github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5/go.mod h1:lmUJ/7eu/Q8D7ML55dXQrVaamCz2vxCfdQBasLZfHKk=
-github.com/VictorAvelar/mollie-api-go/v4 v4.2.4 h1:HuVwM+fIYIBLBSIaMiZkiWL/CCs2hiUn96oS4P/+pIc=
-github.com/VictorAvelar/mollie-api-go/v4 v4.2.4/go.mod h1:PuKst1rRPEBcBwCl8IuczJrHl1cMZQTCuglJq2eF7Uk=
+github.com/VictorAvelar/mollie-api-go/v4 v4.10.0 h1:ZHZi/pB8noIlPGfKQhX3I2aEUDw6k9TZZwVRrROR60E=
+github.com/VictorAvelar/mollie-api-go/v4 v4.10.0/go.mod h1:qXE087sT0Ms9Y9ohT3xPqMWR12uC4U2T83TUMH1amQE=
 github.com/agnivade/levenshtein v1.2.1 h1:EHBY3UOn1gwdy/VbFwgo4cxecRznFk7fKWN1KOX7eoM=
 github.com/agnivade/levenshtein v1.2.1/go.mod h1:QVVI16kDrtSuwcpd0p1+xMC6Z/VfhtCyDIjcwga4/DU=
 github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883 h1:bvNMNQO63//z+xNgfBlViaCIJKLlCJ6/fmUseuG0wVQ=
