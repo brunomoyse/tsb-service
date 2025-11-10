@@ -29,6 +29,16 @@ func (h *WebhookHandler) VerifySignature(payload []byte, sequenceGUID, receivedS
 	mac.Write(payload)
 	expectedSignature := hex.EncodeToString(mac.Sum(nil))
 
+	// Debug logging
+	if expectedSignature != receivedSignature {
+		fmt.Printf("DEBUG: Signature mismatch\n")
+		fmt.Printf("  Secret length: %d\n", len(h.webhookSecret))
+		fmt.Printf("  Sequence GUID: %s\n", sequenceGUID)
+		fmt.Printf("  Payload length: %d bytes\n", len(payload))
+		fmt.Printf("  Expected signature: %s\n", expectedSignature)
+		fmt.Printf("  Received signature: %s\n", receivedSignature)
+	}
+
 	// Constant-time comparison to prevent timing attacks
 	return hmac.Equal([]byte(expectedSignature), []byte(receivedSignature))
 }
