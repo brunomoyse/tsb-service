@@ -150,6 +150,17 @@ func main() {
 		deliverooWebhookSecret := os.Getenv("DELIVEROO_WEBHOOK_SECRET")
 		if deliverooWebhookSecret == "" {
 			log.Println("Warning: DELIVEROO_WEBHOOK_SECRET not set - webhook signature verification will fail")
+		} else {
+			// Debug: Log the first and last 20 chars of the secret to verify it's loaded
+			secretLen := len(deliverooWebhookSecret)
+			if secretLen > 40 {
+				log.Printf("DEBUG: Deliveroo webhook secret loaded (length: %d, starts with: %s...%s)",
+					secretLen,
+					deliverooWebhookSecret[:20],
+					deliverooWebhookSecret[secretLen-20:])
+			} else {
+				log.Printf("DEBUG: Deliveroo webhook secret loaded (length: %d)", secretLen)
+			}
 		}
 		deliverooWebhookHandler = httpHandlers.NewDeliverooWebhookHandler(
 			orderService,
