@@ -94,6 +94,41 @@ func (h *DeliverooWebhookHandler) HandleRiderEvents(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "received"})
 }
 
+// HandleMenuEvents handles menu event webhooks from Deliveroo
+func (h *DeliverooWebhookHandler) HandleMenuEvents(c *gin.Context) {
+	// Parse the webhook event
+	event, err := h.webhookHandler.ParseMenuEvent(c.Request)
+	if err != nil {
+		log.Printf("Failed to parse Deliveroo menu webhook: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid webhook signature or payload"})
+		return
+	}
+
+	// Handle menu upload result
+	result := event.Body.MenuUploadResult
+
+	if result.HTTPStatus == 200 {
+		log.Printf("✓ Menu upload successful for menu %s (brand: %s)", result.MenuID, result.BrandID)
+		log.Printf("  Applied to sites: %v", result.SiteIDs)
+	} else {
+		log.Printf("✗ Menu upload failed for menu %s (brand: %s)", result.MenuID, result.BrandID)
+		log.Printf("  HTTP Status: %d", result.HTTPStatus)
+
+		if len(result.Errors) > 0 {
+			log.Println("  Errors:")
+			for _, err := range result.Errors {
+				if err.Field != nil {
+					log.Printf("    - [%s] %s (field: %s)", err.Code, err.Message, *err.Field)
+				} else {
+					log.Printf("    - [%s] %s", err.Code, err.Message)
+				}
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "received"})
+}
+
 // handleNewOrder processes a new order from Deliveroo
 func (h *DeliverooWebhookHandler) handleNewOrder(ctx context.Context, deliverooOrder deliveroo.Order) {
 	log.Printf("Received new Deliveroo order: %s (Display ID: %s)", deliverooOrder.ID, deliverooOrder.DisplayID)
