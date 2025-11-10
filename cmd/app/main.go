@@ -220,6 +220,7 @@ func main() {
 		webhooks := api.Group("/webhooks/deliveroo")
 		webhooks.POST("/orders", deliverooWebhookHandler.HandleOrderEvents)
 		webhooks.POST("/riders", deliverooWebhookHandler.HandleRiderEvents)
+		webhooks.POST("/menus", deliverooWebhookHandler.HandleMenuEvents)
 		log.Println("Deliveroo webhook endpoints registered at /api/v1/webhooks/deliveroo")
 	}
 
