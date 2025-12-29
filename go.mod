@@ -13,7 +13,7 @@ require (
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/ory/dockertest/v3 v3.12.0
-	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.35
+	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.36
 	github.com/sendgrid/sendgrid-go v3.16.1+incompatible
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.11.1
