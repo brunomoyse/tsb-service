@@ -3,10 +3,13 @@ package interfaces
 import (
 	"context"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"log"
 	"net/http"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
 	"tsb-service/internal/api/graphql/resolver"
 	orderApplication "tsb-service/internal/modules/order/application"
 	"tsb-service/internal/modules/order/domain"
@@ -52,7 +55,22 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 		return
 	}
 
-	err := h.service.UpdatePaymentStatus(c, req.ExternalMolliePaymentID)
+	// Validate Mollie payment ID format
+	if !strings.HasPrefix(req.ExternalMolliePaymentID, "tr_") {
+		log.Printf("webhook: invalid payment ID format: %s", req.ExternalMolliePaymentID)
+		c.JSON(http.StatusOK, gin.H{"message": "ignored"})
+		return
+	}
+
+	// Verify payment exists in our DB before calling Mollie API
+	payment, err := h.service.GetPaymentByExternalID(context.Background(), req.ExternalMolliePaymentID)
+	if err != nil {
+		log.Printf("webhook: unknown payment ID %s: %v", req.ExternalMolliePaymentID, err)
+		c.JSON(http.StatusOK, gin.H{"message": "unknown payment"})
+		return
+	}
+
+	err = h.service.UpdatePaymentStatus(c, req.ExternalMolliePaymentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update payment status"})
 		return
@@ -61,12 +79,6 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 	_, externalPayment, err := h.service.GetExternalPaymentByID(context.Background(), req.ExternalMolliePaymentID)
 	if err != nil {
 		log.Printf("failed to retrieve external payment: %v", err)
-		return
-	}
-
-	payment, err := h.service.GetPaymentByExternalID(context.Background(), req.ExternalMolliePaymentID)
-	if err != nil {
-		log.Printf("failed to retrieve payment: %v", err)
 		return
 	}
 

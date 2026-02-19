@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/gin-contrib/cors"
@@ -65,7 +69,15 @@ func main() {
 	}
 	oauth2.LoadGoogleOAuth()
 
-	mollieCfg := mollie.NewAPITestingConfig(true)
+	mollieTesting := os.Getenv("MOLLIE_TESTING") != "false"
+	var mollieCfg *mollie.Config
+	if mollieTesting {
+		mollieCfg = mollie.NewAPITestingConfig(true)
+		log.Println("Mollie client initialized in TESTING mode")
+	} else {
+		mollieCfg = mollie.NewAPIConfig(true)
+		log.Println("Mollie client initialized in PRODUCTION mode")
+	}
 	mollieClient, err := mollie.NewClient(nil, mollieCfg)
 	if err != nil {
 		log.Fatalf("Failed to initialize Mollie client: %v", err)
@@ -109,7 +121,15 @@ func main() {
 
 	// API routes
 	api := router.Group("/api/v1")
-	api.HEAD("/up", func(c *gin.Context) { c.Status(http.StatusOK) })
+	healthCheck := func(c *gin.Context) {
+		if err := dbConn.Ping(); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy", "db": "unreachable"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	}
+	api.HEAD("/up", healthCheck)
+	api.GET("/up", healthCheck)
 	api.Use(middleware.LanguageExtractor())
 	api.Use(middleware.DataLoaderMiddleware(
 		addressService, orderService, paymentService, productService, userService,
@@ -120,7 +140,7 @@ func main() {
 		broker,
 		addressService, orderService, paymentService, productService, userService,
 	)
-	graphqlHandler := resolver.GraphQLHandler(rootResolver)
+	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL})
 	optionalAuth := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)
 
 	api.POST("/graphql", optionalAuth, graphqlHandler)
@@ -128,8 +148,9 @@ func main() {
 
 	// Other endpoints
 	api.POST("/payments/webhook", paymentHandler.UpdatePaymentStatusHandler)
-	api.POST("/login", userHandler.LoginHandler)
-	api.POST("/register", userHandler.RegisterHandler)
+	authLimiter := middleware.NewRateLimiter(5.0/60, 5) // 5 req/min per IP
+	api.POST("/login", authLimiter.Middleware(), userHandler.LoginHandler)
+	api.POST("/register", authLimiter.Middleware(), userHandler.RegisterHandler)
 	api.GET("/verify", userHandler.VerifyEmailHandler)
 	api.POST("/tokens/refresh", userHandler.RefreshTokenHandler)
 	api.POST("/logout", userHandler.LogoutHandler)
@@ -138,12 +159,30 @@ func main() {
 
 	// HTTP server
 	srv := &http.Server{
-		Addr:    ":8080",
-		Handler: router,
+		Addr:         ":8080",
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
-	log.Println("HTTP server listening on :8080")
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Server error: %v", err)
+	// Graceful shutdown
+	go func() {
+		log.Println("HTTP server listening on :8080")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
 	}
+	log.Println("Server exited gracefully")
 }
