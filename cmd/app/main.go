@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"net"
 	"net/http"
 	"os"
 
@@ -10,14 +9,9 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"google.golang.org/grpc"
-	// gRPC proto package
-	"tsb-service/internal/api/event"
-	pb "tsb-service/internal/api/eventpb"
 
 	gqlMiddleware "tsb-service/internal/api/graphql/middleware"
 	"tsb-service/internal/api/graphql/resolver"
-	httpHandlers "tsb-service/internal/api/http"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
 	"tsb-service/pkg/pubsub"
@@ -38,7 +32,6 @@ import (
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/oauth2"
-	"tsb-service/services/deliveroo"
 )
 
 func main() {
@@ -54,25 +47,8 @@ func main() {
 	}
 	defer dbConn.Close()
 
-	// PubSub broker (used by GraphQL & telemetry)
+	// PubSub broker (used by GraphQL subscriptions)
 	broker := pubsub.NewBroker()
-
-	// Start gRPC server in its own goroutine
-	go func() {
-		lis, err := net.Listen("tcp", ":50051")
-		if err != nil {
-			log.Fatalf("gRPC listen failed: %v", err)
-		}
-		grpcServer := grpc.NewServer()
-
-		// Register the EventService
-		pb.RegisterEventServiceServer(grpcServer, event.NewServer(broker))
-		log.Println("gRPC server listening on :50051")
-
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("gRPC serve error: %v", err)
-		}
-	}()
 
 	// ENV checks & third-party setup
 	mollieApiKey := os.Getenv("MOLLIE_API_TOKEN")
@@ -111,71 +87,6 @@ func main() {
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService, broker)
 	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
 
-	// Deliveroo webhook handler (will be initialized if Deliveroo is configured)
-	var deliverooWebhookHandler *httpHandlers.DeliverooWebhookHandler
-
-	// Deliveroo service setup (optional - only if credentials are provided)
-	var deliverooService *deliveroo.Service
-	deliverooClientID := os.Getenv("DELIVEROO_CLIENT_ID")
-	deliverooClientSecret := os.Getenv("DELIVEROO_CLIENT_SECRET")
-	deliverooBrandID := os.Getenv("DELIVEROO_BRAND_ID")
-	deliverooMenuID := os.Getenv("DELIVEROO_MENU_ID")
-	deliverooSiteID := os.Getenv("DELIVEROO_SITE_ID")
-	deliverooUseSandbox := os.Getenv("DELIVEROO_USE_SANDBOX") == "true"
-
-	if deliverooClientID != "" && deliverooClientSecret != "" && deliverooBrandID != "" {
-		deliverooService = deliveroo.NewServiceWithConfig(deliveroo.ServiceConfig{
-			ClientID:     deliverooClientID,
-			ClientSecret: deliverooClientSecret,
-			BrandID:      deliverooBrandID,
-			MenuID:       deliverooMenuID,
-			SiteID:     deliverooSiteID,
-			Currency:     "EUR",
-			UseSandbox:   deliverooUseSandbox,
-		})
-
-		envType := "production"
-		if deliverooUseSandbox {
-			envType = "sandbox"
-		}
-		log.Printf("Deliveroo service initialized successfully (%s environment)", envType)
-
-		if deliverooSiteID != "" {
-			log.Printf("  - Using V2 API with siteID: %s", deliverooSiteID)
-		} else if deliverooMenuID != "" {
-			log.Printf("  - Using V1 API with menuID: %s", deliverooMenuID)
-		}
-
-		// Initialize Deliveroo webhook handler
-		deliverooWebhookSecret := os.Getenv("DELIVEROO_WEBHOOK_SECRET")
-		if deliverooWebhookSecret == "" {
-			log.Println("Warning: DELIVEROO_WEBHOOK_SECRET not set - webhook signature verification will fail")
-		} else {
-			// Debug: Log the first and last 20 chars of the secret to verify it's loaded
-			secretLen := len(deliverooWebhookSecret)
-			if secretLen > 40 {
-				log.Printf("DEBUG: Deliveroo webhook secret loaded (length: %d, starts with: %s...%s)",
-					secretLen,
-					deliverooWebhookSecret[:20],
-					deliverooWebhookSecret[secretLen-20:])
-			} else {
-				log.Printf("DEBUG: Deliveroo webhook secret loaded (length: %d)", secretLen)
-			}
-		}
-		deliverooWebhookHandler = httpHandlers.NewDeliverooWebhookHandler(
-			orderService,
-			deliverooService,
-			deliverooWebhookSecret,
-			broker,
-			addressRepo,
-			productRepo,
-		)
-		log.Println("Deliveroo webhook handler initialized")
-	} else {
-		log.Println("Deliveroo credentials not configured - menu sync will not be available")
-		deliverooService = nil
-	}
-
 	// Gin HTTP setup
 	router := gin.Default()
 	router.RedirectTrailingSlash = true
@@ -208,7 +119,6 @@ func main() {
 	rootResolver := resolver.NewResolver(
 		broker,
 		addressService, orderService, paymentService, productService, userService,
-		deliverooService,
 	)
 	graphqlHandler := resolver.GraphQLHandler(rootResolver)
 	optionalAuth := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)
@@ -225,15 +135,6 @@ func main() {
 	api.POST("/logout", userHandler.LogoutHandler)
 	api.GET("/oauth/google", userHandler.GoogleAuthHandler)
 	api.GET("/oauth/google/callback", userHandler.GoogleAuthCallbackHandler)
-
-	// Deliveroo webhook endpoints (only registered if handler is initialized)
-	if deliverooWebhookHandler != nil {
-		webhooks := api.Group("/webhooks/deliveroo")
-		webhooks.POST("/orders", deliverooWebhookHandler.HandleOrderEvents)
-		webhooks.POST("/riders", deliverooWebhookHandler.HandleRiderEvents)
-		webhooks.POST("/menus", deliverooWebhookHandler.HandleMenuEvents)
-		log.Println("Deliveroo webhook endpoints registered at /api/v1/webhooks/deliveroo")
-	}
 
 	// HTTP server
 	srv := &http.Server{
