@@ -83,34 +83,6 @@ extend type Query {
     productCategories: [ProductCategory!]!
 }
 
-type SyncMenuResult {
-    success: Boolean!
-    message: String!
-    categoriesCount: Int!
-    productsCount: Int!
-}
-
-enum SyncProvider {
-    DELIVEROO
-    UBER
-}
-
-enum SyncStatus {
-    STARTED
-    IN_PROGRESS
-    SUCCESS
-    ERROR
-}
-
-type SyncEvent {
-    provider: SyncProvider!
-    status: SyncStatus!
-    message: String!
-    categoriesCount: Int!
-    productsCount: Int!
-    timestamp: DateTime!
-}
-
 extend type Mutation {
     createProduct (
         input: CreateProductInput!
@@ -120,10 +92,4 @@ extend type Mutation {
         id: ID!
         input: UpdateProductInput!
     ): Product! @admin
-
-    syncMenuWithDeliveroo: SyncMenuResult! @admin
-}
-
-extend type Subscription {
-    syncEvents: SyncEvent! @admin
 }

@@ -82,7 +82,6 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		AddressExtra:       o.AddressExtra,
 		OrderNote:          o.OrderNote,
 		OrderExtra:         orderExtra,
-		Source:             model.OrderSource(o.Source),
 	}
 }
 

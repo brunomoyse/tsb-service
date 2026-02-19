@@ -81,12 +81,11 @@ func createTestResolver(db *sqlx.DB) *resolver.Resolver {
 
 	// Create resolver
 	return &resolver.Resolver{
-		Broker:           broker,
-		AddressService:   addressService,
-		OrderService:     orderService,
-		PaymentService:   paymentService,
-		ProductService:   productService,
-		UserService:      userService,
-		DeliverooService: nil, // Optional - not needed for core tests
+		Broker:         broker,
+		AddressService: addressService,
+		OrderService:   orderService,
+		PaymentService: paymentService,
+		ProductService: productService,
+		UserService:    userService,
 	}
 }
