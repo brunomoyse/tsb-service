@@ -49,7 +49,8 @@ func (h *UserHandler) GetUserProfileHandler(c *gin.Context) {
 	user, err := h.service.GetUserByID(c, userID)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile", "details": err.Error()})
+		log.Printf("Failed to fetch user profile: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile"})
 		return
 	}
 
@@ -75,13 +76,15 @@ func (h *UserHandler) UpdateMeHandler(c *gin.Context) {
 
 	var req UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload", "details": err.Error()})
+		log.Printf("Invalid request payload for UpdateMe: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
 		return
 	}
 
 	user, err := h.service.UpdateMe(ctx, userID, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user profile", "details": err.Error()})
+		log.Printf("Failed to update user profile: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user profile"})
 		return
 	}
 
@@ -100,22 +103,23 @@ func (h *UserHandler) RegisterHandler(c *gin.Context) {
 
 	var req RegistrationRequest
 	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload", "details": err.Error()})
+		log.Printf("Invalid request payload for Register: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
 		return
 	}
 
 	// Validate required fields.
 	if req.FirstName == "" || req.LastName == "" || req.Email == "" || req.Password == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "missing required fields",
-			"details": "name, email and password are required",
+			"error": "missing required fields",
 		})
 		return
 	}
 
 	user, err := h.service.CreateUser(ctx, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressID, &req.Password, nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user", "details": err.Error()})
+		log.Printf("Failed to create user: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}
 
@@ -154,7 +158,8 @@ func (h *UserHandler) VerifyEmailHandler(c *gin.Context) {
 		return []byte(jwtSecret), nil
 	})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token: " + err.Error()})
+		log.Printf("Invalid verification token: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token"})
 		return
 	}
 
@@ -179,7 +184,8 @@ func (h *UserHandler) VerifyEmailHandler(c *gin.Context) {
 	// Call the service to mark the user as verified.
 	err = h.service.VerifyUserEmail(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Failed to verify email for user %s: %v", userID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify email"})
 		return
 	}
 
@@ -198,7 +204,8 @@ func (h *UserHandler) LoginHandler(c *gin.Context) {
 
 	user, accessToken, refreshToken, err := h.service.Login(ctx, req.Email, req.Password, h.jwtSecret)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		log.Printf("Login failed for %s: %v", req.Email, err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
@@ -274,7 +281,8 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	code := c.Query("code")
 	token, err := oauth2.GoogleOAuthConfig.Exchange(ctx, code)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange code", "details": err.Error()})
+		log.Printf("Failed to exchange OAuth code: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange code"})
 		return
 	}
 
@@ -288,14 +296,16 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	client := oauth2.GoogleOAuthConfig.Client(ctx, token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user info", "details": err.Error()})
+		log.Printf("Failed to fetch Google user info: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user info"})
 		return
 	}
 	defer resp.Body.Close()
 
 	var googleUser GoogleUserInfo
 	if err := json.NewDecoder(resp.Body).Decode(&googleUser); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse user info", "details": err.Error()})
+		log.Printf("Failed to parse Google user info: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse user info"})
 		return
 	}
 
@@ -312,7 +322,8 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	// 1. Try to find the user by Google ID.
 	user, err = h.service.GetUserByGoogleID(ctx, req.GoogleID)
 	if err != nil && err.Error() != "sql: no rows in result set" {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding user by Google ID", "details": err.Error()})
+		log.Printf("Error finding user by Google ID: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding user by Google ID"})
 		return
 	}
 
@@ -320,7 +331,8 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	if user == nil {
 		user, err = h.service.GetUserByEmail(ctx, req.Email)
 		if err != nil && err.Error() != "sql: no rows in result set" {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding user by email", "details": err.Error()})
+			log.Printf("Error finding user by email: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding user by email"})
 			return
 		}
 
@@ -328,7 +340,8 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 		if user == nil {
 			user, err = h.service.CreateUser(ctx, req.FirstName, req.LastName, req.Email, nil, nil, nil, &req.GoogleID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user", "details": err.Error()})
+				log.Printf("Failed to create user via Google OAuth: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 				return
 			}
 		} else {
@@ -336,7 +349,8 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 			if user.GoogleID == nil {
 				user, err = h.service.UpdateGoogleID(ctx, user.ID.String(), req.GoogleID)
 				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Google ID", "details": err.Error()})
+					log.Printf("Failed to update Google ID: %v", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Google ID"})
 					return
 				}
 			}
@@ -346,7 +360,8 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	// Generate tokens.
 	accessToken, refreshToken, err := h.service.GenerateTokens(ctx, *user, h.jwtSecret)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token", "details": err.Error()})
+		log.Printf("Failed to generate token: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
 

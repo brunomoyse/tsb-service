@@ -3,14 +3,17 @@
 package resolver
 
 import (
+	"net/http"
+	"os"
+	"time"
+
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"net/http"
-	"time"
+
 	"tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/directives"
 	addressApplication "tsb-service/internal/modules/address/application"
@@ -19,19 +22,15 @@ import (
 	productApplication "tsb-service/internal/modules/product/application"
 	userApplication "tsb-service/internal/modules/user/application"
 	"tsb-service/pkg/pubsub"
-	"tsb-service/services/deliveroo"
 )
 
-const SyncEventTopic = "sync_events"
-
 type Resolver struct {
-	Broker           *pubsub.Broker
-	AddressService   addressApplication.AddressService
-	OrderService     orderApplication.OrderService
-	PaymentService   paymentApplication.PaymentService
-	ProductService   productApplication.ProductService
-	UserService      userApplication.UserService
-	DeliverooService *deliveroo.Service
+	Broker         *pubsub.Broker
+	AddressService addressApplication.AddressService
+	OrderService   orderApplication.OrderService
+	PaymentService paymentApplication.PaymentService
+	ProductService productApplication.ProductService
+	UserService    userApplication.UserService
 }
 
 // NewResolver constructs the Resolver with required services.
@@ -42,21 +41,19 @@ func NewResolver(
 	paymentService paymentApplication.PaymentService,
 	productService productApplication.ProductService,
 	userService userApplication.UserService,
-	deliverooService *deliveroo.Service,
 ) *Resolver {
 	return &Resolver{
-		Broker:           broker,
-		AddressService:   addressService,
-		OrderService:     orderService,
-		PaymentService:   paymentService,
-		ProductService:   productService,
-		UserService:      userService,
-		DeliverooService: deliverooService,
+		Broker:         broker,
+		AddressService: addressService,
+		OrderService:   orderService,
+		PaymentService: paymentService,
+		ProductService: productService,
+		UserService:    userService,
 	}
 }
 
 // GraphQLHandler defines the GraphQL endpoint with @auth directive injection
-func GraphQLHandler(resolver *Resolver) gin.HandlerFunc {
+func GraphQLHandler(resolver *Resolver, allowedOrigins []string) gin.HandlerFunc {
 	cfg := graphql.Config{Resolvers: resolver}
 	cfg.Directives.Auth = directives.Auth
 	cfg.Directives.Admin = directives.Admin
@@ -73,7 +70,13 @@ func GraphQLHandler(resolver *Resolver) gin.HandlerFunc {
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 			CheckOrigin: func(r *http.Request) bool {
-				return true
+				origin := r.Header.Get("Origin")
+				for _, allowed := range allowedOrigins {
+					if origin == allowed {
+						return true
+					}
+				}
+				return false
 			},
 		},
 		KeepAlivePingInterval: 10 * time.Second,
@@ -82,8 +85,9 @@ func GraphQLHandler(resolver *Resolver) gin.HandlerFunc {
 	h.AddTransport(transport.POST{})
 	h.AddTransport(transport.GET{})
 
-	// Enable introspection
-	h.Use(extension.Introspection{})
+	if os.Getenv("ENABLE_GQL_INTROSPECTION") == "true" {
+		h.Use(extension.Introspection{})
+	}
 
 	h.Use(extension.AutomaticPersistedQuery{
 		//nolint:mnd // Store 50 queries in memory using Least Recently Used (LRU) algorithm
