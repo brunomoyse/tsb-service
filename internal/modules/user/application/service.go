@@ -341,8 +341,11 @@ func generateSalt() (string, error) {
 }
 
 func hashPassword(password string, salt string) string {
-	saltBytes, _ := base64.StdEncoding.DecodeString(salt)
-	hashedPassword := argon2.IDKey([]byte(password), saltBytes, 1, 64*1024, 4, 32)
+	saltBytes, err := base64.StdEncoding.DecodeString(salt)
+	if err != nil {
+		return ""
+	}
+	hashedPassword := argon2.IDKey([]byte(password), saltBytes, 3, 64*1024, 4, 32)
 	return base64.StdEncoding.EncodeToString(hashedPassword)
 }
 
