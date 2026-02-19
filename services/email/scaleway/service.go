@@ -57,9 +57,6 @@ func InitService() error {
 }
 
 func SendVerificationEmail(user userDomain.User, lang string, verificationURL string) error {
-	// @TODO: Remove hardcoded language
-	lang = "fr"
-
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -115,8 +112,6 @@ func SendVerificationEmail(user userDomain.User, lang string, verificationURL st
 }
 
 func SendWelcomeEmail(user userDomain.User, lang, menuURL string) error {
-	// @TODO: Remove hardcoded language
-	lang = "fr"
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -171,9 +166,6 @@ func SendWelcomeEmail(user userDomain.User, lang, menuURL string) error {
 }
 
 func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.Order, op []orderDomain.OrderProduct) error {
-	// @TODO: Remove hardcoded language
-	lang = "fr"
-
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -228,9 +220,6 @@ func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.
 }
 
 func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomain.Order, op []orderDomain.OrderProduct, address *addressDomain.Address) error {
-	// @TODO: Remove hardcoded language
-	lang = "fr"
-
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -285,9 +274,6 @@ func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomai
 }
 
 func SendOrderCanceledEmail(user userDomain.User, lang string) error {
-	// @TODO: Remove hardcoded language
-	lang = "fr"
-
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
