@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -19,6 +18,27 @@ import (
 	"tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/oauth2"
 )
+
+func getSameSiteMode() http.SameSite {
+	if os.Getenv("APP_ENV") == "development" {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteLaxMode
+}
+
+func setAuthCookies(c *gin.Context, accessToken, refreshToken string) {
+	domain := os.Getenv("SESSION_COOKIE_DOMAIN")
+	c.SetSameSite(getSameSiteMode())
+	c.SetCookie("access_token", accessToken, 15*60, "/", domain, true, true)
+	c.SetCookie("refresh_token", refreshToken, 7*24*3600, "/", domain, true, true)
+}
+
+func clearAuthCookies(c *gin.Context) {
+	domain := os.Getenv("SESSION_COOKIE_DOMAIN")
+	c.SetSameSite(getSameSiteMode())
+	c.SetCookie("access_token", "", -1, "/", domain, true, true)
+	c.SetCookie("refresh_token", "", -1, "/", domain, true, true)
+}
 
 type UserHandler struct {
 	service        application.UserService
@@ -215,9 +235,7 @@ func (h *UserHandler) LoginHandler(c *gin.Context) {
 		address, _ = h.addressService.GetAddressByID(c.Request.Context(), *user.AddressID)
 	}
 
-	c.SetSameSite(http.SameSiteNoneMode)
-	c.SetCookie("access_token", *accessToken, 15*60, "/", os.Getenv("SESSION_COOKIE_DOMAIN"), true, true)
-	c.SetCookie("refresh_token", *refreshToken, 7*24*3600, "/", os.Getenv("SESSION_COOKIE_DOMAIN"), true, true)
+	setAuthCookies(c, *accessToken, *refreshToken)
 
 	c.JSON(http.StatusOK, NewLoginResponse(user, address))
 }
@@ -246,13 +264,7 @@ func (h *UserHandler) LogoutHandler(c *gin.Context) {
 	c.Header("X-XSS-Protection", "1; mode=block")
 
 	// Clear authentication cookies
-	domain := ""
-	if parsedURL, err := url.Parse(os.Getenv("APP_BASE_URL")); err == nil {
-		domain = parsedURL.Hostname()
-	}
-
-	c.SetCookie("access_token", "", -1, "/", domain, true, true)
-	c.SetCookie("refresh_token", "", -1, "/", domain, true, true)
+	clearAuthCookies(c)
 
 	// Return success response
 	c.JSON(http.StatusOK, gin.H{
@@ -366,9 +378,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	}
 
 	// Set tokens as cookies and redirect.
-	c.SetSameSite(http.SameSiteNoneMode)
-	c.SetCookie("access_token", accessToken, 15*60, "/", os.Getenv("SESSION_COOKIE_DOMAIN"), true, true)
-	c.SetCookie("refresh_token", refreshToken, 7*24*3600, "/", os.Getenv("SESSION_COOKIE_DOMAIN"), true, true)
+	setAuthCookies(c, accessToken, refreshToken)
 	c.Redirect(http.StatusFound, os.Getenv("REDIRECT_LOGIN_SUCCESSFUL"))
 }
 
@@ -392,9 +402,7 @@ func (h *UserHandler) RefreshTokenHandler(c *gin.Context) {
 	}
 
 	// 3. Set new cookies
-	c.SetSameSite(http.SameSiteNoneMode)
-	c.SetCookie("access_token", newAccessToken, 15*60, "/", os.Getenv("SESSION_COOKIE_DOMAIN"), true, true)
-	c.SetCookie("refresh_token", newRefreshToken, 7*24*3600, "/", os.Getenv("SESSION_COOKIE_DOMAIN"), true, true)
+	setAuthCookies(c, newAccessToken, newRefreshToken)
 
 	// 4. Return minimal user data
 	c.JSON(http.StatusOK, gin.H{
