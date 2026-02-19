@@ -34,8 +34,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		}
 	}()
 
-	// Calculate the total price of the order from order products only if order products exist.
-	// For platform orders, total price is already set from platform data.
+	// Calculate the total price of the order from order products.
 	if op != nil && len(*op) > 0 {
 		computedTotal := decimal.NewFromInt(0)
 		for _, prod := range *op {
@@ -55,21 +54,16 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		o.TotalPrice = computedTotal
 	}
 
-	// OrderExtra and PlatformData are NullableJSON, which handles nil automatically
-	// No need to marshal - they're already in the correct format for the database
-
 	// Insert the order record.
 	const orderQuery = `
 		INSERT INTO orders (
 			user_id, order_status, order_type, is_online_payment,
 			discount_amount, delivery_fee, total_price, preferred_ready_time, estimated_ready_time,
-			address_id, address_extra, order_note, order_extra,
-			source, platform_order_id, platform_data
+			address_id, address_extra, order_note, order_extra
 		) VALUES (
 			$1, $2, $3, $4,
 			$5, $6, $7, $8, $9,
-			$10, $11, $12, $13,
-			$14, $15, $16
+			$10, $11, $12, $13
 		)
 		RETURNING id, created_at, updated_at;
 	`
@@ -94,9 +88,6 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		o.AddressExtra,
 		o.OrderNote,
 		o.OrderExtra,
-		o.Source,
-		o.PlatformOrderID,
-		o.PlatformData,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to insert order: %w", err)
@@ -107,8 +98,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 	o.CreatedAt = inserted.CreatedAt
 	o.UpdatedAt = inserted.UpdatedAt
 
-	// Insert each order product only if order products exist.
-	// Platform orders store their items in platform_data.
+	// Insert each order product.
 	if op != nil && len(*op) > 0 {
 		const orderProductQuery = `
 			INSERT INTO order_product (
@@ -320,27 +310,8 @@ func (r *OrderRepository) FindByUserIDs(ctx context.Context, userIDs []string) (
 	// 4) Group by user_id
 	result := make(map[string][]*domain.Order, len(userIDs))
 	for _, o := range orders {
-		if o.UserID != nil {
-			result[o.UserID.String()] = append(result[o.UserID.String()], &o)
-		}
+		result[o.UserID.String()] = append(result[o.UserID.String()], &o)
 	}
 
 	return result, nil
-}
-
-// FindByPlatformOrderID retrieves an order by its platform order ID and source
-func (r *OrderRepository) FindByPlatformOrderID(ctx context.Context, platformOrderID string, source domain.OrderSource) (*domain.Order, error) {
-	query := `
-		SELECT *
-		FROM orders
-		WHERE platform_order_id = $1 AND source = $2
-		LIMIT 1
-	`
-
-	var order domain.Order
-	if err := r.db.GetContext(ctx, &order, query, platformOrderID, source); err != nil {
-		return nil, fmt.Errorf("failed to query order by platform ID: %w", err)
-	}
-
-	return &order, nil
 }

@@ -22,14 +22,7 @@ func (m *MockEmailService) SendEmail(to, subject, body string) error {
 	return args.Error(0)
 }
 
-// MockDeliverooService is a mock implementation of the Deliveroo service
-type MockDeliverooService struct {
-	mock.Mock
-}
-
-// Add Deliveroo service methods as needed during test implementation
-
 // NewMockServices creates all mock services for testing
-func NewMockServices() (*MockMollieClient, *MockEmailService, *MockDeliverooService) {
-	return &MockMollieClient{}, &MockEmailService{}, &MockDeliverooService{}
+func NewMockServices() (*MockMollieClient, *MockEmailService) {
+	return &MockMollieClient{}, &MockEmailService{}
 }

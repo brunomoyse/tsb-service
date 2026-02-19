@@ -9,7 +9,6 @@ import (
 
 type OrderStatus string
 type OrderType string
-type OrderSource string
 
 const (
 	OrderStatusPending        OrderStatus = "PENDING"
@@ -28,17 +27,11 @@ const (
 	OrderTypePickUp   OrderType = "PICKUP"
 )
 
-const (
-	OrderSourceTokyo     OrderSource = "TOKYO"
-	OrderSourceDeliveroo OrderSource = "DELIVEROO"
-	OrderSourceUber      OrderSource = "UBER"
-)
-
 type Order struct {
 	ID                 uuid.UUID        `db:"id" json:"id"`
 	CreatedAt          time.Time        `db:"created_at" json:"createdAt"`
 	UpdatedAt          time.Time        `db:"updated_at" json:"updatedAt"`
-	UserID             *uuid.UUID       `db:"user_id" json:"userId,omitempty"`
+	UserID             uuid.UUID        `db:"user_id" json:"userId"`
 	OrderStatus        OrderStatus      `db:"order_status" json:"orderStatus"`
 	OrderType          OrderType        `db:"order_type" json:"orderType"`
 	IsOnlinePayment    bool             `db:"is_online_payment" json:"isOnlinePayment"`
@@ -52,10 +45,6 @@ type Order struct {
 	AddressExtra       *string          `db:"address_extra" json:"addressExtra,omitempty"`
 	OrderNote          *string          `db:"order_note" json:"orderNote,omitempty"`
 	OrderExtra         NullableJSON     `db:"order_extra" json:"orderExtras,omitempty"`
-	// Platform order fields
-	Source          OrderSource  `db:"source" json:"source"`
-	PlatformOrderID *string      `db:"platform_order_id" json:"platformOrderId,omitempty"`
-	PlatformData    NullableJSON `db:"platform_data" json:"platformData,omitempty"`
 }
 
 type OrderExtra struct {
@@ -108,7 +97,7 @@ func NewOrder(
 
 	return &Order{
 		ID:                 uuid.Nil,
-		UserID:             &userID,
+		UserID:             userID,
 		OrderStatus:        OrderStatusPending,
 		OrderType:          orderType,
 		IsOnlinePayment:    isOnlinePayment,
@@ -119,36 +108,6 @@ func NewOrder(
 		OrderExtra:         orderExtraJSON,
 		DeliveryFee:        deliveryFee,
 		DiscountAmount:     discountAmount,
-		Source:             OrderSourceTokyo,
 	}
 }
 
-// MapDeliverooStatusToLocal maps Deliveroo order status to local order status
-func MapDeliverooStatusToLocal(deliverooStatus string) OrderStatus {
-	switch deliverooStatus {
-	case "pending", "placed":
-		return OrderStatusPending
-	case "accepted":
-		return OrderStatusConfirmed
-	case "confirmed":
-		return OrderStatusPreparing
-	case "canceled", "rejected":
-		return OrderStatusCanceled
-	case "delivered":
-		return OrderStatusDelivered
-	default:
-		return OrderStatusPending
-	}
-}
-
-// MapDeliverooFulfillmentToType maps Deliveroo fulfillment type to local order type
-func MapDeliverooFulfillmentToType(fulfillmentType string) OrderType {
-	switch fulfillmentType {
-	case "customer":
-		return OrderTypePickUp
-	case "deliveroo", "restaurant", "autonomous":
-		return OrderTypeDelivery
-	default:
-		return OrderTypeDelivery
-	}
-}
