@@ -10,7 +10,6 @@
 - **Multi-language Product Listings**: Support for multiple languages through the `product_translations` table, allowing you to list products in various languages without needing to modify the code.
 - **Product Editing**: Easily update product information such as names, descriptions, and prices, allowing the restaurant to manage its menu dynamically.
 - **Real-time Delivery Tracking**: GraphQL subscription through WS channel for real-time order status updates.
-- **GPS Delivery Tracking with Teltonika Trackers (Future Feature)**: Real-time tracking of delivery vehicles using Teltonika GPS trackers, allowing customers to follow their orders on a map.
 
 ---
 
@@ -20,7 +19,6 @@
 - **Mollie API**: For secure and smooth payment processing.
 - **PostgreSQL**: Database used to store all relevant data.
 - **Docker**: Containerization for easy deployment and environment consistency.
-- **Teltonika Trackers** *(v1+ Feature)*: To track deliveries on a map.
 
 ---
 
@@ -82,14 +80,6 @@ This will start the API locally on `http://localhost:8080` (or another port you 
 - **Initiate Payment**: Payments are handled through the Mollie API.
 
 More detailed API documentation will be available in future releases.
-
----
-
-## 🌐 Planned Features (v1+)
-
-### Delivery Tracking with Teltonika GPS
-
-- Integration with **Teltonika GPS trackers** to follow delivery vehicles live on a map. Customers can view the status and location of their orders in real-time.
 
 ---
 
