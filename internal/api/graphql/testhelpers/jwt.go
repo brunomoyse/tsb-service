@@ -24,22 +24,15 @@ func GenerateTestRefreshToken(userID string, isAdmin bool) (string, error) {
 
 // generateTestToken is an internal helper to generate JWT tokens for testing
 func generateTestToken(userID string, isAdmin bool, tokenType string, duration time.Duration) (string, error) {
-	// Build the base RegisteredClaims
-	baseRC := jwt.RegisteredClaims{
-		Subject:   userID,
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
-	}
-
-	// If the user is an admin, include "admin" in the Audience
-	if isAdmin {
-		baseRC.Audience = jwt.ClaimStrings{"admin"}
-	}
-
-	// Create token claims
+	// Create token claims with IsAdmin custom field
 	claims := domain.JwtClaims{
-		RegisteredClaims: baseRC,
-		Type:             tokenType,
-		ID:               uuid.NewString(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID,
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
+		},
+		Type:    tokenType,
+		ID:      uuid.NewString(),
+		IsAdmin: isAdmin,
 	}
 
 	// Create and sign the token
@@ -54,19 +47,14 @@ func generateTestToken(userID string, isAdmin bool, tokenType string, duration t
 
 // GenerateExpiredToken creates an expired JWT token for testing auth failure cases
 func GenerateExpiredToken(userID string, isAdmin bool) (string, error) {
-	baseRC := jwt.RegisteredClaims{
-		Subject:   userID,
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)), // Expired 1 hour ago
-	}
-
-	if isAdmin {
-		baseRC.Audience = jwt.ClaimStrings{"admin"}
-	}
-
 	claims := domain.JwtClaims{
-		RegisteredClaims: baseRC,
-		Type:             "access",
-		ID:               uuid.NewString(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID,
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)), // Expired 1 hour ago
+		},
+		Type:    "access",
+		ID:      uuid.NewString(),
+		IsAdmin: isAdmin,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -89,14 +77,7 @@ func ParseTestToken(tokenString string, jwtSecret string) (string, bool, error) 
 	}
 
 	if claims, ok := token.Claims.(*domain.JwtClaims); ok && token.Valid {
-		isAdmin := false
-		for _, aud := range claims.Audience {
-			if aud == "admin" {
-				isAdmin = true
-				break
-			}
-		}
-		return claims.Subject, isAdmin, nil
+		return claims.Subject, claims.IsAdmin, nil
 	}
 
 	return "", false, jwt.ErrSignatureInvalid

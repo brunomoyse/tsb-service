@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
@@ -135,7 +136,7 @@ func (s *userService) Login(ctx context.Context, email string, password string, 
 	}
 
 	hashedPasswordRequest := hashPassword(password, *user.Salt)
-	if hashedPasswordRequest != *user.PasswordHash {
+	if subtle.ConstantTimeCompare([]byte(hashedPasswordRequest), []byte(*user.PasswordHash)) != 1 {
 		return nil, nil, nil, fmt.Errorf("invalid password")
 	}
 
@@ -350,24 +351,15 @@ func hashPassword(password string, salt string) string {
 }
 
 func generateTokens(user domain.User, jwtSecret string) (string, string, error) {
-	// build the base RegisteredClaims
-	baseRC := jwt.RegisteredClaims{
-		Subject:   user.ID.String(),
-		ExpiresAt: jwt.NewNumericDate(time.Now()), // we'll override per-token
-	}
-
-	// if the user is an admin, include "admin" in the Audience
-	if user.IsAdmin {
-		baseRC.Audience = jwt.ClaimStrings{"admin"}
-	}
-
 	// Access Token (15m)
-	accessRC := baseRC
-	accessRC.ExpiresAt = jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
 	accessClaims := domain.JwtClaims{
-		RegisteredClaims: accessRC,
-		Type:             "access",
-		ID:               uuid.NewString(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   user.ID.String(),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+		},
+		Type:    "access",
+		ID:      uuid.NewString(),
+		IsAdmin: user.IsAdmin,
 	}
 	at := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
 	accessTokenString, err := at.SignedString([]byte(jwtSecret))
@@ -376,12 +368,14 @@ func generateTokens(user domain.User, jwtSecret string) (string, string, error) 
 	}
 
 	// Refresh Token (7d)
-	refreshRC := baseRC
-	refreshRC.ExpiresAt = jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour))
 	refreshClaims := domain.JwtClaims{
-		RegisteredClaims: refreshRC,
-		Type:             "refresh",
-		ID:               uuid.NewString(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   user.ID.String(),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+		},
+		Type:    "refresh",
+		ID:      uuid.NewString(),
+		IsAdmin: user.IsAdmin,
 	}
 	rt := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 	refreshTokenString, err := rt.SignedString([]byte(jwtSecret))

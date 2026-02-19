@@ -152,10 +152,10 @@ func main() {
 	api.POST("/login", authLimiter.Middleware(), userHandler.LoginHandler)
 	api.POST("/register", authLimiter.Middleware(), userHandler.RegisterHandler)
 	api.GET("/verify", userHandler.VerifyEmailHandler)
-	api.POST("/tokens/refresh", userHandler.RefreshTokenHandler)
+	api.POST("/tokens/refresh", authLimiter.Middleware(), userHandler.RefreshTokenHandler)
 	api.POST("/logout", userHandler.LogoutHandler)
-	api.GET("/oauth/google", userHandler.GoogleAuthHandler)
-	api.GET("/oauth/google/callback", userHandler.GoogleAuthCallbackHandler)
+	api.GET("/oauth/google", authLimiter.Middleware(), userHandler.GoogleAuthHandler)
+	api.GET("/oauth/google/callback", authLimiter.Middleware(), userHandler.GoogleAuthCallbackHandler)
 
 	// HTTP server
 	srv := &http.Server{

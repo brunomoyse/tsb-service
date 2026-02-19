@@ -2,10 +2,11 @@ package middleware
 
 import (
 	"strings"
-	"tsb-service/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/utils"
 )
 
 // OptionalAuthMiddleware parses a JWT if present, and on success
@@ -23,7 +24,7 @@ func OptionalAuthMiddleware(secretKey string) gin.HandlerFunc {
 		}
 
 		if tokenStr != "" {
-			claims := &jwt.RegisteredClaims{}
+			claims := &domain.JwtClaims{}
 			token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 					return nil, jwt.ErrSignatureInvalid
@@ -33,7 +34,7 @@ func OptionalAuthMiddleware(secretKey string) gin.HandlerFunc {
 
 			if err == nil && token.Valid && claims.Subject != "" {
 				ctxWithUser := utils.SetUserID(c.Request.Context(), claims.Subject)
-				ctxWithUser = utils.SetIsAdmin(ctxWithUser, claims.Audience != nil && len(claims.Audience) > 0 && claims.Audience[0] == "admin")
+				ctxWithUser = utils.SetIsAdmin(ctxWithUser, claims.IsAdmin)
 				c.Request = c.Request.WithContext(ctxWithUser)
 
 				// (optional) also set in Gin if you ever need c.Get("userID")

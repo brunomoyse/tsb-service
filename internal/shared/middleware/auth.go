@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/utils"
 )
 
@@ -31,7 +32,7 @@ func AuthMiddleware(secretKey string) gin.HandlerFunc {
 		}
 
 		// 3) Parse and validate the token
-		claims := &jwt.RegisteredClaims{}
+		claims := &domain.JwtClaims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrSignatureInvalid
@@ -59,8 +60,7 @@ func AuthMiddleware(secretKey string) gin.HandlerFunc {
 
 		// 5) Store userID and isAdmin in context using shared utils
 		ctx := utils.SetUserID(c.Request.Context(), claims.Subject)
-		isAdmin := len(claims.Audience) > 0 && claims.Audience[0] == "admin"
-		ctx = utils.SetIsAdmin(ctx, isAdmin)
+		ctx = utils.SetIsAdmin(ctx, claims.IsAdmin)
 		c.Request = c.Request.WithContext(ctx)
 		c.Set(string(utils.UserIDKey), claims.Subject)
 
