@@ -33,6 +33,9 @@ COPY --from=builder /app/tsb-service .
 # Step 10: Expose the port the app listens on
 EXPOSE 8080
 
-# Step 11: Command to run the app
+# Step 11: Health check
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:8080/api/v1/up || exit 1
+
+# Step 12: Command to run the app
 ENV GIN_MODE=release
 CMD ["./tsb-service"]

@@ -18,30 +18,35 @@ func TestConstantTimePasswordComparison(t *testing.T) {
 	salt := "dGVzdC1zYWx0LWJhc2U2NA==" // base64("test-salt-base64")
 
 	t.Run("Correct password matches", func(t *testing.T) {
-		hash := hashPassword("correctPassword", salt)
+		hash, err := hashPassword("correctPassword", salt)
+		require.NoError(t, err)
 		require.NotEmpty(t, hash)
 
-		rehash := hashPassword("correctPassword", salt)
+		rehash, err := hashPassword("correctPassword", salt)
+		require.NoError(t, err)
 		result := subtle.ConstantTimeCompare([]byte(hash), []byte(rehash))
 		assert.Equal(t, 1, result, "Same password should produce matching hashes")
 	})
 
 	t.Run("Wrong password does not match", func(t *testing.T) {
-		hash := hashPassword("correctPassword", salt)
-		wrongHash := hashPassword("wrongPassword", salt)
+		hash, err := hashPassword("correctPassword", salt)
+		require.NoError(t, err)
+		wrongHash, err := hashPassword("wrongPassword", salt)
+		require.NoError(t, err)
 
 		result := subtle.ConstantTimeCompare([]byte(hash), []byte(wrongHash))
 		assert.Equal(t, 0, result, "Different passwords should not match")
 	})
 
 	t.Run("Empty password produces hash", func(t *testing.T) {
-		hash := hashPassword("", salt)
+		hash, err := hashPassword("", salt)
+		require.NoError(t, err)
 		assert.NotEmpty(t, hash, "Empty password should still produce a hash")
 	})
 
-	t.Run("Invalid salt returns empty hash", func(t *testing.T) {
-		hash := hashPassword("password", "not-valid-base64!!!")
-		assert.Empty(t, hash, "Invalid base64 salt should return empty hash")
+	t.Run("Invalid salt returns error", func(t *testing.T) {
+		_, err := hashPassword("password", "not-valid-base64!!!")
+		assert.Error(t, err, "Invalid base64 salt should return an error")
 	})
 }
 

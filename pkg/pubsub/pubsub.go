@@ -43,3 +43,14 @@ func (b *Broker) Unsubscribe(topic string, subCh <-chan interface{}) {
 		}
 	}
 }
+
+func (b *Broker) Shutdown() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for topic, subs := range b.topics {
+		for _, ch := range subs {
+			close(ch)
+		}
+		delete(b.topics, topic)
+	}
+}
