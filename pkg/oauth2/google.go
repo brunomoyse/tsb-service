@@ -2,7 +2,7 @@ package oauth2
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 
 	"golang.org/x/oauth2"
@@ -20,7 +20,8 @@ func LoadGoogleOAuth() {
 	redirectURI := os.Getenv("GOOGLE_REDIRECT_URI")
 
 	if clientID == "" || clientSecret == "" || redirectURI == "" {
-		log.Fatal("GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI must be set")
+		slog.Error("GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI must be set")
+		os.Exit(1)
 	}
 
 	GoogleOAuthConfig = &oauth2.Config{
@@ -31,7 +32,7 @@ func LoadGoogleOAuth() {
 		Endpoint:     google.Endpoint,
 	}
 
-	log.Println("Google OAuth configuration loaded successfully")
+	slog.Info("google OAuth configuration loaded")
 }
 
 // GetGoogleAuthURL returns the Google authentication URL for a given state.

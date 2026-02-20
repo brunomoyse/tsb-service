@@ -3,7 +3,6 @@ package testhelpers
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -76,7 +75,7 @@ func SetupTestDatabase(t *testing.T) *TestDatabase {
 	})
 	require.NoError(t, err, "Could not connect to PostgreSQL container")
 
-	log.Printf("Test database ready at %s", hostAndPort)
+	t.Logf("Test database ready at %s", hostAndPort)
 
 	// Run migrations
 	runMigrations(t, db.DB)
@@ -144,10 +143,10 @@ func runMigrations(t *testing.T, db *sql.DB) {
 		_, err = db.Exec(string(content))
 		require.NoError(t, err, "Could not execute migration: %s", filename)
 
-		log.Printf("Applied migration: %s", filename)
+		t.Logf("Applied migration: %s", filename)
 	}
 
-	log.Printf("All migrations applied successfully (%d total)", len(upMigrations))
+	t.Logf("All migrations applied successfully (%d total)", len(upMigrations))
 }
 
 // findMigrationsDir searches for the migrations directory from the current working directory

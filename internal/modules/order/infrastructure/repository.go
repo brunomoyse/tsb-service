@@ -3,12 +3,13 @@ package repository
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"time"
+	"tsb-service/internal/modules/order/domain"
+
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
-	"log"
-	"time"
-	"tsb-service/internal/modules/order/domain"
 )
 
 type OrderRepository struct {
@@ -222,7 +223,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 	// Execute the query
 	var orders []*domain.Order
 	if err := r.db.SelectContext(ctx, &orders, query, args...); err != nil {
-		log.Printf("Error querying orders (page=%d, limit=%d, userID=%v): %v", page, limit, userID, err)
+		slog.ErrorContext(ctx, "error querying orders", "page", page, "limit", limit, "user_id", userID, "error", err)
 		return nil, fmt.Errorf("failed to query orders: %w", err)
 	}
 

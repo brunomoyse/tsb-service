@@ -8,7 +8,7 @@ package resolver
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	addressApplication "tsb-service/internal/modules/address/application"
@@ -42,6 +42,12 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 	// 2) Fetch products and build price map
 	prodCount := len(input.Items)
+	if prodCount == 0 {
+		return nil, fmt.Errorf("order must contain at least one item")
+	}
+	if prodCount > 50 {
+		return nil, fmt.Errorf("order cannot contain more than 50 different items")
+	}
 	ids := make([]string, prodCount)
 	for i, op := range input.Items {
 		ids[i] = op.ProductID.String()
@@ -65,6 +71,9 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			return nil, fmt.Errorf("product %s not found", pid)
 		}
 		qty := int64(op.Quantity)
+		if qty <= 0 || qty > 99 {
+			return nil, fmt.Errorf("invalid quantity for product %s: must be between 1 and 99", pid)
+		}
 		lineTotal := unitPrice.Mul(decimal.NewFromInt(qty))
 		total = total.Add(lineTotal)
 		rawItems = append(rawItems, orderDomain.OrderProductRaw{
@@ -229,7 +238,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		go func() {
 			err = es.SendOrderPendingEmail(*user, utils.GetLang(ctx), *order, items)
 			if err != nil {
-				log.Printf("failed to send order pending email: %v", err)
+				slog.Error("failed to send order pending email", "order_id", order.ID, "error", err)
 			}
 		}()
 	}
@@ -273,7 +282,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 
 			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
 			if err != nil {
-				log.Printf("failed to retrieve user: %v", err)
+				slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
 				return
 			}
 
@@ -287,8 +296,8 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			// 2) fetch all products in one go
 			prodDetailsSlice, err := r.ProductService.GetProductsByIDs(context.Background(), ids)
 			if err != nil {
-				log.Printf("failed to retrieve products: %v", err)
-				return // or return err if you’re in a function that can
+				slog.Error("failed to retrieve products", "order_id", o.ID, "error", err)
+				return
 			}
 
 			// 3) build a map for quick lookup
@@ -302,7 +311,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			for i, ir := range raws {
 				pd, ok := prodMap[ir.ProductID]
 				if !ok {
-					log.Printf("missing product details for %s", ir.ProductID)
+					slog.Error("missing product details", "order_id", o.ID, "product_id", ir.ProductID)
 					return
 				}
 				items[i] = orderDomain.OrderProduct{
@@ -322,14 +331,14 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			if o.AddressID != nil {
 				address, err = r.AddressService.GetAddressByID(context.Background(), *o.AddressID)
 				if err != nil {
-					log.Printf("failed to retrieve address: %v", err)
+					slog.Error("failed to retrieve address", "order_id", o.ID, "error", err)
 					return
 				}
 			}
 
 			err = es.SendOrderConfirmedEmail(*user, utils.GetLang(ctx), *o, items, address)
 			if err != nil {
-				log.Printf("failed to send order pending email: %v", err)
+				slog.Error("failed to send order confirmed email", "order_id", o.ID, "error", err)
 			}
 		}()
 	}
@@ -347,13 +356,13 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		go func() {
 			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
 			if err != nil {
-				log.Printf("failed to retrieve user: %v", err)
+				slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
 				return
 			}
 
 			err = es.SendOrderCanceledEmail(*user, utils.GetLang(ctx))
 			if err != nil {
-				log.Printf("failed to send order canceled email: %v", err)
+				slog.Error("failed to send order canceled email", "order_id", o.ID, "error", err)
 			}
 		}()
 	}

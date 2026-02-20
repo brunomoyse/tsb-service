@@ -9,7 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
@@ -53,7 +53,7 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 	// 2. If an image was supplied, forward it to the file‑service
 	if input.Image != nil {
 		if err := utils.UploadProductImage(ctx, input.Image.File, input.Image.Filename, prod.Slug); err != nil {
-			log.Printf("image upload failed: %v", err)
+			slog.ErrorContext(ctx, "image upload failed", "product_id", prod.ID, "error", err)
 		}
 	}
 
@@ -127,7 +127,7 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 			input.Image.Filename,
 			prod.Slug, // slug might be nil; helper handles that
 		); err != nil {
-			log.Printf("image upload failed: %v", err)
+			slog.ErrorContext(ctx, "image upload failed", "product_id", id, "error", err)
 		}
 	}
 

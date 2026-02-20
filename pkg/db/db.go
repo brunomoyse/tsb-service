@@ -2,7 +2,7 @@ package db
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"time"
@@ -51,7 +51,8 @@ func ConnectDatabase() (*sqlx.DB, error) {
 	db.SetMaxOpenConns(getEnvInt("DB_MAX_OPEN_CONNS", 25))
 	db.SetMaxIdleConns(getEnvInt("DB_MAX_IDLE_CONNS", 5))
 	db.SetConnMaxLifetime(time.Duration(getEnvInt("DB_CONN_MAX_LIFETIME_MIN", 5)) * time.Minute)
+	db.SetConnMaxIdleTime(time.Duration(getEnvInt("DB_CONN_MAX_IDLE_TIME_MIN", 2)) * time.Minute)
 
-	log.Println("Database connection established")
+	slog.Info("database connection established", "host", dbHost, "port", dbPort, "database", dbName)
 	return db, nil
 }

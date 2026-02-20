@@ -1,9 +1,7 @@
 package interfaces
 
 import (
-	"context"
-	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -46,6 +44,8 @@ func NewPaymentHandler(
 }
 
 func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	var req struct {
 		ExternalMolliePaymentID string `form:"id" binding:"required"`
 	}
@@ -57,46 +57,56 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 
 	// Validate Mollie payment ID format
 	if !strings.HasPrefix(req.ExternalMolliePaymentID, "tr_") {
-		log.Printf("webhook: invalid payment ID format: %s", req.ExternalMolliePaymentID)
+		slog.WarnContext(ctx, "webhook: invalid payment ID format", "component", "webhook", "payment_id", req.ExternalMolliePaymentID)
 		c.JSON(http.StatusOK, gin.H{"message": "ignored"})
 		return
 	}
 
 	// Verify payment exists in our DB before calling Mollie API
-	payment, err := h.service.GetPaymentByExternalID(context.Background(), req.ExternalMolliePaymentID)
+	payment, err := h.service.GetPaymentByExternalID(ctx, req.ExternalMolliePaymentID)
 	if err != nil {
-		log.Printf("webhook: unknown payment ID %s: %v", req.ExternalMolliePaymentID, err)
+		slog.WarnContext(ctx, "webhook: unknown payment ID", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", err)
 		c.JSON(http.StatusOK, gin.H{"message": "unknown payment"})
+		return
+	}
+
+	// Fetch the external payment status from Mollie
+	_, externalPayment, err := h.service.GetExternalPaymentByID(ctx, req.ExternalMolliePaymentID)
+	if err != nil {
+		slog.ErrorContext(ctx, "webhook: failed to retrieve external payment", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", err)
+		c.JSON(http.StatusOK, gin.H{"message": "processed"})
+		return
+	}
+
+	// Idempotency check: if local status already matches Mollie status, skip processing
+	if string(payment.Status) == externalPayment.Status {
+		c.JSON(http.StatusOK, gin.H{"message": "already processed"})
 		return
 	}
 
 	err = h.service.UpdatePaymentStatus(c, req.ExternalMolliePaymentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update payment status"})
-		return
-	}
-
-	_, externalPayment, err := h.service.GetExternalPaymentByID(context.Background(), req.ExternalMolliePaymentID)
-	if err != nil {
-		log.Printf("failed to retrieve external payment: %v", err)
+		slog.ErrorContext(ctx, "webhook: failed to update payment status", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", err)
+		c.JSON(http.StatusOK, gin.H{"message": "processed"})
 		return
 	}
 
 	if externalPayment.Status == "paid" {
 
-		order, orderProducts, err := h.orderService.GetOrderByID(context.Background(), payment.OrderID)
+		order, orderProducts, err := h.orderService.GetOrderByID(ctx, payment.OrderID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order"})
+			slog.ErrorContext(ctx, "webhook: failed to retrieve order", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", err)
+			c.JSON(http.StatusOK, gin.H{"message": "processed"})
 			return
 		}
 		if order == nil {
-			// If you consider "not found" a 404
-			c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+			slog.ErrorContext(ctx, "webhook: order not found for payment", "component", "webhook", "payment_id", req.ExternalMolliePaymentID)
+			c.JSON(http.StatusOK, gin.H{"message": "processed"})
 			return
 		}
 		if orderProducts == nil {
-			// or handle the case if order was found but no products
-			c.JSON(http.StatusNotFound, gin.H{"error": "no order products found"})
+			slog.ErrorContext(ctx, "webhook: no order products found", "component", "webhook", "payment_id", req.ExternalMolliePaymentID)
+			c.JSON(http.StatusOK, gin.H{"message": "processed"})
 			return
 		}
 
@@ -106,9 +116,10 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 			productIDs[i] = op.ProductID.String()
 		}
 
-		products, err := h.productService.GetProductsByIDs(context.Background(), productIDs)
+		products, err := h.productService.GetProductsByIDs(ctx, productIDs)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve products"})
+			slog.ErrorContext(ctx, "webhook: failed to retrieve products", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", err)
+			c.JSON(http.StatusOK, gin.H{"message": "processed"})
 			return
 		}
 
@@ -123,7 +134,8 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 		for i, op := range *orderProducts {
 			prod, ok := productMap[op.ProductID]
 			if !ok {
-				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("product %s not found", op.ProductID)})
+				slog.ErrorContext(ctx, "webhook: product not found", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "product_id", op.ProductID)
+				c.JSON(http.StatusOK, gin.H{"message": "processed"})
 				return
 			}
 			orderProductsResponse[i] = domain.OrderProduct{
@@ -139,10 +151,11 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 			}
 		}
 
-		u, err := h.userService.GetUserByID(context.Background(), order.UserID.String())
+		u, err := h.userService.GetUserByID(ctx, order.UserID.String())
 
 		if err != nil {
-			log.Printf("failed to retrieve user: %v", err)
+			slog.ErrorContext(ctx, "webhook: failed to retrieve user", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", err)
+			c.JSON(http.StatusOK, gin.H{"message": "processed"})
 			return
 		}
 
@@ -150,15 +163,16 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 
 		err = es.SendOrderPendingEmail(*u, "fr", *order, orderProductsResponse)
 		if err != nil {
-			log.Printf("failed to send order pending email: %v", err)
+			slog.ErrorContext(ctx, "webhook: failed to send order pending email", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", err)
 		}
 	} else if externalPayment.Status == "cancelled" || externalPayment.Status == "failed" || externalPayment.Status == "expired" {
-		log.Printf("payment status is not 'paid': %s", externalPayment.Status)
+		slog.InfoContext(ctx, "webhook: payment not paid", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "status", externalPayment.Status)
 		canceledStatus := domain.OrderStatusCanceled
 
-		err = h.orderService.UpdateOrder(context.Background(), payment.OrderID, &canceledStatus, nil)
+		err = h.orderService.UpdateOrder(ctx, payment.OrderID, &canceledStatus, nil)
 		if err != nil {
-			log.Printf("failed to update order status: %v", err)
+			slog.ErrorContext(ctx, "webhook: failed to update order status", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", err)
+			c.JSON(http.StatusOK, gin.H{"message": "processed"})
 			return
 		}
 	}
