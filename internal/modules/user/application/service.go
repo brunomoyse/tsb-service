@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	net_mail "net/mail"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -65,11 +66,6 @@ func (s *userService) CreateUser(ctx context.Context, firstName string, lastName
 		return nil, fmt.Errorf("password or googleID must be provided")
 	}
 
-	// Check if user already exists
-	if user, err := s.repo.FindByEmail(ctx, email); err == nil {
-		return nil, fmt.Errorf("user with email %s already exists", user.Email)
-	}
-
 	if password != nil {
 		if err := validatePasswordStrength(*password); err != nil {
 			return nil, err
@@ -88,10 +84,22 @@ func (s *userService) CreateUser(ctx context.Context, firstName string, lastName
 		// Try to find an existing user by email.
 		user, err := s.repo.FindByEmail(ctx, email)
 		if err == nil {
-			// User already exists; update password.
+			// User already exists.
+			if user.PasswordHash != nil {
+				// Already has a password — true duplicate registration attempt.
+				return nil, fmt.Errorf("user with email %s already exists", user.Email)
+			}
+			// Google-first user: link account by setting password and auto-verify email.
 			updatedUser, err := s.repo.UpdateUserPassword(ctx, user.ID.String(), hashedPassword, salt)
 			if err != nil {
 				return nil, fmt.Errorf("failed to update user password: %w", err)
+			}
+			// Auto-verify email (Google already verified it).
+			if updatedUser.EmailVerifiedAt == nil {
+				updatedUser, err = s.repo.UpdateEmailVerifiedAt(ctx, updatedUser.ID.String())
+				if err != nil {
+					return nil, fmt.Errorf("failed to verify email: %w", err)
+				}
 			}
 			return updatedUser, nil
 		}
@@ -126,7 +134,25 @@ func (s *userService) CreateUser(ctx context.Context, firstName string, lastName
 		return &newUser, nil
 	}
 
-	// Google flow.
+	// Google flow: check if user already exists.
+	existingUser, err := s.repo.FindByEmail(ctx, email)
+	if err == nil {
+		// User with this email already exists — link Google ID if not set.
+		if existingUser.GoogleID == nil {
+			updatedUser, err := s.repo.UpdateGoogleID(ctx, existingUser.ID.String(), *googleID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to link Google account: %w", err)
+			}
+			return updatedUser, nil
+		}
+		// Already has Google ID — return the existing user.
+		return existingUser, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("error checking existing user: %w", err)
+	}
+
+	// Brand new Google user.
 	newUser := domain.NewGoogleUser(firstName, lastName, email, *googleID)
 	id, err := s.repo.Save(ctx, &newUser)
 	if err != nil {
@@ -355,18 +381,30 @@ func validatePasswordStrength(password string) error {
 	if len(password) < 8 {
 		return fmt.Errorf("password must be at least 8 characters long")
 	}
-	hasLetter := false
-	hasNumber := false
+	var hasUpper, hasLower, hasDigit, hasSpecial bool
 	for _, ch := range password {
-		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
-			hasLetter = true
-		}
-		if ch >= '0' && ch <= '9' {
-			hasNumber = true
+		switch {
+		case ch >= 'A' && ch <= 'Z':
+			hasUpper = true
+		case ch >= 'a' && ch <= 'z':
+			hasLower = true
+		case ch >= '0' && ch <= '9':
+			hasDigit = true
+		case strings.ContainsRune(`!@#$%^&*(),.?":{}|<>`, ch):
+			hasSpecial = true
 		}
 	}
-	if !hasLetter || !hasNumber {
-		return fmt.Errorf("password must contain at least one letter and one number")
+	if !hasUpper {
+		return fmt.Errorf("password must contain at least one uppercase letter")
+	}
+	if !hasLower {
+		return fmt.Errorf("password must contain at least one lowercase letter")
+	}
+	if !hasDigit {
+		return fmt.Errorf("password must contain at least one digit")
+	}
+	if !hasSpecial {
+		return fmt.Errorf("password must contain at least one special character (!@#$%%^&*(),.?\":{}|<>)")
 	}
 	return nil
 }

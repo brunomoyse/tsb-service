@@ -12,7 +12,6 @@ import (
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 
 	gqlMiddleware "tsb-service/internal/api/graphql/middleware"
@@ -63,11 +62,11 @@ func main() {
 	}
 	logging.Setup(logLevel, logFormat)
 
-	// DB connection with retry
-	var dbConn *sqlx.DB
+	// DB connection with retry (dual pool: customer + admin)
+	var dbPool *db.DBPool
 	var dbErr error
 	for i := 0; i < 3; i++ {
-		dbConn, dbErr = db.ConnectDatabase()
+		dbPool, dbErr = db.ConnectDualDatabase()
 		if dbErr == nil {
 			break
 		}
@@ -80,7 +79,7 @@ func main() {
 		slog.Error("failed to connect to database after all attempts", "error", dbErr)
 		os.Exit(1)
 	}
-	defer dbConn.Close()
+	defer dbPool.Close()
 
 	// PubSub broker (used by GraphQL subscriptions)
 	broker := pubsub.NewBroker()
@@ -119,12 +118,12 @@ func main() {
 	}
 
 	// Repos / services / handlers
-	addressRepo := addressInfrastructure.NewAddressRepository(dbConn)
-	orderRepo := orderInfrastructure.NewOrderRepository(dbConn)
-	paymentRepo := paymentInfrastructure.NewPaymentRepository(dbConn)
-	productRepo := productInfrastructure.NewProductRepository(dbConn)
-	restaurantRepo := restaurantInfrastructure.NewRestaurantRepository(dbConn)
-	userRepo := userInfrastructure.NewUserRepository(dbConn)
+	addressRepo := addressInfrastructure.NewAddressRepository(dbPool)
+	orderRepo := orderInfrastructure.NewOrderRepository(dbPool)
+	paymentRepo := paymentInfrastructure.NewPaymentRepository(dbPool)
+	productRepo := productInfrastructure.NewProductRepository(dbPool)
+	restaurantRepo := restaurantInfrastructure.NewRestaurantRepository(dbPool)
+	userRepo := userInfrastructure.NewUserRepository(dbPool)
 
 	addressService := addressApplication.NewAddressService(addressRepo)
 	orderService := orderApplication.NewOrderService(orderRepo)
@@ -178,7 +177,7 @@ func main() {
 	// API routes
 	api := router.Group("/api/v1")
 	healthCheck := func(c *gin.Context) {
-		if err := dbConn.Ping(); err != nil {
+		if err := dbPool.DB().Ping(); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy", "db": "unreachable"})
 			return
 		}

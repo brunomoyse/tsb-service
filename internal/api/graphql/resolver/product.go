@@ -108,18 +108,29 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 		prod.Translations = toDomainTranslationsPtr(input.Translations)
 	}
 
-	// 3. Persist the update with the single domain object.
+	// 3. Save the old slug before persisting the update.
+	oldSlug := ""
+	if prod.Slug != nil {
+		oldSlug = *prod.Slug
+	}
+
+	// 4. Persist the update with the single domain object.
 	if err := r.ProductService.UpdateProduct(ctx, prod); err != nil {
 		return nil, fmt.Errorf("failed to update product: %w", err)
 	}
 
-	// 4. We need to refetch the product to get the latest slug
+	// 5. We need to refetch the product to get the latest slug
 	prod, err = r.ProductService.GetProduct(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch product %s: %w", id, err)
 	}
 
-	// 5. Upload/replace image if provided.
+	newSlug := ""
+	if prod.Slug != nil {
+		newSlug = *prod.Slug
+	}
+
+	// 6. Upload/replace image if provided.
 	if input.Image != nil {
 		if err := utils.UploadProductImage(
 			ctx,
@@ -129,9 +140,24 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 		); err != nil {
 			slog.ErrorContext(ctx, "image upload failed", "product_id", id, "error", err)
 		}
+		// If slug changed and new image was uploaded, clean up old image
+		if oldSlug != "" && oldSlug != newSlug {
+			go func() {
+				if err := utils.DeleteProductImage(ctx, oldSlug); err != nil {
+					slog.ErrorContext(ctx, "failed to delete old product image", "old_slug", oldSlug, "error", err)
+				}
+			}()
+		}
+	} else if oldSlug != "" && newSlug != "" && oldSlug != newSlug {
+		// 7. No new image, but slug changed — rename the existing image.
+		go func() {
+			if err := utils.RenameProductImage(ctx, oldSlug, newSlug); err != nil {
+				slog.ErrorContext(ctx, "failed to rename product image", "old_slug", oldSlug, "new_slug", newSlug, "error", err)
+			}
+		}()
 	}
 
-	// 6. Return the updated product in GraphQL form.
+	// 8. Return the updated product in GraphQL form.
 	return ToGQLProduct(prod, userLang), nil
 }
 

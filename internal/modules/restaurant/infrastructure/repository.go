@@ -4,21 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"tsb-service/internal/modules/restaurant/domain"
-
-	"github.com/jmoiron/sqlx"
+	"tsb-service/pkg/db"
 )
 
 type RestaurantRepository struct {
-	db *sqlx.DB
+	pool *db.DBPool
 }
 
-func NewRestaurantRepository(db *sqlx.DB) domain.RestaurantRepository {
-	return &RestaurantRepository{db: db}
+func NewRestaurantRepository(pool *db.DBPool) domain.RestaurantRepository {
+	return &RestaurantRepository{pool: pool}
 }
 
 func (r *RestaurantRepository) GetConfig(ctx context.Context) (*domain.RestaurantConfig, error) {
 	var config domain.RestaurantConfig
-	err := r.db.GetContext(ctx, &config,
+	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
 		`SELECT ordering_enabled, opening_hours, updated_at FROM restaurant_config WHERE id = TRUE`)
 	if err != nil {
 		return nil, err
@@ -28,7 +27,7 @@ func (r *RestaurantRepository) GetConfig(ctx context.Context) (*domain.Restauran
 
 func (r *RestaurantRepository) UpdateOrderingEnabled(ctx context.Context, enabled bool) (*domain.RestaurantConfig, error) {
 	var config domain.RestaurantConfig
-	err := r.db.GetContext(ctx, &config,
+	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
 		`UPDATE restaurant_config SET ordering_enabled = $1, updated_at = NOW() WHERE id = TRUE
 		 RETURNING ordering_enabled, opening_hours, updated_at`, enabled)
 	if err != nil {
@@ -39,7 +38,7 @@ func (r *RestaurantRepository) UpdateOrderingEnabled(ctx context.Context, enable
 
 func (r *RestaurantRepository) UpdateOpeningHours(ctx context.Context, hours json.RawMessage) (*domain.RestaurantConfig, error) {
 	var config domain.RestaurantConfig
-	err := r.db.GetContext(ctx, &config,
+	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
 		`UPDATE restaurant_config SET opening_hours = $1, updated_at = NOW() WHERE id = TRUE
 		 RETURNING ordering_enabled, opening_hours, updated_at`, hours)
 	if err != nil {

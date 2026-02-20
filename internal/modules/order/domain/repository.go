@@ -13,4 +13,6 @@ type OrderRepository interface {
 	FindPaginated(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*Order, error)
 	FindByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*OrderProductRaw, error)
 	FindByUserIDs(ctx context.Context, userIDs []string) (map[string][]*Order, error)
+	InsertStatusHistory(ctx context.Context, orderID uuid.UUID, status OrderStatus) error
+	FindStatusHistoryByOrderID(ctx context.Context, orderID uuid.UUID) ([]*OrderStatusHistory, error)
 }

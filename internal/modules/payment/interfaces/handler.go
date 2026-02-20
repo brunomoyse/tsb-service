@@ -16,6 +16,7 @@ import (
 	productDomain "tsb-service/internal/modules/product/domain"
 	userApplication "tsb-service/internal/modules/user/application"
 	"tsb-service/pkg/pubsub"
+	"tsb-service/pkg/utils"
 	es "tsb-service/services/email/scaleway"
 )
 
@@ -44,7 +45,9 @@ func NewPaymentHandler(
 }
 
 func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
-	ctx := c.Request.Context()
+	// Webhook is a server-to-server call that needs write access to orders/payments,
+	// so use the admin DB pool.
+	ctx := utils.SetIsAdmin(c.Request.Context(), true)
 
 	var req struct {
 		ExternalMolliePaymentID string `form:"id" binding:"required"`
@@ -161,7 +164,7 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 
 		h.broker.Publish("orderUpdated", resolver.ToGQLOrder(order))
 
-		err = es.SendOrderPendingEmail(*u, "fr", *order, orderProductsResponse)
+		err = es.SendOrderPendingEmail(*u, order.Language, *order, orderProductsResponse)
 		if err != nil {
 			slog.ErrorContext(ctx, "webhook: failed to send order pending email", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", err)
 		}
@@ -190,7 +193,7 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 				return
 			}
 
-			if emailErr := es.SendPaymentFailedEmail(*u, "fr"); emailErr != nil {
+			if emailErr := es.SendPaymentFailedEmail(*u, order.Language); emailErr != nil {
 				slog.ErrorContext(ctx, "webhook: failed to send payment failed email", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", emailErr)
 			}
 		}()

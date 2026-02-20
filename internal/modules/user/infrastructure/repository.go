@@ -4,20 +4,19 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/lib/pq"
 	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/db"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 type UserRepository struct {
-	db *sqlx.DB
+	pool *db.DBPool
 }
 
-func NewUserRepository(db *sqlx.DB) domain.UserRepository {
-	return &UserRepository{db: db}
+func NewUserRepository(pool *db.DBPool) domain.UserRepository {
+	return &UserRepository{pool: pool}
 }
 
 func (r *UserRepository) Save(ctx context.Context, user *domain.User) (uuid.UUID, error) {
@@ -27,7 +26,7 @@ func (r *UserRepository) Save(ctx context.Context, user *domain.User) (uuid.UUID
 		RETURNING id;
 	`
 	var id uuid.UUID
-	if err := r.db.QueryRowContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.PasswordHash, user.Salt, user.GoogleID).Scan(&id); err != nil {
+	if err := r.pool.ForContext(ctx).QueryRowContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.PasswordHash, user.Salt, user.GoogleID).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
 	user.ID = id
@@ -41,7 +40,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 		FROM users 
 		WHERE email = $1;
 	`
-	if err := r.db.GetContext(ctx, &u, query, email); err != nil {
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &u, query, email); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -54,7 +53,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User,
 		FROM users 
 		WHERE id = $1;
 	`
-	if err := r.db.GetContext(ctx, &u, query, id); err != nil {
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &u, query, id); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -67,7 +66,7 @@ func (r *UserRepository) FindByGoogleID(ctx context.Context, googleID string) (*
 		FROM users 
 		WHERE google_id = $1;
 	`
-	if err := r.db.GetContext(ctx, &u, query, googleID); err != nil {
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &u, query, googleID); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -75,7 +74,7 @@ func (r *UserRepository) FindByGoogleID(ctx context.Context, googleID string) (*
 
 func (r *UserRepository) UpdateGoogleID(ctx context.Context, userID string, googleID string) (*domain.User, error) {
 	query := `UPDATE users SET google_id = $1 WHERE id = $2`
-	_, err := r.db.ExecContext(ctx, query, googleID, userID)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, googleID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +87,7 @@ func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) (*do
 		SET first_name = $1, last_name = $2, email = $3, phone_number = $4, address_id = $5, email_verified_at = $6
 		WHERE id = $7
 	`
-	_, err := r.db.ExecContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.EmailVerifiedAt, user.ID)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.EmailVerifiedAt, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +97,7 @@ func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) (*do
 
 func (r *UserRepository) UpdateUserPassword(ctx context.Context, userID string, passwordHash string, salt string) (*domain.User, error) {
 	query := `UPDATE users SET password_hash = $1, salt = $2 WHERE id = $3`
-	_, err := r.db.ExecContext(ctx, query, passwordHash, salt, userID)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, passwordHash, salt, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +106,7 @@ func (r *UserRepository) UpdateUserPassword(ctx context.Context, userID string, 
 
 func (r *UserRepository) UpdateEmailVerifiedAt(ctx context.Context, userID string) (*domain.User, error) {
 	query := `UPDATE users SET email_verified_at = NOW() WHERE id = $1`
-	_, err := r.db.ExecContext(ctx, query, userID)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +119,7 @@ func (r *UserRepository) StoreRefreshToken(ctx context.Context, userID uuid.UUID
 		VALUES ($1, $2, $3)
 	`
 	expiresAtTime := time.Unix(expiresAt, 0)
-	_, err := r.db.ExecContext(ctx, query, userID, tokenHash, expiresAtTime)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID, tokenHash, expiresAtTime)
 	return err
 }
 
@@ -130,7 +129,7 @@ func (r *UserRepository) InvalidateRefreshToken(ctx context.Context, tokenHash s
 		SET revoked_at = NOW()
 		WHERE token_hash = $1 AND revoked_at IS NULL
 	`
-	_, err := r.db.ExecContext(ctx, query, tokenHash)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, tokenHash)
 	return err
 }
 
@@ -140,7 +139,7 @@ func (r *UserRepository) InvalidateAllRefreshTokens(ctx context.Context, userID 
 		SET revoked_at = NOW()
 		WHERE user_id = $1 AND revoked_at IS NULL
 	`
-	_, err := r.db.ExecContext(ctx, query, userID)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID)
 	return err
 }
 
@@ -154,7 +153,7 @@ func (r *UserRepository) IsRefreshTokenValid(ctx context.Context, tokenHash stri
 		)
 	`
 	var exists bool
-	err := r.db.QueryRowContext(ctx, query, tokenHash).Scan(&exists)
+	err := r.pool.ForContext(ctx).QueryRowContext(ctx, query, tokenHash).Scan(&exists)
 	if err != nil {
 		return false, err
 	}
@@ -182,7 +181,7 @@ func (r *UserRepository) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs [
 	}
 
 	var rows []userRow
-	if err := r.db.SelectContext(ctx, &rows, query, pq.Array(orderIDs)); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &rows, query, pq.Array(orderIDs)); err != nil {
 		return nil, fmt.Errorf("failed to batch‑get users by order IDs: %w", err)
 	}
 

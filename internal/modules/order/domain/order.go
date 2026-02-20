@@ -45,6 +45,14 @@ type Order struct {
 	AddressExtra       *string          `db:"address_extra" json:"addressExtra,omitempty"`
 	OrderNote          *string          `db:"order_note" json:"orderNote,omitempty"`
 	OrderExtra         NullableJSON     `db:"order_extra" json:"orderExtras,omitempty"`
+	Language           string           `db:"language" json:"language"`
+}
+
+type OrderStatusHistory struct {
+	ID        uuid.UUID   `db:"id" json:"id"`
+	OrderID   uuid.UUID   `db:"order_id" json:"orderId"`
+	Status    OrderStatus `db:"status" json:"status"`
+	ChangedAt time.Time   `db:"changed_at" json:"changedAt"`
 }
 
 type OrderExtra struct {
@@ -89,11 +97,16 @@ func NewOrder(
 	orderExtra []OrderExtra,
 	deliveryFee *decimal.Decimal,
 	discountAmount decimal.Decimal,
+	language string,
 ) *Order {
 	var orderExtraJSON NullableJSON
 	if orderExtra != nil && len(orderExtra) > 0 {
 		jsonBytes, _ := json.Marshal(orderExtra)
 		orderExtraJSON = NullableJSON(jsonBytes)
+	}
+
+	if language == "" {
+		language = "fr"
 	}
 
 	return &Order{
@@ -109,6 +122,7 @@ func NewOrder(
 		OrderExtra:         orderExtraJSON,
 		DeliveryFee:        deliveryFee,
 		DiscountAmount:     discountAmount,
+		Language:           language,
 	}
 }
 

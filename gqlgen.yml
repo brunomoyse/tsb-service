@@ -175,6 +175,8 @@ models:
         resolver: true
       platformData:
         resolver: true
+      statusHistory:
+        resolver: true
       displayCustomerName:
         resolver: true
       displayAddress:
