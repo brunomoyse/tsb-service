@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Payment Failed | Tokyo Sushi Bar</title>
+    <style>
+        /* Base styling */
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background: #f2f2f2;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            overflow: hidden;
+            padding: 30px;
+        }
+        .container img {
+            display: block;
+            margin: 0 auto 20px;
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .content {
+            margin-bottom: 20px;
+        }
+        .content p {
+            line-height: 1.6;
+            margin: 16px 0;
+        }
+        .content p.lead {
+            font-size: 18px;
+            color: #444;
+        }
+        .footer {
+            background-color: #fafafa;
+            padding: 20px 0;
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Restaurant Logo -->
+    <img alt="Logo" src="https://tokyo.brunomoyse.be/icons/tsb-logo.svg" />
+
+    <div class="content">
+        <p class="lead">Hello {{.UserName}},</p>
+        <p>Unfortunately, we were unable to process your payment. Your order has been <strong>canceled</strong>.</p>
+        <p>Please feel free to place a new order whenever you're ready.</p>
+
+        <!-- Try again button -->
+        <p style="text-align: center;">
+            <a href="{{.MenuLink}}"
+               style="
+                   display: inline-block;
+                   background: #ed1c24;
+                   color: #ffffff;
+                   padding: 8px 16px;
+                   text-decoration: none;
+                   font-size: 14px;
+                   border-radius: 4px;
+                   margin: 20px 0;
+                   transition: transform 0.2s ease, box-shadow 0.2s ease;
+               "
+               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';"
+               onmouseout="this.style.transform='none'; this.style.boxShadow='none';"
+            >
+                Try again
+            </a>
+        </p>
+
+        <p>If you need further assistance, feel free to contact the restaurant directly at <strong>04 222 98 88</strong>.</p>
+    </div>
+
+    <div class="footer">
+        <p>If you did not place this order, please disregard this email.</p>
+        <p>&copy; 2026 Tokyo Sushi Bar. All rights reserved.</p>
+    </div>
+</div>
+</body>
+</html>

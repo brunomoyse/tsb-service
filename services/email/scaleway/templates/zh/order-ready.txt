@@ -1,0 +1,13 @@
+您好 {{.UserName}}，
+
+{{if eq .OrderType "DELIVERY"}}
+好消息！您的订单正在配送中，配送员已出发。
+{{else if eq .OrderType "PICKUP"}}
+好消息！您的订单已准备好，请尽快到店取餐。
+{{end}}
+
+跟踪您的订单：{{.StatusLink}}
+
+如果您并未下此订单，请忽略此邮件。
+
+© 2026 Tokyo Sushi Bar。保留所有权利。

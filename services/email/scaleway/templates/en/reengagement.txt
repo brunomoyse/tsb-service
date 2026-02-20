@@ -1,0 +1,11 @@
+Hello {{.UserName}},
+
+It's been a while since your last visit to Tokyo Sushi Bar, and we miss you!
+
+Our chefs have been crafting new delicious dishes just for you. Come discover what's new on our menu.
+
+Discover the menu: {{.MenuLink}}
+
+If you no longer wish to receive these emails, please update your preferences.
+
+© 2026 Tokyo Sushi Bar. All rights reserved.

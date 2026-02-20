@@ -1,0 +1,7 @@
+您好 {{.UserName}}，
+
+您的 Google 帐户已成功关联到您的 Tokyo Sushi Bar 帐户。您现在可以使用 Google 登录以获得更快的体验。
+
+如果您没有执行此操作，请立即拨打 04 222 98 88 与我们联系。
+
+© 2026 Tokyo Sushi Bar。保留所有权利。

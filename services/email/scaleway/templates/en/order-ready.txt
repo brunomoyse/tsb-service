@@ -1,0 +1,13 @@
+Hello {{.UserName}},
+
+{{if eq .OrderType "DELIVERY"}}
+Great news! Your order is now out for delivery. Our driver is on the way to you.
+{{else if eq .OrderType "PICKUP"}}
+Great news! Your order is ready for pickup. Please come to the restaurant at your earliest convenience.
+{{end}}
+
+Track your order: {{.StatusLink}}
+
+If you did not place this order, please disregard this email.
+
+© 2026 Tokyo Sushi Bar. All rights reserved.

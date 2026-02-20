@@ -412,3 +412,175 @@ func renderOrderConfirmedEmailText(path string, u userDomain.User, op []orderDom
 	}
 	return renderEmail(path, data, loadTextTemplate)
 }
+
+// --------------------------------------------------------------------------------
+// Order Ready
+// --------------------------------------------------------------------------------
+
+func prepareOrderReadyData(u userDomain.User, o orderDomain.Order) interface{} {
+	return struct {
+		UserName   string
+		OrderType  string
+		StatusLink string
+	}{
+		UserName:   fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		OrderType:  string(o.OrderType),
+		StatusLink: fmt.Sprintf("%s/me?followOrder=%s", os.Getenv("APP_BASE_URL"), o.ID),
+	}
+}
+
+func renderOrderReadyEmailHTML(path string, u userDomain.User, o orderDomain.Order) (string, error) {
+	data := prepareOrderReadyData(u, o)
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+func renderOrderReadyEmailText(path string, u userDomain.User, o orderDomain.Order) (string, error) {
+	data := prepareOrderReadyData(u, o)
+	return renderEmail(path, data, loadTextTemplate)
+}
+
+// --------------------------------------------------------------------------------
+// Order Completed
+// --------------------------------------------------------------------------------
+
+func prepareOrderCompletedData(u userDomain.User) interface{} {
+	return struct {
+		UserName string
+		MenuLink string
+	}{
+		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		MenuLink: os.Getenv("APP_BASE_URL"),
+	}
+}
+
+func renderOrderCompletedEmailHTML(path string, u userDomain.User) (string, error) {
+	data := prepareOrderCompletedData(u)
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+func renderOrderCompletedEmailText(path string, u userDomain.User) (string, error) {
+	data := prepareOrderCompletedData(u)
+	return renderEmail(path, data, loadTextTemplate)
+}
+
+// --------------------------------------------------------------------------------
+// Payment Failed
+// --------------------------------------------------------------------------------
+
+func preparePaymentFailedData(u userDomain.User) interface{} {
+	return struct {
+		UserName string
+		MenuLink string
+	}{
+		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		MenuLink: os.Getenv("APP_BASE_URL"),
+	}
+}
+
+func renderPaymentFailedEmailHTML(path string, u userDomain.User) (string, error) {
+	data := preparePaymentFailedData(u)
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+func renderPaymentFailedEmailText(path string, u userDomain.User) (string, error) {
+	data := preparePaymentFailedData(u)
+	return renderEmail(path, data, loadTextTemplate)
+}
+
+// --------------------------------------------------------------------------------
+// Refund Issued
+// --------------------------------------------------------------------------------
+
+func prepareRefundIssuedData(u userDomain.User, refundAmount string) interface{} {
+	return struct {
+		UserName     string
+		RefundAmount string
+	}{
+		UserName:     fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		RefundAmount: refundAmount,
+	}
+}
+
+func renderRefundIssuedEmailHTML(path string, u userDomain.User, refundAmount string) (string, error) {
+	data := prepareRefundIssuedData(u, refundAmount)
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+func renderRefundIssuedEmailText(path string, u userDomain.User, refundAmount string) (string, error) {
+	data := prepareRefundIssuedData(u, refundAmount)
+	return renderEmail(path, data, loadTextTemplate)
+}
+
+// --------------------------------------------------------------------------------
+// Account Linked
+// --------------------------------------------------------------------------------
+
+func prepareAccountLinkedData(u userDomain.User) interface{} {
+	return struct {
+		UserName string
+	}{
+		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+	}
+}
+
+func renderAccountLinkedEmailHTML(path string, u userDomain.User) (string, error) {
+	data := prepareAccountLinkedData(u)
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+func renderAccountLinkedEmailText(path string, u userDomain.User) (string, error) {
+	data := prepareAccountLinkedData(u)
+	return renderEmail(path, data, loadTextTemplate)
+}
+
+// --------------------------------------------------------------------------------
+// Ready Time Updated
+// --------------------------------------------------------------------------------
+
+func prepareReadyTimeUpdatedData(u userDomain.User, o orderDomain.Order, lang string) interface{} {
+	return struct {
+		UserName           string
+		OrderType          string
+		EstimatedReadyTime string
+		StatusLink         string
+	}{
+		UserName:           fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		OrderType:          string(o.OrderType),
+		EstimatedReadyTime: formatEstimatedReadyTime(o.EstimatedReadyTime, lang),
+		StatusLink:         fmt.Sprintf("%s/me?followOrder=%s", os.Getenv("APP_BASE_URL"), o.ID),
+	}
+}
+
+func renderReadyTimeUpdatedEmailHTML(path string, u userDomain.User, o orderDomain.Order, lang string) (string, error) {
+	data := prepareReadyTimeUpdatedData(u, o, lang)
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+func renderReadyTimeUpdatedEmailText(path string, u userDomain.User, o orderDomain.Order, lang string) (string, error) {
+	data := prepareReadyTimeUpdatedData(u, o, lang)
+	return renderEmail(path, data, loadTextTemplate)
+}
+
+// --------------------------------------------------------------------------------
+// Re-engagement
+// --------------------------------------------------------------------------------
+
+func prepareReengagementData(u userDomain.User) interface{} {
+	return struct {
+		UserName string
+		MenuLink string
+	}{
+		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		MenuLink: os.Getenv("APP_BASE_URL"),
+	}
+}
+
+func renderReengagementEmailHTML(path string, u userDomain.User) (string, error) {
+	data := prepareReengagementData(u)
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+func renderReengagementEmailText(path string, u userDomain.User) (string, error) {
+	data := prepareReengagementData(u)
+	return renderEmail(path, data, loadTextTemplate)
+}
