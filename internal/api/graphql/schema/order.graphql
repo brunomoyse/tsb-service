@@ -19,9 +19,17 @@ type Order {
     payment: Payment
     items: [OrderItem!]!
 
+    statusHistory: [OrderStatusHistory!]! @admin
+
     # Computed helper fields for display
     displayCustomerName: String!
     displayAddress: String!
+}
+
+type OrderStatusHistory {
+    id: ID!
+    status: OrderStatusEnum!
+    changedAt: DateTime!
 }
 
 type OrderItem {

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
-	"github.com/jmoiron/sqlx"
 
 	"tsb-service/internal/api/graphql/resolver"
 	"tsb-service/internal/api/graphql/testhelpers"
@@ -18,6 +17,7 @@ import (
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
 	userApplication "tsb-service/internal/modules/user/application"
 	userInfrastructure "tsb-service/internal/modules/user/infrastructure"
+	"tsb-service/pkg/db"
 	"tsb-service/pkg/pubsub"
 )
 
@@ -38,7 +38,7 @@ func setupTestContext(t *testing.T) *TestContext {
 	fixtures := testhelpers.SeedTestData(t, testDB.DB)
 
 	// Create resolver with real services and repositories
-	r := createTestResolver(testDB.DB)
+	r := createTestResolver(testDB)
 
 	// Create GraphQL test client
 	client := testhelpers.NewGraphQLTestClient(r, testhelpers.TestJWTSecret)
@@ -57,16 +57,19 @@ func setupTestContext(t *testing.T) *TestContext {
 }
 
 // createTestResolver creates a resolver with all dependencies wired up
-func createTestResolver(db *sqlx.DB) *resolver.Resolver {
+func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
+	// Wrap the test DB in a DBPool (both customer and admin use the same connection)
+	pool := &db.DBPool{Customer: testDB.DB, Admin: testDB.DB}
+
 	// Create PubSub broker
 	broker := pubsub.NewBroker()
 
 	// Create repositories
-	addressRepo := addressInfrastructure.NewAddressRepository(db)
-	orderRepo := orderInfrastructure.NewOrderRepository(db)
-	paymentRepo := paymentInfrastructure.NewPaymentRepository(db)
-	productRepo := productInfrastructure.NewProductRepository(db)
-	userRepo := userInfrastructure.NewUserRepository(db)
+	addressRepo := addressInfrastructure.NewAddressRepository(pool)
+	orderRepo := orderInfrastructure.NewOrderRepository(pool)
+	paymentRepo := paymentInfrastructure.NewPaymentRepository(pool)
+	productRepo := productInfrastructure.NewProductRepository(pool)
+	userRepo := userInfrastructure.NewUserRepository(pool)
 
 	// Create Mollie client (test mode)
 	mollieCfg := mollie.NewAPITestingConfig(true)

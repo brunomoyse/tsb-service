@@ -12,6 +12,8 @@ import (
 	"time"
 	"tsb-service/pkg/utils"
 
+	"tsb-service/pkg/db"
+
 	"github.com/gosimple/slug"
 	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
@@ -24,17 +26,17 @@ import (
 )
 
 type ProductRepository struct {
-	db *sqlx.DB
+	pool *db.DBPool
 }
 
-func NewProductRepository(db *sqlx.DB) domain.ProductRepository {
-	return &ProductRepository{db: db}
+func NewProductRepository(pool *db.DBPool) domain.ProductRepository {
+	return &ProductRepository{pool: pool}
 }
 
 // Create inserts a product and its translations.
 func (r *ProductRepository) Create(ctx context.Context, product *domain.Product) (err error) {
 	// Begin a transaction.
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.pool.ForContext(ctx).BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -125,7 +127,7 @@ func (r *ProductRepository) Create(ctx context.Context, product *domain.Product)
 // Update modifies a product and its translations.
 func (r *ProductRepository) Update(ctx context.Context, product *domain.Product) error {
 	// Begin a transaction.
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.pool.ForContext(ctx).BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -303,7 +305,7 @@ func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) 
          WHERE id = ANY($1)
            AND NOT is_available
     `
-	if err := r.db.SelectContext(ctx, &unavailable, availCheck, pq.Array(productIDs)); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &unavailable, availCheck, pq.Array(productIDs)); err != nil {
 		return nil, err
 	}
 	if len(unavailable) > 0 {
@@ -330,7 +332,7 @@ func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) 
         ORDER BY p.code;
     `
 	var products []*domain.ProductOrderDetails
-	if err := r.db.SelectContext(ctx, &products, query, pq.Array(productIDs), lang); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &products, query, pq.Array(productIDs), lang); err != nil {
 		return nil, err
 	}
 	return products, nil
@@ -374,7 +376,7 @@ func (r *ProductRepository) FindAllCategories(ctx context.Context) ([]*domain.Ca
         LEFT JOIN product_category_translations t ON c.id = t.product_category_id;
     `
 	// Use QueryxContext to get sqlx.Rows.
-	rows, err := r.db.QueryxContext(ctx, query)
+	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +458,7 @@ func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) 
           ON c.id = t.product_category_id
         WHERE c.id = $1;
     `
-	rows, err := r.db.QueryxContext(ctx, query, id)
+	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query, id)
 	if err != nil {
 		slog.ErrorContext(ctx, "FindCategoryByID: query failed", "category_id", id, "error", err)
 		return nil, err
@@ -520,7 +522,7 @@ func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) 
 // groups the rows by product, and sorts the final slice.
 func (r *ProductRepository) queryProducts(ctx context.Context, query string, args ...any) ([]*domain.Product, error) {
 	// Use QueryxContext from sqlx.
-	rows, err := r.db.QueryxContext(ctx, query, args...)
+	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -698,7 +700,7 @@ func (r *ProductRepository) FindCategoriesByProductIDs(
     JOIN product_category_translations pct ON pc.id = pct.product_category_id
     WHERE p.id = ANY($1)
     `
-	rows, err := r.db.QueryxContext(ctx, query, pq.Array(productIDs))
+	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query, pq.Array(productIDs))
 	if err != nil {
 		slog.ErrorContext(ctx, "FindCategoriesByProductIDs: query failed", "error", err)
 		return nil, err
@@ -877,7 +879,7 @@ func (r *ProductRepository) BatchGetProductTranslations(
     `
 
 	// 3) execute the query
-	rows, err := r.db.QueryxContext(ctx, query, pq.Array(productIDs))
+	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query, pq.Array(productIDs))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query product translations: %w", err)
 	}
@@ -932,7 +934,7 @@ func (r *ProductRepository) BatchGetCategoryTranslations(
     `
 
 	// 3) run the query with pq.Array
-	rows, err := r.db.QueryxContext(ctx, query, pq.Array(categoryIDs))
+	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query, pq.Array(categoryIDs))
 	if err != nil {
 		return nil, fmt.Errorf("failed to query category translations: %w", err)
 	}
@@ -1031,7 +1033,7 @@ func (r *ProductRepository) BatchGetChoicesByProductIDs(ctx context.Context, pro
 
 // CreateChoice inserts a choice and its translations in a transaction.
 func (r *ProductRepository) CreateChoice(ctx context.Context, choice *domain.ProductChoice) error {
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.pool.ForContext(ctx).BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -1064,7 +1066,7 @@ func (r *ProductRepository) CreateChoice(ctx context.Context, choice *domain.Pro
 
 // UpdateChoice updates a choice and upserts its translations.
 func (r *ProductRepository) UpdateChoice(ctx context.Context, choice *domain.ProductChoice) error {
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := r.pool.ForContext(ctx).BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -1100,13 +1102,13 @@ func (r *ProductRepository) UpdateChoice(ctx context.Context, choice *domain.Pro
 
 // DeleteChoice removes a choice (cascades to translations).
 func (r *ProductRepository) DeleteChoice(ctx context.Context, choiceID uuid.UUID) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM product_choices WHERE id = $1`, choiceID)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, `DELETE FROM product_choices WHERE id = $1`, choiceID)
 	return err
 }
 
 // queryChoices is a helper that groups choice+translation rows.
 func (r *ProductRepository) queryChoices(ctx context.Context, query string, args ...any) ([]*domain.ProductChoice, error) {
-	rows, err := r.db.QueryxContext(ctx, query, args...)
+	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

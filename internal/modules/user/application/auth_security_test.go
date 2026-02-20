@@ -14,6 +14,48 @@ import (
 
 const testJWTSecret = "test-secret-key-for-security-tests"
 
+func TestValidatePasswordStrength(t *testing.T) {
+	t.Run("Valid password passes", func(t *testing.T) {
+		err := validatePasswordStrength("Str0ng!Pass")
+		assert.NoError(t, err)
+	})
+
+	t.Run("Too short", func(t *testing.T) {
+		err := validatePasswordStrength("Aa1!")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "at least 8 characters")
+	})
+
+	t.Run("Missing uppercase", func(t *testing.T) {
+		err := validatePasswordStrength("lowercase1!")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "uppercase")
+	})
+
+	t.Run("Missing lowercase", func(t *testing.T) {
+		err := validatePasswordStrength("UPPERCASE1!")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "lowercase")
+	})
+
+	t.Run("Missing digit", func(t *testing.T) {
+		err := validatePasswordStrength("NoDigits!!")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "digit")
+	})
+
+	t.Run("Missing special character", func(t *testing.T) {
+		err := validatePasswordStrength("NoSpecial1A")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "special character")
+	})
+
+	t.Run("All requirements met", func(t *testing.T) {
+		err := validatePasswordStrength("MyP@ssw0rd")
+		assert.NoError(t, err)
+	})
+}
+
 func TestConstantTimePasswordComparison(t *testing.T) {
 	salt := "dGVzdC1zYWx0LWJhc2U2NA==" // base64("test-salt-base64")
 

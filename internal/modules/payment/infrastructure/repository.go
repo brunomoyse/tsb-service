@@ -4,22 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
-	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
-	"github.com/shopspring/decimal"
 	"time"
 	"tsb-service/internal/modules/payment/domain"
+	"tsb-service/pkg/db"
+
+	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
+	"github.com/google/uuid"
+	"github.com/lib/pq"
+	"github.com/shopspring/decimal"
 )
 
 type PaymentRepository struct {
-	db *sqlx.DB
+	pool *db.DBPool
 }
 
-func NewPaymentRepository(db *sqlx.DB) domain.PaymentRepository {
+func NewPaymentRepository(pool *db.DBPool) domain.PaymentRepository {
 	return &PaymentRepository{
-		db: db,
+		pool: pool,
 	}
 }
 
@@ -128,7 +129,7 @@ func (r *PaymentRepository) Save(ctx context.Context, external mollie.Payment, o
 	}
 
 	// Begin a transaction.
-	tx, err := r.db.BeginTxx(ctx, nil)
+	tx, err := r.pool.ForContext(ctx).BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -216,7 +217,7 @@ func (r *PaymentRepository) MarkAsRefund(ctx context.Context, externalPaymentID 
 		WHERE mollie_payment_id = $2;
 	`
 
-	_, err := r.db.ExecContext(ctx, query, amount.Value, externalPaymentID)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, amount.Value, externalPaymentID)
 	if err != nil {
 		return fmt.Errorf("failed to mark payment as refunded: %w", err)
 	}
@@ -233,7 +234,7 @@ func (r *PaymentRepository) RefreshStatus(ctx context.Context, externalPayment m
 	`
 
 	var orderID uuid.UUID
-	err := r.db.GetContext(ctx, &orderID, query,
+	err := r.pool.ForContext(ctx).GetContext(ctx, &orderID, query,
 		externalPayment.Status,
 		externalPayment.ID,
 	)
@@ -254,7 +255,7 @@ func (r *PaymentRepository) UpdateStatusByOrderID(ctx context.Context, orderID u
 	`
 
 	var payment domain.MolliePayment
-	err := r.db.GetContext(ctx, &payment, query, status, orderID)
+	err := r.pool.ForContext(ctx).GetContext(ctx, &payment, query, status, orderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update payment status by order ID: %w", err)
 	}
@@ -271,7 +272,7 @@ func (r *PaymentRepository) FindByOrderID(ctx context.Context, orderID uuid.UUID
 	`
 
 	var payment domain.MolliePayment
-	err := r.db.GetContext(ctx, &payment, query, orderID)
+	err := r.pool.ForContext(ctx).GetContext(ctx, &payment, query, orderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find payment by order ID: %w", err)
 	}
@@ -288,7 +289,7 @@ func (r *PaymentRepository) FindByExternalID(ctx context.Context, paymentID stri
 	`
 
 	var payment domain.MolliePayment
-	err := r.db.GetContext(ctx, &payment, query, paymentID)
+	err := r.pool.ForContext(ctx).GetContext(ctx, &payment, query, paymentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find payment by ID: %w", err)
 	}
@@ -304,7 +305,7 @@ func (r *PaymentRepository) FindByOrderIDs(ctx context.Context, orderIDs []strin
 	`
 
 	var payments []*domain.MolliePayment
-	err := r.db.SelectContext(ctx, &payments, query, pq.Array(orderIDs))
+	err := r.pool.ForContext(ctx).SelectContext(ctx, &payments, query, pq.Array(orderIDs))
 	if err != nil {
 		return nil, fmt.Errorf("failed to find payments by order IDs: %w", err)
 	}

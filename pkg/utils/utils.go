@@ -137,3 +137,68 @@ func UploadProductImage(ctx context.Context, src io.Reader, filename string, slu
 
 	return nil
 }
+
+// RenameProductImage tells the file service to rename an image from oldSlug to newSlug.
+func RenameProductImage(ctx context.Context, oldSlug, newSlug string) error {
+	fileSvc := os.Getenv("FILE_SERVICE_URL")
+	if fileSvc == "" {
+		return fmt.Errorf("FILE_SERVICE_URL env var not set")
+	}
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.WriteField("old_slug", oldSlug); err != nil {
+		return fmt.Errorf("write old_slug field: %w", err)
+	}
+	if err := writer.WriteField("new_slug", newSlug); err != nil {
+		return fmt.Errorf("write new_slug field: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fileSvc+"/rename", &body)
+	if err != nil {
+		return fmt.Errorf("build rename request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("rename request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("file service rename failed with status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// DeleteProductImage tells the file service to delete an image by slug.
+func DeleteProductImage(ctx context.Context, slug string) error {
+	fileSvc := os.Getenv("FILE_SERVICE_URL")
+	if fileSvc == "" {
+		return fmt.Errorf("FILE_SERVICE_URL env var not set")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, fileSvc+"/delete/"+slug, nil)
+	if err != nil {
+		return fmt.Errorf("build delete request: %w", err)
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("delete request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("file service delete failed with status %d", resp.StatusCode)
+	}
+
+	return nil
+}

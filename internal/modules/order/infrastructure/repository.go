@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 	"tsb-service/internal/modules/order/domain"
+	"tsb-service/pkg/db"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -13,18 +14,18 @@ import (
 )
 
 type OrderRepository struct {
-	db *sqlx.DB
+	pool *db.DBPool
 }
 
-func NewOrderRepository(db *sqlx.DB) domain.OrderRepository {
-	return &OrderRepository{db: db}
+func NewOrderRepository(pool *db.DBPool) domain.OrderRepository {
+	return &OrderRepository{pool: pool}
 }
 
 // Save inserts a new order, creates a Mollie payment, updates the order with payment details,
 // and links the order with its product lines.
 func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domain.OrderProductRaw) (*domain.Order, *[]domain.OrderProductRaw, error) {
 	// Begin a transaction.
-	tx, err := r.db.BeginTxx(ctx, nil)
+	tx, err := r.pool.ForContext(ctx).BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -60,11 +61,11 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		INSERT INTO orders (
 			user_id, order_status, order_type, is_online_payment,
 			discount_amount, delivery_fee, total_price, preferred_ready_time, estimated_ready_time,
-			address_id, address_extra, order_note, order_extra
+			address_id, address_extra, order_note, order_extra, language
 		) VALUES (
 			$1, $2, $3, $4,
 			$5, $6, $7, $8, $9,
-			$10, $11, $12, $13
+			$10, $11, $12, $13, $14
 		)
 		RETURNING id, created_at, updated_at;
 	`
@@ -89,6 +90,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		o.AddressExtra,
 		o.OrderNote,
 		o.OrderExtra,
+		o.Language,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to insert order: %w", err)
@@ -136,7 +138,7 @@ func (r *OrderRepository) Update(ctx context.Context, order *domain.Order) error
 		SET order_status = $1, estimated_ready_time = $2, updated_at = CURRENT_TIMESTAMP
 		WHERE id = $3;
 	`
-	if _, err := r.db.ExecContext(ctx, query, order.OrderStatus, order.EstimatedReadyTime, order.ID); err != nil {
+	if _, err := r.pool.ForContext(ctx).ExecContext(ctx, query, order.OrderStatus, order.EstimatedReadyTime, order.ID); err != nil {
 		return fmt.Errorf("failed to update order: %w", err)
 	}
 	return nil
@@ -153,7 +155,7 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 
 	var order domain.Order
 
-	if err := r.db.GetContext(ctx, &order, query, orderID); err != nil {
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &order, query, orderID); err != nil {
 		return nil, nil, fmt.Errorf("failed to query order: %w", err)
 	}
 
@@ -176,7 +178,7 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 
 	var orderProducts []domain.OrderProductRaw
 
-	if err := r.db.SelectContext(ctx, &orderProducts, query, order.ID); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &orderProducts, query, order.ID); err != nil {
 		return nil, nil, fmt.Errorf("failed to query order products: %w", err)
 	}
 
@@ -224,7 +226,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 
 	// Execute the query
 	var orders []*domain.Order
-	if err := r.db.SelectContext(ctx, &orders, query, args...); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &orders, query, args...); err != nil {
 		slog.ErrorContext(ctx, "error querying orders", "page", page, "limit", limit, "user_id", userID, "error", err)
 		return nil, fmt.Errorf("failed to query orders: %w", err)
 	}
@@ -258,7 +260,7 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build IN query: %w", err)
 	}
-	query = r.db.Rebind(query)
+	query = r.pool.ForContext(ctx).Rebind(query)
 
 	// temp struct to hold each row (including the order_id)
 	type rawRow struct {
@@ -271,7 +273,7 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 	}
 
 	var rows []rawRow
-	if err := r.db.SelectContext(ctx, &rows, query, args...); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &rows, query, args...); err != nil {
 		return nil, fmt.Errorf("failed to select order products: %w", err)
 	}
 
@@ -305,11 +307,11 @@ func (r *OrderRepository) FindByUserIDs(ctx context.Context, userIDs []string) (
 	}
 
 	// 2) Rebind for the specific driver (?, $1, etc)
-	query = r.db.Rebind(query)
+	query = r.pool.ForContext(ctx).Rebind(query)
 
 	// 3) Fetch into a slice
 	var orders []domain.Order
-	if err := r.db.SelectContext(ctx, &orders, query, args...); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &orders, query, args...); err != nil {
 		return nil, err
 	}
 
@@ -320,4 +322,21 @@ func (r *OrderRepository) FindByUserIDs(ctx context.Context, userIDs []string) (
 	}
 
 	return result, nil
+}
+
+func (r *OrderRepository) InsertStatusHistory(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) error {
+	query := `INSERT INTO order_status_history (order_id, status) VALUES ($1, $2)`
+	if _, err := r.pool.ForContext(ctx).ExecContext(ctx, query, orderID, status); err != nil {
+		return fmt.Errorf("failed to insert status history: %w", err)
+	}
+	return nil
+}
+
+func (r *OrderRepository) FindStatusHistoryByOrderID(ctx context.Context, orderID uuid.UUID) ([]*domain.OrderStatusHistory, error) {
+	query := `SELECT id, order_id, status, changed_at FROM order_status_history WHERE order_id = $1 ORDER BY changed_at ASC`
+	var history []*domain.OrderStatusHistory
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &history, query, orderID); err != nil {
+		return nil, fmt.Errorf("failed to query status history: %w", err)
+	}
+	return history, nil
 }

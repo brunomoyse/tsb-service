@@ -4,17 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/jmoiron/sqlx"
+
 	"github.com/lib/pq"
+
 	"tsb-service/internal/modules/address/domain"
+	"tsb-service/pkg/db"
 )
 
 type AddressRepository struct {
-	db *sqlx.DB
+	pool *db.DBPool
 }
 
-func NewAddressRepository(db *sqlx.DB) domain.AddressRepository {
-	return &AddressRepository{db: db}
+func NewAddressRepository(pool *db.DBPool) domain.AddressRepository {
+	return &AddressRepository{pool: pool}
 }
 
 func (r *AddressRepository) SearchStreetNames(ctx context.Context, query string) ([]*domain.Street, error) {
@@ -27,7 +29,7 @@ func (r *AddressRepository) SearchStreetNames(ctx context.Context, query string)
 	`
 
 	var streetRows []domain.Street
-	if err := r.db.SelectContext(ctx, &streetRows, sqlQuery, query); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &streetRows, sqlQuery, query); err != nil {
 		return nil, err
 	}
 
@@ -57,7 +59,7 @@ func (r *AddressRepository) GetDistinctHouseNumbers(ctx context.Context, streetI
 		ORDER BY house_number_num, house_number;
 	`
 	var houseNumbers []string
-	if err := r.db.SelectContext(ctx, &houseNumbers, sqlQuery, streetID); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &houseNumbers, sqlQuery, streetID); err != nil {
 		return nil, err
 	}
 	return houseNumbers, nil
@@ -72,7 +74,7 @@ func (r *AddressRepository) GetBoxNumbers(ctx context.Context, streetID, houseNu
 	`
 	// Use sql.NullString to safely scan nullable columns.
 	var nullStrings []sql.NullString
-	if err := r.db.SelectContext(ctx, &nullStrings, sqlQuery, streetID, houseNumber); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &nullStrings, sqlQuery, streetID, houseNumber); err != nil {
 		return nil, err
 	}
 
@@ -114,7 +116,7 @@ func (r *AddressRepository) GetFinalAddress(ctx context.Context, streetID string
 	`
 
 	var addr domain.Address
-	if err := r.db.GetContext(ctx, &addr, sqlQuery, streetID, houseNumber, boxNumber); err != nil {
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &addr, sqlQuery, streetID, houseNumber, boxNumber); err != nil {
 		return nil, fmt.Errorf("failed to get final address: %w", err)
 	}
 	return &addr, nil
@@ -128,7 +130,7 @@ func (r *AddressRepository) GetAddressByID(ctx context.Context, ID string) (*dom
 		WHERE a.address_id = $1;
 	`
 	var addr domain.Address
-	if err := r.db.GetContext(ctx, &addr, sqlQuery, ID); err != nil {
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &addr, sqlQuery, ID); err != nil {
 		return nil, fmt.Errorf("failed to get address by ID: %w", err)
 	}
 	return &addr, nil
@@ -164,7 +166,7 @@ func (r *AddressRepository) BatchGetAddressesByOrderIDs(ctx context.Context, ord
 
 	var rows []addressRow
 	// 3) use pq.Array to pass your []string as a PostgresSQL text[]
-	if err := r.db.SelectContext(ctx, &rows, sqlQuery, pq.Array(orderIDs)); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &rows, sqlQuery, pq.Array(orderIDs)); err != nil {
 		return nil, fmt.Errorf("failed to get addresses by order IDs: %w", err)
 	}
 
@@ -206,7 +208,7 @@ func (r *AddressRepository) BatchGetAddressesByUserIDs(ctx context.Context, user
 	}
 
 	var rows []addressRow
-	if err := r.db.SelectContext(ctx, &rows, sqlQuery, pq.Array(userIDs)); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &rows, sqlQuery, pq.Array(userIDs)); err != nil {
 		return nil, fmt.Errorf("failed to get addresses by user IDs: %w", err)
 	}
 

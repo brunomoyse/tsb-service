@@ -191,6 +191,9 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 	}
 
+	// Capture the customer's language at order creation time
+	orderLang := utils.GetLang(ctx)
+
 	tempOrder := orderDomain.NewOrder(
 		userUUID,
 		odType,
@@ -202,6 +205,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		extras,
 		&fee,
 		totalDiscount,
+		orderLang,
 	)
 
 	// 8) Persist via service
@@ -263,7 +267,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	} else {
 		// If offline payment, send the notification e-mail already
 		go func() {
-			err = es.SendOrderPendingEmail(*user, utils.GetLang(ctx), *order, items)
+			err = es.SendOrderPendingEmail(*user, order.Language, *order, items)
 			if err != nil {
 				slog.Error("failed to send order pending email", "order_id", order.ID, "error", err)
 			}
@@ -297,16 +301,12 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
 
+	// Use the stored order language for all emails (captured at order creation)
+	lang := o.Language
+
 	// If new status is "CONFIRMED" or "PREPARING", send the confirmation email
 	if oldOrder.OrderStatus == orderDomain.OrderStatusPending && (o.OrderStatus == orderDomain.OrderStatusConfirmed || o.OrderStatus == orderDomain.OrderStatusPreparing) {
 		go func() {
-			type OrderProduct struct {
-				Product    productDomain.Product
-				Quantity   int64
-				UnitPrice  decimal.Decimal
-				TotalPrice decimal.Decimal
-			}
-
 			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
 			if err != nil {
 				slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
@@ -363,7 +363,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				}
 			}
 
-			err = es.SendOrderConfirmedEmail(*user, utils.GetLang(ctx), *o, items, address)
+			err = es.SendOrderConfirmedEmail(*user, lang, *o, items, address)
 			if err != nil {
 				slog.Error("failed to send order confirmed email", "order_id", o.ID, "error", err)
 			}
@@ -379,7 +379,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
-			err = es.SendOrderReadyEmail(*user, utils.GetLang(ctx), *o)
+			err = es.SendOrderReadyEmail(*user, lang, *o)
 			if err != nil {
 				slog.Error("failed to send order ready email", "order_id", o.ID, "error", err)
 			}
@@ -395,7 +395,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
-			err = es.SendOrderCompletedEmail(*user, utils.GetLang(ctx))
+			err = es.SendOrderCompletedEmail(*user, lang)
 			if err != nil {
 				slog.Error("failed to send order completed email", "order_id", o.ID, "error", err)
 			}
@@ -413,7 +413,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
-			err = es.SendReadyTimeUpdatedEmail(*user, utils.GetLang(ctx), *o)
+			err = es.SendReadyTimeUpdatedEmail(*user, lang, *o)
 			if err != nil {
 				slog.Error("failed to send ready time updated email", "order_id", o.ID, "error", err)
 			}
@@ -439,7 +439,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 					}
 
 					refundAmount := utils.FormatDecimal(o.TotalPrice)
-					err = es.SendRefundIssuedEmail(*user, utils.GetLang(ctx), refundAmount)
+					err = es.SendRefundIssuedEmail(*user, lang, refundAmount)
 					if err != nil {
 						slog.Error("failed to send refund issued email", "order_id", o.ID, "error", err)
 					}
@@ -454,7 +454,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
-			err = es.SendOrderCanceledEmail(*user, utils.GetLang(ctx))
+			err = es.SendOrderCanceledEmail(*user, lang)
 			if err != nil {
 				slog.Error("failed to send order canceled email", "order_id", o.ID, "error", err)
 			}
@@ -575,6 +575,24 @@ func (r *orderResolver) Items(ctx context.Context, obj *model.Order) ([]*model.O
 	})
 
 	return items, nil
+}
+
+// StatusHistory is the resolver for the statusHistory field.
+func (r *orderResolver) StatusHistory(ctx context.Context, obj *model.Order) ([]*model.OrderStatusHistory, error) {
+	history, err := r.OrderService.GetStatusHistory(ctx, obj.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load status history: %w", err)
+	}
+
+	result := make([]*model.OrderStatusHistory, len(history))
+	for i, h := range history {
+		result[i] = &model.OrderStatusHistory{
+			ID:        h.ID,
+			Status:    h.Status,
+			ChangedAt: h.ChangedAt,
+		}
+	}
+	return result, nil
 }
 
 // DisplayCustomerName is the resolver for the displayCustomerName field.
