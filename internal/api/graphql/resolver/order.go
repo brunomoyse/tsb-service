@@ -343,13 +343,80 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		}()
 	}
 
+	// If new status is "AWAITING_PICK_UP" or "OUT_FOR_DELIVERY", send the order ready email
+	if o.OrderStatus == orderDomain.OrderStatusAwaitingUp || o.OrderStatus == orderDomain.OrderStatusOutForDelivery {
+		go func() {
+			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
+			if err != nil {
+				slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
+				return
+			}
+
+			err = es.SendOrderReadyEmail(*user, utils.GetLang(ctx), *o)
+			if err != nil {
+				slog.Error("failed to send order ready email", "order_id", o.ID, "error", err)
+			}
+		}()
+	}
+
+	// If new status is "PICKED_UP" or "DELIVERED", send the order completed email
+	if o.OrderStatus == orderDomain.OrderStatusPickedUp || o.OrderStatus == orderDomain.OrderStatusDelivered {
+		go func() {
+			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
+			if err != nil {
+				slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
+				return
+			}
+
+			err = es.SendOrderCompletedEmail(*user, utils.GetLang(ctx))
+			if err != nil {
+				slog.Error("failed to send order completed email", "order_id", o.ID, "error", err)
+			}
+		}()
+	}
+
+	// If estimated ready time changed on an already-confirmed order (not the initial confirmation)
+	isInitialConfirmation := oldOrder.OrderStatus == orderDomain.OrderStatusPending &&
+		(o.OrderStatus == orderDomain.OrderStatusConfirmed || o.OrderStatus == orderDomain.OrderStatusPreparing)
+	if input.EstimatedReadyTime != nil && oldOrder.EstimatedReadyTime != nil && !isInitialConfirmation {
+		go func() {
+			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
+			if err != nil {
+				slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
+				return
+			}
+
+			err = es.SendReadyTimeUpdatedEmail(*user, utils.GetLang(ctx), *o)
+			if err != nil {
+				slog.Error("failed to send ready time updated email", "order_id", o.ID, "error", err)
+			}
+		}()
+	}
+
 	// If new status is "CANCELED", refund & send the cancellation email
 	if o.OrderStatus == orderDomain.OrderStatusCanceled {
 		payment, err := r.PaymentService.GetPaymentByOrderID(ctx, o.ID)
-		if err != nil && payment != nil {
-			_, err = r.PaymentService.CreateFullRefund(ctx, payment.MolliePaymentID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to initiate refund: %w", err)
+		if err == nil && payment != nil {
+			refund, refundErr := r.PaymentService.CreateFullRefund(ctx, payment.MolliePaymentID)
+			if refundErr != nil {
+				return nil, fmt.Errorf("failed to initiate refund: %w", refundErr)
+			}
+
+			// Send refund issued email
+			if refund != nil {
+				go func() {
+					user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
+					if err != nil {
+						slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
+						return
+					}
+
+					refundAmount := utils.FormatDecimal(o.TotalPrice)
+					err = es.SendRefundIssuedEmail(*user, utils.GetLang(ctx), refundAmount)
+					if err != nil {
+						slog.Error("failed to send refund issued email", "order_id", o.ID, "error", err)
+					}
+				}()
 			}
 		}
 

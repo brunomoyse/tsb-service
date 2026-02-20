@@ -1,0 +1,13 @@
+您好 {{.UserName}}，
+
+{{if eq .OrderType "DELIVERY"}}
+您的订单预计配送时间已更新为：{{.EstimatedReadyTime}}。
+{{else if eq .OrderType "PICKUP"}}
+您的订单预计取餐时间已更新为：{{.EstimatedReadyTime}}。
+{{end}}
+
+对此给您带来的不便，我们深表歉意。
+
+跟踪您的订单：{{.StatusLink}}
+
+© 2026 Tokyo Sushi Bar。保留所有权利。

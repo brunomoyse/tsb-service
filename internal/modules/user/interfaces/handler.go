@@ -19,6 +19,7 @@ import (
 	"tsb-service/internal/modules/user/application"
 	"tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/oauth2"
+	es "tsb-service/services/email/scaleway"
 )
 
 func getSameSiteMode() http.SameSite {
@@ -404,6 +405,13 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Google ID"})
 					return
 				}
+
+				// Send account linked notification email
+				go func() {
+					if emailErr := es.SendAccountLinkedEmail(*user, "fr"); emailErr != nil {
+						slog.ErrorContext(ctx, "failed to send account linked email", "provider", "google", "error", emailErr)
+					}
+				}()
 			}
 		}
 	}

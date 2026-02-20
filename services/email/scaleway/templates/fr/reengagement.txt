@@ -1,0 +1,9 @@
+Bonjour {{.UserName}},
+
+Cela fait un moment que nous ne vous avons pas vu chez Tokyo Sushi Bar, et vous nous manquez !
+
+Nos chefs ont préparé de nouveaux plats délicieux rien que pour vous. Venez découvrir les nouveautés de notre menu.
+
+Découvrir le menu : {{.MenuLink}}
+
+© 2026 Tokyo Sushi Bar. Tous droits réservés.

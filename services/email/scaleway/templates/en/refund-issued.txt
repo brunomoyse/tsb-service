@@ -1,0 +1,11 @@
+Hello {{.UserName}},
+
+A refund of {{.RefundAmount}} EUR has been issued for your canceled order.
+
+Please allow a few business days for the amount to appear in your account.
+
+If you need further assistance, feel free to contact the restaurant directly at 04 222 98 88.
+
+If you did not place this order, please disregard this email.
+
+© 2026 Tokyo Sushi Bar. All rights reserved.

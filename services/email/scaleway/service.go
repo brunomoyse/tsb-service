@@ -380,3 +380,335 @@ func SendOrderCanceledEmail(user userDomain.User, lang string) error {
 
 	return nil
 }
+
+func SendOrderReadyEmail(user userDomain.User, lang string, order orderDomain.Order) error {
+	newReq := *baseReq
+
+	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
+	to := temv1alpha1.CreateEmailRequestAddress{
+		Email: user.Email,
+		Name:  &userFullName,
+	}
+	newReq.To = append(newReq.To, &to)
+
+	path := fmt.Sprintf("templates/%s/order-ready", lang)
+
+	htmlContent, err := renderOrderReadyEmailHTML(path, user, order)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	plainTextContent, err := renderOrderReadyEmailText(path, user, order)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	// Subject depends on order type
+	var subjects map[string]string
+	if order.OrderType == orderDomain.OrderTypeDelivery {
+		subjects = map[string]string{
+			"en": "Your order is on its way!",
+			"fr": "Votre commande est en route !",
+			"zh": "您的订单正在配送中！",
+		}
+	} else {
+		subjects = map[string]string{
+			"en": "Your order is ready!",
+			"fr": "Votre commande est prête !",
+			"zh": "您的订单已准备好！",
+		}
+	}
+
+	subject, ok := subjects[lang]
+	if !ok {
+		subject = subjects["fr"]
+	}
+
+	newReq.Subject = subject
+	newReq.HTML = htmlContent
+	newReq.Text = plainTextContent
+
+	_, err = temClient.CreateEmail(&newReq)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	logger.Debugf("Email sent to %s with subject: %s", user.Email, subject)
+	return nil
+}
+
+func SendOrderCompletedEmail(user userDomain.User, lang string) error {
+	newReq := *baseReq
+
+	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
+	to := temv1alpha1.CreateEmailRequestAddress{
+		Email: user.Email,
+		Name:  &userFullName,
+	}
+	newReq.To = append(newReq.To, &to)
+
+	path := fmt.Sprintf("templates/%s/order-completed", lang)
+
+	htmlContent, err := renderOrderCompletedEmailHTML(path, user)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	plainTextContent, err := renderOrderCompletedEmailText(path, user)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	subjects := map[string]string{
+		"en": "Thank you for your order!",
+		"fr": "Merci pour votre commande !",
+		"zh": "感谢您的订单！",
+	}
+
+	subject, ok := subjects[lang]
+	if !ok {
+		subject = subjects["fr"]
+	}
+
+	newReq.Subject = subject
+	newReq.HTML = htmlContent
+	newReq.Text = plainTextContent
+
+	_, err = temClient.CreateEmail(&newReq)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	logger.Debugf("Email sent to %s with subject: %s", user.Email, subject)
+	return nil
+}
+
+func SendPaymentFailedEmail(user userDomain.User, lang string) error {
+	newReq := *baseReq
+
+	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
+	to := temv1alpha1.CreateEmailRequestAddress{
+		Email: user.Email,
+		Name:  &userFullName,
+	}
+	newReq.To = append(newReq.To, &to)
+
+	path := fmt.Sprintf("templates/%s/payment-failed", lang)
+
+	htmlContent, err := renderPaymentFailedEmailHTML(path, user)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	plainTextContent, err := renderPaymentFailedEmailText(path, user)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	subjects := map[string]string{
+		"en": "Payment unsuccessful",
+		"fr": "Paiement non abouti",
+		"zh": "付款未成功",
+	}
+
+	subject, ok := subjects[lang]
+	if !ok {
+		subject = subjects["fr"]
+	}
+
+	newReq.Subject = subject
+	newReq.HTML = htmlContent
+	newReq.Text = plainTextContent
+
+	_, err = temClient.CreateEmail(&newReq)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	logger.Debugf("Email sent to %s with subject: %s", user.Email, subject)
+	return nil
+}
+
+func SendRefundIssuedEmail(user userDomain.User, lang string, refundAmount string) error {
+	newReq := *baseReq
+
+	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
+	to := temv1alpha1.CreateEmailRequestAddress{
+		Email: user.Email,
+		Name:  &userFullName,
+	}
+	newReq.To = append(newReq.To, &to)
+
+	path := fmt.Sprintf("templates/%s/refund-issued", lang)
+
+	htmlContent, err := renderRefundIssuedEmailHTML(path, user, refundAmount)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	plainTextContent, err := renderRefundIssuedEmailText(path, user, refundAmount)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	subjects := map[string]string{
+		"en": "Your refund has been issued",
+		"fr": "Votre remboursement a été effectué",
+		"zh": "您的退款已处理",
+	}
+
+	subject, ok := subjects[lang]
+	if !ok {
+		subject = subjects["fr"]
+	}
+
+	newReq.Subject = subject
+	newReq.HTML = htmlContent
+	newReq.Text = plainTextContent
+
+	_, err = temClient.CreateEmail(&newReq)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	logger.Debugf("Email sent to %s with subject: %s", user.Email, subject)
+	return nil
+}
+
+func SendAccountLinkedEmail(user userDomain.User, lang string) error {
+	newReq := *baseReq
+
+	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
+	to := temv1alpha1.CreateEmailRequestAddress{
+		Email: user.Email,
+		Name:  &userFullName,
+	}
+	newReq.To = append(newReq.To, &to)
+
+	path := fmt.Sprintf("templates/%s/account-linked", lang)
+
+	htmlContent, err := renderAccountLinkedEmailHTML(path, user)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	plainTextContent, err := renderAccountLinkedEmailText(path, user)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	subjects := map[string]string{
+		"en": "Google account linked",
+		"fr": "Compte Google associé",
+		"zh": "Google 帐户已关联",
+	}
+
+	subject, ok := subjects[lang]
+	if !ok {
+		subject = subjects["fr"]
+	}
+
+	newReq.Subject = subject
+	newReq.HTML = htmlContent
+	newReq.Text = plainTextContent
+
+	_, err = temClient.CreateEmail(&newReq)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	logger.Debugf("Email sent to %s with subject: %s", user.Email, subject)
+	return nil
+}
+
+func SendReadyTimeUpdatedEmail(user userDomain.User, lang string, order orderDomain.Order) error {
+	newReq := *baseReq
+
+	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
+	to := temv1alpha1.CreateEmailRequestAddress{
+		Email: user.Email,
+		Name:  &userFullName,
+	}
+	newReq.To = append(newReq.To, &to)
+
+	path := fmt.Sprintf("templates/%s/ready-time-updated", lang)
+
+	htmlContent, err := renderReadyTimeUpdatedEmailHTML(path, user, order, lang)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	plainTextContent, err := renderReadyTimeUpdatedEmailText(path, user, order, lang)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	subjects := map[string]string{
+		"en": "Updated estimated time",
+		"fr": "Horaire estimé modifié",
+		"zh": "预计时间已更新",
+	}
+
+	subject, ok := subjects[lang]
+	if !ok {
+		subject = subjects["fr"]
+	}
+
+	newReq.Subject = subject
+	newReq.HTML = htmlContent
+	newReq.Text = plainTextContent
+
+	_, err = temClient.CreateEmail(&newReq)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	logger.Debugf("Email sent to %s with subject: %s", user.Email, subject)
+	return nil
+}
+
+func SendReengagementEmail(user userDomain.User, lang string) error {
+	newReq := *baseReq
+
+	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
+	to := temv1alpha1.CreateEmailRequestAddress{
+		Email: user.Email,
+		Name:  &userFullName,
+	}
+	newReq.To = append(newReq.To, &to)
+
+	path := fmt.Sprintf("templates/%s/reengagement", lang)
+
+	htmlContent, err := renderReengagementEmailHTML(path, user)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	plainTextContent, err := renderReengagementEmailText(path, user)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	subjects := map[string]string{
+		"en": "We miss you at Tokyo Sushi Bar!",
+		"fr": "Vous nous manquez chez Tokyo Sushi Bar !",
+		"zh": "Tokyo Sushi Bar 想念您！",
+	}
+
+	subject, ok := subjects[lang]
+	if !ok {
+		subject = subjects["fr"]
+	}
+
+	newReq.Subject = subject
+	newReq.HTML = htmlContent
+	newReq.Text = plainTextContent
+
+	_, err = temClient.CreateEmail(&newReq)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	logger.Debugf("Email sent to %s with subject: %s", user.Email, subject)
+	return nil
+}

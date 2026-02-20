@@ -175,6 +175,25 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"message": "processed"})
 			return
 		}
+
+		// Send payment failed email
+		go func() {
+			order, _, orderErr := h.orderService.GetOrderByID(ctx, payment.OrderID)
+			if orderErr != nil || order == nil {
+				slog.ErrorContext(ctx, "webhook: failed to retrieve order for payment failed email", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", orderErr)
+				return
+			}
+
+			u, userErr := h.userService.GetUserByID(ctx, order.UserID.String())
+			if userErr != nil {
+				slog.ErrorContext(ctx, "webhook: failed to retrieve user for payment failed email", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", userErr)
+				return
+			}
+
+			if emailErr := es.SendPaymentFailedEmail(*u, "fr"); emailErr != nil {
+				slog.ErrorContext(ctx, "webhook: failed to send payment failed email", "component", "webhook", "payment_id", req.ExternalMolliePaymentID, "error", emailErr)
+			}
+		}()
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "payment status updated successfully"})

@@ -1,0 +1,11 @@
+Bonjour {{.UserName}},
+
+{{if eq .OrderType "DELIVERY"}}
+Bonne nouvelle ! Votre commande est en route. Notre livreur est en chemin.
+{{else if eq .OrderType "PICKUP"}}
+Bonne nouvelle ! Votre commande est prête à être récupérée. Veuillez passer au restaurant à votre convenance.
+{{end}}
+
+Suivre votre commande : {{.StatusLink}}
+
+© 2026 Tokyo Sushi Bar. Tous droits réservés.

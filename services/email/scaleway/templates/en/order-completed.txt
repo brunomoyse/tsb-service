@@ -1,0 +1,11 @@
+Hello {{.UserName}},
+
+Thank you for choosing Tokyo Sushi Bar! We hope you enjoyed your meal.
+
+We'd love to see you again soon.
+
+Order again: {{.MenuLink}}
+
+If you did not place this order, please disregard this email.
+
+© 2026 Tokyo Sushi Bar. All rights reserved.

@@ -1,0 +1,11 @@
+Hello {{.UserName}},
+
+Your Google account has been successfully linked to your Tokyo Sushi Bar account.
+
+You can now sign in using Google for a faster experience.
+
+If you did not perform this action, please contact us immediately at 04 222 98 88.
+
+If you did not request this change, please contact us immediately.
+
+© 2026 Tokyo Sushi Bar. All rights reserved.

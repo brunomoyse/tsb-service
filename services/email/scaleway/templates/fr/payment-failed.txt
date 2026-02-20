@@ -1,0 +1,11 @@
+Bonjour {{.UserName}},
+
+Malheureusement, nous n'avons pas pu traiter votre paiement. Votre commande a été annulée.
+
+N'hésitez pas à passer une nouvelle commande quand vous le souhaitez.
+
+Réessayer : {{.MenuLink}}
+
+Pour toute assistance, n'hésitez pas à contacter directement le restaurant au 04 222 98 88.
+
+© 2026 Tokyo Sushi Bar. Tous droits réservés.
