@@ -12,3 +12,7 @@ updates:
         patterns:
           - "cloud.google.com/*"
           - "google.golang.org/*"
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
