@@ -1,0 +1,39 @@
+type DaySchedule {
+    open: String!
+    close: String!
+    dinnerOpen: String
+    dinnerClose: String
+}
+
+type RestaurantConfig {
+    orderingEnabled: Boolean!
+    openingHours: JSON!
+    isCurrentlyOpen: Boolean!
+    updatedAt: DateTime!
+}
+
+input DayScheduleInput {
+    open: String!
+    close: String!
+    dinnerOpen: String
+    dinnerClose: String
+}
+
+input OpeningHoursInput {
+    monday: DayScheduleInput
+    tuesday: DayScheduleInput
+    wednesday: DayScheduleInput
+    thursday: DayScheduleInput
+    friday: DayScheduleInput
+    saturday: DayScheduleInput
+    sunday: DayScheduleInput
+}
+
+extend type Query {
+    restaurantConfig: RestaurantConfig!
+}
+
+extend type Mutation {
+    updateOrderingEnabled(enabled: Boolean!): RestaurantConfig! @admin
+    updateOpeningHours(hours: OpeningHoursInput!): RestaurantConfig! @admin
+}

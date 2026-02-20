@@ -103,9 +103,9 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 	if op != nil && len(*op) > 0 {
 		const orderProductQuery = `
 			INSERT INTO order_product (
-				order_id, product_id, unit_price, quantity, total_price
+				order_id, product_id, unit_price, quantity, total_price, product_choice_id
 			) VALUES (
-				$1, $2, $3, $4, $5
+				$1, $2, $3, $4, $5, $6
 			);
 		`
 		for _, prod := range *op {
@@ -115,6 +115,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 				prod.UnitPrice,
 				prod.Quantity,
 				prod.TotalPrice,
+				prod.ProductChoiceID,
 			); err != nil {
 				return nil, nil, fmt.Errorf("failed to insert order product: %w", err)
 			}
@@ -162,7 +163,8 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 			op.product_id,
 			op.quantity,
 			op.unit_price,
-			op.total_price
+			op.total_price,
+			op.product_choice_id
 		FROM order_product op
 		JOIN products p ON op.product_id = p.id
 		JOIN product_categories pc ON p.category_id = pc.id
@@ -243,7 +245,8 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
             op.product_id,
             op.quantity,
             op.unit_price,
-            op.total_price
+            op.total_price,
+            op.product_choice_id
         FROM order_product op
         JOIN products p ON op.product_id = p.id
         JOIN product_categories pc ON p.category_id = pc.id
@@ -259,11 +262,12 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 
 	// temp struct to hold each row (including the order_id)
 	type rawRow struct {
-		OrderID    uuid.UUID       `db:"order_id"`
-		ProductID  uuid.UUID       `db:"product_id"`
-		Quantity   int64           `db:"quantity"`
-		UnitPrice  decimal.Decimal `db:"unit_price"`
-		TotalPrice decimal.Decimal `db:"total_price"`
+		OrderID         uuid.UUID       `db:"order_id"`
+		ProductID       uuid.UUID       `db:"product_id"`
+		Quantity        int64           `db:"quantity"`
+		UnitPrice       decimal.Decimal `db:"unit_price"`
+		TotalPrice      decimal.Decimal `db:"total_price"`
+		ProductChoiceID *uuid.UUID      `db:"product_choice_id"`
 	}
 
 	var rows []rawRow
@@ -275,10 +279,11 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 	result := make(map[string][]*domain.OrderProductRaw, len(rows))
 	for _, row := range rows {
 		op := &domain.OrderProductRaw{
-			ProductID:  row.ProductID,
-			Quantity:   row.Quantity,
-			UnitPrice:  row.UnitPrice,
-			TotalPrice: row.TotalPrice,
+			ProductID:       row.ProductID,
+			Quantity:        row.Quantity,
+			UnitPrice:       row.UnitPrice,
+			TotalPrice:      row.TotalPrice,
+			ProductChoiceID: row.ProductChoiceID,
 		}
 		// key by the string form of the order UUID
 		result[row.OrderID.String()] = append(result[row.OrderID.String()], op)

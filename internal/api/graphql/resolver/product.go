@@ -135,6 +135,86 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 	return ToGQLProduct(prod, userLang), nil
 }
 
+// CreateProductChoice is the resolver for the createProductChoice field.
+func (r *mutationResolver) CreateProductChoice(ctx context.Context, input model.CreateProductChoiceInput) (*model.ProductChoice, error) {
+	userLang := utils.GetLang(ctx)
+
+	clean := strings.ReplaceAll(strings.TrimSpace(input.PriceModifier), ",", ".")
+	priceMod, err := decimal.NewFromString(clean)
+	if err != nil {
+		return nil, fmt.Errorf("invalid price modifier format: %w", err)
+	}
+
+	translations := make([]domain.ChoiceTranslation, len(input.Translations))
+	for i, t := range input.Translations {
+		translations[i] = domain.ChoiceTranslation{
+			Locale: t.Locale,
+			Name:   t.Name,
+		}
+	}
+
+	choice := &domain.ProductChoice{
+		ID:            uuid.New(),
+		ProductID:     input.ProductID,
+		PriceModifier: priceMod,
+		SortOrder:     input.SortOrder,
+		Translations:  translations,
+	}
+
+	if err := r.ProductService.CreateChoice(ctx, choice); err != nil {
+		return nil, fmt.Errorf("failed to create product choice: %w", err)
+	}
+
+	return ToGQLProductChoice(choice, userLang), nil
+}
+
+// UpdateProductChoice is the resolver for the updateProductChoice field.
+func (r *mutationResolver) UpdateProductChoice(ctx context.Context, id uuid.UUID, input model.UpdateProductChoiceInput) (*model.ProductChoice, error) {
+	userLang := utils.GetLang(ctx)
+
+	choice, err := r.ProductService.GetChoiceByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch product choice: %w", err)
+	}
+
+	if input.PriceModifier != nil {
+		clean := strings.ReplaceAll(strings.TrimSpace(*input.PriceModifier), ",", ".")
+		priceMod, err := decimal.NewFromString(clean)
+		if err != nil {
+			return nil, fmt.Errorf("invalid price modifier format: %w", err)
+		}
+		choice.PriceModifier = priceMod
+	}
+	if input.SortOrder != nil {
+		choice.SortOrder = *input.SortOrder
+	}
+	if input.Translations != nil {
+		translations := make([]domain.ChoiceTranslation, len(input.Translations))
+		for i, t := range input.Translations {
+			translations[i] = domain.ChoiceTranslation{
+				ProductChoiceID: id,
+				Locale:          t.Locale,
+				Name:            t.Name,
+			}
+		}
+		choice.Translations = translations
+	}
+
+	if err := r.ProductService.UpdateChoice(ctx, choice); err != nil {
+		return nil, fmt.Errorf("failed to update product choice: %w", err)
+	}
+
+	return ToGQLProductChoice(choice, userLang), nil
+}
+
+// DeleteProductChoice is the resolver for the deleteProductChoice field.
+func (r *mutationResolver) DeleteProductChoice(ctx context.Context, id uuid.UUID) (bool, error) {
+	if err := r.ProductService.DeleteChoice(ctx, id); err != nil {
+		return false, fmt.Errorf("failed to delete product choice: %w", err)
+	}
+	return true, nil
+}
+
 // Category is the resolver for the category field.
 func (r *productResolver) Category(ctx context.Context, obj *model.Product) (*model.ProductCategory, error) {
 	userLang := utils.GetLang(ctx)
@@ -162,6 +242,25 @@ func (r *productResolver) Category(ctx context.Context, obj *model.Product) (*mo
 
 	// Return the first category found. (Assuming one product belongs to one category)
 	return productCategories[0], nil
+}
+
+// Choices is the resolver for the choices field.
+func (r *productResolver) Choices(ctx context.Context, obj *model.Product) ([]*model.ProductChoice, error) {
+	userLang := utils.GetLang(ctx)
+
+	loader := productApplication.GetProductChoiceLoader(ctx)
+	if loader == nil {
+		return nil, errors.New("no product choice loader found")
+	}
+
+	choices, err := loader.Loader.Load(ctx, obj.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load product choices: %w", err)
+	}
+
+	return Map(choices, func(c *domain.ProductChoice) *model.ProductChoice {
+		return ToGQLProductChoice(c, userLang)
+	}), nil
 }
 
 // Translations is the resolver for the translations field.

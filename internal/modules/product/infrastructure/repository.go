@@ -966,3 +966,198 @@ func (r *ProductRepository) BatchGetCategoryTranslations(
 
 	return translationsByCat, nil
 }
+
+// FindChoicesByProductID retrieves all choices for a product with their translations.
+func (r *ProductRepository) FindChoicesByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoice, error) {
+	query := `
+		SELECT
+			pc.id, pc.product_id, pc.price_modifier, pc.sort_order,
+			pct.locale, pct.name
+		FROM product_choices pc
+		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
+		WHERE pc.product_id = $1
+		ORDER BY pc.sort_order
+	`
+	return r.queryChoices(ctx, query, productID)
+}
+
+// FindChoiceByID retrieves a single choice by ID with translations.
+func (r *ProductRepository) FindChoiceByID(ctx context.Context, choiceID uuid.UUID) (*domain.ProductChoice, error) {
+	query := `
+		SELECT
+			pc.id, pc.product_id, pc.price_modifier, pc.sort_order,
+			pct.locale, pct.name
+		FROM product_choices pc
+		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
+		WHERE pc.id = $1
+	`
+	choices, err := r.queryChoices(ctx, query, choiceID)
+	if err != nil {
+		return nil, err
+	}
+	if len(choices) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return choices[0], nil
+}
+
+// BatchGetChoicesByProductIDs loads choices for multiple products at once (for DataLoader).
+func (r *ProductRepository) BatchGetChoicesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.ProductChoice, error) {
+	if len(productIDs) == 0 {
+		return make(map[string][]*domain.ProductChoice), nil
+	}
+
+	query := `
+		SELECT
+			pc.id, pc.product_id, pc.price_modifier, pc.sort_order,
+			pct.locale, pct.name
+		FROM product_choices pc
+		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
+		WHERE pc.product_id = ANY($1)
+		ORDER BY pc.sort_order
+	`
+	choices, err := r.queryChoices(ctx, query, pq.Array(productIDs))
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string][]*domain.ProductChoice, len(productIDs))
+	for _, c := range choices {
+		key := c.ProductID.String()
+		result[key] = append(result[key], c)
+	}
+	return result, nil
+}
+
+// CreateChoice inserts a choice and its translations in a transaction.
+func (r *ProductRepository) CreateChoice(ctx context.Context, choice *domain.ProductChoice) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO product_choices (id, product_id, price_modifier, sort_order) VALUES ($1, $2, $3, $4)`,
+		choice.ID, choice.ProductID, choice.PriceModifier, choice.SortOrder,
+	)
+	if err != nil {
+		return fmt.Errorf("insert product choice: %w", err)
+	}
+
+	for _, t := range choice.Translations {
+		_, err = tx.ExecContext(ctx,
+			`INSERT INTO product_choice_translations (product_choice_id, locale, name) VALUES ($1, $2, $3)`,
+			choice.ID, t.Locale, t.Name,
+		)
+		if err != nil {
+			return fmt.Errorf("insert choice translation: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// UpdateChoice updates a choice and upserts its translations.
+func (r *ProductRepository) UpdateChoice(ctx context.Context, choice *domain.ProductChoice) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.ExecContext(ctx,
+		`UPDATE product_choices SET price_modifier = $2, sort_order = $3 WHERE id = $1`,
+		choice.ID, choice.PriceModifier, choice.SortOrder,
+	)
+	if err != nil {
+		return fmt.Errorf("update product choice: %w", err)
+	}
+
+	for _, t := range choice.Translations {
+		_, err = tx.ExecContext(ctx,
+			`INSERT INTO product_choice_translations (product_choice_id, locale, name)
+			 VALUES ($1, $2, $3)
+			 ON CONFLICT (product_choice_id, locale)
+			 DO UPDATE SET name = EXCLUDED.name`,
+			choice.ID, t.Locale, t.Name,
+		)
+		if err != nil {
+			return fmt.Errorf("upsert choice translation: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// DeleteChoice removes a choice (cascades to translations).
+func (r *ProductRepository) DeleteChoice(ctx context.Context, choiceID uuid.UUID) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM product_choices WHERE id = $1`, choiceID)
+	return err
+}
+
+// queryChoices is a helper that groups choice+translation rows.
+func (r *ProductRepository) queryChoices(ctx context.Context, query string, args ...any) ([]*domain.ProductChoice, error) {
+	rows, err := r.db.QueryxContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type choiceRow struct {
+		ID            uuid.UUID       `db:"id"`
+		ProductID     uuid.UUID       `db:"product_id"`
+		PriceModifier decimal.Decimal `db:"price_modifier"`
+		SortOrder     int             `db:"sort_order"`
+		Locale        *string         `db:"locale"`
+		Name          *string         `db:"name"`
+	}
+
+	choicesMap := make(map[uuid.UUID]*domain.ProductChoice)
+	var order []uuid.UUID
+
+	for rows.Next() {
+		var row choiceRow
+		if err := rows.StructScan(&row); err != nil {
+			return nil, err
+		}
+
+		choice, exists := choicesMap[row.ID]
+		if !exists {
+			choice = &domain.ProductChoice{
+				ID:            row.ID,
+				ProductID:     row.ProductID,
+				PriceModifier: row.PriceModifier,
+				SortOrder:     row.SortOrder,
+				Translations:  []domain.ChoiceTranslation{},
+			}
+			choicesMap[row.ID] = choice
+			order = append(order, row.ID)
+		}
+
+		if row.Locale != nil && row.Name != nil {
+			choice.Translations = append(choice.Translations, domain.ChoiceTranslation{
+				ProductChoiceID: row.ID,
+				Locale:          *row.Locale,
+				Name:            *row.Name,
+			})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	choices := make([]*domain.ProductChoice, 0, len(order))
+	for _, id := range order {
+		choices = append(choices, choicesMap[id])
+	}
+	return choices, nil
+}

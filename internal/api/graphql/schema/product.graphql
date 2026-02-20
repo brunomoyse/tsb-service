@@ -19,8 +19,24 @@ type Product {
 
     category: ProductCategory!
 
+    choices: [ProductChoice!]!
+
     # Admin only
     translations: [Translation!]!
+}
+
+type ProductChoice {
+    id: ID!
+    productId: ID!
+    priceModifier: String!
+    sortOrder: Int!
+    name: String!
+    translations: [ChoiceTranslation!]!
+}
+
+type ChoiceTranslation {
+    locale: String!
+    name: String!
 }
 
 type Translation {
@@ -75,6 +91,24 @@ input TranslationInput {
     name: String!
 }
 
+input ChoiceTranslationInput {
+    locale: String!
+    name: String!
+}
+
+input CreateProductChoiceInput {
+    productId: ID!
+    priceModifier: String!
+    sortOrder: Int!
+    translations: [ChoiceTranslationInput!]!
+}
+
+input UpdateProductChoiceInput {
+    priceModifier: String
+    sortOrder: Int
+    translations: [ChoiceTranslationInput!]
+}
+
 extend type Query {
     product(id: ID!): Product!
     products: [Product!]!
@@ -92,4 +126,17 @@ extend type Mutation {
         id: ID!
         input: UpdateProductInput!
     ): Product! @admin
+
+    createProductChoice(
+        input: CreateProductChoiceInput!
+    ): ProductChoice! @admin
+
+    updateProductChoice(
+        id: ID!
+        input: UpdateProductChoiceInput!
+    ): ProductChoice! @admin
+
+    deleteProductChoice(
+        id: ID!
+    ): Boolean! @admin
 }
