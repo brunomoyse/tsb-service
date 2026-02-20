@@ -31,6 +31,17 @@ type UpdateUserRequest struct {
 	AddressID   *string `json:"addressId"`
 }
 
+// ForgotPasswordRequest is used when a user requests a password reset.
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+// ResetPasswordRequest is used when a user resets their password.
+type ResetPasswordRequest struct {
+	Token    string `json:"token"`
+	Password string `json:"password"`
+}
+
 // GoogleAuthRequest is used when a user logs in via Google.
 type GoogleAuthRequest struct {
 	GoogleID  string `json:"googleId"`

@@ -19,5 +19,6 @@ type UserRepository interface {
 
 	StoreRefreshToken(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt int64) error
 	InvalidateRefreshToken(ctx context.Context, tokenHash string) error
+	InvalidateAllRefreshTokens(ctx context.Context, userID string) error
 	IsRefreshTokenValid(ctx context.Context, tokenHash string) (bool, error)
 }

@@ -38,6 +38,8 @@ type UserService interface {
 	UpdateEmailVerifiedAt(ctx context.Context, userID string) (*domain.User, error)
 	InvalidateRefreshToken(ctx context.Context, refreshToken string) error
 	VerifyUserEmail(ctx context.Context, userID string) error
+	RequestPasswordReset(ctx context.Context, email string) error
+	ResetPassword(ctx context.Context, token string, newPassword string) error
 
 	BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error)
 }
@@ -69,22 +71,8 @@ func (s *userService) CreateUser(ctx context.Context, firstName string, lastName
 	}
 
 	if password != nil {
-		// Validate password strength
-		if len(*password) < 8 {
-			return nil, fmt.Errorf("password must be at least 8 characters long")
-		}
-		hasLetter := false
-		hasNumber := false
-		for _, ch := range *password {
-			if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
-				hasLetter = true
-			}
-			if ch >= '0' && ch <= '9' {
-				hasNumber = true
-			}
-		}
-		if !hasLetter || !hasNumber {
-			return nil, fmt.Errorf("password must contain at least one letter and one number")
+		if err := validatePasswordStrength(*password); err != nil {
+			return nil, err
 		}
 
 		// Email/password flow.
@@ -361,6 +349,133 @@ func (s *userService) validateRefreshToken(tokenString, secret string) (*domain.
 
 func (s *userService) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error) {
 	return s.repo.BatchGetUsersByOrderIDs(ctx, orderIDs)
+}
+
+func validatePasswordStrength(password string) error {
+	if len(password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters long")
+	}
+	hasLetter := false
+	hasNumber := false
+	for _, ch := range password {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
+			hasLetter = true
+		}
+		if ch >= '0' && ch <= '9' {
+			hasNumber = true
+		}
+	}
+	if !hasLetter || !hasNumber {
+		return fmt.Errorf("password must contain at least one letter and one number")
+	}
+	return nil
+}
+
+func (s *userService) RequestPasswordReset(ctx context.Context, email string) error {
+	user, err := s.repo.FindByEmail(ctx, email)
+	if err != nil {
+		// Silently return nil to prevent email enumeration
+		return nil
+	}
+
+	// Only allow password reset for users with email/password auth
+	if user.PasswordHash == nil {
+		return nil
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	token, err := generatePasswordResetJWT(*user, jwtSecret)
+	if err != nil {
+		return fmt.Errorf("failed to generate password reset token: %w", err)
+	}
+
+	appBaseURL := os.Getenv("APP_BASE_URL")
+	resetURL := fmt.Sprintf("%s/reset-password?token=%s", appBaseURL, token)
+
+	go func() {
+		err := es.SendPasswordResetEmail(*user, utils.GetLang(ctx), resetURL)
+		if err != nil {
+			slog.Error("failed to send password reset email", "user_id", user.ID, "error", err)
+		}
+	}()
+
+	return nil
+}
+
+func (s *userService) ResetPassword(ctx context.Context, token string, newPassword string) error {
+	if err := validatePasswordStrength(newPassword); err != nil {
+		return err
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+
+	// Parse and validate the token
+	parsedToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return []byte(jwtSecret), nil
+	})
+	if err != nil {
+		return fmt.Errorf("invalid or expired token")
+	}
+
+	claims, ok := parsedToken.Claims.(jwt.MapClaims)
+	if !ok || !parsedToken.Valid {
+		return fmt.Errorf("invalid token claims")
+	}
+
+	// Verify purpose
+	if claims["purpose"] != "password_reset" {
+		return fmt.Errorf("invalid token purpose")
+	}
+
+	userID, ok := claims["sub"].(string)
+	if !ok || userID == "" {
+		return fmt.Errorf("invalid token subject")
+	}
+
+	// Hash new password
+	salt, err := generateSalt()
+	if err != nil {
+		return fmt.Errorf("failed to generate salt: %w", err)
+	}
+	hashedPassword, err := hashPassword(newPassword, salt)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Update password in DB
+	_, err = s.repo.UpdateUserPassword(ctx, userID, hashedPassword, salt)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	// Invalidate all refresh tokens for this user
+	if err := s.repo.InvalidateAllRefreshTokens(ctx, userID); err != nil {
+		slog.Error("failed to invalidate refresh tokens after password reset", "user_id", userID, "error", err)
+	}
+
+	return nil
+}
+
+func generatePasswordResetJWT(user domain.User, jwtSecret string) (string, error) {
+	expirationTime := time.Now().Add(1 * time.Hour)
+
+	claims := jwt.MapClaims{
+		"sub":     user.ID.String(),
+		"email":   user.Email,
+		"purpose": "password_reset",
+		"iat":     time.Now().Unix(),
+		"exp":     expirationTime.Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	tokenString, err := token.SignedString([]byte(jwtSecret))
+	if err != nil {
+		return "", err
+	}
+	return tokenString, nil
 }
 
 func generateSalt() (string, error) {

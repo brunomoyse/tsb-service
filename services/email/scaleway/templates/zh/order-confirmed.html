@@ -108,6 +108,15 @@
         <!-- <p><strong>自提折扣：</strong> -{{.TakeawayDiscount}}</p> -->
         {{end}}
         <p><strong>总计：</strong> {{.TotalPrice}}</p>
+
+        {{if .Address}}
+        <h3>配送地址</h3>
+        <p>
+            {{.Address.StreetName}} {{.Address.HouseNumber}}{{if .Address.BoxNumber}} (Box {{.Address.BoxNumber}}){{end}}<br/>
+            {{.Address.MunicipalityName}}, {{.Address.Postcode}}
+        </p>
+        {{end}}
+
         <!-- 跟踪订单状态按钮 -->
         <p style="text-align: center;">
             <a href="{{.StatusLink}}"
@@ -132,7 +141,7 @@
     </div>
     <div class="footer">
         <p>如果您并未下此订单，请忽略此邮件。</p>
-        <p>&copy; 2025 Tokyo Sushi Bar。保留所有权利。</p>
+        <p>&copy; 2026 Tokyo Sushi Bar。保留所有权利。</p>
     </div>
 </div>
 </body>
