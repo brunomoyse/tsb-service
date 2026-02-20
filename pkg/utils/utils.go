@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type contextKey string
@@ -123,17 +124,15 @@ func UploadProductImage(ctx context.Context, src io.Reader, filename string, slu
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	// Fire the request
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("upload request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("file‑service responded %s: %s", resp.Status, string(b))
-	} else {
-		fmt.Printf("File uploaded successfully.\n")
+		return fmt.Errorf("file service upload failed with status %d", resp.StatusCode)
 	}
 
 	return nil
