@@ -206,6 +206,8 @@ func main() {
 	api.GET("/verify", userHandler.VerifyEmailHandler)
 	api.POST("/tokens/refresh", authLimiter.Middleware(), userHandler.RefreshTokenHandler)
 	api.POST("/logout", userHandler.LogoutHandler)
+	api.POST("/forgot-password", authLimiter.Middleware(), userHandler.ForgotPasswordHandler)
+	api.POST("/reset-password", authLimiter.Middleware(), userHandler.ResetPasswordHandler)
 	api.GET("/oauth/google", authLimiter.Middleware(), userHandler.GoogleAuthHandler)
 	api.GET("/oauth/google/callback", authLimiter.Middleware(), userHandler.GoogleAuthCallbackHandler)
 

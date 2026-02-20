@@ -134,6 +134,16 @@ func (r *UserRepository) InvalidateRefreshToken(ctx context.Context, tokenHash s
 	return err
 }
 
+func (r *UserRepository) InvalidateAllRefreshTokens(ctx context.Context, userID string) error {
+	query := `
+		UPDATE refresh_tokens
+		SET revoked_at = NOW()
+		WHERE user_id = $1 AND revoked_at IS NULL
+	`
+	_, err := r.db.ExecContext(ctx, query, userID)
+	return err
+}
+
 func (r *UserRepository) IsRefreshTokenValid(ctx context.Context, tokenHash string) (bool, error) {
 	query := `
 		SELECT EXISTS(

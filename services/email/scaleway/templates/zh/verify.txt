@@ -1,94 +1,13 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>验证您的邮箱 | Tokyo Sushi Bar</title>
-    <style>
-        /* 基本容器样式通常仍然有效，
-           但请注意，某些邮件客户端可能会完全删除样式块。 */
-        body, html {
-            margin: 0;
-            padding: 0;
-            font-family: "Helvetica Neue", Arial, sans-serif;
-            background: #f2f2f2;
-            color: #333;
-        }
-        .container {
-            max-width: 600px;
-            margin: 40px auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-            overflow: hidden;
-            padding: 30px;
-        }
-        .container img {
-            display: block;
-            margin: 0 auto 20px;
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 8px;
-        }
-        .content p {
-            line-height: 1.6;
-            margin: 16px 0;
-        }
-        .content p.lead {
-            font-size: 18px;
-            color: #444;
-        }
-        .footer {
-            background-color: #fafafa;
-            padding: 20px 0;
-            text-align: center;
-            font-size: 12px;
-            color: #777;
-            margin-top: 30px;
-        }
-    </style>
-</head>
-<body>
-<div class="container">
-    <img alt="Logo" src="https://tokyo.brunomoyse.be/icons/tsb-logo.svg" />
+您好 {{.UserName}}，
 
-    <div class="content">
-        <p class="lead">您好 {{.UserName}}，</p>
-        <p>感谢您加入<strong>Tokyo Sushi Bar</strong>！我们很高兴您能探索我们新鲜、美味且真正正宗的寿司体验。</p>
-        <p>要完成注册并激活您的会员资格，请点击下面的按钮验证您的邮箱：</p>
+感谢您加入 Tokyo Sushi Bar！我们很高兴您能探索我们新鲜、美味且真正正宗的寿司体验。
 
-        <!-- 内联样式按钮 -->
-        <p style="text-align: center;">
-            <a href="{{.VerifyLink}}"
-               style="
-                   display: inline-block;
-                   background: #ed1c24;
-                   color: #ffffff;
-                   padding: 8px 16px;
-                   text-decoration: none;
-                   font-size: 14px;
-                   border-radius: 4px;
-                   margin: 20px 0;
-                   transition: transform 0.2s ease, box-shadow 0.2s ease;
-                 "
-               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';"
-               onmouseout="this.style.transform='none'; this.style.boxShadow='none';"
-            >
-                验证我的邮箱
-            </a>
-        </p>
+要完成注册并激活您的会员资格，请点击下面的链接验证您的邮箱：
+验证我的邮箱： {{.VerifyLink}}
 
-        <p>如果上面的按钮不起作用，请将以下URL复制并粘贴到您的浏览器中：</p>
-        <p style="word-break: break-all;">{{.VerifyLink}}</p>
+我们期待以对传统寿司的现代诠释来取悦您。
+お待ちしております！（我们期待您的光临！）
 
-        <p>我们期待以我们对传统寿司的现代诠释来取悦您。<br/>
-            お待ちしております！ (我们期待您的光临！)</p>
-    </div>
+如果您未请求此邮件，请忽略它。
 
-    <div class="footer">
-        <p>如果您未请求此邮件，请忽略它。</p>
-        <p>&copy; 2025 Tokyo Sushi Bar。保留所有权利。</p>
-    </div>
-</div>
-</body>
-</html>
+© 2026 Tokyo Sushi Bar。保留所有权利。

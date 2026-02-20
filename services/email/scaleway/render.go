@@ -165,6 +165,20 @@ func prepareWelcomeEmailData(user userDomain.User, menuLink string) struct {
 	}
 }
 
+// prepareResetPasswordEmailData prepares the data for password reset emails.
+func prepareResetPasswordEmailData(user userDomain.User, resetLink string) struct {
+	UserName  string
+	ResetLink string
+} {
+	return struct {
+		UserName  string
+		ResetLink string
+	}{
+		UserName:  fmt.Sprintf("%s %s", user.FirstName, user.LastName),
+		ResetLink: resetLink,
+	}
+}
+
 // prepareOrderPendingData prepares the data for order pending emails.
 func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (interface{}, error) {
 	type OrderProductView struct {
@@ -365,6 +379,18 @@ func renderOrderCanceledEmailText(path string, u userDomain.User) (string, error
 	if err != nil {
 		return "", err
 	}
+	return renderEmail(path, data, loadTextTemplate)
+}
+
+// renderResetPasswordEmailHTML renders the HTML version of the password reset email.
+func renderResetPasswordEmailHTML(path string, user userDomain.User, resetLink string) (string, error) {
+	data := prepareResetPasswordEmailData(user, resetLink)
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+// renderResetPasswordEmailText renders the plain text version of the password reset email.
+func renderResetPasswordEmailText(path string, user userDomain.User, resetLink string) (string, error) {
+	data := prepareResetPasswordEmailData(user, resetLink)
 	return renderEmail(path, data, loadTextTemplate)
 }
 

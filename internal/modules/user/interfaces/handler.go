@@ -271,6 +271,42 @@ func (h *UserHandler) LogoutHandler(c *gin.Context) {
 	})
 }
 
+func (h *UserHandler) ForgotPasswordHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	var req ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.Email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "valid email is required"})
+		return
+	}
+
+	if err := h.service.RequestPasswordReset(ctx, req.Email); err != nil {
+		slog.ErrorContext(ctx, "password reset request failed", "error", err)
+	}
+
+	// Always return 200 to prevent email enumeration
+	c.JSON(http.StatusOK, gin.H{"message": "If an account with that email exists, a password reset link has been sent."})
+}
+
+func (h *UserHandler) ResetPasswordHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	var req ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.Token == "" || req.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "token and password are required"})
+		return
+	}
+
+	if err := h.service.ResetPassword(ctx, req.Token, req.Password); err != nil {
+		slog.WarnContext(ctx, "password reset failed", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	clearAuthCookies(c)
+	c.JSON(http.StatusOK, gin.H{"message": "Password has been reset successfully."})
+}
+
 func (h *UserHandler) GoogleAuthHandler(c *gin.Context) {
 	state, err := generateStateToken()
 	if err != nil {

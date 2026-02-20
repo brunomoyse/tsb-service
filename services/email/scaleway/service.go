@@ -273,6 +273,60 @@ func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomai
 	return nil
 }
 
+func SendPasswordResetEmail(user userDomain.User, lang string, resetURL string) error {
+	// Copy baseReq to avoid modifying the original request.
+	newReq := *baseReq
+
+	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
+
+	// Fill "To" field.
+	to := temv1alpha1.CreateEmailRequestAddress{
+		Email: user.Email,
+		Name:  &userFullName,
+	}
+
+	// Push the address to the list of recipients.
+	newReq.To = append(newReq.To, &to)
+
+	// Determine the template path based on the user's language.
+	path := fmt.Sprintf("templates/%s/reset-password", lang)
+
+	htmlContent, err := renderResetPasswordEmailHTML(path, user, resetURL)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	plainTextContent, err := renderResetPasswordEmailText(path, user, resetURL)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	subjects := map[string]string{
+		"en": "Reset your password",
+		"fr": "Réinitialiser votre mot de passe",
+		"zh": "重置您的密码",
+	}
+
+	subject, ok := subjects[lang]
+	if !ok {
+		subject = subjects["fr"]
+	}
+
+	newReq.Subject = subject
+	newReq.HTML = htmlContent
+	newReq.Text = plainTextContent
+
+	// Send the email using the Scaleway TEM API.
+	_, err = temClient.CreateEmail(&newReq)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	logger.Debugf("Email sent to %s with subject: %s", user.Email, subject)
+
+	return nil
+}
+
 func SendOrderCanceledEmail(user userDomain.User, lang string) error {
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
