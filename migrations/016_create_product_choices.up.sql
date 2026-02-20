@@ -17,4 +17,4 @@ CREATE TABLE product_choice_translations (
 );
 
 -- Track which choice was selected in an order
-ALTER TABLE order_products ADD COLUMN product_choice_id UUID REFERENCES product_choices(id);
+ALTER TABLE order_product ADD COLUMN product_choice_id UUID REFERENCES product_choices(id);
