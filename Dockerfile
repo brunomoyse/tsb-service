@@ -1,5 +1,5 @@
 # Step 1: Use the official Golang image to create a build stage
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine3.22 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine3.23 AS builder
 
 # Step 2: Set build arguments for cross-compilation
 ARG TARGETOS
@@ -22,7 +22,7 @@ ENV GIN_MODE=release
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-service cmd/app/main.go
 
 # Step 7: Use base alpine image to create the final image
-FROM alpine:3.22
+FROM alpine:3.23
 
 # Step 8: Set the working directory and environment variables
 WORKDIR /app

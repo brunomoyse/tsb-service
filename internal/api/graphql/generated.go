@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 	"tsb-service/internal/api/graphql/model"
@@ -26,20 +25,10 @@ import (
 
 // NewExecutableSchema creates an ExecutableSchema from the ResolverRoot interface.
 func NewExecutableSchema(cfg Config) graphql.ExecutableSchema {
-	return &executableSchema{
-		schema:     cfg.Schema,
-		resolvers:  cfg.Resolvers,
-		directives: cfg.Directives,
-		complexity: cfg.Complexity,
-	}
+	return &executableSchema{SchemaData: cfg.Schema, Resolvers: cfg.Resolvers, Directives: cfg.Directives, ComplexityRoot: cfg.Complexity}
 }
 
-type Config struct {
-	Schema     *ast.Schema
-	Resolvers  ResolverRoot
-	Directives DirectiveRoot
-	Complexity ComplexityRoot
-}
+type Config = graphql.Config[ResolverRoot, DirectiveRoot, ComplexityRoot]
 
 type ResolverRoot interface {
 	Mutation() MutationResolver
@@ -268,70 +257,65 @@ type UserResolver interface {
 	Orders(ctx context.Context, obj *model.User) ([]*model.Order, error)
 }
 
-type executableSchema struct {
-	schema     *ast.Schema
-	resolvers  ResolverRoot
-	directives DirectiveRoot
-	complexity ComplexityRoot
-}
+type executableSchema graphql.ExecutableSchemaState[ResolverRoot, DirectiveRoot, ComplexityRoot]
 
 func (e *executableSchema) Schema() *ast.Schema {
-	if e.schema != nil {
-		return e.schema
+	if e.SchemaData != nil {
+		return e.SchemaData
 	}
 	return parsedSchema
 }
 
 func (e *executableSchema) Complexity(ctx context.Context, typeName, field string, childComplexity int, rawArgs map[string]any) (int, bool) {
-	ec := executionContext{nil, e, 0, 0, nil}
+	ec := newExecutionContext(nil, e, nil)
 	_ = ec
 	switch typeName + "." + field {
 
 	case "Address.boxNumber":
-		if e.complexity.Address.BoxNumber == nil {
+		if e.ComplexityRoot.Address.BoxNumber == nil {
 			break
 		}
 
-		return e.complexity.Address.BoxNumber(childComplexity), true
+		return e.ComplexityRoot.Address.BoxNumber(childComplexity), true
 	case "Address.distance":
-		if e.complexity.Address.Distance == nil {
+		if e.ComplexityRoot.Address.Distance == nil {
 			break
 		}
 
-		return e.complexity.Address.Distance(childComplexity), true
+		return e.ComplexityRoot.Address.Distance(childComplexity), true
 	case "Address.houseNumber":
-		if e.complexity.Address.HouseNumber == nil {
+		if e.ComplexityRoot.Address.HouseNumber == nil {
 			break
 		}
 
-		return e.complexity.Address.HouseNumber(childComplexity), true
+		return e.ComplexityRoot.Address.HouseNumber(childComplexity), true
 	case "Address.id":
-		if e.complexity.Address.ID == nil {
+		if e.ComplexityRoot.Address.ID == nil {
 			break
 		}
 
-		return e.complexity.Address.ID(childComplexity), true
+		return e.ComplexityRoot.Address.ID(childComplexity), true
 	case "Address.municipalityName":
-		if e.complexity.Address.MunicipalityName == nil {
+		if e.ComplexityRoot.Address.MunicipalityName == nil {
 			break
 		}
 
-		return e.complexity.Address.MunicipalityName(childComplexity), true
+		return e.ComplexityRoot.Address.MunicipalityName(childComplexity), true
 	case "Address.postcode":
-		if e.complexity.Address.Postcode == nil {
+		if e.ComplexityRoot.Address.Postcode == nil {
 			break
 		}
 
-		return e.complexity.Address.Postcode(childComplexity), true
+		return e.ComplexityRoot.Address.Postcode(childComplexity), true
 	case "Address.streetName":
-		if e.complexity.Address.StreetName == nil {
+		if e.ComplexityRoot.Address.StreetName == nil {
 			break
 		}
 
-		return e.complexity.Address.StreetName(childComplexity), true
+		return e.ComplexityRoot.Address.StreetName(childComplexity), true
 
 	case "Mutation.createOrder":
-		if e.complexity.Mutation.CreateOrder == nil {
+		if e.ComplexityRoot.Mutation.CreateOrder == nil {
 			break
 		}
 
@@ -340,9 +324,9 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateOrder(childComplexity, args["input"].(model.CreateOrderInput)), true
+		return e.ComplexityRoot.Mutation.CreateOrder(childComplexity, args["input"].(model.CreateOrderInput)), true
 	case "Mutation.createProduct":
-		if e.complexity.Mutation.CreateProduct == nil {
+		if e.ComplexityRoot.Mutation.CreateProduct == nil {
 			break
 		}
 
@@ -351,9 +335,9 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateProduct(childComplexity, args["input"].(model.CreateProductInput)), true
+		return e.ComplexityRoot.Mutation.CreateProduct(childComplexity, args["input"].(model.CreateProductInput)), true
 	case "Mutation.updateMe":
-		if e.complexity.Mutation.UpdateMe == nil {
+		if e.ComplexityRoot.Mutation.UpdateMe == nil {
 			break
 		}
 
@@ -362,9 +346,9 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateMe(childComplexity, args["input"].(model.UpdateUserInput)), true
+		return e.ComplexityRoot.Mutation.UpdateMe(childComplexity, args["input"].(model.UpdateUserInput)), true
 	case "Mutation.updateOrder":
-		if e.complexity.Mutation.UpdateOrder == nil {
+		if e.ComplexityRoot.Mutation.UpdateOrder == nil {
 			break
 		}
 
@@ -373,9 +357,9 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateOrder(childComplexity, args["id"].(uuid.UUID), args["input"].(model.UpdateOrderInput)), true
+		return e.ComplexityRoot.Mutation.UpdateOrder(childComplexity, args["id"].(uuid.UUID), args["input"].(model.UpdateOrderInput)), true
 	case "Mutation.updatePaymentStatus":
-		if e.complexity.Mutation.UpdatePaymentStatus == nil {
+		if e.ComplexityRoot.Mutation.UpdatePaymentStatus == nil {
 			break
 		}
 
@@ -384,9 +368,9 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdatePaymentStatus(childComplexity, args["orderId"].(uuid.UUID), args["status"].(string)), true
+		return e.ComplexityRoot.Mutation.UpdatePaymentStatus(childComplexity, args["orderId"].(uuid.UUID), args["status"].(string)), true
 	case "Mutation.updateProduct":
-		if e.complexity.Mutation.UpdateProduct == nil {
+		if e.ComplexityRoot.Mutation.UpdateProduct == nil {
 			break
 		}
 
@@ -395,471 +379,471 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.UpdateProduct(childComplexity, args["id"].(uuid.UUID), args["input"].(model.UpdateProductInput)), true
+		return e.ComplexityRoot.Mutation.UpdateProduct(childComplexity, args["id"].(uuid.UUID), args["input"].(model.UpdateProductInput)), true
 
 	case "Order.address":
-		if e.complexity.Order.Address == nil {
+		if e.ComplexityRoot.Order.Address == nil {
 			break
 		}
 
-		return e.complexity.Order.Address(childComplexity), true
+		return e.ComplexityRoot.Order.Address(childComplexity), true
 	case "Order.addressExtra":
-		if e.complexity.Order.AddressExtra == nil {
+		if e.ComplexityRoot.Order.AddressExtra == nil {
 			break
 		}
 
-		return e.complexity.Order.AddressExtra(childComplexity), true
+		return e.ComplexityRoot.Order.AddressExtra(childComplexity), true
 	case "Order.createdAt":
-		if e.complexity.Order.CreatedAt == nil {
+		if e.ComplexityRoot.Order.CreatedAt == nil {
 			break
 		}
 
-		return e.complexity.Order.CreatedAt(childComplexity), true
+		return e.ComplexityRoot.Order.CreatedAt(childComplexity), true
 	case "Order.customer":
-		if e.complexity.Order.Customer == nil {
+		if e.ComplexityRoot.Order.Customer == nil {
 			break
 		}
 
-		return e.complexity.Order.Customer(childComplexity), true
+		return e.ComplexityRoot.Order.Customer(childComplexity), true
 	case "Order.deliveryFee":
-		if e.complexity.Order.DeliveryFee == nil {
+		if e.ComplexityRoot.Order.DeliveryFee == nil {
 			break
 		}
 
-		return e.complexity.Order.DeliveryFee(childComplexity), true
+		return e.ComplexityRoot.Order.DeliveryFee(childComplexity), true
 	case "Order.discountAmount":
-		if e.complexity.Order.DiscountAmount == nil {
+		if e.ComplexityRoot.Order.DiscountAmount == nil {
 			break
 		}
 
-		return e.complexity.Order.DiscountAmount(childComplexity), true
+		return e.ComplexityRoot.Order.DiscountAmount(childComplexity), true
 	case "Order.displayAddress":
-		if e.complexity.Order.DisplayAddress == nil {
+		if e.ComplexityRoot.Order.DisplayAddress == nil {
 			break
 		}
 
-		return e.complexity.Order.DisplayAddress(childComplexity), true
+		return e.ComplexityRoot.Order.DisplayAddress(childComplexity), true
 	case "Order.displayCustomerName":
-		if e.complexity.Order.DisplayCustomerName == nil {
+		if e.ComplexityRoot.Order.DisplayCustomerName == nil {
 			break
 		}
 
-		return e.complexity.Order.DisplayCustomerName(childComplexity), true
+		return e.ComplexityRoot.Order.DisplayCustomerName(childComplexity), true
 	case "Order.estimatedReadyTime":
-		if e.complexity.Order.EstimatedReadyTime == nil {
+		if e.ComplexityRoot.Order.EstimatedReadyTime == nil {
 			break
 		}
 
-		return e.complexity.Order.EstimatedReadyTime(childComplexity), true
+		return e.ComplexityRoot.Order.EstimatedReadyTime(childComplexity), true
 	case "Order.id":
-		if e.complexity.Order.ID == nil {
+		if e.ComplexityRoot.Order.ID == nil {
 			break
 		}
 
-		return e.complexity.Order.ID(childComplexity), true
+		return e.ComplexityRoot.Order.ID(childComplexity), true
 	case "Order.isOnlinePayment":
-		if e.complexity.Order.IsOnlinePayment == nil {
+		if e.ComplexityRoot.Order.IsOnlinePayment == nil {
 			break
 		}
 
-		return e.complexity.Order.IsOnlinePayment(childComplexity), true
+		return e.ComplexityRoot.Order.IsOnlinePayment(childComplexity), true
 	case "Order.items":
-		if e.complexity.Order.Items == nil {
+		if e.ComplexityRoot.Order.Items == nil {
 			break
 		}
 
-		return e.complexity.Order.Items(childComplexity), true
+		return e.ComplexityRoot.Order.Items(childComplexity), true
 	case "Order.orderExtra":
-		if e.complexity.Order.OrderExtra == nil {
+		if e.ComplexityRoot.Order.OrderExtra == nil {
 			break
 		}
 
-		return e.complexity.Order.OrderExtra(childComplexity), true
+		return e.ComplexityRoot.Order.OrderExtra(childComplexity), true
 	case "Order.orderNote":
-		if e.complexity.Order.OrderNote == nil {
+		if e.ComplexityRoot.Order.OrderNote == nil {
 			break
 		}
 
-		return e.complexity.Order.OrderNote(childComplexity), true
+		return e.ComplexityRoot.Order.OrderNote(childComplexity), true
 	case "Order.payment":
-		if e.complexity.Order.Payment == nil {
+		if e.ComplexityRoot.Order.Payment == nil {
 			break
 		}
 
-		return e.complexity.Order.Payment(childComplexity), true
+		return e.ComplexityRoot.Order.Payment(childComplexity), true
 	case "Order.preferredReadyTime":
-		if e.complexity.Order.PreferredReadyTime == nil {
+		if e.ComplexityRoot.Order.PreferredReadyTime == nil {
 			break
 		}
 
-		return e.complexity.Order.PreferredReadyTime(childComplexity), true
+		return e.ComplexityRoot.Order.PreferredReadyTime(childComplexity), true
 	case "Order.status":
-		if e.complexity.Order.Status == nil {
+		if e.ComplexityRoot.Order.Status == nil {
 			break
 		}
 
-		return e.complexity.Order.Status(childComplexity), true
+		return e.ComplexityRoot.Order.Status(childComplexity), true
 	case "Order.totalPrice":
-		if e.complexity.Order.TotalPrice == nil {
+		if e.ComplexityRoot.Order.TotalPrice == nil {
 			break
 		}
 
-		return e.complexity.Order.TotalPrice(childComplexity), true
+		return e.ComplexityRoot.Order.TotalPrice(childComplexity), true
 	case "Order.type":
-		if e.complexity.Order.Type == nil {
+		if e.ComplexityRoot.Order.Type == nil {
 			break
 		}
 
-		return e.complexity.Order.Type(childComplexity), true
+		return e.ComplexityRoot.Order.Type(childComplexity), true
 	case "Order.updatedAt":
-		if e.complexity.Order.UpdatedAt == nil {
+		if e.ComplexityRoot.Order.UpdatedAt == nil {
 			break
 		}
 
-		return e.complexity.Order.UpdatedAt(childComplexity), true
+		return e.ComplexityRoot.Order.UpdatedAt(childComplexity), true
 
 	case "OrderItem.product":
-		if e.complexity.OrderItem.Product == nil {
+		if e.ComplexityRoot.OrderItem.Product == nil {
 			break
 		}
 
-		return e.complexity.OrderItem.Product(childComplexity), true
+		return e.ComplexityRoot.OrderItem.Product(childComplexity), true
 	case "OrderItem.productID":
-		if e.complexity.OrderItem.ProductID == nil {
+		if e.ComplexityRoot.OrderItem.ProductID == nil {
 			break
 		}
 
-		return e.complexity.OrderItem.ProductID(childComplexity), true
+		return e.ComplexityRoot.OrderItem.ProductID(childComplexity), true
 	case "OrderItem.quantity":
-		if e.complexity.OrderItem.Quantity == nil {
+		if e.ComplexityRoot.OrderItem.Quantity == nil {
 			break
 		}
 
-		return e.complexity.OrderItem.Quantity(childComplexity), true
+		return e.ComplexityRoot.OrderItem.Quantity(childComplexity), true
 	case "OrderItem.totalPrice":
-		if e.complexity.OrderItem.TotalPrice == nil {
+		if e.ComplexityRoot.OrderItem.TotalPrice == nil {
 			break
 		}
 
-		return e.complexity.OrderItem.TotalPrice(childComplexity), true
+		return e.ComplexityRoot.OrderItem.TotalPrice(childComplexity), true
 	case "OrderItem.unitPrice":
-		if e.complexity.OrderItem.UnitPrice == nil {
+		if e.ComplexityRoot.OrderItem.UnitPrice == nil {
 			break
 		}
 
-		return e.complexity.OrderItem.UnitPrice(childComplexity), true
+		return e.ComplexityRoot.OrderItem.UnitPrice(childComplexity), true
 
 	case "Payment.amount":
-		if e.complexity.Payment.Amount == nil {
+		if e.ComplexityRoot.Payment.Amount == nil {
 			break
 		}
 
-		return e.complexity.Payment.Amount(childComplexity), true
+		return e.ComplexityRoot.Payment.Amount(childComplexity), true
 	case "Payment.amountCaptured":
-		if e.complexity.Payment.AmountCaptured == nil {
+		if e.ComplexityRoot.Payment.AmountCaptured == nil {
 			break
 		}
 
-		return e.complexity.Payment.AmountCaptured(childComplexity), true
+		return e.ComplexityRoot.Payment.AmountCaptured(childComplexity), true
 	case "Payment.amountChargedBack":
-		if e.complexity.Payment.AmountChargedBack == nil {
+		if e.ComplexityRoot.Payment.AmountChargedBack == nil {
 			break
 		}
 
-		return e.complexity.Payment.AmountChargedBack(childComplexity), true
+		return e.ComplexityRoot.Payment.AmountChargedBack(childComplexity), true
 	case "Payment.amountRefunded":
-		if e.complexity.Payment.AmountRefunded == nil {
+		if e.ComplexityRoot.Payment.AmountRefunded == nil {
 			break
 		}
 
-		return e.complexity.Payment.AmountRefunded(childComplexity), true
+		return e.ComplexityRoot.Payment.AmountRefunded(childComplexity), true
 	case "Payment.amountRemaining":
-		if e.complexity.Payment.AmountRemaining == nil {
+		if e.ComplexityRoot.Payment.AmountRemaining == nil {
 			break
 		}
 
-		return e.complexity.Payment.AmountRemaining(childComplexity), true
+		return e.ComplexityRoot.Payment.AmountRemaining(childComplexity), true
 	case "Payment.authorizedAt":
-		if e.complexity.Payment.AuthorizedAt == nil {
+		if e.ComplexityRoot.Payment.AuthorizedAt == nil {
 			break
 		}
 
-		return e.complexity.Payment.AuthorizedAt(childComplexity), true
+		return e.ComplexityRoot.Payment.AuthorizedAt(childComplexity), true
 	case "Payment.cancelUrl":
-		if e.complexity.Payment.CancelURL == nil {
+		if e.ComplexityRoot.Payment.CancelURL == nil {
 			break
 		}
 
-		return e.complexity.Payment.CancelURL(childComplexity), true
+		return e.ComplexityRoot.Payment.CancelURL(childComplexity), true
 	case "Payment.canceledAt":
-		if e.complexity.Payment.CanceledAt == nil {
+		if e.ComplexityRoot.Payment.CanceledAt == nil {
 			break
 		}
 
-		return e.complexity.Payment.CanceledAt(childComplexity), true
+		return e.ComplexityRoot.Payment.CanceledAt(childComplexity), true
 	case "Payment.country_code":
-		if e.complexity.Payment.CountryCode == nil {
+		if e.ComplexityRoot.Payment.CountryCode == nil {
 			break
 		}
 
-		return e.complexity.Payment.CountryCode(childComplexity), true
+		return e.ComplexityRoot.Payment.CountryCode(childComplexity), true
 	case "Payment.createdAt":
-		if e.complexity.Payment.CreatedAt == nil {
+		if e.ComplexityRoot.Payment.CreatedAt == nil {
 			break
 		}
 
-		return e.complexity.Payment.CreatedAt(childComplexity), true
+		return e.ComplexityRoot.Payment.CreatedAt(childComplexity), true
 	case "Payment.description":
-		if e.complexity.Payment.Description == nil {
+		if e.ComplexityRoot.Payment.Description == nil {
 			break
 		}
 
-		return e.complexity.Payment.Description(childComplexity), true
+		return e.ComplexityRoot.Payment.Description(childComplexity), true
 	case "Payment.expiredAt":
-		if e.complexity.Payment.ExpiredAt == nil {
+		if e.ComplexityRoot.Payment.ExpiredAt == nil {
 			break
 		}
 
-		return e.complexity.Payment.ExpiredAt(childComplexity), true
+		return e.ComplexityRoot.Payment.ExpiredAt(childComplexity), true
 	case "Payment.expiresAt":
-		if e.complexity.Payment.ExpiresAt == nil {
+		if e.ComplexityRoot.Payment.ExpiresAt == nil {
 			break
 		}
 
-		return e.complexity.Payment.ExpiresAt(childComplexity), true
+		return e.ComplexityRoot.Payment.ExpiresAt(childComplexity), true
 	case "Payment.failedAt":
-		if e.complexity.Payment.FailedAt == nil {
+		if e.ComplexityRoot.Payment.FailedAt == nil {
 			break
 		}
 
-		return e.complexity.Payment.FailedAt(childComplexity), true
+		return e.ComplexityRoot.Payment.FailedAt(childComplexity), true
 	case "Payment.id":
-		if e.complexity.Payment.ID == nil {
+		if e.ComplexityRoot.Payment.ID == nil {
 			break
 		}
 
-		return e.complexity.Payment.ID(childComplexity), true
+		return e.ComplexityRoot.Payment.ID(childComplexity), true
 	case "Payment.isCancelable":
-		if e.complexity.Payment.IsCancelable == nil {
+		if e.ComplexityRoot.Payment.IsCancelable == nil {
 			break
 		}
 
-		return e.complexity.Payment.IsCancelable(childComplexity), true
+		return e.ComplexityRoot.Payment.IsCancelable(childComplexity), true
 	case "Payment.links":
-		if e.complexity.Payment.Links == nil {
+		if e.ComplexityRoot.Payment.Links == nil {
 			break
 		}
 
-		return e.complexity.Payment.Links(childComplexity), true
+		return e.ComplexityRoot.Payment.Links(childComplexity), true
 	case "Payment.locale":
-		if e.complexity.Payment.Locale == nil {
+		if e.ComplexityRoot.Payment.Locale == nil {
 			break
 		}
 
-		return e.complexity.Payment.Locale(childComplexity), true
+		return e.ComplexityRoot.Payment.Locale(childComplexity), true
 	case "Payment.metadata":
-		if e.complexity.Payment.Metadata == nil {
+		if e.ComplexityRoot.Payment.Metadata == nil {
 			break
 		}
 
-		return e.complexity.Payment.Metadata(childComplexity), true
+		return e.ComplexityRoot.Payment.Metadata(childComplexity), true
 	case "Payment.method":
-		if e.complexity.Payment.Method == nil {
+		if e.ComplexityRoot.Payment.Method == nil {
 			break
 		}
 
-		return e.complexity.Payment.Method(childComplexity), true
+		return e.ComplexityRoot.Payment.Method(childComplexity), true
 	case "Payment.mode":
-		if e.complexity.Payment.Mode == nil {
+		if e.ComplexityRoot.Payment.Mode == nil {
 			break
 		}
 
-		return e.complexity.Payment.Mode(childComplexity), true
+		return e.ComplexityRoot.Payment.Mode(childComplexity), true
 	case "Payment.molliePaymentId":
-		if e.complexity.Payment.MolliePaymentID == nil {
+		if e.ComplexityRoot.Payment.MolliePaymentID == nil {
 			break
 		}
 
-		return e.complexity.Payment.MolliePaymentID(childComplexity), true
+		return e.ComplexityRoot.Payment.MolliePaymentID(childComplexity), true
 	case "Payment.orderId":
-		if e.complexity.Payment.OrderID == nil {
+		if e.ComplexityRoot.Payment.OrderID == nil {
 			break
 		}
 
-		return e.complexity.Payment.OrderID(childComplexity), true
+		return e.ComplexityRoot.Payment.OrderID(childComplexity), true
 	case "Payment.paidAt":
-		if e.complexity.Payment.PaidAt == nil {
+		if e.ComplexityRoot.Payment.PaidAt == nil {
 			break
 		}
 
-		return e.complexity.Payment.PaidAt(childComplexity), true
+		return e.ComplexityRoot.Payment.PaidAt(childComplexity), true
 	case "Payment.profileId":
-		if e.complexity.Payment.ProfileID == nil {
+		if e.ComplexityRoot.Payment.ProfileID == nil {
 			break
 		}
 
-		return e.complexity.Payment.ProfileID(childComplexity), true
+		return e.ComplexityRoot.Payment.ProfileID(childComplexity), true
 	case "Payment.resource":
-		if e.complexity.Payment.Resource == nil {
+		if e.ComplexityRoot.Payment.Resource == nil {
 			break
 		}
 
-		return e.complexity.Payment.Resource(childComplexity), true
+		return e.ComplexityRoot.Payment.Resource(childComplexity), true
 	case "Payment.restrictPaymentMethodsToCountry":
-		if e.complexity.Payment.RestrictPaymentMethodsToCountry == nil {
+		if e.ComplexityRoot.Payment.RestrictPaymentMethodsToCountry == nil {
 			break
 		}
 
-		return e.complexity.Payment.RestrictPaymentMethodsToCountry(childComplexity), true
+		return e.ComplexityRoot.Payment.RestrictPaymentMethodsToCountry(childComplexity), true
 	case "Payment.settlementAmount":
-		if e.complexity.Payment.SettlementAmount == nil {
+		if e.ComplexityRoot.Payment.SettlementAmount == nil {
 			break
 		}
 
-		return e.complexity.Payment.SettlementAmount(childComplexity), true
+		return e.ComplexityRoot.Payment.SettlementAmount(childComplexity), true
 	case "Payment.settlementId":
-		if e.complexity.Payment.SettlementID == nil {
+		if e.ComplexityRoot.Payment.SettlementID == nil {
 			break
 		}
 
-		return e.complexity.Payment.SettlementID(childComplexity), true
+		return e.ComplexityRoot.Payment.SettlementID(childComplexity), true
 	case "Payment.status":
-		if e.complexity.Payment.Status == nil {
+		if e.ComplexityRoot.Payment.Status == nil {
 			break
 		}
 
-		return e.complexity.Payment.Status(childComplexity), true
+		return e.ComplexityRoot.Payment.Status(childComplexity), true
 	case "Payment.webhookUrl":
-		if e.complexity.Payment.WebhookURL == nil {
+		if e.ComplexityRoot.Payment.WebhookURL == nil {
 			break
 		}
 
-		return e.complexity.Payment.WebhookURL(childComplexity), true
+		return e.ComplexityRoot.Payment.WebhookURL(childComplexity), true
 
 	case "Product.category":
-		if e.complexity.Product.Category == nil {
+		if e.ComplexityRoot.Product.Category == nil {
 			break
 		}
 
-		return e.complexity.Product.Category(childComplexity), true
+		return e.ComplexityRoot.Product.Category(childComplexity), true
 	case "Product.code":
-		if e.complexity.Product.Code == nil {
+		if e.ComplexityRoot.Product.Code == nil {
 			break
 		}
 
-		return e.complexity.Product.Code(childComplexity), true
+		return e.ComplexityRoot.Product.Code(childComplexity), true
 	case "Product.createdAt":
-		if e.complexity.Product.CreatedAt == nil {
+		if e.ComplexityRoot.Product.CreatedAt == nil {
 			break
 		}
 
-		return e.complexity.Product.CreatedAt(childComplexity), true
+		return e.ComplexityRoot.Product.CreatedAt(childComplexity), true
 	case "Product.description":
-		if e.complexity.Product.Description == nil {
+		if e.ComplexityRoot.Product.Description == nil {
 			break
 		}
 
-		return e.complexity.Product.Description(childComplexity), true
+		return e.ComplexityRoot.Product.Description(childComplexity), true
 	case "Product.id":
-		if e.complexity.Product.ID == nil {
+		if e.ComplexityRoot.Product.ID == nil {
 			break
 		}
 
-		return e.complexity.Product.ID(childComplexity), true
+		return e.ComplexityRoot.Product.ID(childComplexity), true
 	case "Product.isAvailable":
-		if e.complexity.Product.IsAvailable == nil {
+		if e.ComplexityRoot.Product.IsAvailable == nil {
 			break
 		}
 
-		return e.complexity.Product.IsAvailable(childComplexity), true
+		return e.ComplexityRoot.Product.IsAvailable(childComplexity), true
 	case "Product.isDiscountable":
-		if e.complexity.Product.IsDiscountable == nil {
+		if e.ComplexityRoot.Product.IsDiscountable == nil {
 			break
 		}
 
-		return e.complexity.Product.IsDiscountable(childComplexity), true
+		return e.ComplexityRoot.Product.IsDiscountable(childComplexity), true
 	case "Product.isHalal":
-		if e.complexity.Product.IsHalal == nil {
+		if e.ComplexityRoot.Product.IsHalal == nil {
 			break
 		}
 
-		return e.complexity.Product.IsHalal(childComplexity), true
+		return e.ComplexityRoot.Product.IsHalal(childComplexity), true
 	case "Product.isVegan":
-		if e.complexity.Product.IsVegan == nil {
+		if e.ComplexityRoot.Product.IsVegan == nil {
 			break
 		}
 
-		return e.complexity.Product.IsVegan(childComplexity), true
+		return e.ComplexityRoot.Product.IsVegan(childComplexity), true
 	case "Product.isVisible":
-		if e.complexity.Product.IsVisible == nil {
+		if e.ComplexityRoot.Product.IsVisible == nil {
 			break
 		}
 
-		return e.complexity.Product.IsVisible(childComplexity), true
+		return e.ComplexityRoot.Product.IsVisible(childComplexity), true
 	case "Product.name":
-		if e.complexity.Product.Name == nil {
+		if e.ComplexityRoot.Product.Name == nil {
 			break
 		}
 
-		return e.complexity.Product.Name(childComplexity), true
+		return e.ComplexityRoot.Product.Name(childComplexity), true
 	case "Product.pieceCount":
-		if e.complexity.Product.PieceCount == nil {
+		if e.ComplexityRoot.Product.PieceCount == nil {
 			break
 		}
 
-		return e.complexity.Product.PieceCount(childComplexity), true
+		return e.ComplexityRoot.Product.PieceCount(childComplexity), true
 	case "Product.price":
-		if e.complexity.Product.Price == nil {
+		if e.ComplexityRoot.Product.Price == nil {
 			break
 		}
 
-		return e.complexity.Product.Price(childComplexity), true
+		return e.ComplexityRoot.Product.Price(childComplexity), true
 	case "Product.slug":
-		if e.complexity.Product.Slug == nil {
+		if e.ComplexityRoot.Product.Slug == nil {
 			break
 		}
 
-		return e.complexity.Product.Slug(childComplexity), true
+		return e.ComplexityRoot.Product.Slug(childComplexity), true
 	case "Product.translations":
-		if e.complexity.Product.Translations == nil {
+		if e.ComplexityRoot.Product.Translations == nil {
 			break
 		}
 
-		return e.complexity.Product.Translations(childComplexity), true
+		return e.ComplexityRoot.Product.Translations(childComplexity), true
 
 	case "ProductCategory.id":
-		if e.complexity.ProductCategory.ID == nil {
+		if e.ComplexityRoot.ProductCategory.ID == nil {
 			break
 		}
 
-		return e.complexity.ProductCategory.ID(childComplexity), true
+		return e.ComplexityRoot.ProductCategory.ID(childComplexity), true
 	case "ProductCategory.name":
-		if e.complexity.ProductCategory.Name == nil {
+		if e.ComplexityRoot.ProductCategory.Name == nil {
 			break
 		}
 
-		return e.complexity.ProductCategory.Name(childComplexity), true
+		return e.ComplexityRoot.ProductCategory.Name(childComplexity), true
 	case "ProductCategory.order":
-		if e.complexity.ProductCategory.Order == nil {
+		if e.ComplexityRoot.ProductCategory.Order == nil {
 			break
 		}
 
-		return e.complexity.ProductCategory.Order(childComplexity), true
+		return e.ComplexityRoot.ProductCategory.Order(childComplexity), true
 	case "ProductCategory.products":
-		if e.complexity.ProductCategory.Products == nil {
+		if e.ComplexityRoot.ProductCategory.Products == nil {
 			break
 		}
 
-		return e.complexity.ProductCategory.Products(childComplexity), true
+		return e.ComplexityRoot.ProductCategory.Products(childComplexity), true
 	case "ProductCategory.translations":
-		if e.complexity.ProductCategory.Translations == nil {
+		if e.ComplexityRoot.ProductCategory.Translations == nil {
 			break
 		}
 
-		return e.complexity.ProductCategory.Translations(childComplexity), true
+		return e.ComplexityRoot.ProductCategory.Translations(childComplexity), true
 
 	case "Query.address":
-		if e.complexity.Query.Address == nil {
+		if e.ComplexityRoot.Query.Address == nil {
 			break
 		}
 
@@ -868,9 +852,9 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.Address(childComplexity, args["id"].(string)), true
+		return e.ComplexityRoot.Query.Address(childComplexity, args["id"].(string)), true
 	case "Query.addressByLocation":
-		if e.complexity.Query.AddressByLocation == nil {
+		if e.ComplexityRoot.Query.AddressByLocation == nil {
 			break
 		}
 
@@ -879,9 +863,9 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.AddressByLocation(childComplexity, args["streetID"].(string), args["houseNumber"].(string), args["boxNumber"].(*string)), true
+		return e.ComplexityRoot.Query.AddressByLocation(childComplexity, args["streetID"].(string), args["houseNumber"].(string), args["boxNumber"].(*string)), true
 	case "Query.boxNumbers":
-		if e.complexity.Query.BoxNumbers == nil {
+		if e.ComplexityRoot.Query.BoxNumbers == nil {
 			break
 		}
 
@@ -890,9 +874,9 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.BoxNumbers(childComplexity, args["streetId"].(string), args["houseNumber"].(string)), true
+		return e.ComplexityRoot.Query.BoxNumbers(childComplexity, args["streetId"].(string), args["houseNumber"].(string)), true
 	case "Query.houseNumbers":
-		if e.complexity.Query.HouseNumbers == nil {
+		if e.ComplexityRoot.Query.HouseNumbers == nil {
 			break
 		}
 
@@ -901,15 +885,16 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.HouseNumbers(childComplexity, args["streetId"].(string)), true
+		return e.ComplexityRoot.Query.HouseNumbers(childComplexity, args["streetId"].(string)), true
+
 	case "Query.me":
-		if e.complexity.Query.Me == nil {
+		if e.ComplexityRoot.Query.Me == nil {
 			break
 		}
 
-		return e.complexity.Query.Me(childComplexity), true
+		return e.ComplexityRoot.Query.Me(childComplexity), true
 	case "Query.myOrder":
-		if e.complexity.Query.MyOrder == nil {
+		if e.ComplexityRoot.Query.MyOrder == nil {
 			break
 		}
 
@@ -918,9 +903,9 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.MyOrder(childComplexity, args["id"].(uuid.UUID)), true
+		return e.ComplexityRoot.Query.MyOrder(childComplexity, args["id"].(uuid.UUID)), true
 	case "Query.myOrders":
-		if e.complexity.Query.MyOrders == nil {
+		if e.ComplexityRoot.Query.MyOrders == nil {
 			break
 		}
 
@@ -929,9 +914,9 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.MyOrders(childComplexity, args["first"].(*int), args["page"].(*int)), true
+		return e.ComplexityRoot.Query.MyOrders(childComplexity, args["first"].(*int), args["page"].(*int)), true
 	case "Query.order":
-		if e.complexity.Query.Order == nil {
+		if e.ComplexityRoot.Query.Order == nil {
 			break
 		}
 
@@ -940,15 +925,15 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.Order(childComplexity, args["id"].(uuid.UUID)), true
+		return e.ComplexityRoot.Query.Order(childComplexity, args["id"].(uuid.UUID)), true
 	case "Query.orders":
-		if e.complexity.Query.Orders == nil {
+		if e.ComplexityRoot.Query.Orders == nil {
 			break
 		}
 
-		return e.complexity.Query.Orders(childComplexity), true
+		return e.ComplexityRoot.Query.Orders(childComplexity), true
 	case "Query.product":
-		if e.complexity.Query.Product == nil {
+		if e.ComplexityRoot.Query.Product == nil {
 			break
 		}
 
@@ -957,15 +942,15 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.Product(childComplexity, args["id"].(uuid.UUID)), true
+		return e.ComplexityRoot.Query.Product(childComplexity, args["id"].(uuid.UUID)), true
 	case "Query.productCategories":
-		if e.complexity.Query.ProductCategories == nil {
+		if e.ComplexityRoot.Query.ProductCategories == nil {
 			break
 		}
 
-		return e.complexity.Query.ProductCategories(childComplexity), true
+		return e.ComplexityRoot.Query.ProductCategories(childComplexity), true
 	case "Query.productCategory":
-		if e.complexity.Query.ProductCategory == nil {
+		if e.ComplexityRoot.Query.ProductCategory == nil {
 			break
 		}
 
@@ -974,15 +959,15 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.ProductCategory(childComplexity, args["id"].(uuid.UUID)), true
+		return e.ComplexityRoot.Query.ProductCategory(childComplexity, args["id"].(uuid.UUID)), true
 	case "Query.products":
-		if e.complexity.Query.Products == nil {
+		if e.ComplexityRoot.Query.Products == nil {
 			break
 		}
 
-		return e.complexity.Query.Products(childComplexity), true
+		return e.ComplexityRoot.Query.Products(childComplexity), true
 	case "Query.streets":
-		if e.complexity.Query.Streets == nil {
+		if e.ComplexityRoot.Query.Streets == nil {
 			break
 		}
 
@@ -991,35 +976,35 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Query.Streets(childComplexity, args["query"].(string)), true
+		return e.ComplexityRoot.Query.Streets(childComplexity, args["query"].(string)), true
 
 	case "Street.id":
-		if e.complexity.Street.ID == nil {
+		if e.ComplexityRoot.Street.ID == nil {
 			break
 		}
 
-		return e.complexity.Street.ID(childComplexity), true
+		return e.ComplexityRoot.Street.ID(childComplexity), true
 	case "Street.municipalityName":
-		if e.complexity.Street.MunicipalityName == nil {
+		if e.ComplexityRoot.Street.MunicipalityName == nil {
 			break
 		}
 
-		return e.complexity.Street.MunicipalityName(childComplexity), true
+		return e.ComplexityRoot.Street.MunicipalityName(childComplexity), true
 	case "Street.postcode":
-		if e.complexity.Street.Postcode == nil {
+		if e.ComplexityRoot.Street.Postcode == nil {
 			break
 		}
 
-		return e.complexity.Street.Postcode(childComplexity), true
+		return e.ComplexityRoot.Street.Postcode(childComplexity), true
 	case "Street.streetName":
-		if e.complexity.Street.StreetName == nil {
+		if e.ComplexityRoot.Street.StreetName == nil {
 			break
 		}
 
-		return e.complexity.Street.StreetName(childComplexity), true
+		return e.ComplexityRoot.Street.StreetName(childComplexity), true
 
 	case "Subscription.myOrderUpdated":
-		if e.complexity.Subscription.MyOrderUpdated == nil {
+		if e.ComplexityRoot.Subscription.MyOrderUpdated == nil {
 			break
 		}
 
@@ -1028,81 +1013,81 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Subscription.MyOrderUpdated(childComplexity, args["orderId"].(uuid.UUID)), true
+		return e.ComplexityRoot.Subscription.MyOrderUpdated(childComplexity, args["orderId"].(uuid.UUID)), true
 	case "Subscription.orderCreated":
-		if e.complexity.Subscription.OrderCreated == nil {
+		if e.ComplexityRoot.Subscription.OrderCreated == nil {
 			break
 		}
 
-		return e.complexity.Subscription.OrderCreated(childComplexity), true
+		return e.ComplexityRoot.Subscription.OrderCreated(childComplexity), true
 	case "Subscription.orderUpdated":
-		if e.complexity.Subscription.OrderUpdated == nil {
+		if e.ComplexityRoot.Subscription.OrderUpdated == nil {
 			break
 		}
 
-		return e.complexity.Subscription.OrderUpdated(childComplexity), true
+		return e.ComplexityRoot.Subscription.OrderUpdated(childComplexity), true
 
 	case "Translation.description":
-		if e.complexity.Translation.Description == nil {
+		if e.ComplexityRoot.Translation.Description == nil {
 			break
 		}
 
-		return e.complexity.Translation.Description(childComplexity), true
+		return e.ComplexityRoot.Translation.Description(childComplexity), true
 	case "Translation.language":
-		if e.complexity.Translation.Language == nil {
+		if e.ComplexityRoot.Translation.Language == nil {
 			break
 		}
 
-		return e.complexity.Translation.Language(childComplexity), true
+		return e.ComplexityRoot.Translation.Language(childComplexity), true
 	case "Translation.name":
-		if e.complexity.Translation.Name == nil {
+		if e.ComplexityRoot.Translation.Name == nil {
 			break
 		}
 
-		return e.complexity.Translation.Name(childComplexity), true
+		return e.ComplexityRoot.Translation.Name(childComplexity), true
 
 	case "User.address":
-		if e.complexity.User.Address == nil {
+		if e.ComplexityRoot.User.Address == nil {
 			break
 		}
 
-		return e.complexity.User.Address(childComplexity), true
+		return e.ComplexityRoot.User.Address(childComplexity), true
 	case "User.email":
-		if e.complexity.User.Email == nil {
+		if e.ComplexityRoot.User.Email == nil {
 			break
 		}
 
-		return e.complexity.User.Email(childComplexity), true
+		return e.ComplexityRoot.User.Email(childComplexity), true
 	case "User.firstName":
-		if e.complexity.User.FirstName == nil {
+		if e.ComplexityRoot.User.FirstName == nil {
 			break
 		}
 
-		return e.complexity.User.FirstName(childComplexity), true
+		return e.ComplexityRoot.User.FirstName(childComplexity), true
 	case "User.id":
-		if e.complexity.User.ID == nil {
+		if e.ComplexityRoot.User.ID == nil {
 			break
 		}
 
-		return e.complexity.User.ID(childComplexity), true
+		return e.ComplexityRoot.User.ID(childComplexity), true
 	case "User.lastName":
-		if e.complexity.User.LastName == nil {
+		if e.ComplexityRoot.User.LastName == nil {
 			break
 		}
 
-		return e.complexity.User.LastName(childComplexity), true
+		return e.ComplexityRoot.User.LastName(childComplexity), true
 	case "User.orders":
-		if e.complexity.User.Orders == nil {
+		if e.ComplexityRoot.User.Orders == nil {
 			break
 		}
 
-		return e.complexity.User.Orders(childComplexity), true
+		return e.ComplexityRoot.User.Orders(childComplexity), true
 	case "User.phoneNumber":
-		if e.complexity.User.PhoneNumber == nil {
+		if e.ComplexityRoot.User.PhoneNumber == nil {
 			break
 		}
 
-		return e.complexity.User.PhoneNumber(childComplexity), true
+		return e.ComplexityRoot.User.PhoneNumber(childComplexity), true
 
 	}
 	return 0, false
@@ -1110,7 +1095,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
-	ec := executionContext{opCtx, e, 0, 0, make(chan graphql.DeferredResult)}
+	ec := newExecutionContext(opCtx, e, make(chan graphql.DeferredResult))
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputCreateOrderInput,
 		ec.unmarshalInputCreateOrderItemInput,
@@ -1133,9 +1118,9 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 				ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
 				data = ec._Query(ctx, opCtx.Operation.SelectionSet)
 			} else {
-				if atomic.LoadInt32(&ec.pendingDeferred) > 0 {
-					result := <-ec.deferredResults
-					atomic.AddInt32(&ec.pendingDeferred, -1)
+				if atomic.LoadInt32(&ec.PendingDeferred) > 0 {
+					result := <-ec.DeferredResults
+					atomic.AddInt32(&ec.PendingDeferred, -1)
 					data = result.Result
 					response.Path = result.Path
 					response.Label = result.Label
@@ -1147,8 +1132,8 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			var buf bytes.Buffer
 			data.MarshalGQL(&buf)
 			response.Data = buf.Bytes()
-			if atomic.LoadInt32(&ec.deferred) > 0 {
-				hasNext := atomic.LoadInt32(&ec.pendingDeferred) > 0
+			if atomic.LoadInt32(&ec.Deferred) > 0 {
+				hasNext := atomic.LoadInt32(&ec.PendingDeferred) > 0
 				response.HasNext = &hasNext
 			}
 
@@ -1193,44 +1178,22 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 }
 
 type executionContext struct {
-	*graphql.OperationContext
-	*executableSchema
-	deferred        int32
-	pendingDeferred int32
-	deferredResults chan graphql.DeferredResult
+	*graphql.ExecutionContextState[ResolverRoot, DirectiveRoot, ComplexityRoot]
 }
 
-func (ec *executionContext) processDeferredGroup(dg graphql.DeferredGroup) {
-	atomic.AddInt32(&ec.pendingDeferred, 1)
-	go func() {
-		ctx := graphql.WithFreshResponseContext(dg.Context)
-		dg.FieldSet.Dispatch(ctx)
-		ds := graphql.DeferredResult{
-			Path:   dg.Path,
-			Label:  dg.Label,
-			Result: dg.FieldSet,
-			Errors: graphql.GetErrors(ctx),
-		}
-		// null fields should bubble up
-		if dg.FieldSet.Invalids > 0 {
-			ds.Result = graphql.Null
-		}
-		ec.deferredResults <- ds
-	}()
-}
-
-func (ec *executionContext) introspectSchema() (*introspection.Schema, error) {
-	if ec.DisableIntrospection {
-		return nil, errors.New("introspection disabled")
+func newExecutionContext(
+	opCtx *graphql.OperationContext,
+	execSchema *executableSchema,
+	deferredResults chan graphql.DeferredResult,
+) executionContext {
+	return executionContext{
+		ExecutionContextState: graphql.NewExecutionContextState[ResolverRoot, DirectiveRoot, ComplexityRoot](
+			opCtx,
+			(*graphql.ExecutableSchemaState[ResolverRoot, DirectiveRoot, ComplexityRoot])(execSchema),
+			parsedSchema,
+			deferredResults,
+		),
 	}
-	return introspection.WrapSchema(ec.Schema()), nil
-}
-
-func (ec *executionContext) introspectType(name string) (*introspection.Type, error) {
-	if ec.DisableIntrospection {
-		return nil, errors.New("introspection disabled")
-	}
-	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
 //go:embed "schema/address.graphql" "schema/directive.graphql" "schema/order.graphql" "schema/payment.graphql" "schema/product.graphql" "schema/scalar.graphql" "schema/user.graphql"
@@ -1755,17 +1718,17 @@ func (ec *executionContext) _Mutation_createOrder(ctx context.Context, field gra
 		ec.fieldContext_Mutation_createOrder,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().CreateOrder(ctx, fc.Args["input"].(model.CreateOrderInput))
+			return ec.Resolvers.Mutation().CreateOrder(ctx, fc.Args["input"].(model.CreateOrderInput))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Auth == nil {
+				if ec.Directives.Auth == nil {
 					var zeroVal *model.Order
 					return zeroVal, errors.New("directive auth is not implemented")
 				}
-				return ec.directives.Auth(ctx, nil, directive0)
+				return ec.Directives.Auth(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -1851,17 +1814,17 @@ func (ec *executionContext) _Mutation_updateOrder(ctx context.Context, field gra
 		ec.fieldContext_Mutation_updateOrder,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().UpdateOrder(ctx, fc.Args["id"].(uuid.UUID), fc.Args["input"].(model.UpdateOrderInput))
+			return ec.Resolvers.Mutation().UpdateOrder(ctx, fc.Args["id"].(uuid.UUID), fc.Args["input"].(model.UpdateOrderInput))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Admin == nil {
+				if ec.Directives.Admin == nil {
 					var zeroVal *model.Order
 					return zeroVal, errors.New("directive admin is not implemented")
 				}
-				return ec.directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Admin(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -1947,17 +1910,17 @@ func (ec *executionContext) _Mutation_updatePaymentStatus(ctx context.Context, f
 		ec.fieldContext_Mutation_updatePaymentStatus,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().UpdatePaymentStatus(ctx, fc.Args["orderId"].(uuid.UUID), fc.Args["status"].(string))
+			return ec.Resolvers.Mutation().UpdatePaymentStatus(ctx, fc.Args["orderId"].(uuid.UUID), fc.Args["status"].(string))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Admin == nil {
+				if ec.Directives.Admin == nil {
 					var zeroVal *model.Payment
 					return zeroVal, errors.New("directive admin is not implemented")
 				}
-				return ec.directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Admin(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -2065,17 +2028,17 @@ func (ec *executionContext) _Mutation_createProduct(ctx context.Context, field g
 		ec.fieldContext_Mutation_createProduct,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().CreateProduct(ctx, fc.Args["input"].(model.CreateProductInput))
+			return ec.Resolvers.Mutation().CreateProduct(ctx, fc.Args["input"].(model.CreateProductInput))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Admin == nil {
+				if ec.Directives.Admin == nil {
 					var zeroVal *model.Product
 					return zeroVal, errors.New("directive admin is not implemented")
 				}
-				return ec.directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Admin(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -2151,17 +2114,17 @@ func (ec *executionContext) _Mutation_updateProduct(ctx context.Context, field g
 		ec.fieldContext_Mutation_updateProduct,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().UpdateProduct(ctx, fc.Args["id"].(uuid.UUID), fc.Args["input"].(model.UpdateProductInput))
+			return ec.Resolvers.Mutation().UpdateProduct(ctx, fc.Args["id"].(uuid.UUID), fc.Args["input"].(model.UpdateProductInput))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Admin == nil {
+				if ec.Directives.Admin == nil {
 					var zeroVal *model.Product
 					return zeroVal, errors.New("directive admin is not implemented")
 				}
-				return ec.directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Admin(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -2237,17 +2200,17 @@ func (ec *executionContext) _Mutation_updateMe(ctx context.Context, field graphq
 		ec.fieldContext_Mutation_updateMe,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().UpdateMe(ctx, fc.Args["input"].(model.UpdateUserInput))
+			return ec.Resolvers.Mutation().UpdateMe(ctx, fc.Args["input"].(model.UpdateUserInput))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Auth == nil {
+				if ec.Directives.Auth == nil {
 					var zeroVal *model.User
 					return zeroVal, errors.New("directive auth is not implemented")
 				}
-				return ec.directives.Auth(ctx, nil, directive0)
+				return ec.Directives.Auth(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -2712,7 +2675,7 @@ func (ec *executionContext) _Order_address(ctx context.Context, field graphql.Co
 		field,
 		ec.fieldContext_Order_address,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Order().Address(ctx, obj)
+			return ec.Resolvers.Order().Address(ctx, obj)
 		},
 		nil,
 		ec.marshalOAddress2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAddress,
@@ -2757,7 +2720,7 @@ func (ec *executionContext) _Order_customer(ctx context.Context, field graphql.C
 		field,
 		ec.fieldContext_Order_customer,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Order().Customer(ctx, obj)
+			return ec.Resolvers.Order().Customer(ctx, obj)
 		},
 		nil,
 		ec.marshalOUser2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUser,
@@ -2802,7 +2765,7 @@ func (ec *executionContext) _Order_payment(ctx context.Context, field graphql.Co
 		field,
 		ec.fieldContext_Order_payment,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Order().Payment(ctx, obj)
+			return ec.Resolvers.Order().Payment(ctx, obj)
 		},
 		nil,
 		ec.marshalOPayment2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐPayment,
@@ -2895,7 +2858,7 @@ func (ec *executionContext) _Order_items(ctx context.Context, field graphql.Coll
 		field,
 		ec.fieldContext_Order_items,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Order().Items(ctx, obj)
+			return ec.Resolvers.Order().Items(ctx, obj)
 		},
 		nil,
 		ec.marshalNOrderItem2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderItemᚄ,
@@ -2936,7 +2899,7 @@ func (ec *executionContext) _Order_displayCustomerName(ctx context.Context, fiel
 		field,
 		ec.fieldContext_Order_displayCustomerName,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Order().DisplayCustomerName(ctx, obj)
+			return ec.Resolvers.Order().DisplayCustomerName(ctx, obj)
 		},
 		nil,
 		ec.marshalNString2string,
@@ -2965,7 +2928,7 @@ func (ec *executionContext) _Order_displayAddress(ctx context.Context, field gra
 		field,
 		ec.fieldContext_Order_displayAddress,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Order().DisplayAddress(ctx, obj)
+			return ec.Resolvers.Order().DisplayAddress(ctx, obj)
 		},
 		nil,
 		ec.marshalNString2string,
@@ -2994,7 +2957,7 @@ func (ec *executionContext) _OrderItem_product(ctx context.Context, field graphq
 		field,
 		ec.fieldContext_OrderItem_product,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.OrderItem().Product(ctx, obj)
+			return ec.Resolvers.OrderItem().Product(ctx, obj)
 		},
 		nil,
 		ec.marshalNProduct2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProduct,
@@ -4447,7 +4410,7 @@ func (ec *executionContext) _Product_category(ctx context.Context, field graphql
 		field,
 		ec.fieldContext_Product_category,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Product().Category(ctx, obj)
+			return ec.Resolvers.Product().Category(ctx, obj)
 		},
 		nil,
 		ec.marshalNProductCategory2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductCategory,
@@ -4488,7 +4451,7 @@ func (ec *executionContext) _Product_translations(ctx context.Context, field gra
 		field,
 		ec.fieldContext_Product_translations,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Product().Translations(ctx, obj)
+			return ec.Resolvers.Product().Translations(ctx, obj)
 		},
 		nil,
 		ec.marshalNTranslation2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTranslationᚄ,
@@ -4612,7 +4575,7 @@ func (ec *executionContext) _ProductCategory_products(ctx context.Context, field
 		field,
 		ec.fieldContext_ProductCategory_products,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.ProductCategory().Products(ctx, obj)
+			return ec.Resolvers.ProductCategory().Products(ctx, obj)
 		},
 		nil,
 		ec.marshalNProduct2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductᚄ,
@@ -4673,7 +4636,7 @@ func (ec *executionContext) _ProductCategory_translations(ctx context.Context, f
 		field,
 		ec.fieldContext_ProductCategory_translations,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.ProductCategory().Translations(ctx, obj)
+			return ec.Resolvers.ProductCategory().Translations(ctx, obj)
 		},
 		nil,
 		ec.marshalNTranslation2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTranslationᚄ,
@@ -4711,7 +4674,7 @@ func (ec *executionContext) _Query_streets(ctx context.Context, field graphql.Co
 		ec.fieldContext_Query_streets,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().Streets(ctx, fc.Args["query"].(string))
+			return ec.Resolvers.Query().Streets(ctx, fc.Args["query"].(string))
 		},
 		nil,
 		ec.marshalNStreet2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐStreet,
@@ -4762,7 +4725,7 @@ func (ec *executionContext) _Query_houseNumbers(ctx context.Context, field graph
 		ec.fieldContext_Query_houseNumbers,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().HouseNumbers(ctx, fc.Args["streetId"].(string))
+			return ec.Resolvers.Query().HouseNumbers(ctx, fc.Args["streetId"].(string))
 		},
 		nil,
 		ec.marshalNString2ᚕstringᚄ,
@@ -4803,7 +4766,7 @@ func (ec *executionContext) _Query_boxNumbers(ctx context.Context, field graphql
 		ec.fieldContext_Query_boxNumbers,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().BoxNumbers(ctx, fc.Args["streetId"].(string), fc.Args["houseNumber"].(string))
+			return ec.Resolvers.Query().BoxNumbers(ctx, fc.Args["streetId"].(string), fc.Args["houseNumber"].(string))
 		},
 		nil,
 		ec.marshalNString2ᚕᚖstring,
@@ -4844,7 +4807,7 @@ func (ec *executionContext) _Query_address(ctx context.Context, field graphql.Co
 		ec.fieldContext_Query_address,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().Address(ctx, fc.Args["id"].(string))
+			return ec.Resolvers.Query().Address(ctx, fc.Args["id"].(string))
 		},
 		nil,
 		ec.marshalNAddress2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAddress,
@@ -4901,7 +4864,7 @@ func (ec *executionContext) _Query_addressByLocation(ctx context.Context, field 
 		ec.fieldContext_Query_addressByLocation,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().AddressByLocation(ctx, fc.Args["streetID"].(string), fc.Args["houseNumber"].(string), fc.Args["boxNumber"].(*string))
+			return ec.Resolvers.Query().AddressByLocation(ctx, fc.Args["streetID"].(string), fc.Args["houseNumber"].(string), fc.Args["boxNumber"].(*string))
 		},
 		nil,
 		ec.marshalNAddress2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAddress,
@@ -4957,17 +4920,17 @@ func (ec *executionContext) _Query_orders(ctx context.Context, field graphql.Col
 		field,
 		ec.fieldContext_Query_orders,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Query().Orders(ctx)
+			return ec.Resolvers.Query().Orders(ctx)
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Admin == nil {
+				if ec.Directives.Admin == nil {
 					var zeroVal []*model.Order
 					return zeroVal, errors.New("directive admin is not implemented")
 				}
-				return ec.directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Admin(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -5042,17 +5005,17 @@ func (ec *executionContext) _Query_order(ctx context.Context, field graphql.Coll
 		ec.fieldContext_Query_order,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().Order(ctx, fc.Args["id"].(uuid.UUID))
+			return ec.Resolvers.Query().Order(ctx, fc.Args["id"].(uuid.UUID))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Admin == nil {
+				if ec.Directives.Admin == nil {
 					var zeroVal *model.Order
 					return zeroVal, errors.New("directive admin is not implemented")
 				}
-				return ec.directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Admin(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -5138,17 +5101,17 @@ func (ec *executionContext) _Query_myOrders(ctx context.Context, field graphql.C
 		ec.fieldContext_Query_myOrders,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().MyOrders(ctx, fc.Args["first"].(*int), fc.Args["page"].(*int))
+			return ec.Resolvers.Query().MyOrders(ctx, fc.Args["first"].(*int), fc.Args["page"].(*int))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Auth == nil {
+				if ec.Directives.Auth == nil {
 					var zeroVal []*model.Order
 					return zeroVal, errors.New("directive auth is not implemented")
 				}
-				return ec.directives.Auth(ctx, nil, directive0)
+				return ec.Directives.Auth(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -5234,17 +5197,17 @@ func (ec *executionContext) _Query_myOrder(ctx context.Context, field graphql.Co
 		ec.fieldContext_Query_myOrder,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().MyOrder(ctx, fc.Args["id"].(uuid.UUID))
+			return ec.Resolvers.Query().MyOrder(ctx, fc.Args["id"].(uuid.UUID))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Auth == nil {
+				if ec.Directives.Auth == nil {
 					var zeroVal *model.Order
 					return zeroVal, errors.New("directive auth is not implemented")
 				}
-				return ec.directives.Auth(ctx, nil, directive0)
+				return ec.Directives.Auth(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -5330,7 +5293,7 @@ func (ec *executionContext) _Query_product(ctx context.Context, field graphql.Co
 		ec.fieldContext_Query_product,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().Product(ctx, fc.Args["id"].(uuid.UUID))
+			return ec.Resolvers.Query().Product(ctx, fc.Args["id"].(uuid.UUID))
 		},
 		nil,
 		ec.marshalNProduct2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProduct,
@@ -5402,7 +5365,7 @@ func (ec *executionContext) _Query_products(ctx context.Context, field graphql.C
 		field,
 		ec.fieldContext_Query_products,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Query().Products(ctx)
+			return ec.Resolvers.Query().Products(ctx)
 		},
 		nil,
 		ec.marshalNProduct2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductᚄ,
@@ -5464,7 +5427,7 @@ func (ec *executionContext) _Query_productCategory(ctx context.Context, field gr
 		ec.fieldContext_Query_productCategory,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Query().ProductCategory(ctx, fc.Args["id"].(uuid.UUID))
+			return ec.Resolvers.Query().ProductCategory(ctx, fc.Args["id"].(uuid.UUID))
 		},
 		nil,
 		ec.marshalNProductCategory2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductCategory,
@@ -5516,7 +5479,7 @@ func (ec *executionContext) _Query_productCategories(ctx context.Context, field 
 		field,
 		ec.fieldContext_Query_productCategories,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Query().ProductCategories(ctx)
+			return ec.Resolvers.Query().ProductCategories(ctx)
 		},
 		nil,
 		ec.marshalNProductCategory2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductCategoryᚄ,
@@ -5557,17 +5520,17 @@ func (ec *executionContext) _Query_me(ctx context.Context, field graphql.Collect
 		field,
 		ec.fieldContext_Query_me,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Query().Me(ctx)
+			return ec.Resolvers.Query().Me(ctx)
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Auth == nil {
+				if ec.Directives.Auth == nil {
 					var zeroVal *model.User
 					return zeroVal, errors.New("directive auth is not implemented")
 				}
-				return ec.directives.Auth(ctx, nil, directive0)
+				return ec.Directives.Auth(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -5616,7 +5579,7 @@ func (ec *executionContext) _Query___type(ctx context.Context, field graphql.Col
 		ec.fieldContext_Query___type,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.introspectType(fc.Args["name"].(string))
+			return ec.IntrospectType(fc.Args["name"].(string))
 		},
 		nil,
 		ec.marshalO__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType,
@@ -5680,7 +5643,7 @@ func (ec *executionContext) _Query___schema(ctx context.Context, field graphql.C
 		field,
 		ec.fieldContext_Query___schema,
 		func(ctx context.Context) (any, error) {
-			return ec.introspectSchema()
+			return ec.IntrospectSchema()
 		},
 		nil,
 		ec.marshalO__Schema2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐSchema,
@@ -5839,17 +5802,17 @@ func (ec *executionContext) _Subscription_orderCreated(ctx context.Context, fiel
 		field,
 		ec.fieldContext_Subscription_orderCreated,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Subscription().OrderCreated(ctx)
+			return ec.Resolvers.Subscription().OrderCreated(ctx)
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Admin == nil {
+				if ec.Directives.Admin == nil {
 					var zeroVal *model.Order
 					return zeroVal, errors.New("directive admin is not implemented")
 				}
-				return ec.directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Admin(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -5923,17 +5886,17 @@ func (ec *executionContext) _Subscription_orderUpdated(ctx context.Context, fiel
 		field,
 		ec.fieldContext_Subscription_orderUpdated,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.Subscription().OrderUpdated(ctx)
+			return ec.Resolvers.Subscription().OrderUpdated(ctx)
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Admin == nil {
+				if ec.Directives.Admin == nil {
 					var zeroVal *model.Order
 					return zeroVal, errors.New("directive admin is not implemented")
 				}
-				return ec.directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Admin(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -6008,17 +5971,17 @@ func (ec *executionContext) _Subscription_myOrderUpdated(ctx context.Context, fi
 		ec.fieldContext_Subscription_myOrderUpdated,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Subscription().MyOrderUpdated(ctx, fc.Args["orderId"].(uuid.UUID))
+			return ec.Resolvers.Subscription().MyOrderUpdated(ctx, fc.Args["orderId"].(uuid.UUID))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.directives.Auth == nil {
+				if ec.Directives.Auth == nil {
 					var zeroVal *model.Order
 					return zeroVal, errors.New("directive auth is not implemented")
 				}
-				return ec.directives.Auth(ctx, nil, directive0)
+				return ec.Directives.Auth(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -6335,7 +6298,7 @@ func (ec *executionContext) _User_address(ctx context.Context, field graphql.Col
 		field,
 		ec.fieldContext_User_address,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.User().Address(ctx, obj)
+			return ec.Resolvers.User().Address(ctx, obj)
 		},
 		nil,
 		ec.marshalOAddress2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAddress,
@@ -6380,7 +6343,7 @@ func (ec *executionContext) _User_orders(ctx context.Context, field graphql.Coll
 		field,
 		ec.fieldContext_User_orders,
 		func(ctx context.Context) (any, error) {
-			return ec.resolvers.User().Orders(ctx, obj)
+			return ec.Resolvers.User().Orders(ctx, obj)
 		},
 		nil,
 		ec.marshalOOrder2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderᚄ,
@@ -7962,7 +7925,6 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 			it.Items = data
 		}
 	}
-
 	return it, nil
 }
 
@@ -7996,7 +7958,6 @@ func (ec *executionContext) unmarshalInputCreateOrderItemInput(ctx context.Conte
 			it.Quantity = data
 		}
 	}
-
 	return it, nil
 }
 
@@ -8093,7 +8054,6 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 			it.Translations = data
 		}
 	}
-
 	return it, nil
 }
 
@@ -8127,7 +8087,6 @@ func (ec *executionContext) unmarshalInputOrderExtraInput(ctx context.Context, o
 			it.Options = data
 		}
 	}
-
 	return it, nil
 }
 
@@ -8168,7 +8127,6 @@ func (ec *executionContext) unmarshalInputTranslationInput(ctx context.Context, 
 			it.Name = data
 		}
 	}
-
 	return it, nil
 }
 
@@ -8202,7 +8160,6 @@ func (ec *executionContext) unmarshalInputUpdateOrderInput(ctx context.Context, 
 			it.EstimatedReadyTime = data
 		}
 	}
-
 	return it, nil
 }
 
@@ -8299,7 +8256,6 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 			it.Translations = data
 		}
 	}
-
 	return it, nil
 }
 
@@ -8354,7 +8310,6 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 			it.AddressID = data
 		}
 	}
-
 	return it, nil
 }
 
@@ -8418,10 +8373,10 @@ func (ec *executionContext) _Address(ctx context.Context, sel ast.SelectionSet, 
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -8502,10 +8457,10 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -8795,10 +8750,10 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -8885,10 +8840,10 @@ func (ec *executionContext) _OrderItem(ctx context.Context, sel ast.SelectionSet
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -8999,10 +8954,10 @@ func (ec *executionContext) _Payment(ctx context.Context, sel ast.SelectionSet, 
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -9161,10 +9116,10 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -9282,10 +9237,10 @@ func (ec *executionContext) _ProductCategory(ctx context.Context, sel ast.Select
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -9640,10 +9595,10 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -9694,10 +9649,10 @@ func (ec *executionContext) _Street(ctx context.Context, sel ast.SelectionSet, o
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -9764,10 +9719,10 @@ func (ec *executionContext) _Translation(ctx context.Context, sel ast.SelectionS
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -9886,10 +9841,10 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -9942,10 +9897,10 @@ func (ec *executionContext) ___Directive(ctx context.Context, sel ast.SelectionS
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -9990,10 +9945,10 @@ func (ec *executionContext) ___EnumValue(ctx context.Context, sel ast.SelectionS
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -10048,10 +10003,10 @@ func (ec *executionContext) ___Field(ctx context.Context, sel ast.SelectionSet, 
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -10103,10 +10058,10 @@ func (ec *executionContext) ___InputValue(ctx context.Context, sel ast.Selection
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -10158,10 +10113,10 @@ func (ec *executionContext) ___Schema(ctx context.Context, sel ast.SelectionSet,
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -10217,10 +10172,10 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 		return graphql.Null
 	}
 
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
 
 	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
 			Label:    label,
 			Path:     graphql.GetPath(ctx),
 			FieldSet: dfs,
@@ -10364,39 +10319,11 @@ func (ec *executionContext) marshalNOrder2tsbᚑserviceᚋinternalᚋapiᚋgraph
 }
 
 func (ec *executionContext) marshalNOrder2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Order) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNOrder2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrder(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNOrder2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrder(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -10423,39 +10350,11 @@ func (ec *executionContext) unmarshalNOrderExtraInput2ᚖtsbᚑserviceᚋinterna
 }
 
 func (ec *executionContext) marshalNOrderItem2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.OrderItem) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNOrderItem2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderItem(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNOrderItem2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderItem(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -10522,39 +10421,11 @@ func (ec *executionContext) marshalNProduct2tsbᚑserviceᚋinternalᚋapiᚋgra
 }
 
 func (ec *executionContext) marshalNProduct2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Product) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNProduct2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProduct(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNProduct2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProduct(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -10580,39 +10451,11 @@ func (ec *executionContext) marshalNProductCategory2tsbᚑserviceᚋinternalᚋa
 }
 
 func (ec *executionContext) marshalNProductCategory2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductCategoryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ProductCategory) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNProductCategory2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductCategory(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNProductCategory2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductCategory(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -10634,39 +10477,11 @@ func (ec *executionContext) marshalNProductCategory2ᚖtsbᚑserviceᚋinternal�
 }
 
 func (ec *executionContext) marshalNStreet2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐStreet(ctx context.Context, sel ast.SelectionSet, v []*model.Street) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalOStreet2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐStreet(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalOStreet2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐStreet(ctx, sel, v[i])
+	})
 
 	return ret
 }
@@ -10742,39 +10557,11 @@ func (ec *executionContext) marshalNString2ᚕᚖstring(ctx context.Context, sel
 }
 
 func (ec *executionContext) marshalNTranslation2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTranslationᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Translation) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNTranslation2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTranslation(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNTranslation2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTranslation(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -10849,39 +10636,11 @@ func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlge
 }
 
 func (ec *executionContext) marshalN__Directive2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirectiveᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.Directive) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -10924,39 +10683,11 @@ func (ec *executionContext) unmarshalN__DirectiveLocation2ᚕstringᚄ(ctx conte
 }
 
 func (ec *executionContext) marshalN__DirectiveLocation2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalN__DirectiveLocation2string(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalN__DirectiveLocation2string(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -10980,39 +10711,11 @@ func (ec *executionContext) marshalN__InputValue2githubᚗcomᚋ99designsᚋgqlg
 }
 
 func (ec *executionContext) marshalN__InputValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.InputValue) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalN__InputValue2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValue(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalN__InputValue2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValue(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -11028,39 +10731,11 @@ func (ec *executionContext) marshalN__Type2githubᚗcomᚋ99designsᚋgqlgenᚋg
 }
 
 func (ec *executionContext) marshalN__Type2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐTypeᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.Type) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalN__Type2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalN__Type2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -11227,39 +10902,11 @@ func (ec *executionContext) marshalOOrder2ᚕᚖtsbᚑserviceᚋinternalᚋapi�
 	if v == nil {
 		return graphql.Null
 	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNOrder2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrder(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNOrder2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrder(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -11422,39 +11069,11 @@ func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgq
 	if v == nil {
 		return graphql.Null
 	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalN__EnumValue2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValue(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalN__EnumValue2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValue(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -11469,39 +11088,11 @@ func (ec *executionContext) marshalO__Field2ᚕgithubᚗcomᚋ99designsᚋgqlgen
 	if v == nil {
 		return graphql.Null
 	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalN__Field2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐField(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalN__Field2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐField(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -11516,39 +11107,11 @@ func (ec *executionContext) marshalO__InputValue2ᚕgithubᚗcomᚋ99designsᚋg
 	if v == nil {
 		return graphql.Null
 	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalN__InputValue2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValue(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalN__InputValue2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValue(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
@@ -11570,39 +11133,11 @@ func (ec *executionContext) marshalO__Type2ᚕgithubᚗcomᚋ99designsᚋgqlgen�
 	if v == nil {
 		return graphql.Null
 	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalN__Type2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalN__Type2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType(ctx, sel, v[i])
+	})
 
 	for _, e := range ret {
 		if e == graphql.Null {
