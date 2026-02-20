@@ -10,7 +10,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
+	net_mail "net/mail"
 	"os"
 	"time"
 
@@ -52,6 +53,11 @@ func NewUserService(repo domain.UserRepository) UserService {
 }
 
 func (s *userService) CreateUser(ctx context.Context, firstName string, lastName string, email string, phoneNumber *string, addressID *string, password *string, googleID *string) (*domain.User, error) {
+	// Validate email format
+	if _, err := net_mail.ParseAddress(email); err != nil {
+		return nil, fmt.Errorf("invalid email format")
+	}
+
 	// Ensure at least one credential is provided.
 	if password == nil && googleID == nil {
 		return nil, fmt.Errorf("password or googleID must be provided")
@@ -63,12 +69,33 @@ func (s *userService) CreateUser(ctx context.Context, firstName string, lastName
 	}
 
 	if password != nil {
+		// Validate password strength
+		if len(*password) < 8 {
+			return nil, fmt.Errorf("password must be at least 8 characters long")
+		}
+		hasLetter := false
+		hasNumber := false
+		for _, ch := range *password {
+			if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
+				hasLetter = true
+			}
+			if ch >= '0' && ch <= '9' {
+				hasNumber = true
+			}
+		}
+		if !hasLetter || !hasNumber {
+			return nil, fmt.Errorf("password must contain at least one letter and one number")
+		}
+
 		// Email/password flow.
 		salt, err := generateSalt()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate salt: %w", err)
 		}
-		hashedPassword := hashPassword(*password, salt)
+		hashedPassword, err := hashPassword(*password, salt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hash password: %w", err)
+		}
 
 		// Try to find an existing user by email.
 		user, err := s.repo.FindByEmail(ctx, email)
@@ -103,7 +130,7 @@ func (s *userService) CreateUser(ctx context.Context, firstName string, lastName
 		go func() {
 			err = es.SendVerificationEmail(newUser, utils.GetLang(ctx), verificationURL)
 			if err != nil {
-				log.Printf("failed to send verification email: %v", err)
+				slog.Error("failed to send verification email", "user_id", newUser.ID, "error", err)
 			}
 		}()
 
@@ -135,7 +162,10 @@ func (s *userService) Login(ctx context.Context, email string, password string, 
 		return nil, nil, nil, fmt.Errorf("email not verified")
 	}
 
-	hashedPasswordRequest := hashPassword(password, *user.Salt)
+	hashedPasswordRequest, err := hashPassword(password, *user.Salt)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to hash password: %w", err)
+	}
 	if subtle.ConstantTimeCompare([]byte(hashedPasswordRequest), []byte(*user.PasswordHash)) != 1 {
 		return nil, nil, nil, fmt.Errorf("invalid password")
 	}
@@ -149,7 +179,7 @@ func (s *userService) Login(ctx context.Context, email string, password string, 
 	tokenHash := hashToken(refreshToken)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour).Unix()
 	if err := s.repo.StoreRefreshToken(ctx, user.ID, tokenHash, expiresAt); err != nil {
-		log.Printf("Failed to store refresh token: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
 	return user, &accessToken, &refreshToken, nil
@@ -190,7 +220,7 @@ func (s *userService) GenerateTokens(ctx context.Context, user domain.User, jwtS
 	tokenHash := hashToken(refreshToken)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour).Unix()
 	if err := s.repo.StoreRefreshToken(ctx, user.ID, tokenHash, expiresAt); err != nil {
-		log.Printf("Failed to store refresh token: %v", err)
+		return "", "", fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
 	return accessToken, refreshToken, nil
@@ -268,14 +298,14 @@ func (s *userService) RefreshToken(
 
 	// 5. Revoke old refresh token
 	if err := s.repo.InvalidateRefreshToken(ctx, tokenHash); err != nil {
-		log.Printf("Failed to revoke old refresh token: %v", err)
+		return "", "", nil, fmt.Errorf("failed to revoke old refresh token: %w", err)
 	}
 
 	// 6. Store new refresh token
 	newTokenHash := hashToken(refreshToken)
 	expiresAt := time.Now().Add(7 * 24 * time.Hour).Unix()
 	if err := s.repo.StoreRefreshToken(ctx, user.ID, newTokenHash, expiresAt); err != nil {
-		log.Printf("Failed to store new refresh token: %v", err)
+		return "", "", nil, fmt.Errorf("failed to store new refresh token: %w", err)
 	}
 
 	return accessToken, refreshToken, user, nil
@@ -305,7 +335,7 @@ func (s *userService) VerifyUserEmail(ctx context.Context, userID string) error 
 	go func() {
 		err = es.SendWelcomeEmail(*user, utils.GetLang(ctx), os.Getenv("APP_BASE_URL")+"/menu")
 		if err != nil {
-			log.Printf("failed to send welcome email: %v", err)
+			slog.Error("failed to send welcome email", "user_id", user.ID, "error", err)
 		}
 	}()
 
@@ -341,13 +371,13 @@ func generateSalt() (string, error) {
 	return base64.StdEncoding.EncodeToString(salt), nil
 }
 
-func hashPassword(password string, salt string) string {
+func hashPassword(password string, salt string) (string, error) {
 	saltBytes, err := base64.StdEncoding.DecodeString(salt)
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("failed to decode salt: %w", err)
 	}
 	hashedPassword := argon2.IDKey([]byte(password), saltBytes, 3, 64*1024, 4, 32)
-	return base64.StdEncoding.EncodeToString(hashedPassword)
+	return base64.StdEncoding.EncodeToString(hashedPassword), nil
 }
 
 func generateTokens(user domain.User, jwtSecret string) (string, string, error) {
