@@ -178,7 +178,7 @@ func findMigrationsDir(startPath string) string {
 // TruncateAllTables removes all data from tables (useful for test isolation)
 func (td *TestDatabase) TruncateAllTables(t *testing.T) {
 	tables := []string{
-		"order_products",
+		"order_product",
 		"orders",
 		"mollie_payments",
 		"product_translations",
