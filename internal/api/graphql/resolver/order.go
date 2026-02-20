@@ -30,6 +30,15 @@ import (
 
 // CreateOrder is the resolver for the createOrder field.
 func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error) {
+	// 0) Check if ordering is allowed
+	allowed, err := r.RestaurantService.IsOrderingAllowed(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check ordering availability: %w", err)
+	}
+	if !allowed {
+		return nil, fmt.Errorf("ordering is currently unavailable")
+	}
+
 	// 1) Authenticated user
 	userID := utils.GetUserID(ctx)
 	if userID == "" {
@@ -74,13 +83,31 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		if qty <= 0 || qty > 99 {
 			return nil, fmt.Errorf("invalid quantity for product %s: must be between 1 and 99", pid)
 		}
+
+		var choiceID *uuid.UUID
+		if op.ChoiceID != nil {
+			choice, err := r.ProductService.GetChoiceByID(ctx, *op.ChoiceID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to retrieve choice %s: %w", op.ChoiceID, err)
+			}
+			if choice == nil {
+				return nil, fmt.Errorf("choice %s not found", op.ChoiceID)
+			}
+			if choice.ProductID != pid {
+				return nil, fmt.Errorf("choice %s does not belong to product %s", op.ChoiceID, pid)
+			}
+			unitPrice = unitPrice.Add(choice.PriceModifier)
+			choiceID = op.ChoiceID
+		}
+
 		lineTotal := unitPrice.Mul(decimal.NewFromInt(qty))
 		total = total.Add(lineTotal)
 		rawItems = append(rawItems, orderDomain.OrderProductRaw{
-			ProductID:  pid,
-			Quantity:   qty,
-			UnitPrice:  unitPrice,
-			TotalPrice: lineTotal,
+			ProductID:       pid,
+			Quantity:        qty,
+			UnitPrice:       unitPrice,
+			TotalPrice:      lineTotal,
+			ProductChoiceID: choiceID,
 		})
 	}
 
@@ -608,6 +635,24 @@ func (r *orderItemResolver) Product(ctx context.Context, obj *model.OrderItem) (
 
 	// Return the first product found. (Assuming one order item belongs to one product)
 	return products[0], nil
+}
+
+// Choice is the resolver for the choice field.
+func (r *orderItemResolver) Choice(ctx context.Context, obj *model.OrderItem) (*model.ProductChoice, error) {
+	if obj.ChoiceID == nil {
+		return nil, nil
+	}
+	userLang := utils.GetLang(ctx)
+
+	choice, err := r.ProductService.GetChoiceByID(ctx, *obj.ChoiceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load product choice: %w", err)
+	}
+	if choice == nil {
+		return nil, nil
+	}
+
+	return ToGQLProductChoice(choice, userLang), nil
 }
 
 // Orders is the resolver for the orders field.

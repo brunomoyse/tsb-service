@@ -35,6 +35,8 @@ import (
 
 	addressApplication "tsb-service/internal/modules/address/application"
 	addressInfrastructure "tsb-service/internal/modules/address/infrastructure"
+	restaurantApplication "tsb-service/internal/modules/restaurant/application"
+	restaurantInfrastructure "tsb-service/internal/modules/restaurant/infrastructure"
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/oauth2"
@@ -121,12 +123,14 @@ func main() {
 	orderRepo := orderInfrastructure.NewOrderRepository(dbConn)
 	paymentRepo := paymentInfrastructure.NewPaymentRepository(dbConn)
 	productRepo := productInfrastructure.NewProductRepository(dbConn)
+	restaurantRepo := restaurantInfrastructure.NewRestaurantRepository(dbConn)
 	userRepo := userInfrastructure.NewUserRepository(dbConn)
 
 	addressService := addressApplication.NewAddressService(addressRepo)
 	orderService := orderApplication.NewOrderService(orderRepo)
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient)
 	productService := productApplication.NewProductService(productRepo)
+	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo)
 	userService := userApplication.NewUserService(userRepo)
 
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService, broker)
@@ -190,7 +194,7 @@ func main() {
 	// GraphQL
 	rootResolver := resolver.NewResolver(
 		broker,
-		addressService, orderService, paymentService, productService, userService,
+		addressService, orderService, paymentService, productService, restaurantService, userService,
 	)
 	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL})
 	optionalAuth := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)

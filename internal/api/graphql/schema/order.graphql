@@ -30,6 +30,8 @@ type OrderItem {
     unitPrice: String!
     quantity: Int!
     totalPrice: String!
+    choiceId: ID
+    choice: ProductChoice
 }
 
 enum OrderStatusEnum {
@@ -68,6 +70,7 @@ input CreateOrderInput {
 input CreateOrderItemInput {
     productId: ID!
     quantity: Int!
+    choiceId: ID
 }
 
 input UpdateOrderInput {

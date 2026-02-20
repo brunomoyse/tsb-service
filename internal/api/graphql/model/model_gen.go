@@ -24,6 +24,16 @@ type Address struct {
 	Distance         float64 `json:"distance"`
 }
 
+type ChoiceTranslation struct {
+	Locale string `json:"locale"`
+	Name   string `json:"name"`
+}
+
+type ChoiceTranslationInput struct {
+	Locale string `json:"locale"`
+	Name   string `json:"name"`
+}
+
 type CreateOrderInput struct {
 	OrderType          OrderTypeEnum           `json:"orderType"`
 	IsOnlinePayment    bool                    `json:"isOnlinePayment"`
@@ -36,8 +46,16 @@ type CreateOrderInput struct {
 }
 
 type CreateOrderItemInput struct {
-	ProductID uuid.UUID `json:"productId"`
-	Quantity  int       `json:"quantity"`
+	ProductID uuid.UUID  `json:"productId"`
+	Quantity  int        `json:"quantity"`
+	ChoiceID  *uuid.UUID `json:"choiceId,omitempty"`
+}
+
+type CreateProductChoiceInput struct {
+	ProductID     uuid.UUID                 `json:"productId"`
+	PriceModifier string                    `json:"priceModifier"`
+	SortOrder     int                       `json:"sortOrder"`
+	Translations  []*ChoiceTranslationInput `json:"translations"`
 }
 
 type CreateProductInput struct {
@@ -54,7 +72,31 @@ type CreateProductInput struct {
 	Translations   []*TranslationInput `json:"translations"`
 }
 
+type DaySchedule struct {
+	Open        string  `json:"open"`
+	Close       string  `json:"close"`
+	DinnerOpen  *string `json:"dinnerOpen,omitempty"`
+	DinnerClose *string `json:"dinnerClose,omitempty"`
+}
+
+type DayScheduleInput struct {
+	Open        string  `json:"open"`
+	Close       string  `json:"close"`
+	DinnerOpen  *string `json:"dinnerOpen,omitempty"`
+	DinnerClose *string `json:"dinnerClose,omitempty"`
+}
+
 type Mutation struct {
+}
+
+type OpeningHoursInput struct {
+	Monday    *DayScheduleInput `json:"monday,omitempty"`
+	Tuesday   *DayScheduleInput `json:"tuesday,omitempty"`
+	Wednesday *DayScheduleInput `json:"wednesday,omitempty"`
+	Thursday  *DayScheduleInput `json:"thursday,omitempty"`
+	Friday    *DayScheduleInput `json:"friday,omitempty"`
+	Saturday  *DayScheduleInput `json:"saturday,omitempty"`
+	Sunday    *DayScheduleInput `json:"sunday,omitempty"`
 }
 
 type Order struct {
@@ -86,11 +128,13 @@ type OrderExtraInput struct {
 }
 
 type OrderItem struct {
-	Product    *Product  `json:"product"`
-	ProductID  uuid.UUID `json:"productID"`
-	UnitPrice  string    `json:"unitPrice"`
-	Quantity   int       `json:"quantity"`
-	TotalPrice string    `json:"totalPrice"`
+	Product    *Product       `json:"product"`
+	ProductID  uuid.UUID      `json:"productID"`
+	UnitPrice  string         `json:"unitPrice"`
+	Quantity   int            `json:"quantity"`
+	TotalPrice string         `json:"totalPrice"`
+	ChoiceID   *uuid.UUID     `json:"choiceId,omitempty"`
+	Choice     *ProductChoice `json:"choice,omitempty"`
 }
 
 type Payment struct {
@@ -142,6 +186,7 @@ type Product struct {
 	Name           string           `json:"name"`
 	Description    *string          `json:"description,omitempty"`
 	Category       *ProductCategory `json:"category"`
+	Choices        []*ProductChoice `json:"choices"`
 	Translations   []*Translation   `json:"translations"`
 }
 
@@ -153,7 +198,23 @@ type ProductCategory struct {
 	Translations []*Translation `json:"translations"`
 }
 
+type ProductChoice struct {
+	ID            uuid.UUID            `json:"id"`
+	ProductID     uuid.UUID            `json:"productId"`
+	PriceModifier string               `json:"priceModifier"`
+	SortOrder     int                  `json:"sortOrder"`
+	Name          string               `json:"name"`
+	Translations  []*ChoiceTranslation `json:"translations"`
+}
+
 type Query struct {
+}
+
+type RestaurantConfig struct {
+	OrderingEnabled bool           `json:"orderingEnabled"`
+	OpeningHours    map[string]any `json:"openingHours"`
+	IsCurrentlyOpen bool           `json:"isCurrentlyOpen"`
+	UpdatedAt       time.Time      `json:"updatedAt"`
 }
 
 type Street struct {
@@ -181,6 +242,12 @@ type TranslationInput struct {
 type UpdateOrderInput struct {
 	Status             *domain.OrderStatus `json:"status,omitempty"`
 	EstimatedReadyTime *time.Time          `json:"estimatedReadyTime,omitempty"`
+}
+
+type UpdateProductChoiceInput struct {
+	PriceModifier *string                   `json:"priceModifier,omitempty"`
+	SortOrder     *int                      `json:"sortOrder,omitempty"`
+	Translations  []*ChoiceTranslationInput `json:"translations,omitempty"`
 }
 
 type UpdateProductInput struct {
@@ -211,6 +278,7 @@ type User struct {
 	FirstName   string    `json:"firstName"`
 	LastName    string    `json:"lastName"`
 	PhoneNumber *string   `json:"phoneNumber,omitempty"`
+	IsAdmin     bool      `json:"isAdmin"`
 	Address     *Address  `json:"address,omitempty"`
 	Orders      []*Order  `json:"orders,omitempty"`
 }

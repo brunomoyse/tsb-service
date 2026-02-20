@@ -23,6 +23,14 @@ type ProductService interface {
 	BatchGetProductByIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Product, error)
 	BatchGetCategoryTranslations(ctx context.Context, categoryIDs []string) (map[string][]*domain.Translation, error)
 	BatchGetProductTranslations(ctx context.Context, productIDs []string) (map[string][]*domain.Translation, error)
+
+	// Product choices
+	GetChoicesByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoice, error)
+	GetChoiceByID(ctx context.Context, choiceID uuid.UUID) (*domain.ProductChoice, error)
+	BatchGetChoicesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.ProductChoice, error)
+	CreateChoice(ctx context.Context, choice *domain.ProductChoice) error
+	UpdateChoice(ctx context.Context, choice *domain.ProductChoice) error
+	DeleteChoice(ctx context.Context, choiceID uuid.UUID) error
 }
 
 type productService struct {
@@ -114,4 +122,28 @@ func (s *productService) BatchGetCategoryTranslations(ctx context.Context, categ
 
 func (s *productService) BatchGetProductTranslations(ctx context.Context, productIDs []string) (map[string][]*domain.Translation, error) {
 	return s.repo.BatchGetProductTranslations(ctx, productIDs)
+}
+
+func (s *productService) GetChoicesByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoice, error) {
+	return s.repo.FindChoicesByProductID(ctx, productID)
+}
+
+func (s *productService) GetChoiceByID(ctx context.Context, choiceID uuid.UUID) (*domain.ProductChoice, error) {
+	return s.repo.FindChoiceByID(ctx, choiceID)
+}
+
+func (s *productService) BatchGetChoicesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.ProductChoice, error) {
+	return s.repo.BatchGetChoicesByProductIDs(ctx, productIDs)
+}
+
+func (s *productService) CreateChoice(ctx context.Context, choice *domain.ProductChoice) error {
+	return s.repo.CreateChoice(ctx, choice)
+}
+
+func (s *productService) UpdateChoice(ctx context.Context, choice *domain.ProductChoice) error {
+	return s.repo.UpdateChoice(ctx, choice)
+}
+
+func (s *productService) DeleteChoice(ctx context.Context, choiceID uuid.UUID) error {
+	return s.repo.DeleteChoice(ctx, choiceID)
 }

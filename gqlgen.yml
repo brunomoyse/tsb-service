@@ -158,6 +158,10 @@ models:
         resolver: true
       translations:
         resolver: true
+      choices:
+        resolver: true
+
+  ProductChoice:
 
   Order:
     fields:
@@ -180,12 +184,19 @@ models:
     fields:
       product:
         resolver: true
+      choice:
+        resolver: true
 
   ProductCategory:
     fields:
       products:
         resolver: true
       translations:
+        resolver: true
+
+  RestaurantConfig:
+    fields:
+      isCurrentlyOpen:
         resolver: true
 
   User:

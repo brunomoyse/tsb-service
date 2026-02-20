@@ -4,6 +4,7 @@ type User {
     firstName: String!
     lastName: String!
     phoneNumber: String
+    isAdmin: Boolean!
     address: Address
     orders: [Order!]
 }

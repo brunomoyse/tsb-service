@@ -26,6 +26,34 @@ type Product struct {
 	Translations   []Translation   `json:"translations"`
 }
 
+// ProductChoice represents a selectable option for a product.
+type ProductChoice struct {
+	ID            uuid.UUID       `db:"id" json:"id"`
+	ProductID     uuid.UUID       `db:"product_id" json:"productId"`
+	PriceModifier decimal.Decimal `db:"price_modifier" json:"priceModifier"`
+	SortOrder     int             `db:"sort_order" json:"sortOrder"`
+	Translations  []ChoiceTranslation `json:"translations"`
+}
+
+type ChoiceTranslation struct {
+	ProductChoiceID uuid.UUID `db:"product_choice_id" json:"productChoiceId"`
+	Locale          string    `db:"locale" json:"locale"`
+	Name            string    `db:"name" json:"name"`
+}
+
+// GetTranslationFor returns the translation matching the given locale.
+func (c *ProductChoice) GetTranslationFor(locale string) string {
+	for _, t := range c.Translations {
+		if t.Locale == locale {
+			return t.Name
+		}
+	}
+	if len(c.Translations) > 0 {
+		return c.Translations[0].Name
+	}
+	return ""
+}
+
 type ProductOrderDetails struct {
 	ID             uuid.UUID       `db:"id" json:"id"`
 	Code           *string         `db:"code" json:"code"`

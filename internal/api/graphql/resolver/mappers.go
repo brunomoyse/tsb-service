@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"encoding/json"
+	"time"
 	"tsb-service/internal/api/graphql/model"
 	addressDomain "tsb-service/internal/modules/address/domain"
 	orderDomain "tsb-service/internal/modules/order/domain"
@@ -54,6 +55,7 @@ func ToGQLUser(u *userDomain.User) *model.User {
 		FirstName:   u.FirstName,
 		LastName:    u.LastName,
 		PhoneNumber: u.PhoneNumber,
+		IsAdmin:     u.IsAdmin,
 	}
 }
 
@@ -91,6 +93,7 @@ func ToGQLOrderItem(oi *orderDomain.OrderProductRaw) *model.OrderItem {
 		Quantity:   int(oi.Quantity),
 		UnitPrice:  oi.UnitPrice.String(),
 		TotalPrice: oi.TotalPrice.String(),
+		ChoiceID:   oi.ProductChoiceID,
 	}
 }
 
@@ -161,4 +164,50 @@ func toDomainTranslationsPtr(in []*model.TranslationInput) []productDomain.Trans
 		}
 	}
 	return out
+}
+
+func toGQLRestaurantConfig(orderingEnabled bool, openingHoursRaw json.RawMessage, updatedAt time.Time) *model.RestaurantConfig {
+	var openingHours map[string]any
+	_ = json.Unmarshal(openingHoursRaw, &openingHours)
+
+	return &model.RestaurantConfig{
+		OrderingEnabled: orderingEnabled,
+		OpeningHours:    openingHours,
+		UpdatedAt:       updatedAt,
+	}
+}
+
+func toScheduleMap(s *model.DayScheduleInput) any {
+	if s == nil {
+		return nil
+	}
+	m := map[string]string{
+		"open":  s.Open,
+		"close": s.Close,
+	}
+	if s.DinnerOpen != nil {
+		m["dinnerOpen"] = *s.DinnerOpen
+	}
+	if s.DinnerClose != nil {
+		m["dinnerClose"] = *s.DinnerClose
+	}
+	return m
+}
+
+func ToGQLProductChoice(c *productDomain.ProductChoice, lang string) *model.ProductChoice {
+	translations := make([]*model.ChoiceTranslation, len(c.Translations))
+	for i, t := range c.Translations {
+		translations[i] = &model.ChoiceTranslation{
+			Locale: t.Locale,
+			Name:   t.Name,
+		}
+	}
+	return &model.ProductChoice{
+		ID:            c.ID,
+		ProductID:     c.ProductID,
+		PriceModifier: c.PriceModifier.String(),
+		SortOrder:     c.SortOrder,
+		Name:          c.GetTranslationFor(lang),
+		Translations:  translations,
+	}
 }
