@@ -280,14 +280,15 @@ type UpdateUserInput struct {
 }
 
 type User struct {
-	ID          uuid.UUID `json:"id"`
-	Email       string    `json:"email"`
-	FirstName   string    `json:"firstName"`
-	LastName    string    `json:"lastName"`
-	PhoneNumber *string   `json:"phoneNumber,omitempty"`
-	IsAdmin     bool      `json:"isAdmin"`
-	Address     *Address  `json:"address,omitempty"`
-	Orders      []*Order  `json:"orders,omitempty"`
+	ID                  uuid.UUID  `json:"id"`
+	Email               string     `json:"email"`
+	FirstName           string     `json:"firstName"`
+	LastName            string     `json:"lastName"`
+	PhoneNumber         *string    `json:"phoneNumber,omitempty"`
+	IsAdmin             bool       `json:"isAdmin"`
+	DeletionRequestedAt *time.Time `json:"deletionRequestedAt,omitempty"`
+	Address             *Address   `json:"address,omitempty"`
+	Orders              []*Order   `json:"orders,omitempty"`
 }
 
 type OrderTypeEnum string

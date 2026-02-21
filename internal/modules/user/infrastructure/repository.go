@@ -160,6 +160,24 @@ func (r *UserRepository) IsRefreshTokenValid(ctx context.Context, tokenHash stri
 	return exists, nil
 }
 
+func (r *UserRepository) RequestDeletion(ctx context.Context, userID string) (*domain.User, error) {
+	query := `UPDATE users SET deletion_requested_at = NOW() WHERE id = $1`
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	return r.FindByID(ctx, userID)
+}
+
+func (r *UserRepository) CancelDeletionRequest(ctx context.Context, userID string) (*domain.User, error) {
+	query := `UPDATE users SET deletion_requested_at = NULL WHERE id = $1`
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	return r.FindByID(ctx, userID)
+}
+
 func (r *UserRepository) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error) {
 	if len(orderIDs) == 0 {
 		return map[string][]*domain.User{}, nil

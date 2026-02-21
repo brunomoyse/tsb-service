@@ -156,6 +156,14 @@ func (m *mockUserService) ResetPassword(ctx context.Context, token, newPassword 
 	return nil
 }
 
+func (m *mockUserService) RequestDeletion(ctx context.Context, userID string) (*domain.User, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *mockUserService) CancelDeletionRequest(ctx context.Context, userID string) (*domain.User, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (m *mockUserService) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error) {
 	return nil, fmt.Errorf("not implemented")
 }

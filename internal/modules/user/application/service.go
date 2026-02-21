@@ -41,6 +41,8 @@ type UserService interface {
 	VerifyUserEmail(ctx context.Context, userID string) error
 	RequestPasswordReset(ctx context.Context, email string) error
 	ResetPassword(ctx context.Context, token string, newPassword string) error
+	RequestDeletion(ctx context.Context, userID string) (*domain.User, error)
+	CancelDeletionRequest(ctx context.Context, userID string) (*domain.User, error)
 
 	BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error)
 }
@@ -371,6 +373,31 @@ func (s *userService) validateRefreshToken(tokenString, secret string) (*domain.
 	}
 
 	return claims, nil
+}
+
+func (s *userService) RequestDeletion(ctx context.Context, userID string) (*domain.User, error) {
+	user, err := s.repo.RequestDeletion(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to request deletion: %w", err)
+	}
+
+	// Send admin notification email asynchronously
+	go func() {
+		err := es.SendDeletionRequestEmail(*user)
+		if err != nil {
+			slog.Error("failed to send deletion request email", "user_id", user.ID, "error", err)
+		}
+	}()
+
+	return user, nil
+}
+
+func (s *userService) CancelDeletionRequest(ctx context.Context, userID string) (*domain.User, error) {
+	user, err := s.repo.CancelDeletionRequest(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to cancel deletion request: %w", err)
+	}
+	return user, nil
 }
 
 func (s *userService) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error) {

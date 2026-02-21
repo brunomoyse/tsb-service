@@ -71,10 +71,12 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
+		CancelDeletionRequest func(childComplexity int) int
 		CreateOrder           func(childComplexity int, input model.CreateOrderInput) int
 		CreateProduct         func(childComplexity int, input model.CreateProductInput) int
 		CreateProductChoice   func(childComplexity int, input model.CreateProductChoiceInput) int
 		DeleteProductChoice   func(childComplexity int, id uuid.UUID) int
+		RequestDeletion       func(childComplexity int) int
 		UpdateMe              func(childComplexity int, input model.UpdateUserInput) int
 		UpdateOpeningHours    func(childComplexity int, hours model.OpeningHoursInput) int
 		UpdateOrder           func(childComplexity int, id uuid.UUID, input model.UpdateOrderInput) int
@@ -239,14 +241,15 @@ type ComplexityRoot struct {
 	}
 
 	User struct {
-		Address     func(childComplexity int) int
-		Email       func(childComplexity int) int
-		FirstName   func(childComplexity int) int
-		ID          func(childComplexity int) int
-		IsAdmin     func(childComplexity int) int
-		LastName    func(childComplexity int) int
-		Orders      func(childComplexity int) int
-		PhoneNumber func(childComplexity int) int
+		Address             func(childComplexity int) int
+		DeletionRequestedAt func(childComplexity int) int
+		Email               func(childComplexity int) int
+		FirstName           func(childComplexity int) int
+		ID                  func(childComplexity int) int
+		IsAdmin             func(childComplexity int) int
+		LastName            func(childComplexity int) int
+		Orders              func(childComplexity int) int
+		PhoneNumber         func(childComplexity int) int
 	}
 }
 
@@ -262,6 +265,8 @@ type MutationResolver interface {
 	UpdateOrderingEnabled(ctx context.Context, enabled bool) (*model.RestaurantConfig, error)
 	UpdateOpeningHours(ctx context.Context, hours model.OpeningHoursInput) (*model.RestaurantConfig, error)
 	UpdateMe(ctx context.Context, input model.UpdateUserInput) (*model.User, error)
+	RequestDeletion(ctx context.Context) (*model.User, error)
+	CancelDeletionRequest(ctx context.Context) (*model.User, error)
 }
 type OrderResolver interface {
 	Address(ctx context.Context, obj *model.Order) (*model.Address, error)
@@ -411,6 +416,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.DaySchedule.Open(childComplexity), true
 
+	case "Mutation.cancelDeletionRequest":
+		if e.ComplexityRoot.Mutation.CancelDeletionRequest == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Mutation.CancelDeletionRequest(childComplexity), true
 	case "Mutation.createOrder":
 		if e.ComplexityRoot.Mutation.CreateOrder == nil {
 			break
@@ -455,6 +466,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteProductChoice(childComplexity, args["id"].(uuid.UUID)), true
+	case "Mutation.requestDeletion":
+		if e.ComplexityRoot.Mutation.RequestDeletion == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Mutation.RequestDeletion(childComplexity), true
 	case "Mutation.updateMe":
 		if e.ComplexityRoot.Mutation.UpdateMe == nil {
 			break
@@ -1315,6 +1332,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.User.Address(childComplexity), true
+	case "User.deletionRequestedAt":
+		if e.ComplexityRoot.User.DeletionRequestedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.User.DeletionRequestedAt(childComplexity), true
 	case "User.email":
 		if e.ComplexityRoot.User.Email == nil {
 			break
@@ -3077,6 +3100,8 @@ func (ec *executionContext) fieldContext_Mutation_updateMe(ctx context.Context, 
 				return ec.fieldContext_User_phoneNumber(ctx, field)
 			case "isAdmin":
 				return ec.fieldContext_User_isAdmin(ctx, field)
+			case "deletionRequestedAt":
+				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
 				return ec.fieldContext_User_address(ctx, field)
 			case "orders":
@@ -3095,6 +3120,130 @@ func (ec *executionContext) fieldContext_Mutation_updateMe(ctx context.Context, 
 	if fc.Args, err = ec.field_Mutation_updateMe_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_requestDeletion(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_requestDeletion,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Mutation().RequestDeletion(ctx)
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.User
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNUser2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_requestDeletion(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "firstName":
+				return ec.fieldContext_User_firstName(ctx, field)
+			case "lastName":
+				return ec.fieldContext_User_lastName(ctx, field)
+			case "phoneNumber":
+				return ec.fieldContext_User_phoneNumber(ctx, field)
+			case "isAdmin":
+				return ec.fieldContext_User_isAdmin(ctx, field)
+			case "deletionRequestedAt":
+				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
+			case "address":
+				return ec.fieldContext_User_address(ctx, field)
+			case "orders":
+				return ec.fieldContext_User_orders(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_cancelDeletionRequest(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_cancelDeletionRequest,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Mutation().CancelDeletionRequest(ctx)
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *model.User
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNUser2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_cancelDeletionRequest(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "firstName":
+				return ec.fieldContext_User_firstName(ctx, field)
+			case "lastName":
+				return ec.fieldContext_User_lastName(ctx, field)
+			case "phoneNumber":
+				return ec.fieldContext_User_phoneNumber(ctx, field)
+			case "isAdmin":
+				return ec.fieldContext_User_isAdmin(ctx, field)
+			case "deletionRequestedAt":
+				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
+			case "address":
+				return ec.fieldContext_User_address(ctx, field)
+			case "orders":
+				return ec.fieldContext_User_orders(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -3586,6 +3735,8 @@ func (ec *executionContext) fieldContext_Order_customer(_ context.Context, field
 				return ec.fieldContext_User_phoneNumber(ctx, field)
 			case "isAdmin":
 				return ec.fieldContext_User_isAdmin(ctx, field)
+			case "deletionRequestedAt":
+				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
 				return ec.fieldContext_User_address(ctx, field)
 			case "orders":
@@ -6892,6 +7043,8 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_User_phoneNumber(ctx, field)
 			case "isAdmin":
 				return ec.fieldContext_User_isAdmin(ctx, field)
+			case "deletionRequestedAt":
+				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
 				return ec.fieldContext_User_address(ctx, field)
 			case "orders":
@@ -7769,6 +7922,35 @@ func (ec *executionContext) fieldContext_User_isAdmin(_ context.Context, field g
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_deletionRequestedAt(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_deletionRequestedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.DeletionRequestedAt, nil
+		},
+		nil,
+		ec.marshalODateTime2ᚖtimeᚐTime,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_deletionRequestedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
 		},
 	}
 	return fc, nil
@@ -10302,6 +10484,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "requestDeletion":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_requestDeletion(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cancelDeletionRequest":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_cancelDeletionRequest(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -11952,6 +12148,8 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "deletionRequestedAt":
+			out.Values[i] = ec._User_deletionRequestedAt(ctx, field, obj)
 		case "address":
 			field := field
 
