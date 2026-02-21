@@ -129,7 +129,7 @@ func main() {
 	orderService := orderApplication.NewOrderService(orderRepo)
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient)
 	productService := productApplication.NewProductService(productRepo)
-	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo)
+	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, os.Getenv("APP_ENV") != "production")
 	userService := userApplication.NewUserService(userRepo)
 
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService, broker)

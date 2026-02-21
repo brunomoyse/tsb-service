@@ -57,6 +57,9 @@ func (r *queryResolver) RestaurantConfig(ctx context.Context) (*model.Restaurant
 
 // IsCurrentlyOpen is the resolver for the isCurrentlyOpen field.
 func (r *restaurantConfigResolver) IsCurrentlyOpen(ctx context.Context, obj *model.RestaurantConfig) (bool, error) {
+	if r.RestaurantService.IsDevMode() {
+		return true, nil
+	}
 	config, err := r.RestaurantService.GetConfig(ctx)
 	if err != nil {
 		return false, fmt.Errorf("get restaurant config: %w", err)
