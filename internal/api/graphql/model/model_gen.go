@@ -34,6 +34,37 @@ type ChoiceTranslationInput struct {
 	Name   string `json:"name"`
 }
 
+type Coupon struct {
+	ID             uuid.UUID  `json:"id"`
+	Code           string     `json:"code"`
+	DiscountType   string     `json:"discountType"`
+	DiscountValue  string     `json:"discountValue"`
+	MinOrderAmount *string    `json:"minOrderAmount,omitempty"`
+	MaxUses        *int       `json:"maxUses,omitempty"`
+	UsedCount      int        `json:"usedCount"`
+	IsActive       bool       `json:"isActive"`
+	ValidFrom      *time.Time `json:"validFrom,omitempty"`
+	ValidUntil     *time.Time `json:"validUntil,omitempty"`
+	CreatedAt      time.Time  `json:"createdAt"`
+}
+
+type CouponValidation struct {
+	Valid          bool    `json:"valid"`
+	DiscountAmount string  `json:"discountAmount"`
+	ErrorMessage   *string `json:"errorMessage,omitempty"`
+}
+
+type CreateCouponInput struct {
+	Code           string     `json:"code"`
+	DiscountType   string     `json:"discountType"`
+	DiscountValue  string     `json:"discountValue"`
+	MinOrderAmount *string    `json:"minOrderAmount,omitempty"`
+	MaxUses        *int       `json:"maxUses,omitempty"`
+	IsActive       bool       `json:"isActive"`
+	ValidFrom      *time.Time `json:"validFrom,omitempty"`
+	ValidUntil     *time.Time `json:"validUntil,omitempty"`
+}
+
 type CreateOrderInput struct {
 	OrderType          OrderTypeEnum           `json:"orderType"`
 	IsOnlinePayment    bool                    `json:"isOnlinePayment"`
@@ -43,6 +74,7 @@ type CreateOrderInput struct {
 	OrderExtra         []*OrderExtraInput      `json:"orderExtra,omitempty"`
 	PreferredReadyTime *time.Time              `json:"preferredReadyTime,omitempty"`
 	Items              []*CreateOrderItemInput `json:"items"`
+	CouponCode         *string                 `json:"couponCode,omitempty"`
 }
 
 type CreateOrderItemInput struct {
@@ -114,6 +146,7 @@ type Order struct {
 	AddressExtra        *string               `json:"addressExtra,omitempty"`
 	OrderNote           *string               `json:"orderNote,omitempty"`
 	OrderExtra          map[string]any        `json:"orderExtra,omitempty"`
+	CouponCode          *string               `json:"couponCode,omitempty"`
 	Address             *Address              `json:"address,omitempty"`
 	Customer            *User                 `json:"customer,omitempty"`
 	Payment             *Payment              `json:"payment,omitempty"`
@@ -246,6 +279,17 @@ type TranslationInput struct {
 	Name        string  `json:"name"`
 }
 
+type UpdateCouponInput struct {
+	Code           *string    `json:"code,omitempty"`
+	DiscountType   *string    `json:"discountType,omitempty"`
+	DiscountValue  *string    `json:"discountValue,omitempty"`
+	MinOrderAmount *string    `json:"minOrderAmount,omitempty"`
+	MaxUses        *int       `json:"maxUses,omitempty"`
+	IsActive       *bool      `json:"isActive,omitempty"`
+	ValidFrom      *time.Time `json:"validFrom,omitempty"`
+	ValidUntil     *time.Time `json:"validUntil,omitempty"`
+}
+
 type UpdateOrderInput struct {
 	Status             *domain.OrderStatus `json:"status,omitempty"`
 	EstimatedReadyTime *time.Time          `json:"estimatedReadyTime,omitempty"`
@@ -286,6 +330,7 @@ type User struct {
 	LastName            string     `json:"lastName"`
 	PhoneNumber         *string    `json:"phoneNumber,omitempty"`
 	IsAdmin             bool       `json:"isAdmin"`
+	EmailVerifiedAt     *time.Time `json:"emailVerifiedAt,omitempty"`
 	DeletionRequestedAt *time.Time `json:"deletionRequestedAt,omitempty"`
 	Address             *Address   `json:"address,omitempty"`
 	Orders              []*Order   `json:"orders,omitempty"`

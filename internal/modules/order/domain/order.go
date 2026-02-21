@@ -46,6 +46,7 @@ type Order struct {
 	OrderNote          *string          `db:"order_note" json:"orderNote,omitempty"`
 	OrderExtra         NullableJSON     `db:"order_extra" json:"orderExtras,omitempty"`
 	Language           string           `db:"language" json:"language"`
+	CouponCode         *string          `db:"coupon_code" json:"couponCode,omitempty"`
 }
 
 type OrderStatusHistory struct {

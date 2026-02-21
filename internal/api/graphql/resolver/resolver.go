@@ -17,6 +17,7 @@ import (
 	"tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/directives"
 	addressApplication "tsb-service/internal/modules/address/application"
+	couponApplication "tsb-service/internal/modules/coupon/application"
 	orderApplication "tsb-service/internal/modules/order/application"
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	productApplication "tsb-service/internal/modules/product/application"
@@ -28,6 +29,7 @@ import (
 type Resolver struct {
 	Broker            *pubsub.Broker
 	AddressService    addressApplication.AddressService
+	CouponService     couponApplication.CouponService
 	OrderService      orderApplication.OrderService
 	PaymentService    paymentApplication.PaymentService
 	ProductService    productApplication.ProductService
@@ -39,6 +41,7 @@ type Resolver struct {
 func NewResolver(
 	broker *pubsub.Broker,
 	addressService addressApplication.AddressService,
+	couponService couponApplication.CouponService,
 	orderService orderApplication.OrderService,
 	paymentService paymentApplication.PaymentService,
 	productService productApplication.ProductService,
@@ -48,6 +51,7 @@ func NewResolver(
 	return &Resolver{
 		Broker:            broker,
 		AddressService:    addressService,
+		CouponService:     couponService,
 		OrderService:      orderService,
 		PaymentService:    paymentService,
 		ProductService:    productService,

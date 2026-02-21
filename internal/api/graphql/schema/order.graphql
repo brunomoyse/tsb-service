@@ -13,6 +13,7 @@ type Order {
     addressExtra: String
     orderNote: String
     orderExtra: JSON
+    couponCode: String
 
     address: Address
     customer: User
@@ -73,6 +74,7 @@ input CreateOrderInput {
     orderExtra: [OrderExtraInput!]
     preferredReadyTime: DateTime
     items: [CreateOrderItemInput!]!
+    couponCode: String
 }
 
 input CreateOrderItemInput {
