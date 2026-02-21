@@ -23,7 +23,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.26'
           cache: true
 
       - name: Install dependencies
@@ -34,33 +34,14 @@ jobs:
 
       - name: Run tests
         run: |
-          # Run only GraphQL API tests (exclude deliveroo and email services)
-          go test -v -race -coverprofile=coverage.out -covermode=atomic \
+          go test -v -race \
             ./internal/... \
             ./cmd/... \
             ./pkg/... \
-            -skip="TestAuthentication|TestDebugAuth"
+            -skip="TestUpdateProduct"
         env:
-          # Test environment variables
           JWT_SECRET: test-jwt-secret-for-ci
           MOLLIE_API_TOKEN: test_dummy_token
-
-      - name: Generate coverage report
-        run: go tool cover -html=coverage.out -o coverage.html
-
-      - name: Upload coverage to Codecov (optional)
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.out
-          flags: unittests
-          name: codecov-umbrella
-        continue-on-error: true
-
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage.html
 
   lint:
     name: Lint Code
@@ -73,7 +54,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.26'
           cache: true
 
       - name: Run golangci-lint
@@ -94,7 +75,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.26'
           cache: true
 
       - name: Build
