@@ -1,0 +1,11 @@
+Account Deletion Request
+
+A user has requested the deletion of their account.
+
+Name: {{.UserName}}
+Email: {{.UserEmail}}
+User ID: {{.UserID}}
+
+Please review this request and take the appropriate action.
+
+© 2026 Tokyo Sushi Bar. All rights reserved.

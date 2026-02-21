@@ -50,12 +50,13 @@ func ToGQLProductCategory(c *productDomain.Category, lang string) *model.Product
 
 func ToGQLUser(u *userDomain.User) *model.User {
 	return &model.User{
-		ID:          u.ID,
-		Email:       u.Email,
-		FirstName:   u.FirstName,
-		LastName:    u.LastName,
-		PhoneNumber: u.PhoneNumber,
-		IsAdmin:     u.IsAdmin,
+		ID:                  u.ID,
+		Email:               u.Email,
+		FirstName:           u.FirstName,
+		LastName:            u.LastName,
+		PhoneNumber:         u.PhoneNumber,
+		IsAdmin:             u.IsAdmin,
+		DeletionRequestedAt: u.DeletionRequestedAt,
 	}
 }
 

@@ -15,6 +15,8 @@ type UserRepository interface {
 	UpdateUserPassword(ctx context.Context, userID string, password string, salt string) (*User, error)
 	UpdateEmailVerifiedAt(ctx context.Context, userID string) (*User, error)
 	UpdateUser(ctx context.Context, user *User) (*User, error)
+	RequestDeletion(ctx context.Context, userID string) (*User, error)
+	CancelDeletionRequest(ctx context.Context, userID string) (*User, error)
 	BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*User, error)
 
 	StoreRefreshToken(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt int64) error

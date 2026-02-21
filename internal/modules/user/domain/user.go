@@ -20,8 +20,9 @@ type User struct {
 	PasswordHash    *string    `db:"password_hash" json:"passwordHash"`
 	Salt            *string    `db:"salt" json:"salt"`
 	RememberToken   *string    `db:"remember_token" json:"rememberToken"`
-	GoogleID        *string    `db:"google_id" json:"googleId"`
-	IsAdmin         bool       `db:"is_admin" json:"isAdmin"`
+	GoogleID            *string    `db:"google_id" json:"googleId"`
+	IsAdmin             bool       `db:"is_admin" json:"isAdmin"`
+	DeletionRequestedAt *time.Time `db:"deletion_requested_at" json:"deletionRequestedAt"`
 }
 
 type JwtClaims struct {

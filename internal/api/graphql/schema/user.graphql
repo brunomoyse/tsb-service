@@ -5,6 +5,7 @@ type User {
     lastName: String!
     phoneNumber: String
     isAdmin: Boolean!
+    deletionRequestedAt: DateTime
     address: Address
     orders: [Order!]
 }
@@ -25,4 +26,6 @@ extend type Mutation {
     updateMe (
         input: UpdateUserInput!
     ): User! @auth
+    requestDeletion: User! @auth
+    cancelDeletionRequest: User! @auth
 }
