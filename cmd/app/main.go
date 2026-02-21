@@ -22,6 +22,8 @@ import (
 	"tsb-service/pkg/pubsub"
 	"tsb-service/services/email/scaleway"
 
+	couponApplication "tsb-service/internal/modules/coupon/application"
+	couponInfrastructure "tsb-service/internal/modules/coupon/infrastructure"
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderInfrastructure "tsb-service/internal/modules/order/infrastructure"
 	paymentApplication "tsb-service/internal/modules/payment/application"
@@ -119,6 +121,7 @@ func main() {
 
 	// Repos / services / handlers
 	addressRepo := addressInfrastructure.NewAddressRepository(dbPool)
+	couponRepo := couponInfrastructure.NewCouponRepository(dbPool)
 	orderRepo := orderInfrastructure.NewOrderRepository(dbPool)
 	paymentRepo := paymentInfrastructure.NewPaymentRepository(dbPool)
 	productRepo := productInfrastructure.NewProductRepository(dbPool)
@@ -126,6 +129,7 @@ func main() {
 	userRepo := userInfrastructure.NewUserRepository(dbPool)
 
 	addressService := addressApplication.NewAddressService(addressRepo)
+	couponService := couponApplication.NewCouponService(couponRepo)
 	orderService := orderApplication.NewOrderService(orderRepo)
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient)
 	productService := productApplication.NewProductService(productRepo)
@@ -193,7 +197,7 @@ func main() {
 	// GraphQL
 	rootResolver := resolver.NewResolver(
 		broker,
-		addressService, orderService, paymentService, productService, restaurantService, userService,
+		addressService, couponService, orderService, paymentService, productService, restaurantService, userService,
 	)
 	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL})
 	optionalAuth := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)

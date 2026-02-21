@@ -1,0 +1,52 @@
+type Coupon {
+    id: ID!
+    code: String!
+    discountType: String!
+    discountValue: String!
+    minOrderAmount: String
+    maxUses: Int
+    usedCount: Int!
+    isActive: Boolean!
+    validFrom: DateTime
+    validUntil: DateTime
+    createdAt: DateTime!
+}
+
+type CouponValidation {
+    valid: Boolean!
+    discountAmount: String!
+    errorMessage: String
+}
+
+input CreateCouponInput {
+    code: String!
+    discountType: String!
+    discountValue: String!
+    minOrderAmount: String
+    maxUses: Int
+    isActive: Boolean!
+    validFrom: DateTime
+    validUntil: DateTime
+}
+
+input UpdateCouponInput {
+    code: String
+    discountType: String
+    discountValue: String
+    minOrderAmount: String
+    maxUses: Int
+    isActive: Boolean
+    validFrom: DateTime
+    validUntil: DateTime
+}
+
+extend type Query {
+    validateCoupon(code: String!, orderAmount: String!): CouponValidation! @auth
+    coupons: [Coupon!]! @admin
+    coupon(id: ID!): Coupon! @admin
+}
+
+extend type Mutation {
+    createCoupon(input: CreateCouponInput!): Coupon! @admin
+    updateCoupon(id: ID!, input: UpdateCouponInput!): Coupon! @admin
+}

@@ -44,6 +44,7 @@ type UserService interface {
 	RequestDeletion(ctx context.Context, userID string) (*domain.User, error)
 	CancelDeletionRequest(ctx context.Context, userID string) (*domain.User, error)
 
+	ResendVerificationEmail(ctx context.Context, userID string) error
 	BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error)
 }
 
@@ -398,6 +399,34 @@ func (s *userService) CancelDeletionRequest(ctx context.Context, userID string) 
 		return nil, fmt.Errorf("failed to cancel deletion request: %w", err)
 	}
 	return user, nil
+}
+
+func (s *userService) ResendVerificationEmail(ctx context.Context, userID string) error {
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+
+	if user.EmailVerifiedAt != nil {
+		return fmt.Errorf("email already verified")
+	}
+
+	apiBaseUrl := os.Getenv("API_BASE_URL")
+	jwtSecret := os.Getenv("JWT_SECRET")
+	verificationToken, err := generateEmailVerificationJWT(*user, jwtSecret)
+	if err != nil {
+		return fmt.Errorf("failed to generate verification token: %w", err)
+	}
+	verificationURL := fmt.Sprintf("%s/verify?token=%s", apiBaseUrl, verificationToken)
+
+	go func() {
+		err := es.SendVerificationEmail(*user, utils.GetLang(ctx), verificationURL)
+		if err != nil {
+			slog.Error("failed to send verification email", "user_id", user.ID, "error", err)
+		}
+	}()
+
+	return nil
 }
 
 func (s *userService) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error) {

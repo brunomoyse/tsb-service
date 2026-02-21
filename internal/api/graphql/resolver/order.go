@@ -180,6 +180,24 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 	}
 
+	// Validate and apply coupon discount (stacks with pickup discount)
+	var couponCode *string
+	var validatedCouponID *uuid.UUID
+	if input.CouponCode != nil && *input.CouponCode != "" {
+		coupon, couponDiscount, err := r.CouponService.ValidateCoupon(ctx, *input.CouponCode, total)
+		if err != nil {
+			return nil, fmt.Errorf("invalid coupon: %w", err)
+		}
+		totalDiscount = totalDiscount.Add(couponDiscount)
+		couponCode = input.CouponCode
+		validatedCouponID = &coupon.ID
+	}
+
+	// Ensure combined discounts never exceed the order total
+	if totalDiscount.GreaterThan(total) {
+		totalDiscount = total
+	}
+
 	var extras []orderDomain.OrderExtra
 	if input.OrderExtra != nil {
 		extras = make([]orderDomain.OrderExtra, len(input.OrderExtra))
@@ -207,6 +225,18 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		totalDiscount,
 		orderLang,
 	)
+	tempOrder.CouponCode = couponCode
+
+	// Atomically reserve coupon usage BEFORE creating the order to prevent race conditions
+	if validatedCouponID != nil {
+		ok, err := r.CouponService.IncrementUsageAtomic(ctx, *validatedCouponID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to reserve coupon: %w", err)
+		}
+		if !ok {
+			return nil, fmt.Errorf("coupon is no longer valid or usage limit reached")
+		}
+	}
 
 	// 8) Persist via service
 	order, itemsRaw, err := r.OrderService.CreateOrder(ctx, tempOrder, &rawItems)

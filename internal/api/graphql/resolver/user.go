@@ -64,6 +64,17 @@ func (r *mutationResolver) CancelDeletionRequest(ctx context.Context) (*model.Us
 	return ToGQLUser(u), nil
 }
 
+// ResendVerificationEmail is the resolver for the resendVerificationEmail field.
+func (r *mutationResolver) ResendVerificationEmail(ctx context.Context) (bool, error) {
+	userID := utils.GetUserID(ctx)
+
+	if err := r.UserService.ResendVerificationEmail(ctx, userID); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 	// Load the userID from the context

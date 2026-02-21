@@ -164,6 +164,10 @@ func (m *mockUserService) CancelDeletionRequest(ctx context.Context, userID stri
 	return nil, fmt.Errorf("not implemented")
 }
 
+func (m *mockUserService) ResendVerificationEmail(ctx context.Context, userID string) error {
+	return fmt.Errorf("not implemented")
+}
+
 func (m *mockUserService) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error) {
 	return nil, fmt.Errorf("not implemented")
 }

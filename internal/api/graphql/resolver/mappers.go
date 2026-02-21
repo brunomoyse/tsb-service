@@ -5,6 +5,7 @@ import (
 	"time"
 	"tsb-service/internal/api/graphql/model"
 	addressDomain "tsb-service/internal/modules/address/domain"
+	couponDomain "tsb-service/internal/modules/coupon/domain"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	paymentDomain "tsb-service/internal/modules/payment/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
@@ -56,6 +57,7 @@ func ToGQLUser(u *userDomain.User) *model.User {
 		LastName:            u.LastName,
 		PhoneNumber:         u.PhoneNumber,
 		IsAdmin:             u.IsAdmin,
+		EmailVerifiedAt:     u.EmailVerifiedAt,
 		DeletionRequestedAt: u.DeletionRequestedAt,
 	}
 }
@@ -85,6 +87,7 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		AddressExtra:       o.AddressExtra,
 		OrderNote:          o.OrderNote,
 		OrderExtra:         orderExtra,
+		CouponCode:         o.CouponCode,
 	}
 }
 
@@ -193,6 +196,28 @@ func toScheduleMap(s *model.DayScheduleInput) any {
 		m["dinnerClose"] = *s.DinnerClose
 	}
 	return m
+}
+
+func ToGQLCoupon(c *couponDomain.Coupon) *model.Coupon {
+	var minOrderAmount *string
+	if c.MinOrderAmount != nil {
+		s := c.MinOrderAmount.String()
+		minOrderAmount = &s
+	}
+
+	return &model.Coupon{
+		ID:             c.ID,
+		Code:           c.Code,
+		DiscountType:   string(c.DiscountType),
+		DiscountValue:  c.DiscountValue.String(),
+		MinOrderAmount: minOrderAmount,
+		MaxUses:        c.MaxUses,
+		UsedCount:      c.UsedCount,
+		IsActive:       c.IsActive,
+		ValidFrom:      c.ValidFrom,
+		ValidUntil:     c.ValidUntil,
+		CreatedAt:      c.CreatedAt,
+	}
 }
 
 func ToGQLProductChoice(c *productDomain.ProductChoice, lang string) *model.ProductChoice {
