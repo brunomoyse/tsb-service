@@ -174,7 +174,7 @@ func (h *UserHandler) VerifyEmailHandler(c *gin.Context) {
 	}
 
 	// Parse and validate the token.
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
 		// Ensure the signing method is HMAC.
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])

@@ -1,12 +1,14 @@
 package infrastructure
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"time"
 	"tsb-service/pkg/logging"
@@ -432,15 +434,10 @@ func (r *ProductRepository) FindAllCategories(ctx context.Context) ([]*domain.Ca
 		return nil, err
 	}
 
-	// Convert the map to a slice.
-	var categories []*domain.Category
-	for _, cat := range categoriesMap {
-		categories = append(categories, cat)
-	}
-
-	// Sort the slice by the Order field.
-	sort.Slice(categories, func(i, j int) bool {
-		return categories[i].Order < categories[j].Order
+	// Convert the map to a slice and sort by Order.
+	categories := slices.Collect(maps.Values(categoriesMap))
+	slices.SortFunc(categories, func(a, b *domain.Category) int {
+		return cmp.Compare(a.Order, b.Order)
 	})
 
 	return categories, nil
@@ -617,10 +614,7 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 	}
 
 	// Convert the map to a slice.
-	products := make([]*domain.Product, 0, len(productsMap))
-	for _, p := range productsMap {
-		products = append(products, p)
-	}
+	products := slices.Collect(maps.Values(productsMap))
 
 	// Sorting logic mimicking the desired SQL order.
 	alphaRegexp := regexp.MustCompile(`^[A-Za-z]+`)
@@ -639,22 +633,22 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 		return ""
 	}
 
-	sort.Slice(products, func(i, j int) bool {
+	slices.SortFunc(products, func(a, b *domain.Product) int {
 		// Retrieve product codes, defaulting to empty string.
 		codeA := ""
-		if products[i].Code != nil {
-			codeA = *products[i].Code
+		if a.Code != nil {
+			codeA = *a.Code
 		}
 		codeB := ""
-		if products[j].Code != nil {
-			codeB = *products[j].Code
+		if b.Code != nil {
+			codeB = *b.Code
 		}
 
 		// Extract the alphabetical parts.
 		alphaA := alphaRegexp.FindString(codeA)
 		alphaB := alphaRegexp.FindString(codeB)
-		if alphaA != alphaB {
-			return alphaA < alphaB
+		if c := cmp.Compare(alphaA, alphaB); c != 0 {
+			return c
 		}
 
 		// Extract numeric parts.
@@ -671,14 +665,14 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 				numB = n
 			}
 		}
-		if numA != numB {
-			return numA < numB
+		if c := cmp.Compare(numA, numB); c != 0 {
+			return c
 		}
 
 		// Finally, compare using the French translation's name.
-		tnameA := getFrenchName(products[i].Translations)
-		tnameB := getFrenchName(products[j].Translations)
-		return tnameA < tnameB
+		tnameA := getFrenchName(a.Translations)
+		tnameB := getFrenchName(b.Translations)
+		return cmp.Compare(tnameA, tnameB)
 	})
 
 	return products, nil

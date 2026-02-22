@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 	"os"
@@ -50,10 +51,7 @@ func main() {
 	}
 
 	// Initialize structured logger
-	logLevel := os.Getenv("LOG_LEVEL")
-	if logLevel == "" {
-		logLevel = "info"
-	}
+	logLevel := cmp.Or(os.Getenv("LOG_LEVEL"), "info")
 	logFormat := os.Getenv("LOG_FORMAT")
 	if logFormat == "" {
 		if os.Getenv("APP_ENV") == "development" {
@@ -68,7 +66,7 @@ func main() {
 	// DB connection with retry (dual pool: customer + admin)
 	var dbPool *db.DBPool
 	var dbErr error
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		dbPool, dbErr = db.ConnectDualDatabase()
 		if dbErr == nil {
 			break

@@ -1,6 +1,7 @@
 package db
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
@@ -64,10 +65,7 @@ func connectWithCreds(user, password, label string) (*sqlx.DB, error) {
 	dbPort := os.Getenv("DB_PORT")
 	dbName := os.Getenv("DB_DATABASE")
 
-	dbSSLMode := os.Getenv("DB_SSL_MODE")
-	if dbSSLMode == "" {
-		dbSSLMode = "require"
-	}
+	dbSSLMode := cmp.Or(os.Getenv("DB_SSL_MODE"), "require")
 
 	connectionString := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",

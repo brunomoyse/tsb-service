@@ -1,10 +1,13 @@
 package domain
 
 import (
+	"cmp"
 	"encoding/json"
+	"time"
+	"tsb-service/pkg/types"
+
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
-	"time"
 )
 
 type OrderStatus string
@@ -44,7 +47,7 @@ type Order struct {
 	AddressID          *string          `db:"address_id" json:"addressId,omitempty"`
 	AddressExtra       *string          `db:"address_extra" json:"addressExtra,omitempty"`
 	OrderNote          *string          `db:"order_note" json:"orderNote,omitempty"`
-	OrderExtra         NullableJSON     `db:"order_extra" json:"orderExtras,omitempty"`
+	OrderExtra         types.NullableJSON     `db:"order_extra" json:"orderExtras,omitempty"`
 	Language           string           `db:"language" json:"language"`
 	CouponCode         *string          `db:"coupon_code" json:"couponCode,omitempty"`
 }
@@ -100,15 +103,13 @@ func NewOrder(
 	discountAmount decimal.Decimal,
 	language string,
 ) *Order {
-	var orderExtraJSON NullableJSON
+	var orderExtraJSON types.NullableJSON
 	if orderExtra != nil && len(orderExtra) > 0 {
 		jsonBytes, _ := json.Marshal(orderExtra)
-		orderExtraJSON = NullableJSON(jsonBytes)
+		orderExtraJSON = types.NullableJSON(jsonBytes)
 	}
 
-	if language == "" {
-		language = "fr"
-	}
+	language = cmp.Or(language, "fr")
 
 	return &Order{
 		ID:                 uuid.Nil,

@@ -1,7 +1,8 @@
 package middleware
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 	"strconv"
 	"strings"
 	"tsb-service/pkg/utils"
@@ -56,8 +57,8 @@ func findBestLanguageMatch(headerValue string, supportedLanguages []string) stri
 	}
 
 	// Sort by quality factor in descending order
-	sort.Slice(commonLanguages, func(i, j int) bool {
-		return commonLanguages[i].Quality > commonLanguages[j].Quality
+	slices.SortFunc(commonLanguages, func(a, b languageQuality) int {
+		return cmp.Compare(b.Quality, a.Quality)
 	})
 
 	// Instead of always forcing French when present,
@@ -77,10 +78,8 @@ type languageQuality struct {
 
 // parseAcceptLanguage parses the Accept-Language header and returns a list of languages with quality factors
 func parseAcceptLanguage(headerValue string) []languageQuality {
-	languages := strings.Split(headerValue, ",")
-
 	var languagesWithQuality []languageQuality
-	for _, lang := range languages {
+	for lang := range strings.SplitSeq(headerValue, ",") {
 		lang = strings.TrimSpace(lang)
 		parts := strings.Split(lang, ";")
 

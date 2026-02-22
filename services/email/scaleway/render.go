@@ -34,7 +34,7 @@ var textEmailFS embed.FS
 // --------------------------------------------------------------------------------
 
 type templateExecutor interface {
-	Execute(w io.Writer, data interface{}) error
+	Execute(w io.Writer, data any) error
 }
 
 // --------------------------------------------------------------------------------
@@ -67,7 +67,7 @@ func loadTextTemplate(path string) (templateExecutor, error) {
 
 // renderEmail loads a template using the provided loader, executes it with data,
 // and returns the rendered string.
-func renderEmail(path string, data interface{}, loader func(string) (templateExecutor, error)) (string, error) {
+func renderEmail(path string, data any, loader func(string) (templateExecutor, error)) (string, error) {
 	tmpl, err := loader(path)
 	if err != nil {
 		return "", err
@@ -180,7 +180,7 @@ func prepareResetPasswordEmailData(user userDomain.User, resetLink string) struc
 }
 
 // prepareOrderPendingData prepares the data for order pending emails.
-func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (interface{}, error) {
+func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o orderDomain.Order) (any, error) {
 	type OrderProductView struct {
 		Name       string
 		Quantity   int64
@@ -222,7 +222,7 @@ func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o
 	return data, nil
 }
 
-func prepareOrderCanceledData(u userDomain.User) (interface{}, error) {
+func prepareOrderCanceledData(u userDomain.User) (any, error) {
 	data := struct {
 		UserName string
 	}{
@@ -239,7 +239,7 @@ func prepareOrderConfirmedData(
 	o orderDomain.Order,
 	a *addressDomain.Address,
 	lang string,
-) (interface{}, error) {
+) (any, error) {
 	type OrderProductView struct {
 		Name       string
 		Quantity   int64
@@ -417,7 +417,7 @@ func renderOrderConfirmedEmailText(path string, u userDomain.User, op []orderDom
 // Order Ready
 // --------------------------------------------------------------------------------
 
-func prepareOrderReadyData(u userDomain.User, o orderDomain.Order) interface{} {
+func prepareOrderReadyData(u userDomain.User, o orderDomain.Order) any {
 	return struct {
 		UserName   string
 		OrderType  string
@@ -443,7 +443,7 @@ func renderOrderReadyEmailText(path string, u userDomain.User, o orderDomain.Ord
 // Order Completed
 // --------------------------------------------------------------------------------
 
-func prepareOrderCompletedData(u userDomain.User) interface{} {
+func prepareOrderCompletedData(u userDomain.User) any {
 	return struct {
 		UserName string
 		MenuLink string
@@ -467,7 +467,7 @@ func renderOrderCompletedEmailText(path string, u userDomain.User) (string, erro
 // Payment Failed
 // --------------------------------------------------------------------------------
 
-func preparePaymentFailedData(u userDomain.User) interface{} {
+func preparePaymentFailedData(u userDomain.User) any {
 	return struct {
 		UserName string
 		MenuLink string
@@ -491,7 +491,7 @@ func renderPaymentFailedEmailText(path string, u userDomain.User) (string, error
 // Refund Issued
 // --------------------------------------------------------------------------------
 
-func prepareRefundIssuedData(u userDomain.User, refundAmount string) interface{} {
+func prepareRefundIssuedData(u userDomain.User, refundAmount string) any {
 	return struct {
 		UserName     string
 		RefundAmount string
@@ -515,7 +515,7 @@ func renderRefundIssuedEmailText(path string, u userDomain.User, refundAmount st
 // Account Linked
 // --------------------------------------------------------------------------------
 
-func prepareAccountLinkedData(u userDomain.User) interface{} {
+func prepareAccountLinkedData(u userDomain.User) any {
 	return struct {
 		UserName string
 	}{
@@ -537,7 +537,7 @@ func renderAccountLinkedEmailText(path string, u userDomain.User) (string, error
 // Ready Time Updated
 // --------------------------------------------------------------------------------
 
-func prepareReadyTimeUpdatedData(u userDomain.User, o orderDomain.Order, lang string) interface{} {
+func prepareReadyTimeUpdatedData(u userDomain.User, o orderDomain.Order, lang string) any {
 	return struct {
 		UserName           string
 		OrderType          string
@@ -565,7 +565,7 @@ func renderReadyTimeUpdatedEmailText(path string, u userDomain.User, o orderDoma
 // Deletion Request
 // --------------------------------------------------------------------------------
 
-func prepareDeletionRequestData(u userDomain.User) interface{} {
+func prepareDeletionRequestData(u userDomain.User) any {
 	return struct {
 		UserName string
 		UserEmail string
@@ -591,7 +591,7 @@ func renderDeletionRequestEmailText(path string, u userDomain.User) (string, err
 // Re-engagement
 // --------------------------------------------------------------------------------
 
-func prepareReengagementData(u userDomain.User) interface{} {
+func prepareReengagementData(u userDomain.User) any {
 	return struct {
 		UserName string
 		MenuLink string

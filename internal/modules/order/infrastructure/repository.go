@@ -199,7 +199,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 	offset := (page - 1) * limit
 
 	var whereClause string
-	var args []interface{}
+	var args []any
 	placeholderIndex := 1
 
 	// If userID is not nil, add a WHERE condition

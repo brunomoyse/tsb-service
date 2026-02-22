@@ -133,7 +133,7 @@ func TestUpdateMe(t *testing.T) {
 
 		newFirstName := "Johnny"
 		newLastName := "Doeson"
-		input := map[string]interface{}{
+		input := map[string]any{
 			"firstName": newFirstName,
 			"lastName":  newLastName,
 		}
@@ -166,7 +166,7 @@ func TestUpdateMe(t *testing.T) {
 			}
 		`
 
-		input := map[string]interface{}{
+		input := map[string]any{
 			"firstName": "Hacker",
 		}
 

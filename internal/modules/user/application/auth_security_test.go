@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/types"
 )
 
 const testJWTSecret = "test-secret-key-for-security-tests"
@@ -105,8 +106,8 @@ func TestGenerateTokensIsAdminClaim(t *testing.T) {
 		require.NotEmpty(t, refreshToken)
 
 		// Parse access token and verify IsAdmin
-		claims := &domain.JwtClaims{}
-		token, err := jwt.ParseWithClaims(accessToken, claims, func(t *jwt.Token) (interface{}, error) {
+		claims := &types.JwtClaims{}
+		token, err := jwt.ParseWithClaims(accessToken, claims, func(t *jwt.Token) (any, error) {
 			return []byte(testJWTSecret), nil
 		})
 		require.NoError(t, err)
@@ -116,8 +117,8 @@ func TestGenerateTokensIsAdminClaim(t *testing.T) {
 		assert.Equal(t, user.ID.String(), claims.Subject)
 
 		// Parse refresh token and verify IsAdmin
-		refreshClaims := &domain.JwtClaims{}
-		rToken, err := jwt.ParseWithClaims(refreshToken, refreshClaims, func(t *jwt.Token) (interface{}, error) {
+		refreshClaims := &types.JwtClaims{}
+		rToken, err := jwt.ParseWithClaims(refreshToken, refreshClaims, func(t *jwt.Token) (any, error) {
 			return []byte(testJWTSecret), nil
 		})
 		require.NoError(t, err)
@@ -135,8 +136,8 @@ func TestGenerateTokensIsAdminClaim(t *testing.T) {
 		accessToken, _, err := generateTokens(user, testJWTSecret)
 		require.NoError(t, err)
 
-		claims := &domain.JwtClaims{}
-		token, err := jwt.ParseWithClaims(accessToken, claims, func(t *jwt.Token) (interface{}, error) {
+		claims := &types.JwtClaims{}
+		token, err := jwt.ParseWithClaims(accessToken, claims, func(t *jwt.Token) (any, error) {
 			return []byte(testJWTSecret), nil
 		})
 		require.NoError(t, err)
@@ -153,8 +154,8 @@ func TestGenerateTokensIsAdminClaim(t *testing.T) {
 		accessToken, _, err := generateTokens(user, testJWTSecret)
 		require.NoError(t, err)
 
-		claims := &domain.JwtClaims{}
-		_, err = jwt.ParseWithClaims(accessToken, claims, func(t *jwt.Token) (interface{}, error) {
+		claims := &types.JwtClaims{}
+		_, err = jwt.ParseWithClaims(accessToken, claims, func(t *jwt.Token) (any, error) {
 			return []byte(testJWTSecret), nil
 		})
 		require.NoError(t, err)
@@ -170,14 +171,14 @@ func TestGenerateTokensIsAdminClaim(t *testing.T) {
 		accessToken, refreshToken, err := generateTokens(user, testJWTSecret)
 		require.NoError(t, err)
 
-		accessClaims := &domain.JwtClaims{}
-		_, err = jwt.ParseWithClaims(accessToken, accessClaims, func(t *jwt.Token) (interface{}, error) {
+		accessClaims := &types.JwtClaims{}
+		_, err = jwt.ParseWithClaims(accessToken, accessClaims, func(t *jwt.Token) (any, error) {
 			return []byte(testJWTSecret), nil
 		})
 		require.NoError(t, err)
 
-		refreshClaims := &domain.JwtClaims{}
-		_, err = jwt.ParseWithClaims(refreshToken, refreshClaims, func(t *jwt.Token) (interface{}, error) {
+		refreshClaims := &types.JwtClaims{}
+		_, err = jwt.ParseWithClaims(refreshToken, refreshClaims, func(t *jwt.Token) (any, error) {
 			return []byte(testJWTSecret), nil
 		})
 		require.NoError(t, err)

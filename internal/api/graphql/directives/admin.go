@@ -10,14 +10,14 @@ import (
 )
 
 // Admin checks for a "user" value in ctx and verifies if the user is an admin.
-func Admin(ctx context.Context, obj interface{}, next graphql.Resolver) (interface{}, error) {
+func Admin(ctx context.Context, obj any, next graphql.Resolver) (any, error) {
 	// 1) Must be authenticated
 	userID := utils.GetUserID(ctx)
 	if userID == "" {
 		err := &gqlerror.Error{
 			Message:    "UNAUTHENTICATED: please login",
 			Path:       graphql.GetPath(ctx),
-			Extensions: map[string]interface{}{"code": "UNAUTHENTICATED"},
+			Extensions: map[string]any{"code": "UNAUTHENTICATED"},
 		}
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func Admin(ctx context.Context, obj interface{}, next graphql.Resolver) (interfa
 		err := &gqlerror.Error{
 			Message:    "FORBIDDEN: you are not an admin",
 			Path:       graphql.GetPath(ctx),
-			Extensions: map[string]interface{}{"code": "FORBIDDEN"},
+			Extensions: map[string]any{"code": "FORBIDDEN"},
 		}
 		return nil, err
 	}

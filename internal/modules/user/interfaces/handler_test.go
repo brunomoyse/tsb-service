@@ -621,9 +621,9 @@ func TestRefreshTokenHandler(t *testing.T) {
 		assert.True(t, hasNewRefresh, "new refresh_token cookie should be set")
 
 		// Verify response body
-		var resp map[string]interface{}
+		var resp map[string]any
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-		userMap := resp["user"].(map[string]interface{})
+		userMap := resp["user"].(map[string]any)
 		assert.Equal(t, user.Email, userMap["email"])
 	})
 
@@ -954,7 +954,7 @@ func TestVerifyEmailHandler(t *testing.T) {
 		handler := newTestHandler(svc)
 
 		// Generate a token with wrong purpose
-		token := generateTestJWT(t, map[string]interface{}{
+		token := generateTestJWT(t, map[string]any{
 			"sub":     uuid.NewString(),
 			"purpose": "password_reset", // wrong purpose
 		})
@@ -978,7 +978,7 @@ func TestVerifyEmailHandler(t *testing.T) {
 		}
 		handler := newTestHandler(svc)
 
-		token := generateTestJWT(t, map[string]interface{}{
+		token := generateTestJWT(t, map[string]any{
 			"sub":     userID,
 			"purpose": "email_verification",
 		})
@@ -996,7 +996,7 @@ func TestVerifyEmailHandler(t *testing.T) {
 
 // --- Test JWT helper ---
 
-func generateTestJWT(t *testing.T, claims map[string]interface{}) string {
+func generateTestJWT(t *testing.T, claims map[string]any) string {
 	t.Helper()
 	mapClaims := make(jwt.MapClaims)
 	for k, v := range claims {
