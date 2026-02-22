@@ -8,7 +8,7 @@ package resolver
 import (
 	"context"
 	"fmt"
-	"log/slog"
+	"go.uber.org/zap"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	addressApplication "tsb-service/internal/modules/address/application"
@@ -299,7 +299,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		go func() {
 			err = es.SendOrderPendingEmail(*user, order.Language, *order, items)
 			if err != nil {
-				slog.Error("failed to send order pending email", "order_id", order.ID, "error", err)
+				zap.L().Error("failed to send order pending email", zap.String("order_id", order.ID.String()), zap.Error(err))
 			}
 		}()
 	}
@@ -339,7 +339,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		go func() {
 			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
 			if err != nil {
-				slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
+				zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return
 			}
 
@@ -353,7 +353,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			// 2) fetch all products in one go
 			prodDetailsSlice, err := r.ProductService.GetProductsByIDs(context.Background(), ids)
 			if err != nil {
-				slog.Error("failed to retrieve products", "order_id", o.ID, "error", err)
+				zap.L().Error("failed to retrieve products", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return
 			}
 
@@ -368,7 +368,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			for i, ir := range raws {
 				pd, ok := prodMap[ir.ProductID]
 				if !ok {
-					slog.Error("missing product details", "order_id", o.ID, "product_id", ir.ProductID)
+					zap.L().Error("missing product details", zap.String("order_id", o.ID.String()), zap.String("product_id", ir.ProductID.String()))
 					return
 				}
 				items[i] = orderDomain.OrderProduct{
@@ -388,14 +388,14 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			if o.AddressID != nil {
 				address, err = r.AddressService.GetAddressByID(context.Background(), *o.AddressID)
 				if err != nil {
-					slog.Error("failed to retrieve address", "order_id", o.ID, "error", err)
+					zap.L().Error("failed to retrieve address", zap.String("order_id", o.ID.String()), zap.Error(err))
 					return
 				}
 			}
 
 			err = es.SendOrderConfirmedEmail(*user, lang, *o, items, address)
 			if err != nil {
-				slog.Error("failed to send order confirmed email", "order_id", o.ID, "error", err)
+				zap.L().Error("failed to send order confirmed email", zap.String("order_id", o.ID.String()), zap.Error(err))
 			}
 		}()
 	}
@@ -405,13 +405,13 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		go func() {
 			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
 			if err != nil {
-				slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
+				zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return
 			}
 
 			err = es.SendOrderReadyEmail(*user, lang, *o)
 			if err != nil {
-				slog.Error("failed to send order ready email", "order_id", o.ID, "error", err)
+				zap.L().Error("failed to send order ready email", zap.String("order_id", o.ID.String()), zap.Error(err))
 			}
 		}()
 	}
@@ -421,13 +421,13 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		go func() {
 			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
 			if err != nil {
-				slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
+				zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return
 			}
 
 			err = es.SendOrderCompletedEmail(*user, lang)
 			if err != nil {
-				slog.Error("failed to send order completed email", "order_id", o.ID, "error", err)
+				zap.L().Error("failed to send order completed email", zap.String("order_id", o.ID.String()), zap.Error(err))
 			}
 		}()
 	}
@@ -439,13 +439,13 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		go func() {
 			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
 			if err != nil {
-				slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
+				zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return
 			}
 
 			err = es.SendReadyTimeUpdatedEmail(*user, lang, *o)
 			if err != nil {
-				slog.Error("failed to send ready time updated email", "order_id", o.ID, "error", err)
+				zap.L().Error("failed to send ready time updated email", zap.String("order_id", o.ID.String()), zap.Error(err))
 			}
 		}()
 	}
@@ -464,14 +464,14 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				go func() {
 					user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
 					if err != nil {
-						slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
+						zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
 						return
 					}
 
 					refundAmount := utils.FormatDecimal(o.TotalPrice)
 					err = es.SendRefundIssuedEmail(*user, lang, refundAmount)
 					if err != nil {
-						slog.Error("failed to send refund issued email", "order_id", o.ID, "error", err)
+						zap.L().Error("failed to send refund issued email", zap.String("order_id", o.ID.String()), zap.Error(err))
 					}
 				}()
 			}
@@ -480,13 +480,13 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		go func() {
 			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
 			if err != nil {
-				slog.Error("failed to retrieve user", "order_id", o.ID, "error", err)
+				zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return
 			}
 
 			err = es.SendOrderCanceledEmail(*user, lang)
 			if err != nil {
-				slog.Error("failed to send order canceled email", "order_id", o.ID, "error", err)
+				zap.L().Error("failed to send order canceled email", zap.String("order_id", o.ID.String()), zap.Error(err))
 			}
 		}()
 	}

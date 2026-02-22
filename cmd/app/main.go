@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +12,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"go.uber.org/zap"
 
 	gqlMiddleware "tsb-service/internal/api/graphql/middleware"
 	"tsb-service/internal/api/graphql/resolver"
@@ -63,6 +63,7 @@ func main() {
 		}
 	}
 	logging.Setup(logLevel, logFormat)
+	defer logging.Sync()
 
 	// DB connection with retry (dual pool: customer + admin)
 	var dbPool *db.DBPool
@@ -72,13 +73,13 @@ func main() {
 		if dbErr == nil {
 			break
 		}
-		slog.Error("failed to connect to database", "attempt", i+1, "max_attempts", 3, "error", dbErr)
+		zap.L().Error("failed to connect to database", zap.Int("attempt", i+1), zap.Int("max_attempts", 3), zap.Error(dbErr))
 		if i < 2 {
 			time.Sleep(2 * time.Second)
 		}
 	}
 	if dbErr != nil {
-		slog.Error("failed to connect to database after all attempts", "error", dbErr)
+		zap.L().Error("failed to connect to database after all attempts", zap.Error(dbErr))
 		os.Exit(1)
 	}
 	defer dbPool.Close()
@@ -89,17 +90,17 @@ func main() {
 	// ENV checks & third-party setup
 	mollieApiKey := os.Getenv("MOLLIE_API_TOKEN")
 	if mollieApiKey == "" {
-		slog.Error("MOLLIE_API_TOKEN is required")
+		zap.L().Error("MOLLIE_API_TOKEN is required")
 		os.Exit(1)
 	}
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		slog.Error("JWT_SECRET is required")
+		zap.L().Error("JWT_SECRET is required")
 		os.Exit(1)
 	}
 
 	if err := scaleway.InitService(); err != nil {
-		slog.Error("failed to initialize email service", "error", err)
+		zap.L().Error("failed to initialize email service", zap.Error(err))
 		os.Exit(1)
 	}
 	oauth2.LoadGoogleOAuth()
@@ -108,14 +109,14 @@ func main() {
 	var mollieCfg *mollie.Config
 	if mollieTesting {
 		mollieCfg = mollie.NewAPITestingConfig(true)
-		slog.Info("mollie client initialized", "mode", "testing")
+		zap.L().Info("mollie client initialized", zap.String("mode", "testing"))
 	} else {
 		mollieCfg = mollie.NewAPIConfig(true)
-		slog.Info("mollie client initialized", "mode", "production")
+		zap.L().Info("mollie client initialized", zap.String("mode", "production"))
 	}
 	mollieClient, err := mollie.NewClient(nil, mollieCfg)
 	if err != nil {
-		slog.Error("failed to initialize mollie client", "error", err)
+		zap.L().Error("failed to initialize mollie client", zap.Error(err))
 		os.Exit(1)
 	}
 
@@ -143,14 +144,14 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(middleware.RequestIDMiddleware())
-	router.Use(middleware.SlogRequestLogger())
+	router.Use(middleware.ZapRequestLogger())
 	router.RedirectTrailingSlash = true
 	router.RedirectFixedPath = true
 
 	appBaseURL := os.Getenv("APP_BASE_URL")
 	appDashboardURL := os.Getenv("APP_DASHBOARD_URL")
 	if appBaseURL == "" || appDashboardURL == "" {
-		slog.Error("APP_BASE_URL and APP_DASHBOARD_URL are required")
+		zap.L().Error("APP_BASE_URL and APP_DASHBOARD_URL are required")
 		os.Exit(1)
 	}
 
@@ -229,9 +230,9 @@ func main() {
 
 	// Graceful shutdown
 	go func() {
-		slog.Info("HTTP server listening", "addr", ":8080")
+		zap.L().Info("HTTP server listening", zap.String("addr", ":8080"))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("server error", "error", err)
+			zap.L().Error("server error", zap.Error(err))
 			os.Exit(1)
 		}
 	}()
@@ -239,14 +240,14 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	slog.Info("shutting down server")
+	zap.L().Info("shutting down server")
 	broker.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		slog.Error("server forced to shutdown", "error", err)
+		zap.L().Error("server forced to shutdown", zap.Error(err))
 		os.Exit(1)
 	}
-	slog.Info("server exited gracefully")
+	zap.L().Info("server exited gracefully")
 }

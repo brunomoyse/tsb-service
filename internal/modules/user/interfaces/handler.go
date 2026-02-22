@@ -7,17 +7,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"go.uber.org/zap"
 
 	addressApplication "tsb-service/internal/modules/address/application"
 	addressDomain "tsb-service/internal/modules/address/domain"
 	"tsb-service/internal/modules/user/application"
 	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/logging"
 	"tsb-service/pkg/oauth2"
 	es "tsb-service/services/email/scaleway"
 )
@@ -72,7 +73,7 @@ func (h *UserHandler) GetUserProfileHandler(c *gin.Context) {
 	user, err := h.service.GetUserByID(c, userID)
 
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), "failed to fetch user profile", "error", err)
+		logging.FromContext(c.Request.Context()).Error("failed to fetch user profile", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile"})
 		return
 	}
@@ -99,14 +100,14 @@ func (h *UserHandler) UpdateMeHandler(c *gin.Context) {
 
 	var req UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		slog.WarnContext(ctx, "invalid request payload", "handler", "updateMe", "error", err)
+		logging.FromContext(ctx).Warn("invalid request payload", zap.String("handler", "updateMe"), zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
 		return
 	}
 
 	user, err := h.service.UpdateMe(ctx, userID, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressID)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to update user profile", "error", err)
+		logging.FromContext(ctx).Error("failed to update user profile", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user profile"})
 		return
 	}
@@ -126,7 +127,7 @@ func (h *UserHandler) RegisterHandler(c *gin.Context) {
 
 	var req RegistrationRequest
 	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		slog.WarnContext(ctx, "invalid request payload", "handler", "register", "error", err)
+		logging.FromContext(ctx).Warn("invalid request payload", zap.String("handler", "register"), zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
 		return
 	}
@@ -141,7 +142,7 @@ func (h *UserHandler) RegisterHandler(c *gin.Context) {
 
 	user, err := h.service.CreateUser(ctx, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressID, &req.Password, nil)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to create user", "error", err)
+		logging.FromContext(ctx).Error("failed to create user", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}
@@ -181,7 +182,7 @@ func (h *UserHandler) VerifyEmailHandler(c *gin.Context) {
 		return []byte(jwtSecret), nil
 	})
 	if err != nil {
-		slog.WarnContext(c.Request.Context(), "invalid verification token", "error", err)
+		logging.FromContext(c.Request.Context()).Warn("invalid verification token", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token"})
 		return
 	}
@@ -207,7 +208,7 @@ func (h *UserHandler) VerifyEmailHandler(c *gin.Context) {
 	// Call the service to mark the user as verified.
 	err = h.service.VerifyUserEmail(c.Request.Context(), userID)
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), "failed to verify email", "user_id", userID, "error", err)
+		logging.FromContext(c.Request.Context()).Error("failed to verify email", zap.String("user_id", userID), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify email"})
 		return
 	}
@@ -227,7 +228,7 @@ func (h *UserHandler) LoginHandler(c *gin.Context) {
 
 	user, accessToken, refreshToken, err := h.service.Login(ctx, req.Email, req.Password, h.jwtSecret)
 	if err != nil {
-		slog.WarnContext(ctx, "login failed", "error", err)
+		logging.FromContext(ctx).Warn("login failed", zap.Error(err))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
@@ -250,7 +251,7 @@ func (h *UserHandler) LogoutHandler(c *gin.Context) {
 	refreshToken, _ := c.Cookie("refresh_token")
 	if refreshToken != "" {
 		if err := h.service.InvalidateRefreshToken(ctx, refreshToken); err != nil {
-			slog.ErrorContext(ctx, "failed to invalidate refresh token", "error", err)
+			logging.FromContext(ctx).Error("failed to invalidate refresh token", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "Failed to complete logout. Please try again.",
 			})
@@ -282,7 +283,7 @@ func (h *UserHandler) ForgotPasswordHandler(c *gin.Context) {
 	}
 
 	if err := h.service.RequestPasswordReset(ctx, req.Email); err != nil {
-		slog.ErrorContext(ctx, "password reset request failed", "error", err)
+		logging.FromContext(ctx).Error("password reset request failed", zap.Error(err))
 	}
 
 	// Always return 200 to prevent email enumeration
@@ -299,7 +300,7 @@ func (h *UserHandler) ResetPasswordHandler(c *gin.Context) {
 	}
 
 	if err := h.service.ResetPassword(ctx, req.Token, req.Password); err != nil {
-		slog.WarnContext(ctx, "password reset failed", "error", err)
+		logging.FromContext(ctx).Warn("password reset failed", zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -320,6 +321,7 @@ func (h *UserHandler) GoogleAuthHandler(c *gin.Context) {
 
 func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	ctx := c.Request.Context()
+	log := logging.FromContext(ctx)
 
 	// Validate state.
 	state := c.Query("state")
@@ -333,7 +335,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	code := c.Query("code")
 	token, err := oauth2.GoogleOAuthConfig.Exchange(ctx, code)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to exchange OAuth code", "provider", "google", "error", err)
+		log.Error("failed to exchange OAuth code", zap.String("provider", "google"), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange code"})
 		return
 	}
@@ -348,7 +350,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	client := oauth2.GoogleOAuthConfig.Client(ctx, token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to fetch user info", "provider", "google", "error", err)
+		log.Error("failed to fetch user info", zap.String("provider", "google"), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user info"})
 		return
 	}
@@ -356,7 +358,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 
 	var googleUser GoogleUserInfo
 	if err := json.NewDecoder(resp.Body).Decode(&googleUser); err != nil {
-		slog.ErrorContext(ctx, "failed to parse user info", "provider", "google", "error", err)
+		log.Error("failed to parse user info", zap.String("provider", "google"), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse user info"})
 		return
 	}
@@ -374,7 +376,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	// 1. Try to find the user by Google ID.
 	user, err = h.service.GetUserByGoogleID(ctx, req.GoogleID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		slog.ErrorContext(ctx, "error finding user by google ID", "provider", "google", "error", err)
+		log.Error("error finding user by google ID", zap.String("provider", "google"), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding user by Google ID"})
 		return
 	}
@@ -383,7 +385,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	if user == nil {
 		user, err = h.service.GetUserByEmail(ctx, req.Email)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			slog.ErrorContext(ctx, "error finding user by email", "provider", "google", "error", err)
+			log.Error("error finding user by email", zap.String("provider", "google"), zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding user by email"})
 			return
 		}
@@ -392,7 +394,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 		if user == nil {
 			user, err = h.service.CreateUser(ctx, req.FirstName, req.LastName, req.Email, nil, nil, nil, &req.GoogleID)
 			if err != nil {
-				slog.ErrorContext(ctx, "failed to create user via OAuth", "provider", "google", "error", err)
+				log.Error("failed to create user via OAuth", zap.String("provider", "google"), zap.Error(err))
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 				return
 			}
@@ -401,7 +403,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 			if user.GoogleID == nil {
 				user, err = h.service.UpdateGoogleID(ctx, user.ID.String(), req.GoogleID)
 				if err != nil {
-					slog.ErrorContext(ctx, "failed to update google ID", "provider", "google", "error", err)
+					log.Error("failed to update google ID", zap.String("provider", "google"), zap.Error(err))
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Google ID"})
 					return
 				}
@@ -409,7 +411,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 				// Send account linked notification email
 				go func() {
 					if emailErr := es.SendAccountLinkedEmail(*user, "fr"); emailErr != nil {
-						slog.ErrorContext(ctx, "failed to send account linked email", "provider", "google", "error", emailErr)
+						logging.FromContext(ctx).Error("failed to send account linked email", zap.String("provider", "google"), zap.Error(emailErr))
 					}
 				}()
 			}
@@ -419,7 +421,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 	// Generate tokens.
 	accessToken, refreshToken, err := h.service.GenerateTokens(ctx, *user, h.jwtSecret)
 	if err != nil {
-		slog.ErrorContext(ctx, "failed to generate token", "provider", "google", "error", err)
+		log.Error("failed to generate token", zap.String("provider", "google"), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}

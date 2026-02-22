@@ -4,8 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"log/slog"
 	"os"
+	"strings"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"tsb-service/pkg/utils"
 )
@@ -14,58 +17,50 @@ type contextKeyType string
 
 const requestIDKey contextKeyType = "request_id"
 
-// Setup initializes the global slog logger. format: "json" or "text". level: "debug", "info", "warn", "error".
+// Setup initializes the global zap logger. format: "json" or "text". level: "debug", "info", "warn", "error".
 func Setup(level, format string) {
-	var lvl slog.Level
-	switch level {
+	var lvl zapcore.Level
+	switch strings.ToLower(level) {
 	case "debug":
-		lvl = slog.LevelDebug
+		lvl = zapcore.DebugLevel
 	case "warn":
-		lvl = slog.LevelWarn
+		lvl = zapcore.WarnLevel
 	case "error":
-		lvl = slog.LevelError
+		lvl = zapcore.ErrorLevel
 	default:
-		lvl = slog.LevelInfo
+		lvl = zapcore.InfoLevel
 	}
 
-	opts := &slog.HandlerOptions{Level: lvl}
-
-	var base slog.Handler
+	var encoder zapcore.Encoder
 	if format == "json" {
-		base = slog.NewJSONHandler(os.Stdout, opts)
+		encoder = zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
 	} else {
-		base = slog.NewTextHandler(os.Stdout, opts)
+		cfg := zap.NewDevelopmentEncoderConfig()
+		cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		cfg.EncodeTime = zapcore.TimeEncoderOfLayout("15:04:05.000")
+		encoder = zapcore.NewConsoleEncoder(cfg)
 	}
 
-	logger := slog.New(&contextHandler{base: base})
-	slog.SetDefault(logger)
+	core := zapcore.NewCore(encoder, zapcore.AddSync(os.Stdout), lvl)
+	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	zap.ReplaceGlobals(logger)
 }
 
-// contextHandler wraps a slog.Handler to auto-extract request_id and user_id from context.
-type contextHandler struct {
-	base slog.Handler
+// Sync flushes any buffered log entries. Call before exit.
+func Sync() {
+	_ = zap.L().Sync()
 }
 
-func (h *contextHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return h.base.Enabled(ctx, level)
-}
-
-func (h *contextHandler) Handle(ctx context.Context, r slog.Record) error {
+// FromContext returns a logger enriched with request_id and user_id from ctx.
+func FromContext(ctx context.Context) *zap.Logger {
+	l := zap.L()
 	if rid := GetRequestID(ctx); rid != "" {
-		r.AddAttrs(slog.String("request_id", rid))
+		l = l.With(zap.String("request_id", rid))
 	}
 	if uid := utils.GetUserID(ctx); uid != "" {
-		r.AddAttrs(slog.String("user_id", uid))
+		l = l.With(zap.String("user_id", uid))
 	}
-	return h.base.Handle(ctx, r)
-}
-
-func (h *contextHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return &contextHandler{base: h.base.WithAttrs(attrs)}
-}
-
-func (h *contextHandler) WithGroup(name string) slog.Handler {
-	return &contextHandler{base: h.base.WithGroup(name)}
+	return l
 }
 
 // GenerateRequestID returns a 16-character hex string from crypto/rand.

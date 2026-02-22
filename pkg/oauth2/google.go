@@ -2,9 +2,9 @@ package oauth2
 
 import (
 	"context"
-	"log/slog"
 	"os"
 
+	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -20,7 +20,7 @@ func LoadGoogleOAuth() {
 	redirectURI := os.Getenv("GOOGLE_REDIRECT_URI")
 
 	if clientID == "" || clientSecret == "" || redirectURI == "" {
-		slog.Error("GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI must be set")
+		zap.L().Error("GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI must be set")
 		os.Exit(1)
 	}
 
@@ -32,7 +32,7 @@ func LoadGoogleOAuth() {
 		Endpoint:     google.Endpoint,
 	}
 
-	slog.Info("google OAuth configuration loaded")
+	zap.L().Info("google OAuth configuration loaded")
 }
 
 // GetGoogleAuthURL returns the Google authentication URL for a given state.
