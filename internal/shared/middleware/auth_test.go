@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/types"
 	"tsb-service/pkg/utils"
 )
 
@@ -24,7 +24,7 @@ func init() {
 
 // generateToken creates a test JWT with IsAdmin claim
 func generateToken(userID string, isAdmin bool, tokenType string, duration time.Duration) (string, error) {
-	claims := domain.JwtClaims{
+	claims := types.JwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),

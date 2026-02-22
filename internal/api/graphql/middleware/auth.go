@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
-	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/types"
 	"tsb-service/pkg/utils"
 )
 
@@ -24,8 +24,8 @@ func OptionalAuthMiddleware(secretKey string) gin.HandlerFunc {
 		}
 
 		if tokenStr != "" {
-			claims := &domain.JwtClaims{}
-			token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+			claims := &types.JwtClaims{}
+			token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (any, error) {
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 					return nil, jwt.ErrSignatureInvalid
 				}

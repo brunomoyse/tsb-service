@@ -1,25 +1,28 @@
 package pubsub
 
-import "sync"
+import (
+	"slices"
+	"sync"
+)
 
 type Broker struct {
 	mu     sync.RWMutex
-	topics map[string][]chan interface{}
+	topics map[string][]chan any
 }
 
 func NewBroker() *Broker {
-	return &Broker{topics: make(map[string][]chan interface{})}
+	return &Broker{topics: make(map[string][]chan any)}
 }
 
-func (b *Broker) Subscribe(topic string) <-chan interface{} {
-	ch := make(chan interface{}, 1)
+func (b *Broker) Subscribe(topic string) <-chan any {
+	ch := make(chan any, 1)
 	b.mu.Lock()
 	b.topics[topic] = append(b.topics[topic], ch)
 	b.mu.Unlock()
 	return ch
 }
 
-func (b *Broker) Publish(topic string, msg interface{}) {
+func (b *Broker) Publish(topic string, msg any) {
 	b.mu.RLock()
 	subs := b.topics[topic]
 	b.mu.RUnlock()
@@ -31,14 +34,14 @@ func (b *Broker) Publish(topic string, msg interface{}) {
 	}
 }
 
-func (b *Broker) Unsubscribe(topic string, subCh <-chan interface{}) {
+func (b *Broker) Unsubscribe(topic string, subCh <-chan any) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	list := b.topics[topic]
 	for i, ch := range list {
 		if ch == subCh {
-			b.topics[topic] = append(list[:i], list[i+1:]...)
 			close(ch)
+			b.topics[topic] = slices.Delete(list, i, i+1)
 			break
 		}
 	}

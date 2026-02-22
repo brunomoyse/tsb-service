@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"github.com/golang-jwt/jwt/v4"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,13 +22,6 @@ type User struct {
 	GoogleID            *string    `db:"google_id" json:"googleId"`
 	IsAdmin             bool       `db:"is_admin" json:"isAdmin"`
 	DeletionRequestedAt *time.Time `db:"deletion_requested_at" json:"deletionRequestedAt"`
-}
-
-type JwtClaims struct {
-	jwt.RegisteredClaims
-	Type    string `json:"type"`     // "access" or "refresh"
-	ID      string `json:"jti"`      // Unique token identifier
-	IsAdmin bool   `json:"is_admin"` // Admin role flag
 }
 
 func NewUser(firstName string, lastName string, email string, phoneNumber *string, addressID *string, passwordHash *string, salt *string) User {

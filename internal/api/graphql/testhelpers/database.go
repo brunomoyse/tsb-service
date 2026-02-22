@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -132,7 +132,7 @@ func runMigrations(t *testing.T, db *sql.DB) {
 			upMigrations = append(upMigrations, file.Name())
 		}
 	}
-	sort.Strings(upMigrations)
+	slices.Sort(upMigrations)
 
 	// Execute each migration
 	for _, filename := range upMigrations {
@@ -159,7 +159,7 @@ func findMigrationsDir(startPath string) string {
 
 	// Try parent directories (up to 5 levels)
 	currentPath := startPath
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		parentPath := filepath.Dir(currentPath)
 		if parentPath == currentPath {
 			break // Reached root

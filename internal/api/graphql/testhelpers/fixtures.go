@@ -85,7 +85,7 @@ type TestOrder struct {
 
 // SeedTestData creates and inserts test data into the database
 func SeedTestData(t *testing.T, db *sqlx.DB) *TestFixtures {
-	ctx := context.Background()
+	ctx := t.Context()
 	fixtures := &TestFixtures{}
 
 	// Create test users

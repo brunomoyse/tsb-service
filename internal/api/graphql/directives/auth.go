@@ -11,14 +11,14 @@ import (
 
 // Auth checks for a "user" value in ctx
 // If missing, it aborts with an error; otherwise it proceeds to the next resolver.
-func Auth(ctx context.Context, obj interface{}, next graphql.Resolver) (interface{}, error) {
+func Auth(ctx context.Context, obj any, next graphql.Resolver) (any, error) {
 	// 1) Must be authenticated
 	userID := utils.GetUserID(ctx)
 	if userID == "" {
 		err := &gqlerror.Error{
 			Message:    "UNAUTHENTICATED: please login",
 			Path:       graphql.GetPath(ctx),
-			Extensions: map[string]interface{}{"code": "UNAUTHENTICATED"},
+			Extensions: map[string]any{"code": "UNAUTHENTICATED"},
 		}
 		return nil, err
 	}

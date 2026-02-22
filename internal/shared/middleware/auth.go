@@ -7,7 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
-	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/types"
 	"tsb-service/pkg/utils"
 )
 
@@ -32,8 +32,8 @@ func AuthMiddleware(secretKey string) gin.HandlerFunc {
 		}
 
 		// 3) Parse and validate the token
-		claims := &domain.JwtClaims{}
-		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+		claims := &types.JwtClaims{}
+		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (any, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrSignatureInvalid
 			}
@@ -42,10 +42,9 @@ func AuthMiddleware(secretKey string) gin.HandlerFunc {
 
 		// 4) Handle parsing/validation errors
 		if err != nil {
-			var ve *jwt.ValidationError
 			if err == jwt.ErrSignatureInvalid {
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token signature"})
-			} else if errors.As(err, &ve) && ve.Errors&jwt.ValidationErrorExpired != 0 {
+			} else if ve, ok := errors.AsType[*jwt.ValidationError](err); ok && ve.Errors&jwt.ValidationErrorExpired != 0 {
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token expired"})
 			} else {
 				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})

@@ -21,6 +21,7 @@ import (
 	"golang.org/x/crypto/argon2"
 
 	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/types"
 	"tsb-service/pkg/utils"
 	es "tsb-service/services/email/scaleway"
 )
@@ -360,9 +361,9 @@ func (s *userService) VerifyUserEmail(ctx context.Context, userID string) error 
 }
 
 // Token validation
-func (s *userService) validateRefreshToken(tokenString, secret string) (*domain.JwtClaims, error) {
-	claims := &domain.JwtClaims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+func (s *userService) validateRefreshToken(tokenString, secret string) (*types.JwtClaims, error) {
+	claims := &types.JwtClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
@@ -504,7 +505,7 @@ func (s *userService) ResetPassword(ctx context.Context, token string, newPasswo
 	jwtSecret := os.Getenv("JWT_SECRET")
 
 	// Parse and validate the token
-	parsedToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+	parsedToken, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
@@ -591,7 +592,7 @@ func hashPassword(password string, salt string) (string, error) {
 
 func generateTokens(user domain.User, jwtSecret string) (string, string, error) {
 	// Access Token (15m)
-	accessClaims := domain.JwtClaims{
+	accessClaims := types.JwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.ID.String(),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
@@ -607,7 +608,7 @@ func generateTokens(user domain.User, jwtSecret string) (string, string, error) 
 	}
 
 	// Refresh Token (7d)
-	refreshClaims := domain.JwtClaims{
+	refreshClaims := types.JwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.ID.String(),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),

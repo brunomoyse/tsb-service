@@ -369,7 +369,7 @@ func TestCreateProduct(t *testing.T) {
 			}
 		`
 
-		input := map[string]interface{}{
+		input := map[string]any{
 			"categoryId":     ctx.Fixtures.SushiCategory.ID.String(),
 			"price":          "15.99",
 			"code":           "SUSHI-NEW",
@@ -378,7 +378,7 @@ func TestCreateProduct(t *testing.T) {
 			"isHalal":        false,
 			"isVegan":        false,
 			"isDiscountable": true,
-			"translations": []map[string]interface{}{
+			"translations": []map[string]any{
 				{
 					"language":    "en",
 					"name":        "New Sushi Roll",
@@ -431,7 +431,7 @@ func TestCreateProduct(t *testing.T) {
 			}
 		`
 
-		input := map[string]interface{}{
+		input := map[string]any{
 			"categoryId":     ctx.Fixtures.SushiCategory.ID.String(),
 			"price":          "15.99",
 			"code":           "SUSHI-FORBIDDEN",
@@ -440,7 +440,7 @@ func TestCreateProduct(t *testing.T) {
 			"isHalal":        false,
 			"isVegan":        false,
 			"isDiscountable": true,
-			"translations": []map[string]interface{}{
+			"translations": []map[string]any{
 				{
 					"language":    "en",
 					"name":        "Forbidden Sushi",
@@ -497,7 +497,7 @@ func TestUpdateProduct(t *testing.T) {
 			}
 		`
 
-		input := map[string]interface{}{
+		input := map[string]any{
 			"price": "13.50",
 		}
 
@@ -533,7 +533,7 @@ func TestUpdateProduct(t *testing.T) {
 			}
 		`
 
-		input := map[string]interface{}{
+		input := map[string]any{
 			"price": "99.99",
 		}
 

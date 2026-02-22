@@ -6,7 +6,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 
-	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/types"
 )
 
 // TestJWTSecret is a known secret for testing
@@ -25,7 +25,7 @@ func GenerateTestRefreshToken(userID string, isAdmin bool) (string, error) {
 // generateTestToken is an internal helper to generate JWT tokens for testing
 func generateTestToken(userID string, isAdmin bool, tokenType string, duration time.Duration) (string, error) {
 	// Create token claims with IsAdmin custom field
-	claims := domain.JwtClaims{
+	claims := types.JwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
@@ -47,7 +47,7 @@ func generateTestToken(userID string, isAdmin bool, tokenType string, duration t
 
 // GenerateExpiredToken creates an expired JWT token for testing auth failure cases
 func GenerateExpiredToken(userID string, isAdmin bool) (string, error) {
-	claims := domain.JwtClaims{
+	claims := types.JwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)), // Expired 1 hour ago
@@ -68,7 +68,7 @@ func GenerateExpiredToken(userID string, isAdmin bool) (string, error) {
 
 // ParseTestToken parses a JWT token and extracts userID and isAdmin status
 func ParseTestToken(tokenString string, jwtSecret string) (string, bool, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &domain.JwtClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &types.JwtClaims{}, func(token *jwt.Token) (any, error) {
 		return []byte(jwtSecret), nil
 	})
 
@@ -76,7 +76,7 @@ func ParseTestToken(tokenString string, jwtSecret string) (string, bool, error) 
 		return "", false, err
 	}
 
-	if claims, ok := token.Claims.(*domain.JwtClaims); ok && token.Valid {
+	if claims, ok := token.Claims.(*types.JwtClaims); ok && token.Valid {
 		return claims.Subject, claims.IsAdmin, nil
 	}
 

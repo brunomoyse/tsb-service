@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"os"
 	"time"
 
@@ -20,14 +21,8 @@ func main() {
 	}
 
 	// Initialize structured logger
-	logLevel := os.Getenv("LOG_LEVEL")
-	if logLevel == "" {
-		logLevel = "info"
-	}
-	logFormat := os.Getenv("LOG_FORMAT")
-	if logFormat == "" {
-		logFormat = "text"
-	}
+	logLevel := cmp.Or(os.Getenv("LOG_LEVEL"), "info")
+	logFormat := cmp.Or(os.Getenv("LOG_FORMAT"), "text")
 	logging.Setup(logLevel, logFormat)
 	defer logging.Sync()
 
