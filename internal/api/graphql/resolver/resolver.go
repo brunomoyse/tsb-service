@@ -101,7 +101,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string) gin.HandlerFunc
 		//nolint:mnd // Store 50 queries in memory using Least Recently Used (LRU) algorithm
 		Cache: lru.New[string](50),
 	})
-	h.Use(extension.FixedComplexityLimit(50))
+	h.Use(extension.FixedComplexityLimit(100))
 
 	return func(c *gin.Context) {
 		h.ServeHTTP(c.Writer, c.Request)
