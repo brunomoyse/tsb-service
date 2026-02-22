@@ -10,7 +10,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log/slog"
 	net_mail "net/mail"
 	"os"
 	"strings"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/argon2"
 
 	"tsb-service/internal/modules/user/domain"
@@ -129,7 +129,7 @@ func (s *userService) CreateUser(ctx context.Context, firstName string, lastName
 		go func() {
 			err = es.SendVerificationEmail(newUser, utils.GetLang(ctx), verificationURL)
 			if err != nil {
-				slog.Error("failed to send verification email", "user_id", newUser.ID, "error", err)
+				zap.L().Error("failed to send verification email", zap.String("user_id", newUser.ID.String()), zap.Error(err))
 			}
 		}()
 
@@ -352,7 +352,7 @@ func (s *userService) VerifyUserEmail(ctx context.Context, userID string) error 
 	go func() {
 		err = es.SendWelcomeEmail(*user, utils.GetLang(ctx), os.Getenv("APP_BASE_URL")+"/menu")
 		if err != nil {
-			slog.Error("failed to send welcome email", "user_id", user.ID, "error", err)
+			zap.L().Error("failed to send welcome email", zap.String("user_id", user.ID.String()), zap.Error(err))
 		}
 	}()
 
@@ -386,7 +386,7 @@ func (s *userService) RequestDeletion(ctx context.Context, userID string) (*doma
 	go func() {
 		err := es.SendDeletionRequestEmail(*user)
 		if err != nil {
-			slog.Error("failed to send deletion request email", "user_id", user.ID, "error", err)
+			zap.L().Error("failed to send deletion request email", zap.String("user_id", user.ID.String()), zap.Error(err))
 		}
 	}()
 
@@ -422,7 +422,7 @@ func (s *userService) ResendVerificationEmail(ctx context.Context, userID string
 	go func() {
 		err := es.SendVerificationEmail(*user, utils.GetLang(ctx), verificationURL)
 		if err != nil {
-			slog.Error("failed to send verification email", "user_id", user.ID, "error", err)
+			zap.L().Error("failed to send verification email", zap.String("user_id", user.ID.String()), zap.Error(err))
 		}
 	}()
 
@@ -489,7 +489,7 @@ func (s *userService) RequestPasswordReset(ctx context.Context, email string) er
 	go func() {
 		err := es.SendPasswordResetEmail(*user, utils.GetLang(ctx), resetURL)
 		if err != nil {
-			slog.Error("failed to send password reset email", "user_id", user.ID, "error", err)
+			zap.L().Error("failed to send password reset email", zap.String("user_id", user.ID.String()), zap.Error(err))
 		}
 	}()
 
@@ -547,7 +547,7 @@ func (s *userService) ResetPassword(ctx context.Context, token string, newPasswo
 
 	// Invalidate all refresh tokens for this user
 	if err := s.repo.InvalidateAllRefreshTokens(ctx, userID); err != nil {
-		slog.Error("failed to invalidate refresh tokens after password reset", "user_id", userID, "error", err)
+		zap.L().Error("failed to invalidate refresh tokens after password reset", zap.String("user_id", userID), zap.Error(err))
 	}
 
 	return nil

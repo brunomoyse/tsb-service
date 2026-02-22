@@ -3,13 +3,13 @@ package db
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"go.uber.org/zap"
 
 	"tsb-service/pkg/utils"
 )
@@ -79,7 +79,7 @@ func connectWithCreds(user, password, label string) (*sqlx.DB, error) {
 		return nil, fmt.Errorf("error connecting to database (%s): %v", label, err)
 	}
 
-	slog.Info("database connection established", "role", label, "host", dbHost, "port", dbPort, "database", dbName)
+	zap.L().Info("database connection established", zap.String("role", label), zap.String("host", dbHost), zap.String("port", dbPort), zap.String("database", dbName))
 	return db, nil
 }
 
@@ -119,7 +119,7 @@ func ConnectDualDatabase() (*DBPool, error) {
 	adminPassword := os.Getenv("DB_ADMIN_PASSWORD")
 
 	if adminUser == "" {
-		slog.Info("DB_ADMIN_USERNAME not set, using single connection for both roles")
+		zap.L().Info("DB_ADMIN_USERNAME not set, using single connection for both roles")
 		// Tune the single connection with combined limits
 		tunePool(customerDB, getEnvInt("DB_MAX_OPEN_CONNS", 25), getEnvInt("DB_MAX_IDLE_CONNS", 5))
 		return &DBPool{Customer: customerDB, Admin: customerDB}, nil

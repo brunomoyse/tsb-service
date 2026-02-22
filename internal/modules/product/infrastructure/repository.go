@@ -5,13 +5,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"regexp"
 	"sort"
 	"strconv"
 	"time"
+	"tsb-service/pkg/logging"
 	"tsb-service/pkg/utils"
 
+	"go.uber.org/zap"
 	"tsb-service/pkg/db"
 
 	"github.com/gosimple/slug"
@@ -460,12 +461,12 @@ func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) 
     `
 	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query, id)
 	if err != nil {
-		slog.ErrorContext(ctx, "FindCategoryByID: query failed", "category_id", id, "error", err)
+		logging.FromContext(ctx).Error("FindCategoryByID: query failed", zap.String("category_id", id.String()), zap.Error(err))
 		return nil, err
 	}
 	defer func() {
 		if cerr := rows.Close(); cerr != nil {
-			slog.WarnContext(ctx, "FindCategoryByID: error closing rows", "category_id", id, "error", cerr)
+			logging.FromContext(ctx).Warn("FindCategoryByID: error closing rows", zap.String("category_id", id.String()), zap.Error(cerr))
 		}
 	}()
 
@@ -482,7 +483,7 @@ func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) 
 	for rows.Next() {
 		var cr categoryRow
 		if err := rows.StructScan(&cr); err != nil {
-			slog.ErrorContext(ctx, "FindCategoryByID: row scan error", "category_id", id, "error", err)
+			logging.FromContext(ctx).Error("FindCategoryByID: row scan error", zap.String("category_id", id.String()), zap.Error(err))
 			return nil, err
 		}
 
@@ -506,7 +507,7 @@ func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) 
 	}
 
 	if err := rows.Err(); err != nil {
-		slog.ErrorContext(ctx, "FindCategoryByID: row iteration error", "category_id", id, "error", err)
+		logging.FromContext(ctx).Error("FindCategoryByID: row iteration error", zap.String("category_id", id.String()), zap.Error(err))
 		return nil, err
 	}
 
@@ -702,12 +703,12 @@ func (r *ProductRepository) FindCategoriesByProductIDs(
     `
 	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query, pq.Array(productIDs))
 	if err != nil {
-		slog.ErrorContext(ctx, "FindCategoriesByProductIDs: query failed", "error", err)
+		logging.FromContext(ctx).Error("FindCategoriesByProductIDs: query failed", zap.Error(err))
 		return nil, err
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			slog.WarnContext(ctx, "FindCategoriesByProductIDs: error closing rows", "error", err)
+			logging.FromContext(ctx).Warn("FindCategoriesByProductIDs: error closing rows", zap.Error(err))
 		}
 	}()
 
@@ -723,7 +724,7 @@ func (r *ProductRepository) FindCategoriesByProductIDs(
 			CategoryName  string    `db:"category_name"`
 		}
 		if err := rows.StructScan(&cr); err != nil {
-			slog.ErrorContext(ctx, "FindCategoriesByProductIDs: error scanning row", "error", err)
+			logging.FromContext(ctx).Error("FindCategoriesByProductIDs: error scanning row", zap.Error(err))
 			return nil, err
 		}
 
@@ -752,7 +753,7 @@ func (r *ProductRepository) FindCategoriesByProductIDs(
 		}
 	}
 	if err := rows.Err(); err != nil {
-		slog.ErrorContext(ctx, "FindCategoriesByProductIDs: row iteration error", "error", err)
+		logging.FromContext(ctx).Error("FindCategoriesByProductIDs: row iteration error", zap.Error(err))
 		return nil, err
 	}
 
@@ -799,7 +800,7 @@ func (r *ProductRepository) FindByCategoryIDs(ctx context.Context, categoryIDs [
 	// Delegate to the shared helper to do the heavy lifting.
 	products, err := r.queryProducts(ctx, query, pq.Array(categoryIDs))
 	if err != nil {
-		slog.ErrorContext(ctx, "FindByCategoryIDs: queryProducts failed", "error", err)
+		logging.FromContext(ctx).Error("FindByCategoryIDs: queryProducts failed", zap.Error(err))
 		return nil, err
 	}
 

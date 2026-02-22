@@ -9,10 +9,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
+	"go.uber.org/zap"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
+	"tsb-service/pkg/logging"
 	productApplication "tsb-service/internal/modules/product/application"
 	"tsb-service/internal/modules/product/domain"
 	"tsb-service/pkg/utils"
@@ -53,7 +54,7 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 	// 2. If an image was supplied, forward it to the file‑service
 	if input.Image != nil {
 		if err := utils.UploadProductImage(ctx, input.Image.File, input.Image.Filename, prod.Slug); err != nil {
-			slog.ErrorContext(ctx, "image upload failed", "product_id", prod.ID, "error", err)
+			logging.FromContext(ctx).Error("image upload failed", zap.String("product_id", prod.ID.String()), zap.Error(err))
 		}
 	}
 
@@ -138,13 +139,13 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 			input.Image.Filename,
 			prod.Slug, // slug might be nil; helper handles that
 		); err != nil {
-			slog.ErrorContext(ctx, "image upload failed", "product_id", id, "error", err)
+			logging.FromContext(ctx).Error("image upload failed", zap.String("product_id", id.String()), zap.Error(err))
 		}
 		// If slug changed and new image was uploaded, clean up old image
 		if oldSlug != "" && oldSlug != newSlug {
 			go func() {
 				if err := utils.DeleteProductImage(ctx, oldSlug); err != nil {
-					slog.ErrorContext(ctx, "failed to delete old product image", "old_slug", oldSlug, "error", err)
+					logging.FromContext(ctx).Error("failed to delete old product image", zap.String("old_slug", oldSlug), zap.Error(err))
 				}
 			}()
 		}
@@ -152,7 +153,7 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 		// 7. No new image, but slug changed — rename the existing image.
 		go func() {
 			if err := utils.RenameProductImage(ctx, oldSlug, newSlug); err != nil {
-				slog.ErrorContext(ctx, "failed to rename product image", "old_slug", oldSlug, "new_slug", newSlug, "error", err)
+				logging.FromContext(ctx).Error("failed to rename product image", zap.String("old_slug", oldSlug), zap.String("new_slug", newSlug), zap.Error(err))
 			}
 		}()
 	}

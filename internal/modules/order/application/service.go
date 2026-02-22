@@ -3,12 +3,13 @@ package application
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"tsb-service/internal/modules/order/domain"
+	"tsb-service/pkg/logging"
 )
 
 type OrderService interface {
@@ -40,7 +41,7 @@ func (s *orderService) CreateOrder(ctx context.Context, o *domain.Order, op *[]d
 
 	// Record initial status in history
 	if err := s.repo.InsertStatusHistory(ctx, order.ID, order.OrderStatus); err != nil {
-		slog.ErrorContext(ctx, "failed to record initial status history", "order_id", order.ID, "error", err)
+		logging.FromContext(ctx).Error("failed to record initial status history", zap.String("order_id", order.ID.String()), zap.Error(err))
 	}
 
 	return order, orderProducts, nil
@@ -76,7 +77,7 @@ func (s *orderService) UpdateOrder(ctx context.Context, orderID uuid.UUID, newSt
 	// Record status change in history
 	if order.OrderStatus != oldStatus {
 		if err := s.repo.InsertStatusHistory(ctx, order.ID, order.OrderStatus); err != nil {
-			slog.ErrorContext(ctx, "failed to record status history", "order_id", order.ID, "status", order.OrderStatus, "error", err)
+			logging.FromContext(ctx).Error("failed to record status history", zap.String("order_id", order.ID.String()), zap.String("status", string(order.OrderStatus)), zap.Error(err))
 		}
 	}
 

@@ -1,11 +1,11 @@
 package main
 
 import (
-	"log/slog"
 	"os"
 	"time"
 
 	"github.com/joho/godotenv"
+	"go.uber.org/zap"
 
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/db"
@@ -16,7 +16,7 @@ import (
 func main() {
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
-		slog.Warn("no .env file found, using environment variables")
+		zap.L().Warn("no .env file found, using environment variables")
 	}
 
 	// Initialize structured logger
@@ -29,18 +29,19 @@ func main() {
 		logFormat = "text"
 	}
 	logging.Setup(logLevel, logFormat)
+	defer logging.Sync()
 
 	// Connect to database
 	dbConn, err := db.ConnectDatabase()
 	if err != nil {
-		slog.Error("failed to connect to database", "error", err)
+		zap.L().Error("failed to connect to database", zap.Error(err))
 		os.Exit(1)
 	}
 	defer dbConn.Close()
 
 	// Initialize email service
 	if err := es.InitService(); err != nil {
-		slog.Error("failed to initialize email service", "error", err)
+		zap.L().Error("failed to initialize email service", zap.Error(err))
 		os.Exit(1)
 	}
 
@@ -58,20 +59,20 @@ func main() {
 
 	var users []userDomain.User
 	if err := dbConn.Select(&users, query); err != nil {
-		slog.Error("failed to query inactive users", "error", err)
+		zap.L().Error("failed to query inactive users", zap.Error(err))
 		os.Exit(1)
 	}
 
-	slog.Info("found inactive users", "count", len(users))
+	zap.L().Info("found inactive users", zap.Int("count", len(users)))
 
 	sent := 0
 	failed := 0
 	for _, user := range users {
 		if err := es.SendReengagementEmail(user, "fr"); err != nil {
-			slog.Error("failed to send re-engagement email", "user_id", user.ID, "email", user.Email, "error", err)
+			zap.L().Error("failed to send re-engagement email", zap.String("user_id", user.ID.String()), zap.String("email", user.Email), zap.Error(err))
 			failed++
 		} else {
-			slog.Info("re-engagement email sent", "user_id", user.ID, "email", user.Email)
+			zap.L().Info("re-engagement email sent", zap.String("user_id", user.ID.String()), zap.String("email", user.Email))
 			sent++
 		}
 
@@ -79,5 +80,5 @@ func main() {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	slog.Info("re-engagement campaign completed", "total", len(users), "sent", sent, "failed", failed)
+	zap.L().Info("re-engagement campaign completed", zap.Int("total", len(users)), zap.Int("sent", sent), zap.Int("failed", failed))
 }

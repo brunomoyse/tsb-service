@@ -3,14 +3,15 @@ package repository
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 	"tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/db"
+	"tsb-service/pkg/logging"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 )
 
 type OrderRepository struct {
@@ -214,7 +215,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 
 	// Build the final query
 	query := fmt.Sprintf(`
-        SELECT 
+        SELECT
             o.*
         FROM orders o
         %s
@@ -228,7 +229,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 	// Execute the query
 	var orders []*domain.Order
 	if err := r.pool.ForContext(ctx).SelectContext(ctx, &orders, query, args...); err != nil {
-		slog.ErrorContext(ctx, "error querying orders", "page", page, "limit", limit, "user_id", userID, "error", err)
+		logging.FromContext(ctx).Error("error querying orders", zap.Int("page", page), zap.Int("limit", limit), zap.Any("user_id", userID), zap.Error(err))
 		return nil, fmt.Errorf("failed to query orders: %w", err)
 	}
 
