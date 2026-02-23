@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	couponDomain "tsb-service/internal/modules/coupon/domain"
 
@@ -58,7 +59,9 @@ func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateC
 		return nil, fmt.Errorf("failed to create coupon: %w", err)
 	}
 
-	return ToGQLCoupon(coupon), nil
+	gqlCoupon := ToGQLCoupon(coupon)
+	r.Broker.Publish("couponUpdated", gqlCoupon)
+	return gqlCoupon, nil
 }
 
 // UpdateCoupon is the resolver for the updateCoupon field.
@@ -115,7 +118,9 @@ func (r *mutationResolver) UpdateCoupon(ctx context.Context, id uuid.UUID, input
 		return nil, fmt.Errorf("failed to update coupon: %w", err)
 	}
 
-	return ToGQLCoupon(coupon), nil
+	gqlCoupon := ToGQLCoupon(coupon)
+	r.Broker.Publish("couponUpdated", gqlCoupon)
+	return gqlCoupon, nil
 }
 
 // ValidateCoupon is the resolver for the validateCoupon field.
@@ -163,3 +168,34 @@ func (r *queryResolver) Coupon(ctx context.Context, id uuid.UUID) (*model.Coupon
 	}
 	return ToGQLCoupon(coupon), nil
 }
+
+// CouponUpdated is the resolver for the couponUpdated field.
+func (r *subscriptionResolver) CouponUpdated(ctx context.Context) (<-chan *model.Coupon, error) {
+	ch := make(chan *model.Coupon, 1)
+	sub := r.Broker.Subscribe("couponUpdated")
+
+	go func() {
+		<-ctx.Done()
+		r.Broker.Unsubscribe("couponUpdated", sub)
+		close(ch)
+	}()
+
+	go func() {
+		for msg := range sub {
+			if c, ok := msg.(*model.Coupon); ok {
+				ch <- c
+			}
+		}
+	}()
+
+	return ch, nil
+}
+
+// Mutation returns graphql1.MutationResolver implementation.
+func (r *Resolver) Mutation() graphql1.MutationResolver { return &mutationResolver{r} }
+
+// Subscription returns graphql1.SubscriptionResolver implementation.
+func (r *Resolver) Subscription() graphql1.SubscriptionResolver { return &subscriptionResolver{r} }
+
+type mutationResolver struct{ *Resolver }
+type subscriptionResolver struct{ *Resolver }

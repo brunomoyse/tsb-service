@@ -37,3 +37,7 @@ extend type Mutation {
     updateOrderingEnabled(enabled: Boolean!): RestaurantConfig! @admin
     updateOpeningHours(hours: OpeningHoursInput!): RestaurantConfig! @admin
 }
+
+extend type Subscription {
+    restaurantConfigUpdated: RestaurantConfig!
+}

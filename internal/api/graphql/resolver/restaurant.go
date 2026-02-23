@@ -20,7 +20,9 @@ func (r *mutationResolver) UpdateOrderingEnabled(ctx context.Context, enabled bo
 	if err != nil {
 		return nil, fmt.Errorf("update ordering enabled: %w", err)
 	}
-	return toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.UpdatedAt), nil
+	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.UpdatedAt)
+	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
+	return gqlConfig, nil
 }
 
 // UpdateOpeningHours is the resolver for the updateOpeningHours field.
@@ -43,7 +45,9 @@ func (r *mutationResolver) UpdateOpeningHours(ctx context.Context, hours model.O
 	if err != nil {
 		return nil, fmt.Errorf("update opening hours: %w", err)
 	}
-	return toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.UpdatedAt), nil
+	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.UpdatedAt)
+	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
+	return gqlConfig, nil
 }
 
 // RestaurantConfig is the resolver for the restaurantConfig field.
@@ -65,6 +69,28 @@ func (r *restaurantConfigResolver) IsCurrentlyOpen(ctx context.Context, obj *mod
 		return false, fmt.Errorf("get restaurant config: %w", err)
 	}
 	return config.IsOrderingAllowed(time.Now()), nil
+}
+
+// RestaurantConfigUpdated is the resolver for the restaurantConfigUpdated field.
+func (r *subscriptionResolver) RestaurantConfigUpdated(ctx context.Context) (<-chan *model.RestaurantConfig, error) {
+	ch := make(chan *model.RestaurantConfig, 1)
+	sub := r.Broker.Subscribe("restaurantConfigUpdated")
+
+	go func() {
+		<-ctx.Done()
+		r.Broker.Unsubscribe("restaurantConfigUpdated", sub)
+		close(ch)
+	}()
+
+	go func() {
+		for msg := range sub {
+			if c, ok := msg.(*model.RestaurantConfig); ok {
+				ch <- c
+			}
+		}
+	}()
+
+	return ch, nil
 }
 
 // RestaurantConfig returns graphql1.RestaurantConfigResolver implementation.

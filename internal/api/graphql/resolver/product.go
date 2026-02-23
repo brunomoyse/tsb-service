@@ -10,16 +10,16 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"go.uber.org/zap"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
-	"tsb-service/pkg/logging"
 	productApplication "tsb-service/internal/modules/product/application"
 	"tsb-service/internal/modules/product/domain"
+	"tsb-service/pkg/logging"
 	"tsb-service/pkg/utils"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 )
 
 // CreateProduct is the resolver for the createProduct field.
@@ -158,8 +158,11 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 		}()
 	}
 
-	// 8. Return the updated product in GraphQL form.
-	return ToGQLProduct(prod, userLang), nil
+	// 8. Notify subscribers of product update.
+	gqlProd := ToGQLProduct(prod, userLang)
+	r.Broker.Publish("productUpdated", gqlProd)
+
+	return gqlProd, nil
 }
 
 // CreateProductChoice is the resolver for the createProductChoice field.
@@ -438,6 +441,28 @@ func (r *queryResolver) ProductCategories(ctx context.Context) ([]*model.Product
 	})
 
 	return categories, nil
+}
+
+// ProductUpdated is the resolver for the productUpdated field.
+func (r *subscriptionResolver) ProductUpdated(ctx context.Context) (<-chan *model.Product, error) {
+	ch := make(chan *model.Product, 1)
+	sub := r.Broker.Subscribe("productUpdated")
+
+	go func() {
+		<-ctx.Done()
+		r.Broker.Unsubscribe("productUpdated", sub)
+		close(ch)
+	}()
+
+	go func() {
+		for msg := range sub {
+			if p, ok := msg.(*model.Product); ok {
+				ch <- p
+			}
+		}
+	}()
+
+	return ch, nil
 }
 
 // Product returns graphql1.ProductResolver implementation.
