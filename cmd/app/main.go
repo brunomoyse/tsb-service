@@ -202,7 +202,7 @@ func main() {
 	optionalAuth := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)
 
 	api.POST("/graphql", optionalAuth, graphqlHandler)
-	api.GET("/graphql", middleware.AuthMiddleware(jwtSecret), graphqlHandler)
+	api.GET("/graphql", optionalAuth, graphqlHandler)
 
 	// Other endpoints
 	api.POST("/payments/webhook", paymentHandler.UpdatePaymentStatusHandler)

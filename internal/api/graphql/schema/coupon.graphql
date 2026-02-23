@@ -50,3 +50,7 @@ extend type Mutation {
     createCoupon(input: CreateCouponInput!): Coupon! @admin
     updateCoupon(id: ID!, input: UpdateCouponInput!): Coupon! @admin
 }
+
+extend type Subscription {
+    couponUpdated: Coupon! @admin
+}

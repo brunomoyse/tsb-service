@@ -256,9 +256,12 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
-		MyOrderUpdated func(childComplexity int, orderID uuid.UUID) int
-		OrderCreated   func(childComplexity int) int
-		OrderUpdated   func(childComplexity int) int
+		CouponUpdated           func(childComplexity int) int
+		MyOrderUpdated          func(childComplexity int, orderID uuid.UUID) int
+		OrderCreated            func(childComplexity int) int
+		OrderUpdated            func(childComplexity int) int
+		ProductUpdated          func(childComplexity int) int
+		RestaurantConfigUpdated func(childComplexity int) int
 	}
 
 	Translation struct {
@@ -346,9 +349,12 @@ type RestaurantConfigResolver interface {
 	IsCurrentlyOpen(ctx context.Context, obj *model.RestaurantConfig) (bool, error)
 }
 type SubscriptionResolver interface {
+	CouponUpdated(ctx context.Context) (<-chan *model.Coupon, error)
 	OrderCreated(ctx context.Context) (<-chan *model.Order, error)
 	OrderUpdated(ctx context.Context) (<-chan *model.Order, error)
 	MyOrderUpdated(ctx context.Context, orderID uuid.UUID) (<-chan *model.Order, error)
+	ProductUpdated(ctx context.Context) (<-chan *model.Product, error)
+	RestaurantConfigUpdated(ctx context.Context) (<-chan *model.RestaurantConfig, error)
 }
 type UserResolver interface {
 	Address(ctx context.Context, obj *model.User) (*model.Address, error)
@@ -1465,6 +1471,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Street.StreetName(childComplexity), true
 
+	case "Subscription.couponUpdated":
+		if e.ComplexityRoot.Subscription.CouponUpdated == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Subscription.CouponUpdated(childComplexity), true
 	case "Subscription.myOrderUpdated":
 		if e.ComplexityRoot.Subscription.MyOrderUpdated == nil {
 			break
@@ -1488,6 +1500,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Subscription.OrderUpdated(childComplexity), true
+	case "Subscription.productUpdated":
+		if e.ComplexityRoot.Subscription.ProductUpdated == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Subscription.ProductUpdated(childComplexity), true
+	case "Subscription.restaurantConfigUpdated":
+		if e.ComplexityRoot.Subscription.RestaurantConfigUpdated == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Subscription.RestaurantConfigUpdated(childComplexity), true
 
 	case "Translation.description":
 		if e.ComplexityRoot.Translation.Description == nil {
@@ -8502,6 +8526,72 @@ func (ec *executionContext) fieldContext_Street_postcode(_ context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Subscription_couponUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_couponUpdated,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Subscription().CouponUpdated(ctx)
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.Coupon
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNCoupon2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCoupon,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_couponUpdated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Coupon_id(ctx, field)
+			case "code":
+				return ec.fieldContext_Coupon_code(ctx, field)
+			case "discountType":
+				return ec.fieldContext_Coupon_discountType(ctx, field)
+			case "discountValue":
+				return ec.fieldContext_Coupon_discountValue(ctx, field)
+			case "minOrderAmount":
+				return ec.fieldContext_Coupon_minOrderAmount(ctx, field)
+			case "maxUses":
+				return ec.fieldContext_Coupon_maxUses(ctx, field)
+			case "usedCount":
+				return ec.fieldContext_Coupon_usedCount(ctx, field)
+			case "isActive":
+				return ec.fieldContext_Coupon_isActive(ctx, field)
+			case "validFrom":
+				return ec.fieldContext_Coupon_validFrom(ctx, field)
+			case "validUntil":
+				return ec.fieldContext_Coupon_validUntil(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Coupon_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Coupon", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Subscription_orderCreated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
 	return graphql.ResolveFieldStream(
 		ctx,
@@ -8774,6 +8864,108 @@ func (ec *executionContext) fieldContext_Subscription_myOrderUpdated(ctx context
 	if fc.Args, err = ec.field_Subscription_myOrderUpdated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_productUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_productUpdated,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Subscription().ProductUpdated(ctx)
+		},
+		nil,
+		ec.marshalNProduct2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProduct,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_productUpdated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "code":
+				return ec.fieldContext_Product_code(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Product_createdAt(ctx, field)
+			case "id":
+				return ec.fieldContext_Product_id(ctx, field)
+			case "isAvailable":
+				return ec.fieldContext_Product_isAvailable(ctx, field)
+			case "isDiscountable":
+				return ec.fieldContext_Product_isDiscountable(ctx, field)
+			case "isHalal":
+				return ec.fieldContext_Product_isHalal(ctx, field)
+			case "isVegan":
+				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVisible":
+				return ec.fieldContext_Product_isVisible(ctx, field)
+			case "pieceCount":
+				return ec.fieldContext_Product_pieceCount(ctx, field)
+			case "price":
+				return ec.fieldContext_Product_price(ctx, field)
+			case "slug":
+				return ec.fieldContext_Product_slug(ctx, field)
+			case "name":
+				return ec.fieldContext_Product_name(ctx, field)
+			case "description":
+				return ec.fieldContext_Product_description(ctx, field)
+			case "category":
+				return ec.fieldContext_Product_category(ctx, field)
+			case "choices":
+				return ec.fieldContext_Product_choices(ctx, field)
+			case "translations":
+				return ec.fieldContext_Product_translations(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Product", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_restaurantConfigUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_restaurantConfigUpdated,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Subscription().RestaurantConfigUpdated(ctx)
+		},
+		nil,
+		ec.marshalNRestaurantConfig2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐRestaurantConfig,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_restaurantConfigUpdated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "orderingEnabled":
+				return ec.fieldContext_RestaurantConfig_orderingEnabled(ctx, field)
+			case "openingHours":
+				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
+			case "isCurrentlyOpen":
+				return ec.fieldContext_RestaurantConfig_isCurrentlyOpen(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_RestaurantConfig_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RestaurantConfig", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -13565,12 +13757,18 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	}
 
 	switch fields[0].Name {
+	case "couponUpdated":
+		return ec._Subscription_couponUpdated(ctx, fields[0])
 	case "orderCreated":
 		return ec._Subscription_orderCreated(ctx, fields[0])
 	case "orderUpdated":
 		return ec._Subscription_orderUpdated(ctx, fields[0])
 	case "myOrderUpdated":
 		return ec._Subscription_myOrderUpdated(ctx, fields[0])
+	case "productUpdated":
+		return ec._Subscription_productUpdated(ctx, fields[0])
+	case "restaurantConfigUpdated":
+		return ec._Subscription_restaurantConfigUpdated(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}

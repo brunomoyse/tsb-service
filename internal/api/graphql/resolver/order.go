@@ -8,7 +8,6 @@ package resolver
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	addressApplication "tsb-service/internal/modules/address/application"
@@ -26,6 +25,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 )
 
 // CreateOrder is the resolver for the createOrder field.
@@ -865,19 +865,11 @@ func (r *subscriptionResolver) MyOrderUpdated(ctx context.Context, orderID uuid.
 	return ch, nil
 }
 
-// Mutation returns graphql1.MutationResolver implementation.
-func (r *Resolver) Mutation() graphql1.MutationResolver { return &mutationResolver{r} }
-
 // Order returns graphql1.OrderResolver implementation.
 func (r *Resolver) Order() graphql1.OrderResolver { return &orderResolver{r} }
 
 // OrderItem returns graphql1.OrderItemResolver implementation.
 func (r *Resolver) OrderItem() graphql1.OrderItemResolver { return &orderItemResolver{r} }
 
-// Subscription returns graphql1.SubscriptionResolver implementation.
-func (r *Resolver) Subscription() graphql1.SubscriptionResolver { return &subscriptionResolver{r} }
-
-type mutationResolver struct{ *Resolver }
 type orderResolver struct{ *Resolver }
 type orderItemResolver struct{ *Resolver }
-type subscriptionResolver struct{ *Resolver }

@@ -140,3 +140,7 @@ extend type Mutation {
         id: ID!
     ): Boolean! @admin
 }
+
+extend type Subscription {
+    productUpdated: Product!
+}
