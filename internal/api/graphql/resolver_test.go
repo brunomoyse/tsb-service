@@ -9,12 +9,16 @@ import (
 	"tsb-service/internal/api/graphql/testhelpers"
 	addressApplication "tsb-service/internal/modules/address/application"
 	addressInfrastructure "tsb-service/internal/modules/address/infrastructure"
+	couponApplication "tsb-service/internal/modules/coupon/application"
+	couponInfrastructure "tsb-service/internal/modules/coupon/infrastructure"
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderInfrastructure "tsb-service/internal/modules/order/infrastructure"
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	paymentInfrastructure "tsb-service/internal/modules/payment/infrastructure"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
+	restaurantApplication "tsb-service/internal/modules/restaurant/application"
+	restaurantInfrastructure "tsb-service/internal/modules/restaurant/infrastructure"
 	userApplication "tsb-service/internal/modules/user/application"
 	userInfrastructure "tsb-service/internal/modules/user/infrastructure"
 	"tsb-service/pkg/db"
@@ -66,9 +70,11 @@ func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
 
 	// Create repositories
 	addressRepo := addressInfrastructure.NewAddressRepository(pool)
+	couponRepo := couponInfrastructure.NewCouponRepository(pool)
 	orderRepo := orderInfrastructure.NewOrderRepository(pool)
 	paymentRepo := paymentInfrastructure.NewPaymentRepository(pool)
 	productRepo := productInfrastructure.NewProductRepository(pool)
+	restaurantRepo := restaurantInfrastructure.NewRestaurantRepository(pool)
 	userRepo := userInfrastructure.NewUserRepository(pool)
 
 	// Create Mollie client (test mode)
@@ -77,18 +83,22 @@ func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
 
 	// Create services
 	addressService := addressApplication.NewAddressService(addressRepo)
+	couponService := couponApplication.NewCouponService(couponRepo)
 	orderService := orderApplication.NewOrderService(orderRepo)
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient)
 	productService := productApplication.NewProductService(productRepo)
+	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, true)
 	userService := userApplication.NewUserService(userRepo)
 
 	// Create resolver
 	return &resolver.Resolver{
-		Broker:         broker,
-		AddressService: addressService,
-		OrderService:   orderService,
-		PaymentService: paymentService,
-		ProductService: productService,
-		UserService:    userService,
+		Broker:            broker,
+		AddressService:    addressService,
+		CouponService:     couponService,
+		OrderService:      orderService,
+		PaymentService:    paymentService,
+		ProductService:    productService,
+		RestaurantService: restaurantService,
+		UserService:       userService,
 	}
 }

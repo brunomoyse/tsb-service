@@ -52,12 +52,13 @@ func (r *CouponRepository) FindAll(ctx context.Context) ([]*domain.Coupon, error
 }
 
 func (r *CouponRepository) Save(ctx context.Context, coupon *domain.Coupon) error {
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx,
+	err := r.pool.ForContext(ctx).QueryRowxContext(ctx,
 		`INSERT INTO coupons (id, code, discount_type, discount_value, min_order_amount, max_uses, used_count, is_active, valid_from, valid_until)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		 RETURNING created_at`,
 		coupon.ID, coupon.Code, coupon.DiscountType, coupon.DiscountValue,
 		coupon.MinOrderAmount, coupon.MaxUses, coupon.UsedCount, coupon.IsActive,
-		coupon.ValidFrom, coupon.ValidUntil)
+		coupon.ValidFrom, coupon.ValidUntil).Scan(&coupon.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to save coupon: %w", err)
 	}
