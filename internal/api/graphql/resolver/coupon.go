@@ -8,6 +8,7 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"strings"
 	"tsb-service/internal/api/graphql/model"
 	couponDomain "tsb-service/internal/modules/coupon/domain"
 
@@ -22,7 +23,7 @@ func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateC
 		return nil, fmt.Errorf("invalid discount value: %w", err)
 	}
 
-	discountType := couponDomain.DiscountType(input.DiscountType)
+	discountType := couponDomain.DiscountType(strings.ToLower(input.DiscountType))
 	if discountType != couponDomain.DiscountTypePercentage && discountType != couponDomain.DiscountTypeFixed {
 		return nil, fmt.Errorf("invalid discount type: must be 'percentage' or 'fixed'")
 	}
@@ -71,7 +72,7 @@ func (r *mutationResolver) UpdateCoupon(ctx context.Context, id uuid.UUID, input
 		coupon.Code = *input.Code
 	}
 	if input.DiscountType != nil {
-		dt := couponDomain.DiscountType(*input.DiscountType)
+		dt := couponDomain.DiscountType(strings.ToLower(*input.DiscountType))
 		if dt != couponDomain.DiscountTypePercentage && dt != couponDomain.DiscountTypeFixed {
 			return nil, fmt.Errorf("invalid discount type: must be 'percentage' or 'fixed'")
 		}

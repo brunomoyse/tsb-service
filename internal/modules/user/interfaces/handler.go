@@ -229,6 +229,10 @@ func (h *UserHandler) LoginHandler(c *gin.Context) {
 	user, accessToken, refreshToken, err := h.service.Login(ctx, req.Email, req.Password, h.jwtSecret)
 	if err != nil {
 		logging.FromContext(ctx).Warn("login failed", zap.Error(err))
+		if err.Error() == "email not verified" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "email_not_verified"})
+			return
+		}
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}

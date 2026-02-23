@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 	"tsb-service/internal/api/graphql/model"
 	addressDomain "tsb-service/internal/modules/address/domain"
@@ -208,7 +209,7 @@ func ToGQLCoupon(c *couponDomain.Coupon) *model.Coupon {
 	return &model.Coupon{
 		ID:             c.ID,
 		Code:           c.Code,
-		DiscountType:   string(c.DiscountType),
+		DiscountType:   strings.ToUpper(string(c.DiscountType)),
 		DiscountValue:  c.DiscountValue.String(),
 		MinOrderAmount: minOrderAmount,
 		MaxUses:        c.MaxUses,
