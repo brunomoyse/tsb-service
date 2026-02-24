@@ -84,7 +84,7 @@ func renderEmail(path string, data any, loader func(string) (templateExecutor, e
 // --------------------------------------------------------------------------------
 
 func logoURL() string {
-	return fmt.Sprintf("%s/icons/tsb-logo.svg", os.Getenv("APP_BASE_URL"))
+	return fmt.Sprintf("%s/images/tsb-logo-w.png", os.Getenv("APP_BASE_URL"))
 }
 
 // --------------------------------------------------------------------------------
