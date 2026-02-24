@@ -34,6 +34,7 @@ func ToGQLProduct(p *productDomain.Product, lang string) *model.Product {
 		IsVisible:      p.IsVisible,
 		IsAvailable:    p.IsAvailable,
 		IsHalal:        p.IsHalal,
+		IsSpicy:        p.IsSpicy,
 		IsDiscountable: p.IsDiscountable,
 		IsVegan:        p.IsVegan,
 		Name:           p.GetTranslationFor(lang).Name,

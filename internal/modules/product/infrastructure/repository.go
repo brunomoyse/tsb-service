@@ -84,8 +84,8 @@ func (r *ProductRepository) Create(ctx context.Context, product *domain.Product)
 
 	// Insert the product.
 	query := `
-		INSERT INTO products (id, price, code, piece_count, slug, is_visible, is_available, is_halal, is_vegan, is_discountable, category_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO products (id, price, code, piece_count, slug, is_visible, is_available, is_halal, is_vegan, is_spicy, is_discountable, category_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 	_, err = tx.ExecContext(ctx, query,
 		product.ID.String(),
@@ -97,6 +97,7 @@ func (r *ProductRepository) Create(ctx context.Context, product *domain.Product)
 		product.IsAvailable,
 		product.IsHalal,
 		product.IsVegan,
+		product.IsSpicy,
 		product.IsDiscountable,
 		product.CategoryID.String(),
 	)
@@ -185,8 +186,9 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 		    is_available = $7,
 		    is_halal = $8,
 		    is_vegan = $9,
-		    is_discountable = $10,
-		    category_id = $11
+		    is_spicy = $10,
+		    is_discountable = $11,
+		    category_id = $12
 		WHERE id = $1
 	`
 	_, err = tx.ExecContext(ctx, updateQuery,
@@ -199,6 +201,7 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 		product.IsAvailable,
 		product.IsHalal,
 		product.IsVegan,
+		product.IsSpicy,
 		product.IsDiscountable,
 		product.CategoryID.String(),
 	)
@@ -249,6 +252,7 @@ func (r *ProductRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain
             p.is_available,
             p.is_halal,
             p.is_vegan,
+            p.is_spicy,
             p.is_discountable,
             p.category_id,
             p.created_at,
@@ -283,6 +287,7 @@ func (r *ProductRepository) FindAll(ctx context.Context) ([]*domain.Product, err
             p.is_available,
             p.is_halal,
             p.is_vegan,
+            p.is_spicy,
             p.is_discountable,
             p.category_id,
             p.created_at,
@@ -354,6 +359,7 @@ func (r *ProductRepository) FindByCategoryID(ctx context.Context, categoryID str
             p.is_available,
             p.is_halal,
             p.is_vegan,
+            p.is_spicy,
             p.category_id,
             p.created_at,
             p.updated_at,
@@ -542,6 +548,7 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 		IsAvailable      bool            `db:"is_available"`
 		IsHalal          bool            `db:"is_halal"`
 		IsVegan          bool            `db:"is_vegan"`
+		IsSpicy          bool            `db:"is_spicy"`
 		IsDiscountable   bool            `db:"is_discountable"`
 		CategoryID       string          `db:"category_id"`
 		CreatedAt        time.Time       `db:"created_at"`
@@ -577,6 +584,7 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 				IsAvailable:    row.IsAvailable,
 				IsHalal:        row.IsHalal,
 				IsVegan:        row.IsVegan,
+				IsSpicy:        row.IsSpicy,
 				IsDiscountable: row.IsDiscountable,
 				CategoryID:     categoryID,
 				CreatedAt:      row.CreatedAt,
@@ -778,6 +786,7 @@ func (r *ProductRepository) FindByCategoryIDs(ctx context.Context, categoryIDs [
             p.is_available,
             p.is_halal,
             p.is_vegan,
+            p.is_spicy,
             p.is_discountable,
             p.category_id,
             p.created_at,
@@ -824,6 +833,7 @@ func (r *ProductRepository) BatchGetProductByIDs(ctx context.Context, productIDs
             p.is_available,
             p.is_halal,
             p.is_vegan,
+            p.is_spicy,
             p.is_discountable,
             p.category_id,
             p.created_at,

@@ -43,6 +43,7 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 		input.IsAvailable,
 		input.IsHalal,
 		input.IsVegan,
+		input.IsSpicy,
 		input.IsDiscountable,
 		toDomainTranslations(input.Translations),
 	)
@@ -104,6 +105,9 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 	}
 	if input.IsVegan != nil {
 		prod.IsVegan = *input.IsVegan
+	}
+	if input.IsSpicy != nil {
+		prod.IsSpicy = *input.IsSpicy
 	}
 	if input.Translations != nil {
 		prod.Translations = toDomainTranslationsPtr(input.Translations)
