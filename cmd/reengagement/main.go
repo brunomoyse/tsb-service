@@ -11,7 +11,7 @@ import (
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/logging"
-	es "tsb-service/services/email/scaleway"
+	es "tsb-service/pkg/email/scaleway"
 )
 
 func main() {

@@ -1,3 +1,7 @@
 .idea
 .env
 .claude/
+
+# Build artifacts
+main
+tsb-service

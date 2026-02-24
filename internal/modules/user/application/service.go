@@ -23,7 +23,7 @@ import (
 	"tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/types"
 	"tsb-service/pkg/utils"
-	es "tsb-service/services/email/scaleway"
+	es "tsb-service/pkg/email/scaleway"
 )
 
 type UserService interface {
