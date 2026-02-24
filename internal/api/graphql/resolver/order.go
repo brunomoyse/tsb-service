@@ -22,7 +22,7 @@ import (
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/utils"
-	es "tsb-service/services/email/scaleway"
+	es "tsb-service/pkg/email/scaleway"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"

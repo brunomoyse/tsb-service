@@ -18,7 +18,7 @@ import (
 	"tsb-service/pkg/logging"
 	"tsb-service/pkg/pubsub"
 	"tsb-service/pkg/utils"
-	es "tsb-service/services/email/scaleway"
+	es "tsb-service/pkg/email/scaleway"
 )
 
 type PaymentHandler struct {

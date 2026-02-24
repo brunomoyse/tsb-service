@@ -20,7 +20,7 @@ import (
 	"tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/logging"
 	"tsb-service/pkg/oauth2"
-	es "tsb-service/services/email/scaleway"
+	es "tsb-service/pkg/email/scaleway"
 )
 
 func getSameSiteMode() http.SameSite {

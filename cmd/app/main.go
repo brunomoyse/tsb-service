@@ -21,7 +21,7 @@ import (
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
 	"tsb-service/pkg/logging"
 	"tsb-service/pkg/pubsub"
-	"tsb-service/services/email/scaleway"
+	"tsb-service/pkg/email/scaleway"
 
 	couponApplication "tsb-service/internal/modules/coupon/application"
 	couponInfrastructure "tsb-service/internal/modules/coupon/infrastructure"
