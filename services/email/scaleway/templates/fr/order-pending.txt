@@ -8,17 +8,21 @@ Récapitulatif de la commande
 {{range .OrderItems}}
 Produit : {{.Name}}
 Qté     : {{.Quantity}}
-Prix    : {{.TotalPrice}}
+Prix    : {{.TotalPrice}} €
 
 {{end}}
 ----------------------------
-Sous-total :      {{.SubtotalPrice}}
+Sous-total :               {{.SubtotalPrice}} €
 {{if eq .OrderType "DELIVERY"}}
-Frais de livraison : {{.DeliveryFee}}
-{{else if eq .OrderType "PICKUP"}}
-Remise sur le retrait : {{.TakeawayDiscount}}
+Frais de livraison :       {{.DeliveryFee}} €
 {{end}}
-Total :           {{.TotalPrice}}
+{{if .HasTakeaway}}
+Remise à emporter (-10%) : -{{.TakeawayDiscount}} €
+{{end}}
+{{if .HasCoupon}}
+Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}} : -{{.CouponDiscount}} €
+{{end}}
+Total :                    {{.TotalPrice}} €
 
 Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions pour votre confiance et sommes impatients de vous faire découvrir notre expérience sushi authentique.
 

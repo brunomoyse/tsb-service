@@ -1,9 +1,7 @@
 Hello {{.UserName}},
 
-{{if eq .OrderType "DELIVERY"}}
-The estimated delivery time for your order has been updated to: {{.EstimatedReadyTime}}.
-{{else if eq .OrderType "PICKUP"}}
-The estimated pickup time for your order has been updated to: {{.EstimatedReadyTime}}.
+{{if .EstimatedReadyTime}}
+{{if eq .OrderType "DELIVERY"}}The estimated delivery time for your order has been updated to: {{.EstimatedReadyTime}}.{{else if eq .OrderType "PICKUP"}}The estimated pickup time for your order has been updated to: {{.EstimatedReadyTime}}.{{end}}
 {{end}}
 
 We apologize for any inconvenience.

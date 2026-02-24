@@ -2,26 +2,30 @@ Hello {{.UserName}},
 
 Thank you for ordering at Tokyo Sushi Bar! We are pleased to inform you that your order has been confirmed by the restaurant.
 
-{{if eq .OrderType "DELIVERY"}}
-Your order will be delivered to you at {{.EstimatedReadyTime}}.
-{{else if eq .OrderType "PICKUP"}}
-Your order will be available for pickup at {{.EstimatedReadyTime}}.
+{{if .EstimatedReadyTime}}
+{{if eq .OrderType "DELIVERY"}}Your order will be delivered on {{.EstimatedReadyTime}} (estimated time).{{else if eq .OrderType "PICKUP"}}Your order will be available for pickup on {{.EstimatedReadyTime}} (estimated time).{{end}}
+{{else}}
+We will notify you once the estimated time is set.
 {{end}}
 
 Order Summary:
 {{range .OrderItems}}
 Product:  {{.Name}}
 Quantity: {{.Quantity}}
-Price:    {{.TotalPrice}}
+Price:    {{.TotalPrice}} €
 
 {{end}}
-Subtotal:      {{.SubtotalPrice}}
+Subtotal:              {{.SubtotalPrice}} €
 {{if eq .OrderType "DELIVERY"}}
-Delivery Fee:  {{.DeliveryFee}}
-{{else if eq .OrderType "PICKUP"}}
-<!-- Optional: Takeaway Discount: {{.TakeawayDiscount}} -->
+Delivery Fee:          {{.DeliveryFee}} €
 {{end}}
-Total:         {{.TotalPrice}}
+{{if .HasTakeaway}}
+Takeaway Discount:     -{{.TakeawayDiscount}} €
+{{end}}
+{{if .HasCoupon}}
+Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}}:  -{{.CouponDiscount}} €
+{{end}}
+Total:                 {{.TotalPrice}} €
 
 {{if .Address}}
 Delivery Address:

@@ -2,117 +2,58 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Confirmation de commande | Tokyo Sushi Bar</title>
-    <style>
-        /* Styles de base */
-        body, html {
-            margin: 0;
-            padding: 0;
-            font-family: "Helvetica Neue", Arial, sans-serif;
-            background: #f2f2f2;
-            color: #333;
-        }
-        .container {
-            max-width: 600px;
-            margin: 40px auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-            overflow: hidden;
-            padding: 30px;
-        }
-        .container img {
-            display: block;
-            margin: 0 auto 20px;
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 8px;
-        }
-        .content {
-            margin-bottom: 20px;
-        }
-        .content p {
-            line-height: 1.6;
-            margin: 16px 0;
-        }
-        .content p.lead {
-            font-size: 18px;
-            color: #444;
-        }
-        h3 {
-            margin: 20px 0 10px;
-            color: #333;
-        }
-        .order-summary {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-        .order-summary th, .order-summary td {
-            padding: 8px;
-            border-bottom: 1px solid #ddd;
-            text-align: left;
-        }
-        .order-summary th {
-            background-color: #f7f7f7;
-        }
-        .footer {
-            background-color: #fafafa;
-            padding: 20px 0;
-            text-align: center;
-            font-size: 12px;
-            color: #777;
-            margin-top: 30px;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commande Reçue | Tokyo Sushi Bar</title>
 </head>
-<body>
-<div class="container">
-    <!-- Logo du restaurant -->
-    <img alt="Logo" src="https://tokyo.brunomoyse.be/icons/tsb-logo.svg" />
-
-    <div class="content">
-        <p class="lead">Bonjour {{.UserName}},</p>
-        <p>Merci d'avoir passé commande chez <strong>Tokyo Sushi Bar</strong> ! Nous vous confirmons la réception de votre commande, qui est actuellement en attente de validation par le restaurant. Vous recevrez prochainement un nouvel e-mail confirmant votre commande et précisant le délai estimé pour la livraison ou le retrait.</p>
-
-        <h3>Récapitulatif de la commande</h3>
-        <table class="order-summary">
-            <thead>
+<body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
+<tr><td align="center" style="padding:40px 16px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+    <!-- HEADER -->
+    <tr><td style="background-color:#1a1a1a;padding:24px 36px;text-align:center;">
+        <img src="{{.LogoURL}}" alt="Tokyo Sushi Bar" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
+    </td></tr>
+    <!-- RED ACCENT LINE -->
+    <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <!-- CONTENT -->
+    <tr><td style="background-color:#ffffff;padding:36px;">
+        <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">Bonjour {{.UserName}},</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Merci d'avoir passé commande chez <strong>Tokyo Sushi Bar</strong> ! Nous vous confirmons la réception de votre commande, qui est actuellement en attente de validation par le restaurant. Vous recevrez prochainement un nouvel e-mail confirmant votre commande et précisant le délai estimé pour la livraison ou le retrait.</p>
+        <p style="margin:0 0 8px;font-size:16px;font-weight:600;color:#2D2D2D;">Récapitulatif de la commande</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">
             <tr>
-                <th>Produit</th>
-                <th>Qté</th>
-                <th style="text-align: right;">Prix</th>
+                <td style="background-color:#FAF9F7;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">Produit</td>
+                <td style="background-color:#FAF9F7;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">Qté</td>
+                <td style="background-color:#FAF9F7;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;text-align:right;">Prix</td>
             </tr>
-            </thead>
-            <tbody>
             {{range .OrderItems}}
             <tr>
-                <td>{{.Name}}</td>
-                <td>{{.Quantity}}</td>
-                <td style="text-align: right;">{{.TotalPrice}}</td>
+                <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">{{.Name}}</td>
+                <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">{{.Quantity}}</td>
+                <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;border-bottom:1px solid #E8E4DF;text-align:right;">{{.TotalPrice}} &euro;</td>
             </tr>
             {{end}}
-            </tbody>
         </table>
-
-        <p><strong>Sous-total :</strong> {{.SubtotalPrice}}</p>
-        {{if eq .OrderType "DELIVERY"}}
-        <p><strong>Frais de livraison :</strong> {{.DeliveryFee}}</p>
-        {{else if eq .OrderType "PICKUP"}}
-        <!--
-        <p><strong>Remise sur le retrait :</strong> -{{.TakeawayDiscount}}</p>
-        -->
+        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>Sous-total :</strong> <span style="float:right;">{{.SubtotalPrice}} &euro;</span></p>
+        {{if .HasTakeaway}}
+        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>Remise à emporter (-10%) :</strong> <span style="float:right;">-{{.TakeawayDiscount}} &euro;</span></p>
         {{end}}
-        <p><strong>Total :</strong> {{.TotalPrice}}</p>
-
-        <p>Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions pour votre confiance et sommes impatients de vous faire découvrir notre expérience sushi authentique.</p>
-    </div>
-
-    <div class="footer">
-        <p>Si vous n'êtes pas à l'origine de cette commande, veuillez ignorer cet e-mail.</p>
-        <p>&copy; 2026 Tokyo Sushi Bar. Tous droits réservés.</p>
-    </div>
-</div>
+        {{if .HasCoupon}}
+        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}} :</strong> <span style="float:right;">-{{.CouponDiscount}} &euro;</span></p>
+        {{end}}
+        {{if eq .OrderType "DELIVERY"}}
+        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>Frais de livraison :</strong> <span style="float:right;">{{.DeliveryFee}} &euro;</span></p>
+        {{end}}
+        <p style="margin:16px 0 0;padding:12px 0 0;border-top:2px solid #E8E4DF;font-size:16px;font-weight:600;color:#2D2D2D;"><strong>Total :</strong> <span style="float:right;">{{.TotalPrice}} &euro;</span></p>
+        <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#2D2D2D;">Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions pour votre confiance et sommes impatients de vous faire découvrir notre expérience sushi authentique.</p>
+    </td></tr>
+    <!-- FOOTER -->
+    <tr><td style="background-color:#2D2D2D;padding:24px 36px;text-align:center;">
+        <p style="margin:0;font-size:12px;color:#9CA3AF;">Si vous n'êtes pas à l'origine de cette commande, veuillez ignorer cet e-mail.</p>
+        <p style="margin:8px 0 0;font-size:12px;color:#9CA3AF;">&copy; 2026 Tokyo Sushi Bar. Tous droits réservés.</p>
+    </td></tr>
+</table>
+</td></tr>
+</table>
 </body>
 </html>

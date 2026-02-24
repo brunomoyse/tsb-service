@@ -1,9 +1,7 @@
 Bonjour {{.UserName}},
 
-{{if eq .OrderType "DELIVERY"}}
-L'heure de livraison estimée de votre commande a été mise à jour : {{.EstimatedReadyTime}}.
-{{else if eq .OrderType "PICKUP"}}
-L'heure de retrait estimée de votre commande a été mise à jour : {{.EstimatedReadyTime}}.
+{{if .EstimatedReadyTime}}
+{{if eq .OrderType "DELIVERY"}}L'heure de livraison estimée de votre commande a été mise à jour : {{.EstimatedReadyTime}}.{{else if eq .OrderType "PICKUP"}}L'heure de retrait estimée de votre commande a été mise à jour : {{.EstimatedReadyTime}}.{{end}}
 {{end}}
 
 Nous nous excusons pour tout désagrément.

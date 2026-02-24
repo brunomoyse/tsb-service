@@ -80,7 +80,7 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		Status:             o.OrderStatus,
 		Type:               model.OrderTypeEnum(o.OrderType),
 		IsOnlinePayment:    o.IsOnlinePayment,
-		DiscountAmount:     o.DiscountAmount.String(),
+		DiscountAmount:     o.DiscountAmount().String(),
 		DeliveryFee:        deliveryFeeStr,
 		TotalPrice:         o.TotalPrice.String(),
 		PreferredReadyTime: o.PreferredReadyTime,
