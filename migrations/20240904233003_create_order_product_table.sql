@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.order_product
         REFERENCES public.products (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE
-)
+);
 
 -- +goose Down
 -- Table: public.order_product

@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 	"testing"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
+	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
 )
 
@@ -111,7 +110,7 @@ func (td *TestDatabase) Teardown(t *testing.T) {
 	}
 }
 
-// runMigrations executes all .up.sql migration files
+// runMigrations executes all goose migrations
 func runMigrations(t *testing.T, db *sql.DB) {
 	// Get the project root directory (assuming tests run from project root or subdirs)
 	workDir, err := os.Getwd()
@@ -121,32 +120,17 @@ func runMigrations(t *testing.T, db *sql.DB) {
 	migrationsPath := findMigrationsDir(workDir)
 	require.NotEmpty(t, migrationsPath, "Could not find migrations directory")
 
-	// Read all migration files
-	files, err := os.ReadDir(migrationsPath)
-	require.NoError(t, err, "Could not read migrations directory")
+	// Use goose to run migrations
+	err = goose.SetDialect("postgres")
+	require.NoError(t, err, "Could not set goose dialect")
 
-	// Filter and sort .up.sql files
-	var upMigrations []string
-	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), ".up.sql") {
-			upMigrations = append(upMigrations, file.Name())
-		}
-	}
-	slices.Sort(upMigrations)
+	err = goose.Up(db, migrationsPath)
+	require.NoError(t, err, "Could not run goose migrations")
 
-	// Execute each migration
-	for _, filename := range upMigrations {
-		migrationPath := filepath.Join(migrationsPath, filename)
-		content, err := os.ReadFile(migrationPath)
-		require.NoError(t, err, "Could not read migration file: %s", filename)
+	version, err := goose.GetDBVersion(db)
+	require.NoError(t, err, "Could not get migration version")
 
-		_, err = db.Exec(string(content))
-		require.NoError(t, err, "Could not execute migration: %s", filename)
-
-		t.Logf("Applied migration: %s", filename)
-	}
-
-	t.Logf("All migrations applied successfully (%d total)", len(upMigrations))
+	t.Logf("All migrations applied successfully (version: %d)", version)
 }
 
 // findMigrationsDir searches for the migrations directory from the current working directory
