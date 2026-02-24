@@ -2,29 +2,33 @@ Bonjour {{.UserName}},
 
 Merci d'avoir commandé chez Tokyo Sushi Bar ! Nous avons le plaisir de vous informer que votre commande a été confirmée par le restaurant.
 
-{{if eq .OrderType "DELIVERY"}}
-Votre commande sera livrée à {{.EstimatedReadyTime}}.
-{{else if eq .OrderType "PICKUP"}}
-Votre commande sera disponible en retrait à {{.EstimatedReadyTime}}.
+{{if .EstimatedReadyTime}}
+{{if eq .OrderType "DELIVERY"}}Votre commande sera livrée le {{.EstimatedReadyTime}} (heure estimée).{{else if eq .OrderType "PICKUP"}}Votre commande sera disponible pour retrait le {{.EstimatedReadyTime}} (heure estimée).{{end}}
+{{else}}
+Nous vous informerons dès que l'heure estimée sera définie.
 {{end}}
 
 Récapitulatif de la commande :
 {{range .OrderItems}}
 Produit :   {{.Name}}
 Qté :       {{.Quantity}}
-Prix :      {{.TotalPrice}}
+Prix :      {{.TotalPrice}} €
 
 {{end}}
-Sous-total :       {{.SubtotalPrice}}
+Sous-total :               {{.SubtotalPrice}} €
 {{if eq .OrderType "DELIVERY"}}
-Frais de livraison : {{.DeliveryFee}}
-{{else if eq .OrderType "PICKUP"}}
-<!-- Optionnel : Remise pour retrait : {{.TakeawayDiscount}} -->
+Frais de livraison :       {{.DeliveryFee}} €
 {{end}}
-Total :            {{.TotalPrice}}
+{{if .HasTakeaway}}
+Remise à emporter (-10%) : -{{.TakeawayDiscount}} €
+{{end}}
+{{if .HasCoupon}}
+Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}} : -{{.CouponDiscount}} €
+{{end}}
+Total :                    {{.TotalPrice}} €
 
 {{if .Address}}
-Adresse de livraison:
+Adresse de livraison :
 {{.Address.StreetName}} {{.Address.HouseNumber}}{{if .Address.BoxNumber}} (Box {{.Address.BoxNumber}}){{end}}
 {{.Address.MunicipalityName}}, {{.Address.Postcode}}
 {{end}}

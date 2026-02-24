@@ -2,93 +2,44 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Verify Your Email | Tokyo Sushi Bar</title>
-    <style>
-        /* Basic container styling often still works,
-           but be aware that some clients may strip style blocks entirely. */
-        body, html {
-            margin: 0;
-            padding: 0;
-            font-family: "Helvetica Neue", Arial, sans-serif;
-            background: #f2f2f2;
-            color: #333;
-        }
-        .container {
-            max-width: 600px;
-            margin: 40px auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-            overflow: hidden;
-            padding: 30px;
-        }
-        .container img {
-            display: block;
-            margin: 0 auto 20px;
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 8px;
-        }
-        .content p {
-            line-height: 1.6;
-            margin: 16px 0;
-        }
-        .content p.lead {
-            font-size: 18px;
-            color: #444;
-        }
-        .footer {
-            background-color: #fafafa;
-            padding: 20px 0;
-            text-align: center;
-            font-size: 12px;
-            color: #777;
-            margin-top: 30px;
-        }
-    </style>
 </head>
-<body>
-<div class="container">
-    <img alt="Logo" src="https://tokyo.brunomoyse.be/icons/tsb-logo.svg" />
+<body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
+<tr><td align="center" style="padding:40px 16px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+    <!-- HEADER -->
+    <tr><td style="background-color:#1a1a1a;padding:24px 36px;text-align:center;">
+        <img src="{{.LogoURL}}" alt="Tokyo Sushi Bar" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
+    </td></tr>
+    <!-- RED ACCENT LINE -->
+    <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <!-- CONTENT -->
+    <tr><td style="background-color:#ffffff;padding:36px;">
+        <p style="margin:0 0 16px;font-size:18px;color:#2D2D2D;font-weight:600;">Hello {{.UserName}},</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Thank you for joining <strong>Tokyo Sushi Bar</strong>! We're excited to have you explore our fresh, flavorful, and truly authentic sushi experience.</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">To complete your registration and activate your membership, please verify your email by clicking the button below:</p>
 
-    <div class="content">
-        <p class="lead">Hello {{.UserName}},</p>
-        <p>Thank you for joining <strong>Tokyo Sushi Bar</strong>! We’re excited to have you explore our fresh, flavorful, and truly authentic sushi experience.</p>
-        <p>To complete your registration and activate your membership, please verify your email by clicking the button below:</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;">
+        <tr><td style="background-color:#C41E24;border-radius:6px;padding:12px 28px;">
+            <a href="{{.VerifyLink}}" style="color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;display:inline-block;">Verify My Email</a>
+        </td></tr>
+        </table>
 
-        <!-- Inline-styled button -->
-        <p style="text-align: center;">
-            <a href="{{.VerifyLink}}"
-               style="
-                   display: inline-block;
-                   background: #ed1c24;
-                   color: #ffffff;
-                   padding: 8px 16px;
-                   text-decoration: none;
-                   font-size: 14px;
-                   border-radius: 4px;
-                   margin: 20px 0;
-                   transition: transform 0.2s ease, box-shadow 0.2s ease;
-                 "
-               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';"
-               onmouseout="this.style.transform='none'; this.style.boxShadow='none';"
-            >
-                Verify My Email
-            </a>
-        </p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">If the button above doesn't work, feel free to copy and paste the following URL into your browser:</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;word-break:break-all;">{{.VerifyLink}}</p>
 
-        <p>If the button above doesn’t work, feel free to copy and paste the following URL into your browser:</p>
-        <p style="word-break: break-all;">{{.VerifyLink}}</p>
-
-        <p>We look forward to delighting you with our modern take on traditional sushi.<br/>
-            お待ちしております！ (We’re waiting for you!)</p>
-    </div>
-
-    <div class="footer">
-        <p>If you did not request this email, please ignore it.</p>
-        <p>&copy; 2026 Tokyo Sushi Bar. All rights reserved.</p>
-    </div>
-</div>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">We look forward to delighting you with our modern take on traditional sushi.<br/>
+            お待ちしております！ (We're waiting for you!)</p>
+    </td></tr>
+    <!-- FOOTER -->
+    <tr><td style="background-color:#2D2D2D;padding:24px 36px;text-align:center;">
+        <p style="margin:0;font-size:12px;color:#9CA3AF;">If you did not request this email, please ignore it.</p>
+        <p style="margin:8px 0 0;font-size:12px;color:#9CA3AF;">&copy; 2026 Tokyo Sushi Bar. All rights reserved.</p>
+    </td></tr>
+</table>
+</td></tr>
+</table>
 </body>
 </html>

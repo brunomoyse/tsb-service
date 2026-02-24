@@ -80,6 +80,14 @@ func renderEmail(path string, data any, loader func(string) (templateExecutor, e
 }
 
 // --------------------------------------------------------------------------------
+// Logo URL Helper
+// --------------------------------------------------------------------------------
+
+func logoURL() string {
+	return fmt.Sprintf("%s/icons/tsb-logo.svg", os.Getenv("APP_BASE_URL"))
+}
+
+// --------------------------------------------------------------------------------
 // Common Data Preparation Helpers
 // --------------------------------------------------------------------------------
 
@@ -89,7 +97,7 @@ func renderEmail(path string, data any, loader func(string) (templateExecutor, e
 // Chinese: "2025年1月15日 星期一 18:30"
 func formatEstimatedReadyTime(t *time.Time, lang string) string {
 	if t == nil {
-		return "À définir / To be defined / 待定"
+		return ""
 	}
 
 	// Map for day names
@@ -141,13 +149,16 @@ func formatEstimatedReadyTime(t *time.Time, lang string) string {
 func prepareVerifyEmailData(user userDomain.User, verifyLink string) struct {
 	UserName   string
 	VerifyLink string
+	LogoURL    string
 } {
 	return struct {
 		UserName   string
 		VerifyLink string
+		LogoURL    string
 	}{
 		UserName:   fmt.Sprintf("%s %s", user.FirstName, user.LastName),
 		VerifyLink: verifyLink,
+		LogoURL:    logoURL(),
 	}
 }
 
@@ -155,13 +166,16 @@ func prepareVerifyEmailData(user userDomain.User, verifyLink string) struct {
 func prepareWelcomeEmailData(user userDomain.User, menuLink string) struct {
 	UserName string
 	MenuLink string
+	LogoURL  string
 } {
 	return struct {
 		UserName string
 		MenuLink string
+		LogoURL  string
 	}{
 		UserName: fmt.Sprintf("%s %s", user.FirstName, user.LastName),
 		MenuLink: menuLink,
+		LogoURL:  logoURL(),
 	}
 }
 
@@ -169,13 +183,16 @@ func prepareWelcomeEmailData(user userDomain.User, menuLink string) struct {
 func prepareResetPasswordEmailData(user userDomain.User, resetLink string) struct {
 	UserName  string
 	ResetLink string
+	LogoURL   string
 } {
 	return struct {
 		UserName  string
 		ResetLink string
+		LogoURL   string
 	}{
 		UserName:  fmt.Sprintf("%s %s", user.FirstName, user.LastName),
 		ResetLink: resetLink,
+		LogoURL:   logoURL(),
 	}
 }
 
@@ -201,22 +218,42 @@ func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o
 		subtotal = subtotal.Add(item.TotalPrice)
 	}
 
+	var deliveryFee decimal.Decimal
+	if o.DeliveryFee != nil {
+		deliveryFee = *o.DeliveryFee
+	}
+
+	var couponCode string
+	if o.CouponCode != nil {
+		couponCode = *o.CouponCode
+	}
+
 	data := struct {
-		UserName         string
-		OrderItems       []OrderProductView
-		OrderType        string
-		SubtotalPrice    string
-		TakeawayDiscount string
-		DeliveryFee      string
-		TotalPrice       string
+		UserName           string
+		OrderItems         []OrderProductView
+		OrderType          string
+		SubtotalPrice      string
+		TakeawayDiscount   string
+		HasTakeaway        bool
+		CouponDiscount     string
+		HasCoupon          bool
+		CouponCode         string
+		DeliveryFee        string
+		TotalPrice         string
+		LogoURL            string
 	}{
-		UserName:         fmt.Sprintf("%s %s", u.FirstName, u.LastName),
-		OrderItems:       orderViews,
-		OrderType:        string(o.OrderType),
-		SubtotalPrice:    utils.FormatDecimal(subtotal),
-		TakeawayDiscount: utils.FormatDecimal(decimal.NewFromFloat(0)), // @TODO: adjust discount if needed
-		DeliveryFee:      utils.FormatDecimal(*o.DeliveryFee),
-		TotalPrice:       utils.FormatDecimal(o.TotalPrice),
+		UserName:           fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		OrderItems:         orderViews,
+		OrderType:          string(o.OrderType),
+		SubtotalPrice:      utils.FormatDecimal(subtotal),
+		TakeawayDiscount:   utils.FormatDecimal(o.TakeawayDiscount),
+		HasTakeaway:        o.TakeawayDiscount.GreaterThan(decimal.Zero),
+		CouponDiscount:     utils.FormatDecimal(o.CouponDiscount),
+		HasCoupon:          o.CouponDiscount.GreaterThan(decimal.Zero),
+		CouponCode:         couponCode,
+		DeliveryFee:        utils.FormatDecimal(deliveryFee),
+		TotalPrice:         utils.FormatDecimal(o.TotalPrice),
+		LogoURL:            logoURL(),
 	}
 
 	return data, nil
@@ -225,8 +262,10 @@ func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o
 func prepareOrderCanceledData(u userDomain.User) (any, error) {
 	data := struct {
 		UserName string
+		LogoURL  string
 	}{
 		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		LogoURL:  logoURL(),
 	}
 
 	return data, nil
@@ -265,11 +304,15 @@ func prepareOrderConfirmedData(
 	}
 
 	// 2) delivery fee & discount
-	var deliveryFee, discount decimal.Decimal
+	var deliveryFee decimal.Decimal
 	if o.DeliveryFee != nil {
 		deliveryFee = *o.DeliveryFee
 	}
-	discount = o.DiscountAmount
+
+	var couponCode string
+	if o.CouponCode != nil {
+		couponCode = *o.CouponCode
+	}
 
 	// 3) maybe build AddressView
 	var addrView *AddressView
@@ -292,27 +335,37 @@ func prepareOrderConfirmedData(
 
 	// 5) assemble data
 	data := struct {
-		UserName            string
-		OrderItems          []OrderProductView
-		OrderType           string
-		SubtotalPrice       string
-		TakeawayDiscount    string
-		DeliveryFee         string
-		TotalPrice          string
-		StatusLink          string
-		EstimatedReadyTime  string
-		Address             *AddressView
+		UserName           string
+		OrderItems         []OrderProductView
+		OrderType          string
+		SubtotalPrice      string
+		TakeawayDiscount   string
+		HasTakeaway        bool
+		CouponDiscount     string
+		HasCoupon          bool
+		CouponCode         string
+		DeliveryFee        string
+		TotalPrice         string
+		StatusLink         string
+		EstimatedReadyTime string
+		Address            *AddressView
+		LogoURL            string
 	}{
 		UserName:           u.FirstName + " " + u.LastName,
 		OrderItems:         orderViews,
 		OrderType:          string(o.OrderType),
 		SubtotalPrice:      utils.FormatDecimal(subtotal),
-		TakeawayDiscount:   utils.FormatDecimal(discount),
+		TakeawayDiscount:   utils.FormatDecimal(o.TakeawayDiscount),
+		HasTakeaway:        o.TakeawayDiscount.GreaterThan(decimal.Zero),
+		CouponDiscount:     utils.FormatDecimal(o.CouponDiscount),
+		HasCoupon:          o.CouponDiscount.GreaterThan(decimal.Zero),
+		CouponCode:         couponCode,
 		DeliveryFee:        utils.FormatDecimal(deliveryFee),
 		TotalPrice:         utils.FormatDecimal(o.TotalPrice),
 		StatusLink:         fmt.Sprintf("%s/me?followOrder=%s", os.Getenv("APP_BASE_URL"), o.ID),
 		EstimatedReadyTime: estimatedReadyTime,
 		Address:            addrView,
+		LogoURL:            logoURL(),
 	}
 
 	return data, nil
@@ -422,10 +475,12 @@ func prepareOrderReadyData(u userDomain.User, o orderDomain.Order) any {
 		UserName   string
 		OrderType  string
 		StatusLink string
+		LogoURL    string
 	}{
 		UserName:   fmt.Sprintf("%s %s", u.FirstName, u.LastName),
 		OrderType:  string(o.OrderType),
 		StatusLink: fmt.Sprintf("%s/me?followOrder=%s", os.Getenv("APP_BASE_URL"), o.ID),
+		LogoURL:    logoURL(),
 	}
 }
 
@@ -447,9 +502,11 @@ func prepareOrderCompletedData(u userDomain.User) any {
 	return struct {
 		UserName string
 		MenuLink string
+		LogoURL  string
 	}{
 		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
 		MenuLink: os.Getenv("APP_BASE_URL"),
+		LogoURL:  logoURL(),
 	}
 }
 
@@ -471,9 +528,11 @@ func preparePaymentFailedData(u userDomain.User) any {
 	return struct {
 		UserName string
 		MenuLink string
+		LogoURL  string
 	}{
 		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
 		MenuLink: os.Getenv("APP_BASE_URL"),
+		LogoURL:  logoURL(),
 	}
 }
 
@@ -495,9 +554,11 @@ func prepareRefundIssuedData(u userDomain.User, refundAmount string) any {
 	return struct {
 		UserName     string
 		RefundAmount string
+		LogoURL      string
 	}{
 		UserName:     fmt.Sprintf("%s %s", u.FirstName, u.LastName),
 		RefundAmount: refundAmount,
+		LogoURL:      logoURL(),
 	}
 }
 
@@ -518,8 +579,10 @@ func renderRefundIssuedEmailText(path string, u userDomain.User, refundAmount st
 func prepareAccountLinkedData(u userDomain.User) any {
 	return struct {
 		UserName string
+		LogoURL  string
 	}{
 		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		LogoURL:  logoURL(),
 	}
 }
 
@@ -543,11 +606,13 @@ func prepareReadyTimeUpdatedData(u userDomain.User, o orderDomain.Order, lang st
 		OrderType          string
 		EstimatedReadyTime string
 		StatusLink         string
+		LogoURL            string
 	}{
 		UserName:           fmt.Sprintf("%s %s", u.FirstName, u.LastName),
 		OrderType:          string(o.OrderType),
 		EstimatedReadyTime: formatEstimatedReadyTime(o.EstimatedReadyTime, lang),
 		StatusLink:         fmt.Sprintf("%s/me?followOrder=%s", os.Getenv("APP_BASE_URL"), o.ID),
+		LogoURL:            logoURL(),
 	}
 }
 
@@ -567,13 +632,15 @@ func renderReadyTimeUpdatedEmailText(path string, u userDomain.User, o orderDoma
 
 func prepareDeletionRequestData(u userDomain.User) any {
 	return struct {
-		UserName string
+		UserName  string
 		UserEmail string
-		UserID   string
+		UserID    string
+		LogoURL   string
 	}{
 		UserName:  fmt.Sprintf("%s %s", u.FirstName, u.LastName),
 		UserEmail: u.Email,
 		UserID:    u.ID.String(),
+		LogoURL:   logoURL(),
 	}
 }
 
@@ -595,9 +662,11 @@ func prepareReengagementData(u userDomain.User) any {
 	return struct {
 		UserName string
 		MenuLink string
+		LogoURL  string
 	}{
 		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
 		MenuLink: os.Getenv("APP_BASE_URL"),
+		LogoURL:  logoURL(),
 	}
 }
 

@@ -63,13 +63,28 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 		})
 	}
 
-	// discount
-	if o.DiscountAmount.Cmp(decimal.Zero) > 0 {
-		neg := o.DiscountAmount.Neg() // make it negative
-
+	// takeaway discount
+	if o.TakeawayDiscount.GreaterThan(decimal.Zero) {
+		neg := o.TakeawayDiscount.Neg()
 		lines = append(lines, mollie.PaymentLines{
 			Type:        mollie.DiscountProductLine,
 			Description: "Remise à emporter",
+			Quantity:    1,
+			UnitPrice:   amt(neg),
+			TotalAmount: amt(neg),
+		})
+	}
+
+	// coupon discount
+	if o.CouponDiscount.GreaterThan(decimal.Zero) {
+		neg := o.CouponDiscount.Neg()
+		desc := "Réduction coupon"
+		if o.CouponCode != nil {
+			desc = fmt.Sprintf("Coupon %s", *o.CouponCode)
+		}
+		lines = append(lines, mollie.PaymentLines{
+			Type:        mollie.DiscountProductLine,
+			Description: desc,
 			Quantity:    1,
 			UnitPrice:   amt(neg),
 			TotalAmount: amt(neg),

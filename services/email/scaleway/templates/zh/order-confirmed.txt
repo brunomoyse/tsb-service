@@ -2,26 +2,36 @@
 
 感谢您在 Tokyo Sushi Bar 下单！我们很高兴地通知您，您的订单已由餐厅确认。
 
-{{if eq .OrderType "DELIVERY"}}
-您的订单将于 {{.EstimatedReadyTime}} 送达。
-{{else if eq .OrderType "PICKUP"}}
-您的订单将于 {{.EstimatedReadyTime}} 可自取。
+{{if .EstimatedReadyTime}}
+{{if eq .OrderType "DELIVERY"}}您的订单将于 {{.EstimatedReadyTime}} 送达（预计时间）。{{else if eq .OrderType "PICKUP"}}您的订单将于 {{.EstimatedReadyTime}} 可自取（预计时间）。{{end}}
+{{else}}
+预计时间确定后，我们会及时通知您。
 {{end}}
 
 订单摘要：
 {{range .OrderItems}}
 商品：    {{.Name}}
 数量：    {{.Quantity}}
-价格：    {{.TotalPrice}}
+价格：    {{.TotalPrice}} €
 
 {{end}}
-小计：        {{.SubtotalPrice}}
+小计：                {{.SubtotalPrice}} €
 {{if eq .OrderType "DELIVERY"}}
-配送费：    {{.DeliveryFee}}
-{{else if eq .OrderType "PICKUP"}}
-<!-- 可选：自提折扣：{{.TakeawayDiscount}} -->
+配送费：              {{.DeliveryFee}} €
 {{end}}
-总计：        {{.TotalPrice}}
+{{if .HasTakeaway}}
+自取折扣 (-10%)：     -{{.TakeawayDiscount}} €
+{{end}}
+{{if .HasCoupon}}
+优惠券{{if .CouponCode}}（{{.CouponCode}}）{{end}}： -{{.CouponDiscount}} €
+{{end}}
+总计：                {{.TotalPrice}} €
+
+{{if .Address}}
+配送地址：
+{{.Address.StreetName}} {{.Address.HouseNumber}}{{if .Address.BoxNumber}}（Box {{.Address.BoxNumber}}）{{end}}
+{{.Address.MunicipalityName}}, {{.Address.Postcode}}
+{{end}}
 
 请通过以下链接跟踪您的订单状态： {{.StatusLink}}
 

@@ -2,153 +2,79 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Confirmation de commande | Tokyo Sushi Bar</title>
-    <style>
-        /* Base styling */
-        body, html {
-            margin: 0;
-            padding: 0;
-            font-family: "Helvetica Neue", Arial, sans-serif;
-            background: #f2f2f2;
-            color: #333;
-        }
-        .container {
-            max-width: 600px;
-            margin: 40px auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-            overflow: hidden;
-            padding: 30px;
-        }
-        .container img {
-            display: block;
-            margin: 0 auto 20px;
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 8px;
-        }
-        .content {
-            margin-bottom: 20px;
-        }
-        .content p {
-            line-height: 1.6;
-            margin: 16px 0;
-        }
-        .content p.lead {
-            font-size: 18px;
-            color: #444;
-        }
-        h3 {
-            margin: 20px 0 10px;
-            color: #333;
-        }
-        .order-summary {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-        .order-summary th, .order-summary td {
-            padding: 8px;
-            border-bottom: 1px solid #ddd;
-            text-align: left;
-        }
-        .order-summary th {
-            background-color: #f7f7f7;
-        }
-        .footer {
-            background-color: #fafafa;
-            padding: 20px 0;
-            text-align: center;
-            font-size: 12px;
-            color: #777;
-            margin-top: 30px;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commande Confirmée | Tokyo Sushi Bar</title>
 </head>
-<body>
-<div class="container">
-    <!-- Logo du restaurant -->
-    <img alt="Logo" src="https://tokyo.brunomoyse.be/icons/tsb-logo.svg" />
-    <div class="content">
-        <p class="lead">Bonjour {{.UserName}},</p>
-        <p>
-            Merci d'avoir commandé chez <strong>Tokyo Sushi Bar</strong> ! Nous sommes heureux de vous informer que votre commande a été confirmée par le restaurant.
-        </p>
-        <p>
-            {{if eq .OrderType "DELIVERY"}}
-            Votre commande sera livrée le <strong>{{.EstimatedReadyTime}}</strong> (heure estimée).
-            {{else if eq .OrderType "PICKUP"}}
-            Votre commande sera disponible pour retrait le <strong>{{.EstimatedReadyTime}}</strong> (heure estimée).
-            {{end}}
-        </p>
+<body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
+<tr><td align="center" style="padding:40px 16px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+    <!-- HEADER -->
+    <tr><td style="background-color:#1a1a1a;padding:24px 36px;text-align:center;">
+        <img src="{{.LogoURL}}" alt="Tokyo Sushi Bar" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
+    </td></tr>
+    <!-- RED ACCENT LINE -->
+    <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <!-- CONTENT -->
+    <tr><td style="background-color:#ffffff;padding:36px;">
+        <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">Bonjour {{.UserName}},</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Merci d'avoir commandé chez <strong>Tokyo Sushi Bar</strong> ! Nous sommes heureux de vous informer que votre commande a été confirmée par le restaurant.</p>
+        {{if .EstimatedReadyTime}}
+        {{if eq .OrderType "DELIVERY"}}
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Votre commande sera livrée le <strong>{{.EstimatedReadyTime}}</strong> (heure estimée).</p>
+        {{else if eq .OrderType "PICKUP"}}
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Votre commande sera disponible pour retrait le <strong>{{.EstimatedReadyTime}}</strong> (heure estimée).</p>
+        {{end}}
+        {{else}}
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Nous vous informerons dès que l'heure estimée sera définie.</p>
+        {{end}}
         {{if .Address}}
-        <p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">
             <strong>Adresse de livraison :</strong><br/>
             {{.Address.StreetName}} {{.Address.HouseNumber}}{{if .Address.BoxNumber}} / {{.Address.BoxNumber}}{{end}}<br/>
             {{.Address.MunicipalityName}}, {{.Address.Postcode}}
         </p>
         {{end}}
-
-        <h3>Récapitulatif de la commande</h3>
-        <table class="order-summary">
-            <thead>
+        <p style="margin:0 0 8px;font-size:16px;font-weight:600;color:#2D2D2D;">Récapitulatif de la commande</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">
             <tr>
-                <th>Produit</th>
-                <th>Qté</th>
-                <th style="text-align: right;">Prix</th>
+                <td style="background-color:#FAF9F7;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">Produit</td>
+                <td style="background-color:#FAF9F7;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">Qté</td>
+                <td style="background-color:#FAF9F7;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;text-align:right;">Prix</td>
             </tr>
-            </thead>
-            <tbody>
             {{range .OrderItems}}
             <tr>
-                <td>{{.Name}}</td>
-                <td>{{.Quantity}}</td>
-                <td style="text-align: right;">{{.TotalPrice}}</td>
+                <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">{{.Name}}</td>
+                <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">{{.Quantity}}</td>
+                <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;border-bottom:1px solid #E8E4DF;text-align:right;">{{.TotalPrice}} &euro;</td>
             </tr>
             {{end}}
-            </tbody>
         </table>
-
-        <p><strong>Sous-total :</strong> {{.SubtotalPrice}}</p>
-        {{if eq .OrderType "DELIVERY"}}
-        <p><strong>Frais de livraison :</strong> {{.DeliveryFee}}</p>
-        {{else if eq .OrderType "PICKUP"}}
-        <!-- Optionnel : Remise pour retrait si applicable -->
-        <!-- <p><strong>Remise pour retrait :</strong> -{{.TakeawayDiscount}}</p> -->
+        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>Sous-total :</strong> <span style="float:right;">{{.SubtotalPrice}} &euro;</span></p>
+        {{if .HasTakeaway}}
+        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>Remise à emporter (-10%) :</strong> <span style="float:right;">-{{.TakeawayDiscount}} &euro;</span></p>
         {{end}}
-        <p><strong>Total :</strong> {{.TotalPrice}}</p>
-
-        <p style="text-align: center;">
-            <a href="{{.StatusLink}}"
-               style="
-                display: inline-block;
-                background: #ed1c24;
-                color: #ffffff;
-                padding: 8px 16px;
-                text-decoration: none;
-                font-size: 14px;
-                border-radius: 4px;
-                margin: 20px 0;
-                transition: transform 0.2s ease, box-shadow 0.2s ease;
-             "
-               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';"
-               onmouseout="this.style.transform='none'; this.style.boxShadow='none';"
-            >
-                Suivre l'état de votre commande
-            </a>
-        </p>
-
-        <p>
-            Pour toute question concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions de votre confiance et avons hâte de vous régaler avec notre expérience sushi authentique.
-        </p>
-    </div>
-
-    <div class="footer">
-        <p>Si vous n'avez pas passé cette commande, veuillez ignorer cet e-mail.</p>
-        <p>&copy; 2026 Tokyo Sushi Bar. Tous droits réservés.</p>
-    </div>
-</div>
+        {{if .HasCoupon}}
+        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}} :</strong> <span style="float:right;">-{{.CouponDiscount}} &euro;</span></p>
+        {{end}}
+        {{if eq .OrderType "DELIVERY"}}
+        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>Frais de livraison :</strong> <span style="float:right;">{{.DeliveryFee}} &euro;</span></p>
+        {{end}}
+        <p style="margin:16px 0 0;padding:12px 0 0;border-top:2px solid #E8E4DF;font-size:16px;font-weight:600;color:#2D2D2D;"><strong>Total :</strong> <span style="float:right;">{{.TotalPrice}} &euro;</span></p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;">
+        <tr><td style="background-color:#C41E24;border-radius:6px;padding:12px 28px;">
+            <a href="{{.StatusLink}}" style="color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;display:inline-block;">Suivre l'état de votre commande</a>
+        </td></tr>
+        </table>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">Pour toute question concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions de votre confiance et avons hâte de vous régaler avec notre expérience sushi authentique.</p>
+    </td></tr>
+    <!-- FOOTER -->
+    <tr><td style="background-color:#2D2D2D;padding:24px 36px;text-align:center;">
+        <p style="margin:0;font-size:12px;color:#9CA3AF;">Si vous n'avez pas passé cette commande, veuillez ignorer cet e-mail.</p>
+        <p style="margin:8px 0 0;font-size:12px;color:#9CA3AF;">&copy; 2026 Tokyo Sushi Bar. Tous droits réservés.</p>
+    </td></tr>
+</table>
+</td></tr>
+</table>
 </body>
 </html>

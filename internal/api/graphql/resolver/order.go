@@ -167,35 +167,38 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		total = total.Add(fee)
 	}
 
-	// Compute total discount if any
-	totalDiscount := decimal.Zero
-	// Loop through the items and check if any discount is applicable (isDiscountable property)
+	// Compute takeaway discount for PICKUP orders
+	takeawayDiscount := decimal.Zero
 	if odType == orderDomain.OrderTypePickUp {
 		for _, p := range products {
 			if p.IsDiscountable {
-				// Assuming a discount of 10%
-				discount := p.Price.Mul(decimal.NewFromFloat(0.10))
-				totalDiscount = totalDiscount.Add(discount)
+				// 10% discount on discountable items
+				takeawayDiscount = takeawayDiscount.Add(p.Price.Mul(decimal.NewFromFloat(0.10)))
 			}
 		}
 	}
 
 	// Validate and apply coupon discount (stacks with pickup discount)
+	couponDiscount := decimal.Zero
 	var couponCode *string
 	var validatedCouponID *uuid.UUID
 	if input.CouponCode != nil && *input.CouponCode != "" {
-		coupon, couponDiscount, err := r.CouponService.ValidateCoupon(ctx, *input.CouponCode, total)
+		coupon, cd, err := r.CouponService.ValidateCoupon(ctx, *input.CouponCode, total)
 		if err != nil {
 			return nil, fmt.Errorf("invalid coupon: %w", err)
 		}
-		totalDiscount = totalDiscount.Add(couponDiscount)
+		couponDiscount = cd
 		couponCode = input.CouponCode
 		validatedCouponID = &coupon.ID
 	}
 
 	// Ensure combined discounts never exceed the order total
+	totalDiscount := takeawayDiscount.Add(couponDiscount)
 	if totalDiscount.GreaterThan(total) {
-		totalDiscount = total
+		// Scale both proportionally
+		ratio := total.Div(totalDiscount)
+		takeawayDiscount = takeawayDiscount.Mul(ratio).Round(2)
+		couponDiscount = total.Sub(takeawayDiscount)
 	}
 
 	var extras []orderDomain.OrderExtra
@@ -222,7 +225,8 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		input.PreferredReadyTime,
 		extras,
 		&fee,
-		totalDiscount,
+		takeawayDiscount,
+		couponDiscount,
 		orderLang,
 	)
 	tempOrder.CouponCode = couponCode

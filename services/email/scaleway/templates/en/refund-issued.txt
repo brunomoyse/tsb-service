@@ -1,6 +1,6 @@
 Hello {{.UserName}},
 
-A refund of {{.RefundAmount}} EUR has been issued for your canceled order.
+A refund of {{.RefundAmount}} € has been issued for your canceled order.
 
 Please allow a few business days for the amount to appear in your account.
 

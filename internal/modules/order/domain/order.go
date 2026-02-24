@@ -39,7 +39,8 @@ type Order struct {
 	OrderType          OrderType        `db:"order_type" json:"orderType"`
 	IsOnlinePayment    bool             `db:"is_online_payment" json:"isOnlinePayment"`
 	PaymentID          *uuid.UUID       `db:"payment_id" json:"paymentId,omitempty"`
-	DiscountAmount     decimal.Decimal  `db:"discount_amount" json:"discountAmount"`
+	TakeawayDiscount   decimal.Decimal  `db:"takeaway_discount" json:"takeawayDiscount"`
+	CouponDiscount     decimal.Decimal  `db:"coupon_discount" json:"couponDiscount"`
 	DeliveryFee        *decimal.Decimal `db:"delivery_fee" json:"deliveryFee,omitempty"`
 	TotalPrice         decimal.Decimal  `db:"total_price" json:"totalPrice"`
 	PreferredReadyTime *time.Time       `db:"preferred_ready_time" json:"preferredReadyTime,omitempty"`
@@ -90,6 +91,11 @@ type Product struct {
 
 // NewOrder is a constructor function that creates a new Order domain object.
 // Prices will be set later in the service layer.
+// DiscountAmount returns the total discount (takeaway + coupon).
+func (o *Order) DiscountAmount() decimal.Decimal {
+	return o.TakeawayDiscount.Add(o.CouponDiscount)
+}
+
 func NewOrder(
 	userID uuid.UUID,
 	orderType OrderType,
@@ -100,7 +106,8 @@ func NewOrder(
 	preferredReadyTime *time.Time,
 	orderExtra []OrderExtra,
 	deliveryFee *decimal.Decimal,
-	discountAmount decimal.Decimal,
+	takeawayDiscount decimal.Decimal,
+	couponDiscount decimal.Decimal,
 	language string,
 ) *Order {
 	var orderExtraJSON types.NullableJSON
@@ -123,7 +130,8 @@ func NewOrder(
 		PreferredReadyTime: preferredReadyTime,
 		OrderExtra:         orderExtraJSON,
 		DeliveryFee:        deliveryFee,
-		DiscountAmount:     discountAmount,
+		TakeawayDiscount:   takeawayDiscount,
+		CouponDiscount:     couponDiscount,
 		Language:           language,
 	}
 }

@@ -2,84 +2,38 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Bienvenue chez Tokyo Sushi Bar</title>
-    <style>
-        /* Basic container styling */
-        body, html {
-            margin: 0;
-            padding: 0;
-            font-family: "Helvetica Neue", Arial, sans-serif;
-            background: #f2f2f2;
-            color: #333;
-        }
-        .container {
-            max-width: 600px;
-            margin: 40px auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-            overflow: hidden;
-            padding: 30px;
-        }
-        .container img {
-            display: block;
-            margin: 0 auto 20px;
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 8px;
-        }
-        .content p {
-            line-height: 1.6;
-            margin: 16px 0;
-        }
-        .content p.lead {
-            font-size: 18px;
-            color: #444;
-        }
-        .footer {
-            background-color: #fafafa;
-            padding: 20px 0;
-            text-align: center;
-            font-size: 12px;
-            color: #777;
-            margin-top: 30px;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenue chez Tokyo Sushi Bar | Tokyo Sushi Bar</title>
 </head>
-<body>
-<div class="container">
-    <img alt="Logo" src="https://tokyo.brunomoyse.be/icons/tsb-logo.svg" />
-    <div class="content">
-        <p class="lead">Bonjour {{.UserName}},</p>
-        <p>Bienvenue chez <strong>Tokyo Sushi Bar</strong> ! Nous sommes ravis de vous compter parmi nous et impatients de vous faire découvrir notre expérience sushi authentique.</p>
-        <p>Votre compte est désormais actif. Pour commencer, cliquez sur le bouton ci-dessous afin d'accéder à notre menu :</p>
-        <!-- Inline-styled button -->
-        <p style="text-align: center;">
-            <a href="{{.MenuLink}}"
-               style="
-                   display: inline-block;
-                   background: #ed1c24;
-                   color: #ffffff;
-                   padding: 8px 16px;
-                   text-decoration: none;
-                   font-size: 14px;
-                   border-radius: 4px;
-                   margin: 20px 0;
-                   transition: transform 0.2s ease, box-shadow 0.2s ease;
-                 "
-               onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';"
-               onmouseout="this.style.transform='none'; this.style.boxShadow='none';"
-            >
-                Découvrir le menu
-            </a>
-        </p>
-        <p>Nous sommes impatients de vous offrir une expérience sushi exceptionnelle.</p>
-    </div>
-    <div class="footer">
-        <p>Si vous n'avez pas créé ce compte, veuillez ignorer cet e-mail.</p>
-        <p>&copy; 2026 Tokyo Sushi Bar. Tous droits réservés.</p>
-    </div>
-</div>
+<body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
+<tr><td align="center" style="padding:40px 16px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+    <!-- HEADER -->
+    <tr><td style="background-color:#1a1a1a;padding:24px 36px;text-align:center;">
+        <img src="{{.LogoURL}}" alt="Tokyo Sushi Bar" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
+    </td></tr>
+    <!-- RED ACCENT LINE -->
+    <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <!-- CONTENT -->
+    <tr><td style="background-color:#ffffff;padding:36px;">
+        <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">Bonjour {{.UserName}},</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Bienvenue chez <strong>Tokyo Sushi Bar</strong> ! Nous sommes ravis de vous compter parmi nous et impatients de vous faire découvrir notre expérience sushi authentique.</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Votre compte est désormais actif. Pour commencer, cliquez sur le bouton ci-dessous afin d'accéder à notre menu :</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;">
+        <tr><td style="background-color:#C41E24;border-radius:6px;padding:12px 28px;">
+            <a href="{{.MenuLink}}" style="color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;display:inline-block;">Découvrir le menu</a>
+        </td></tr>
+        </table>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">Nous sommes impatients de vous offrir une expérience sushi exceptionnelle.</p>
+    </td></tr>
+    <!-- FOOTER -->
+    <tr><td style="background-color:#2D2D2D;padding:24px 36px;text-align:center;">
+        <p style="margin:0;font-size:12px;color:#9CA3AF;">Si vous n'avez pas créé ce compte, veuillez ignorer cet e-mail.</p>
+        <p style="margin:8px 0 0;font-size:12px;color:#9CA3AF;">&copy; 2026 Tokyo Sushi Bar. Tous droits réservés.</p>
+    </td></tr>
+</table>
+</td></tr>
+</table>
 </body>
 </html>
