@@ -1,1 +1,0 @@
-ALTER TABLE users ADD COLUMN deletion_requested_at TIMESTAMP(0) WITH TIME ZONE;
