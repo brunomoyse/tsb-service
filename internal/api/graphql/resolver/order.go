@@ -8,6 +8,7 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"strings"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	addressApplication "tsb-service/internal/modules/address/application"
@@ -636,7 +637,7 @@ func (r *orderResolver) DisplayCustomerName(ctx context.Context, obj *model.Orde
 		return "Guest", nil
 	}
 	if customer != nil {
-		return fmt.Sprintf("%s %s", customer.FirstName, customer.LastName), nil
+		return fmt.Sprintf("%s %s", strings.ToUpper(customer.LastName), customer.FirstName), nil
 	}
 	return "Guest", nil
 }
