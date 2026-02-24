@@ -171,6 +171,7 @@ func TestProduct(t *testing.T) {
 				Slug        string
 				IsHalal     bool
 				IsVegan     bool
+				IsSpicy     bool
 				PieceCount  *int
 			}
 		}
@@ -185,6 +186,7 @@ func TestProduct(t *testing.T) {
 					slug
 					isHalal
 					isVegan
+					isSpicy
 					pieceCount
 				}
 			}
@@ -202,6 +204,7 @@ func TestProduct(t *testing.T) {
 		assert.Equal(t, "salmon-sushi", resp.Product.Slug)
 		assert.False(t, resp.Product.IsHalal)
 		assert.False(t, resp.Product.IsVegan)
+		assert.False(t, resp.Product.IsSpicy)
 		assert.NotNil(t, resp.Product.PieceCount)
 		assert.Equal(t, 8, *resp.Product.PieceCount)
 	})
@@ -377,6 +380,7 @@ func TestCreateProduct(t *testing.T) {
 			"isAvailable":    true,
 			"isHalal":        false,
 			"isVegan":        false,
+			"isSpicy":        false,
 			"isDiscountable": true,
 			"translations": []map[string]any{
 				{
@@ -439,6 +443,7 @@ func TestCreateProduct(t *testing.T) {
 			"isAvailable":    true,
 			"isHalal":        false,
 			"isVegan":        false,
+			"isSpicy":        false,
 			"isDiscountable": true,
 			"translations": []map[string]any{
 				{

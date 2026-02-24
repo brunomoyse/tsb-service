@@ -66,6 +66,7 @@ type TestProduct struct {
 	Slug          string
 	IsHalal       bool
 	IsVegan       bool
+	IsSpicy       bool
 	PieceCount    *int
 	IsDiscountable bool
 	NameEN        string
@@ -267,13 +268,13 @@ func createTestProduct(t *testing.T, ctx context.Context, db *sqlx.DB, product T
 
 	// Insert product
 	productQuery := `
-		INSERT INTO products (id, created_at, updated_at, category_id, price, is_visible, is_available, code, slug, is_halal, is_vegan, piece_count, is_discountable)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		INSERT INTO products (id, created_at, updated_at, category_id, price, is_visible, is_available, code, slug, is_halal, is_vegan, is_spicy, piece_count, is_discountable)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`
 	now := time.Now()
 	_, err := db.ExecContext(ctx, productQuery,
 		product.ID, now, now, product.CategoryID, product.Price, product.IsVisible, product.IsAvailable,
-		product.Code, product.Slug, product.IsHalal, product.IsVegan, product.PieceCount, product.IsDiscountable)
+		product.Code, product.Slug, product.IsHalal, product.IsVegan, product.IsSpicy, product.PieceCount, product.IsDiscountable)
 	require.NoError(t, err, "Failed to create product")
 
 	// Insert translations (migration only supports en/fr/zh)

@@ -19,6 +19,7 @@ type Product struct {
 	IsAvailable    bool            `db:"is_available" json:"isAvailable"`
 	IsHalal        bool            `db:"is_halal" json:"isHalal"`
 	IsVegan        bool            `db:"is_vegan" json:"isVegan"`
+	IsSpicy        bool            `db:"is_spicy" json:"isSpicy"`
 	IsDiscountable bool            `db:"is_discountable" json:"isDiscountable"`
 	CategoryID     uuid.UUID       `db:"category_id" json:"categoryId"`
 	CreatedAt      time.Time       `db:"created_at" json:"createdAt"`

@@ -7,6 +7,7 @@ type Product {
     isAvailable: Boolean!
     isDiscountable: Boolean!
     isHalal: Boolean!
+    isSpicy: Boolean!
     isVegan: Boolean!
     isVisible: Boolean!
     pieceCount: Int
@@ -64,6 +65,7 @@ input CreateProductInput {
     isAvailable: Boolean!
     isDiscountable: Boolean!
     isHalal: Boolean!
+    isSpicy: Boolean!
     isVegan: Boolean!
     isVisible: Boolean!
     pieceCount: Int
@@ -78,6 +80,7 @@ input UpdateProductInput {
     isAvailable: Boolean
     isDiscountable: Boolean
     isHalal: Boolean
+    isSpicy: Boolean
     isVegan: Boolean
     isVisible: Boolean
     pieceCount: Int
