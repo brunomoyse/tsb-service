@@ -195,7 +195,7 @@ func (s *userService) Login(ctx context.Context, email string, password string, 
 
 	// Store refresh token hash
 	tokenHash := hashToken(refreshToken)
-	expiresAt := time.Now().Add(7 * 24 * time.Hour).Unix()
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).Unix()
 	if err := s.repo.StoreRefreshToken(ctx, user.ID, tokenHash, expiresAt); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
@@ -236,7 +236,7 @@ func (s *userService) GenerateTokens(ctx context.Context, user domain.User, jwtS
 
 	// Store refresh token hash
 	tokenHash := hashToken(refreshToken)
-	expiresAt := time.Now().Add(7 * 24 * time.Hour).Unix()
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).Unix()
 	if err := s.repo.StoreRefreshToken(ctx, user.ID, tokenHash, expiresAt); err != nil {
 		return "", "", fmt.Errorf("failed to store refresh token: %w", err)
 	}
@@ -321,7 +321,7 @@ func (s *userService) RefreshToken(
 
 	// 6. Store new refresh token
 	newTokenHash := hashToken(refreshToken)
-	expiresAt := time.Now().Add(7 * 24 * time.Hour).Unix()
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).Unix()
 	if err := s.repo.StoreRefreshToken(ctx, user.ID, newTokenHash, expiresAt); err != nil {
 		return "", "", nil, fmt.Errorf("failed to store new refresh token: %w", err)
 	}
@@ -591,11 +591,11 @@ func hashPassword(password string, salt string) (string, error) {
 }
 
 func generateTokens(user domain.User, jwtSecret string) (string, string, error) {
-	// Access Token (15m)
+	// Access Token (1h)
 	accessClaims := types.JwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.ID.String(),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 		},
 		Type:    "access",
 		ID:      uuid.NewString(),
@@ -607,11 +607,11 @@ func generateTokens(user domain.User, jwtSecret string) (string, string, error) 
 		return "", "", fmt.Errorf("failed to sign access token: %w", err)
 	}
 
-	// Refresh Token (7d)
+	// Refresh Token (30d)
 	refreshClaims := types.JwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.ID.String(),
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * 24 * time.Hour)),
 		},
 		Type:    "refresh",
 		ID:      uuid.NewString(),
