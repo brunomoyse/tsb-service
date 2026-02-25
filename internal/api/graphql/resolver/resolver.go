@@ -3,8 +3,10 @@
 package resolver
 
 import (
+	"context"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -12,6 +14,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/websocket"
 
 	"tsb-service/internal/api/graphql"
@@ -24,6 +27,8 @@ import (
 	restaurantApplication "tsb-service/internal/modules/restaurant/application"
 	userApplication "tsb-service/internal/modules/user/application"
 	"tsb-service/pkg/pubsub"
+	"tsb-service/pkg/types"
+	"tsb-service/pkg/utils"
 )
 
 type Resolver struct {
@@ -61,7 +66,7 @@ func NewResolver(
 }
 
 // GraphQLHandler defines the GraphQL endpoint with @auth directive injection
-func GraphQLHandler(resolver *Resolver, allowedOrigins []string) gin.HandlerFunc {
+func GraphQLHandler(resolver *Resolver, allowedOrigins []string, jwtSecret string) gin.HandlerFunc {
 	cfg := graphql.Config{Resolvers: resolver}
 	cfg.Directives.Auth = directives.Auth
 	cfg.Directives.Admin = directives.Admin
@@ -86,6 +91,30 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string) gin.HandlerFunc
 				}
 				return false
 			},
+		},
+		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
+			// If auth was already set by HTTP middleware (via cookie), keep it
+			if utils.GetUserID(ctx) != "" {
+				return ctx, &initPayload, nil
+			}
+			// Fall back to connectionParams Authorization header
+			auth := initPayload.Authorization()
+			if auth == "" {
+				return ctx, &initPayload, nil
+			}
+			tokenStr := strings.TrimPrefix(auth, "Bearer ")
+			claims := &types.JwtClaims{}
+			token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
+				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, jwt.ErrSignatureInvalid
+				}
+				return []byte(jwtSecret), nil
+			})
+			if err == nil && token.Valid && claims.Subject != "" {
+				ctx = utils.SetUserID(ctx, claims.Subject)
+				ctx = utils.SetIsAdmin(ctx, claims.IsAdmin)
+			}
+			return ctx, &initPayload, nil
 		},
 		KeepAlivePingInterval: 10 * time.Second,
 	})

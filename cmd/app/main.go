@@ -198,7 +198,7 @@ func main() {
 		broker,
 		addressService, couponService, orderService, paymentService, productService, restaurantService, userService,
 	)
-	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL})
+	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL}, jwtSecret)
 	optionalAuth := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)
 
 	api.POST("/graphql", optionalAuth, graphqlHandler)
