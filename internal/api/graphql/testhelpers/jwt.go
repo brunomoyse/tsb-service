@@ -14,12 +14,12 @@ const TestJWTSecret = "test-secret-key-for-testing-only"
 
 // GenerateTestAccessToken creates a valid JWT access token for testing
 func GenerateTestAccessToken(userID string, isAdmin bool) (string, error) {
-	return generateTestToken(userID, isAdmin, "access", 15*time.Minute)
+	return generateTestToken(userID, isAdmin, "access", 1*time.Hour)
 }
 
 // GenerateTestRefreshToken creates a valid JWT refresh token for testing
 func GenerateTestRefreshToken(userID string, isAdmin bool) (string, error) {
-	return generateTestToken(userID, isAdmin, "refresh", 7*24*time.Hour)
+	return generateTestToken(userID, isAdmin, "refresh", 30*24*time.Hour)
 }
 
 // generateTestToken is an internal helper to generate JWT tokens for testing

@@ -23,8 +23,12 @@ import (
 	es "tsb-service/pkg/email/scaleway"
 )
 
+func isProduction() bool {
+	return os.Getenv("APP_ENV") != "development"
+}
+
 func getSameSiteMode() http.SameSite {
-	if os.Getenv("APP_ENV") == "development" {
+	if !isProduction() {
 		return http.SameSiteNoneMode
 	}
 	return http.SameSiteLaxMode
@@ -32,16 +36,18 @@ func getSameSiteMode() http.SameSite {
 
 func setAuthCookies(c *gin.Context, accessToken, refreshToken string) {
 	domain := os.Getenv("SESSION_COOKIE_DOMAIN")
+	secure := isProduction()
 	c.SetSameSite(getSameSiteMode())
-	c.SetCookie("access_token", accessToken, 15*60, "/", domain, true, true)
-	c.SetCookie("refresh_token", refreshToken, 7*24*3600, "/", domain, true, true)
+	c.SetCookie("access_token", accessToken, 3600, "/", domain, secure, true)
+	c.SetCookie("refresh_token", refreshToken, 30*24*3600, "/", domain, secure, true)
 }
 
 func clearAuthCookies(c *gin.Context) {
 	domain := os.Getenv("SESSION_COOKIE_DOMAIN")
+	secure := isProduction()
 	c.SetSameSite(getSameSiteMode())
-	c.SetCookie("access_token", "", -1, "/", domain, true, true)
-	c.SetCookie("refresh_token", "", -1, "/", domain, true, true)
+	c.SetCookie("access_token", "", -1, "/", domain, secure, true)
+	c.SetCookie("refresh_token", "", -1, "/", domain, secure, true)
 }
 
 type UserHandler struct {

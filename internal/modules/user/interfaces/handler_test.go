@@ -280,11 +280,11 @@ func TestSetAuthCookies(t *testing.T) {
 		assert.Contains(t, accessCookie.Domain, "example.com")
 		assert.True(t, accessCookie.Secure)
 		assert.True(t, accessCookie.HttpOnly)
-		assert.Equal(t, 15*60, accessCookie.MaxAge)
+		assert.Equal(t, 3600, accessCookie.MaxAge)
 
 		assert.NotNil(t, refreshCookie, "refresh_token cookie should be set")
 		assert.Equal(t, "refresh-token-value", refreshCookie.Value)
-		assert.Equal(t, 7*24*3600, refreshCookie.MaxAge)
+		assert.Equal(t, 30*24*3600, refreshCookie.MaxAge)
 	})
 }
 
