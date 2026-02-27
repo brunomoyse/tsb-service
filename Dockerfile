@@ -17,9 +17,10 @@ RUN go mod download
 # Step 6: Copy the source code into the container
 COPY . .
 
-# Step 7: Build the Go app with cross-compilation support
+# Step 7: Build the Go app and migration tool with cross-compilation support
 ENV GIN_MODE=release
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-service cmd/app/main.go
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-service cmd/app/main.go && \
+    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-migrate cmd/migrate/main.go
 
 # Step 7: Use base alpine image to create the final image
 FROM alpine:3.23
@@ -27,8 +28,10 @@ FROM alpine:3.23
 # Step 8: Set the working directory and environment variables
 WORKDIR /app
 
-# Step 9: Copy the binary from the build container
+# Step 9: Copy binaries and migration files from the build container
 COPY --from=builder /app/tsb-service .
+COPY --from=builder /app/tsb-migrate .
+COPY --from=builder /app/migrations ./migrations
 
 # Step 10: Expose the port the app listens on
 EXPOSE 8080
