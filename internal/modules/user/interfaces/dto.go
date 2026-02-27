@@ -61,8 +61,7 @@ type UserResponse struct {
 }
 
 type LoginResponse struct {
-	User        *UserResponse `json:"user"`
-	AccessToken string        `json:"accessToken"`
+	User *UserResponse `json:"user"`
 }
 
 func NewUserResponse(u *domain.User, a *addressDomain.Address) *UserResponse {
