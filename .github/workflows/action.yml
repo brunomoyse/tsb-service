@@ -40,6 +40,6 @@ jobs:
     steps:
       - name: Trigger deploy webhook
         run: |
-          curl -X POST https://tokyo.brunomoyse.be/_deploy/hooks/deploy-tokyosushi \
+          curl -X POST ${{ vars.DEPLOY_WEBHOOK_URL }} \
             -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
             --fail --max-time 300
