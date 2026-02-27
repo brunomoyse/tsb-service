@@ -224,25 +224,7 @@ func testUser() *domain.User {
 // --- Tests ---
 
 func TestGetSameSiteMode(t *testing.T) {
-	t.Run("Development mode returns SameSiteNoneMode", func(t *testing.T) {
-		os.Setenv("APP_ENV", "development")
-		defer os.Unsetenv("APP_ENV")
-
-		mode := getSameSiteMode()
-		assert.Equal(t, http.SameSiteNoneMode, mode)
-	})
-
-	t.Run("Production mode returns SameSiteLaxMode", func(t *testing.T) {
-		os.Setenv("APP_ENV", "production")
-		defer os.Unsetenv("APP_ENV")
-
-		mode := getSameSiteMode()
-		assert.Equal(t, http.SameSiteLaxMode, mode)
-	})
-
-	t.Run("Empty APP_ENV returns SameSiteLaxMode", func(t *testing.T) {
-		os.Unsetenv("APP_ENV")
-
+	t.Run("Always returns SameSiteLaxMode", func(t *testing.T) {
 		mode := getSameSiteMode()
 		assert.Equal(t, http.SameSiteLaxMode, mode)
 	})
@@ -314,13 +296,11 @@ func TestClearAuthCookies(t *testing.T) {
 	})
 }
 
-func TestSameSiteModeDevelopment(t *testing.T) {
+func TestSameSiteModeOnCookies(t *testing.T) {
 	os.Setenv("SESSION_COOKIE_DOMAIN", "localhost")
-	os.Setenv("APP_ENV", "development")
 	defer os.Unsetenv("SESSION_COOKIE_DOMAIN")
-	defer os.Unsetenv("APP_ENV")
 
-	t.Run("Development mode sets SameSite=None on cookies", func(t *testing.T) {
+	t.Run("Cookies always use SameSite=Lax", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request = httptest.NewRequest(http.MethodPost, "/login", nil)
@@ -330,7 +310,7 @@ func TestSameSiteModeDevelopment(t *testing.T) {
 		setCookieHeaders := w.Header().Values("Set-Cookie")
 		assert.Len(t, setCookieHeaders, 2)
 		for _, header := range setCookieHeaders {
-			assert.Contains(t, header, "SameSite=None")
+			assert.Contains(t, header, "SameSite=Lax")
 		}
 	})
 }
