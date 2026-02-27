@@ -1,39 +1,56 @@
-name: Publish and Deploy Docker Image
+name: Build and Deploy
 
 on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to rollback to (e.g. v1.0.0)'
+        required: true
+        type: string
+      migrations_down:
+        description: 'Number of migrations to rollback (0 = none)'
+        required: true
+        default: '0'
+        type: string
 
 env:
   DOCKER_REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.actor }}/tsb-service:latest
+  IMAGE_NAME: ${{ github.actor }}/tsb-service
+
+# ── Test (auto on push to main) ──────────────────────────────────────────────
 
 jobs:
-  build_and_publish:
-    name: Build and Publish Docker Image
+  build_test:
+    if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+    name: Build Test Image
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Log in to GitHub Container Registry
-      run: echo "${{ secrets.PAT }}" | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ github.actor }} --password-stdin
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.PAT }}" | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ github.actor }} --password-stdin
 
-    - name: Build and Push Multi-Arch Docker Image
-      run: |
-        docker buildx build \
-          --platform linux/amd64,linux/arm64 \
-          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }} \
-          --push \
-          .
+      - name: Build and Push Multi-Arch Image
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            --push \
+            .
 
-  deploy:
-    needs: build_and_publish
+  deploy_test:
+    if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+    needs: build_test
     name: Deploy to Home Server
     runs-on: ubuntu-latest
 
@@ -43,3 +60,94 @@ jobs:
           curl -X POST ${{ vars.DEPLOY_WEBHOOK_URL }} \
             -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
             --fail --max-time 300
+
+# ── Production release (tag push v*) ────────────────────────────────────────
+
+  build_production:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    name: Build Production Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.PAT }}" | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Build and Push Production Image
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:production \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+            --push \
+            .
+
+  migrate_production:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: build_production
+    name: Run Migrations
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Run migrations via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ vars.OVH_HOST }}
+          username: ${{ vars.OVH_USER }}
+          key: ${{ secrets.OVH_SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/tokyosushi
+            docker compose pull tsb-service
+            docker compose run --rm tsb-service ./tsb-migrate -cmd=up
+
+  deploy_production:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: migrate_production
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ vars.OVH_HOST }}
+          username: ${{ vars.OVH_USER }}
+          key: ${{ secrets.OVH_SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/tokyosushi
+            docker compose up -d tsb-service
+            docker image prune -f
+
+# ── Rollback (manual trigger) ────────────────────────────────────────────────
+
+  rollback:
+    if: github.event_name == 'workflow_dispatch'
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Rollback via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ vars.OVH_HOST }}
+          username: ${{ vars.OVH_USER }}
+          key: ${{ secrets.OVH_SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/tokyosushi
+            # Rollback migrations using the CURRENT running version
+            for i in $(seq 1 ${{ inputs.migrations_down }}); do
+              docker compose exec tsb-service ./tsb-migrate -cmd=down
+            done
+            # Switch to target version
+            docker pull ghcr.io/brunomoyse/tsb-service:${{ inputs.version }}
+            docker tag ghcr.io/brunomoyse/tsb-service:${{ inputs.version }} ghcr.io/brunomoyse/tsb-service:production
+            docker compose up -d tsb-service
+            docker image prune -f
