@@ -28,9 +28,6 @@ func isProduction() bool {
 }
 
 func getSameSiteMode() http.SameSite {
-	if !isProduction() {
-		return http.SameSiteNoneMode
-	}
 	return http.SameSiteLaxMode
 }
 
