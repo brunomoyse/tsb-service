@@ -10,7 +10,7 @@
 <tr><td align="center" style="padding:40px 16px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
     <!-- HEADER -->
-    <tr><td style="background-color:#1a1a1a;padding:24px 36px;text-align:center;">
+    <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:12px 12px 0 0;">
         <img src="{{.LogoURL}}" alt="Tokyo Sushi Bar" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
     </td></tr>
     <!-- RED ACCENT LINE -->
@@ -38,9 +38,9 @@
         <p style="margin:0 0 8px;font-size:16px;font-weight:600;color:#2D2D2D;">Récapitulatif de la commande</p>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">
             <tr>
-                <td style="background-color:#FAF9F7;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">Produit</td>
-                <td style="background-color:#FAF9F7;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">Qté</td>
-                <td style="background-color:#FAF9F7;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;text-align:right;">Prix</td>
+                <td style="background-color:#F0EBE3;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">Produit</td>
+                <td style="background-color:#F0EBE3;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">Qté</td>
+                <td style="background-color:#F0EBE3;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;text-align:right;">Prix</td>
             </tr>
             {{range .OrderItems}}
             <tr>
@@ -62,16 +62,16 @@
         {{end}}
         <p style="margin:16px 0 0;padding:12px 0 0;border-top:2px solid #E8E4DF;font-size:16px;font-weight:600;color:#2D2D2D;"><strong>Total :</strong> <span style="float:right;">{{.TotalPrice}} &euro;</span></p>
         <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;">
-        <tr><td style="background-color:#C41E24;border-radius:6px;padding:12px 28px;">
+        <tr><td style="background-color:#ef4444;border-radius:12px;padding:12px 28px;">
             <a href="{{.StatusLink}}" style="color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;display:inline-block;">Suivre l'état de votre commande</a>
         </td></tr>
         </table>
         <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">Pour toute question concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions de votre confiance et avons hâte de vous régaler avec notre expérience sushi authentique.</p>
     </td></tr>
     <!-- FOOTER -->
-    <tr><td style="background-color:#2D2D2D;padding:24px 36px;text-align:center;">
-        <p style="margin:0;font-size:12px;color:#9CA3AF;">Si vous n'avez pas passé cette commande, veuillez ignorer cet e-mail.</p>
-        <p style="margin:8px 0 0;font-size:12px;color:#9CA3AF;">&copy; 2026 Tokyo Sushi Bar. Tous droits réservés.</p>
+    <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:0 0 12px 12px;">
+        <p style="margin:0;font-size:12px;color:#6B6560;">Si vous n'avez pas passé cette commande, veuillez ignorer cet e-mail.</p>
+        <p style="margin:8px 0 0;font-size:12px;color:#6B6560;">&copy; 2026 Tokyo Sushi Bar. Tous droits réservés.</p>
     </td></tr>
 </table>
 </td></tr>
