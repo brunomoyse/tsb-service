@@ -10,12 +10,12 @@
 - **Multi-language Support**: Product and category translations stored in dedicated tables, language resolved from `Accept-Language` header
 - **Authentication**: JWT-based dual-token system (access + refresh tokens) with Google OAuth support
 - **Role-based Access Control**: `@auth` and `@admin` GraphQL directives for fine-grained authorization
-- **Structured Logging**: Request-scoped structured logging with `log/slog`
+- **Structured Logging**: Request-scoped structured logging with `go.uber.org/zap`
 - **Production Hardened**: Rate limiting, security headers, body size limits, CORS, graceful shutdown
 
 ## Technologies
 
-- **Go 1.24** with Gin framework
+- **Go 1.26** with Gin framework
 - **gqlgen** for GraphQL code generation
 - **PostgreSQL** with sqlx
 - **Mollie API** for payment processing
@@ -93,6 +93,17 @@ go test -v -race ./internal/... ./cmd/... ./pkg/...
 golangci-lint run --timeout=5m
 ```
 
+## Database Migrations
+
+Uses [pressly/goose](https://github.com/pressly/goose) v3. Migration files in `migrations/`.
+
+```bash
+go run cmd/migrate/main.go -cmd=up        # Run pending migrations
+go run cmd/migrate/main.go -cmd=down      # Rollback last migration
+go run cmd/migrate/main.go -cmd=status    # Check status
+go run cmd/migrate/main.go -cmd=create add_new_feature  # Create new migration
+```
+
 ## Docker
 
 ```bash
@@ -100,4 +111,16 @@ docker build -t tsb-service .
 docker run --name tsb-service --env-file .env -p 8080:8080 tsb-service
 ```
 
-Multi-stage Dockerfile with health check. Supports multi-arch builds (AMD64/ARM64).
+Multi-stage Dockerfile with health check. Supports multi-arch builds (AMD64/ARM64). Includes migration binary (`tsb-migrate`) and SQL files for in-container migration execution.
+
+## Deployment
+
+### Release
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+This triggers a GitHub Actions workflow that builds a `:production` + `:v1.0.0` AMD64 image, runs migrations on the production server, and deploys via SSH.
+
+### Rollback
+Go to the Actions tab → "Run workflow" → enter the version to rollback to (e.g. `v1.0.0`) and the number of migrations to roll back.
