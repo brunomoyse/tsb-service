@@ -248,14 +248,20 @@ func (h *UserHandler) LoginHandler(c *gin.Context) {
 
 	setAuthCookies(c, *accessToken, *refreshToken)
 
-	c.JSON(http.StatusOK, NewLoginResponse(user, address))
+	c.JSON(http.StatusOK, NewLoginResponse(user, address, *accessToken, *refreshToken))
 }
 
 func (h *UserHandler) LogoutHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// Retrieve and invalidate refresh token
+	// Retrieve refresh token from cookie, fallback to JSON body (mobile clients)
 	refreshToken, _ := c.Cookie("refresh_token")
+	if refreshToken == "" {
+		var req LogoutRequest
+		if err := c.ShouldBindJSON(&req); err == nil && req.RefreshToken != "" {
+			refreshToken = req.RefreshToken
+		}
+	}
 	if refreshToken != "" {
 		if err := h.service.InvalidateRefreshToken(ctx, refreshToken); err != nil {
 			logging.FromContext(ctx).Error("failed to invalidate refresh token", zap.Error(err))
@@ -323,6 +329,12 @@ func (h *UserHandler) GoogleAuthHandler(c *gin.Context) {
 		return
 	}
 	c.SetCookie("oauth_state", state, 60, "/", "", true, true)
+
+	// If mobile client, store platform hint so callback can redirect via deep link
+	if c.Query("platform") == "mobile" {
+		c.SetCookie("oauth_platform", "mobile", 60, "/", "", true, true)
+	}
+
 	c.Redirect(http.StatusFound, oauth2.GetGoogleAuthURL(state))
 }
 
@@ -433,15 +445,33 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 		return
 	}
 
-	// Set tokens as cookies and redirect.
+	// Set tokens as cookies.
 	setAuthCookies(c, accessToken, refreshToken)
+
+	// Check if this is a mobile OAuth flow
+	oauthPlatform, _ := c.Cookie("oauth_platform")
+	if oauthPlatform == "mobile" {
+		// Clear the platform cookie
+		c.SetCookie("oauth_platform", "", -1, "/", "", true, true)
+		// Redirect to custom URL scheme for Capacitor app
+		deepLink := fmt.Sprintf("tokyosushi://oauth/callback?accessToken=%s&refreshToken=%s", accessToken, refreshToken)
+		c.Redirect(http.StatusFound, deepLink)
+		return
+	}
+
 	c.Redirect(http.StatusFound, os.Getenv("REDIRECT_LOGIN_SUCCESSFUL"))
 }
 
 func (h *UserHandler) RefreshTokenHandler(c *gin.Context) {
-	// 1. Get refresh token from cookie
+	// 1. Get refresh token from cookie, fallback to JSON body (mobile clients)
 	refreshToken, err := c.Cookie("refresh_token")
-	if err != nil {
+	if err != nil || refreshToken == "" {
+		var req RefreshTokenRequest
+		if bindErr := c.ShouldBindJSON(&req); bindErr == nil && req.RefreshToken != "" {
+			refreshToken = req.RefreshToken
+		}
+	}
+	if refreshToken == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 		return
 	}
@@ -460,12 +490,14 @@ func (h *UserHandler) RefreshTokenHandler(c *gin.Context) {
 	// 3. Set new cookies
 	setAuthCookies(c, newAccessToken, newRefreshToken)
 
-	// 4. Return minimal user data
-	c.JSON(http.StatusOK, gin.H{
-		"user": gin.H{
+	// 4. Return tokens + minimal user data
+	c.JSON(http.StatusOK, RefreshTokenResponse{
+		User: gin.H{
 			"id":    user.ID,
 			"email": user.Email,
 		},
+		AccessToken:  newAccessToken,
+		RefreshToken: newRefreshToken,
 	})
 }
 
