@@ -4,6 +4,7 @@ import (
 	addressDomain "tsb-service/internal/modules/address/domain"
 	"tsb-service/internal/modules/user/domain"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -61,7 +62,26 @@ type UserResponse struct {
 }
 
 type LoginResponse struct {
-	User *UserResponse `json:"user"`
+	User         *UserResponse `json:"user"`
+	AccessToken  string        `json:"accessToken,omitempty"`
+	RefreshToken string        `json:"refreshToken,omitempty"`
+}
+
+// RefreshTokenRequest is used when a mobile client sends the refresh token in the body.
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refreshToken"`
+}
+
+// RefreshTokenResponse is returned after a successful token refresh.
+type RefreshTokenResponse struct {
+	User         gin.H  `json:"user"`
+	AccessToken  string `json:"accessToken,omitempty"`
+	RefreshToken string `json:"refreshToken,omitempty"`
+}
+
+// LogoutRequest is used when a mobile client sends the refresh token in the body.
+type LogoutRequest struct {
+	RefreshToken string `json:"refreshToken"`
 }
 
 func NewUserResponse(u *domain.User, a *addressDomain.Address) *UserResponse {
@@ -75,8 +95,10 @@ func NewUserResponse(u *domain.User, a *addressDomain.Address) *UserResponse {
 	}
 }
 
-func NewLoginResponse(u *domain.User, a *addressDomain.Address) *LoginResponse {
+func NewLoginResponse(u *domain.User, a *addressDomain.Address, accessToken, refreshToken string) *LoginResponse {
 	return &LoginResponse{
-		User: NewUserResponse(u, a),
+		User:         NewUserResponse(u, a),
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 	}
 }
