@@ -219,12 +219,14 @@ func main() {
 	api.GET("/oauth/google/callback", authLimiter.Middleware(), userHandler.GoogleAuthCallbackHandler)
 
 	// HTTP server
+	// Use ReadHeaderTimeout instead of ReadTimeout, and omit WriteTimeout,
+	// because both set deadlines on the underlying net.Conn that persist after
+	// WebSocket hijack — killing long-lived subscription connections.
 	srv := &http.Server{
-		Addr:         ":8080",
-		Handler:      router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:              ":8080",
+		Handler:           router,
+		ReadHeaderTimeout: 15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	// Graceful shutdown
