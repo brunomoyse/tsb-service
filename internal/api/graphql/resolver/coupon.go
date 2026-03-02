@@ -12,6 +12,7 @@ import (
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	couponDomain "tsb-service/internal/modules/coupon/domain"
+	"tsb-service/pkg/utils"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -37,14 +38,15 @@ func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateC
 	}
 
 	coupon := &couponDomain.Coupon{
-		ID:            uuid.New(),
-		Code:          input.Code,
-		DiscountType:  discountType,
-		DiscountValue: discountValue,
-		IsActive:      input.IsActive,
-		ValidFrom:     input.ValidFrom,
-		ValidUntil:    input.ValidUntil,
-		MaxUses:       input.MaxUses,
+		ID:             uuid.New(),
+		Code:           input.Code,
+		DiscountType:   discountType,
+		DiscountValue:  discountValue,
+		IsActive:       input.IsActive,
+		ValidFrom:      input.ValidFrom,
+		ValidUntil:     input.ValidUntil,
+		MaxUses:        input.MaxUses,
+		MaxUsesPerUser: input.MaxUsesPerUser,
 	}
 
 	if input.MinOrderAmount != nil {
@@ -104,6 +106,9 @@ func (r *mutationResolver) UpdateCoupon(ctx context.Context, id uuid.UUID, input
 	if input.MaxUses != nil {
 		coupon.MaxUses = input.MaxUses
 	}
+	if input.MaxUsesPerUser != nil {
+		coupon.MaxUsesPerUser = input.MaxUsesPerUser
+	}
 	if input.IsActive != nil {
 		coupon.IsActive = *input.IsActive
 	}
@@ -130,7 +135,13 @@ func (r *queryResolver) ValidateCoupon(ctx context.Context, code string, orderAm
 		return nil, fmt.Errorf("invalid order amount: %w", err)
 	}
 
-	_, discount, err := r.CouponService.ValidateCoupon(ctx, code, amount)
+	userID := utils.GetUserID(ctx)
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	_, discount, err := r.CouponService.ValidateCoupon(ctx, code, amount, userUUID)
 	if err != nil {
 		errMsg := err.Error()
 		return &model.CouponValidation{

@@ -11,10 +11,10 @@ import (
 )
 
 type CouponService interface {
-	ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal) (*domain.Coupon, decimal.Decimal, error)
+	ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal, userID uuid.UUID) (*domain.Coupon, decimal.Decimal, error)
 	IncrementUsage(ctx context.Context, id uuid.UUID) error
 	// IncrementUsageAtomic atomically increments and returns false if the coupon is no longer valid.
-	IncrementUsageAtomic(ctx context.Context, id uuid.UUID) (bool, error)
+	IncrementUsageAtomic(ctx context.Context, id uuid.UUID, userID uuid.UUID) (bool, error)
 	GetAllCoupons(ctx context.Context) ([]*domain.Coupon, error)
 	GetCoupon(ctx context.Context, id uuid.UUID) (*domain.Coupon, error)
 	CreateCoupon(ctx context.Context, coupon *domain.Coupon) error
@@ -29,13 +29,18 @@ func NewCouponService(repo domain.CouponRepository) CouponService {
 	return &couponService{repo: repo}
 }
 
-func (s *couponService) ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal) (*domain.Coupon, decimal.Decimal, error) {
+func (s *couponService) ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal, userID uuid.UUID) (*domain.Coupon, decimal.Decimal, error) {
 	coupon, err := s.repo.FindByCode(ctx, code)
 	if err != nil {
 		return nil, decimal.Zero, fmt.Errorf("invalid or expired coupon")
 	}
 
-	if err := coupon.Validate(orderAmount); err != nil {
+	userUsageCount, err := s.repo.GetUserUsageCount(ctx, coupon.ID, userID)
+	if err != nil {
+		return nil, decimal.Zero, fmt.Errorf("failed to check user usage: %w", err)
+	}
+
+	if err := coupon.Validate(orderAmount, userUsageCount); err != nil {
 		return coupon, decimal.Zero, fmt.Errorf("invalid or expired coupon")
 	}
 
@@ -47,7 +52,23 @@ func (s *couponService) IncrementUsage(ctx context.Context, id uuid.UUID) error 
 	return s.repo.IncrementUsedCount(ctx, id)
 }
 
-func (s *couponService) IncrementUsageAtomic(ctx context.Context, id uuid.UUID) (bool, error) {
+func (s *couponService) IncrementUsageAtomic(ctx context.Context, id uuid.UUID, userID uuid.UUID) (bool, error) {
+	// First, get the coupon to check if there's a per-user limit
+	coupon, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("failed to find coupon: %w", err)
+	}
+
+	// Atomically increment per-user usage
+	ok, err := s.repo.IncrementUserUsageAtomic(ctx, id, userID, coupon.MaxUsesPerUser)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		return false, nil
+	}
+
+	// Then increment global usage
 	return s.repo.IncrementUsedCountAtomic(ctx, id)
 }
 
