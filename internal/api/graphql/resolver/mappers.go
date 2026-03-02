@@ -214,6 +214,7 @@ func ToGQLCoupon(c *couponDomain.Coupon) *model.Coupon {
 		DiscountValue:  c.DiscountValue.String(),
 		MinOrderAmount: minOrderAmount,
 		MaxUses:        c.MaxUses,
+		MaxUsesPerUser: c.MaxUsesPerUser,
 		UsedCount:      c.UsedCount,
 		IsActive:       c.IsActive,
 		ValidFrom:      c.ValidFrom,

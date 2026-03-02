@@ -16,4 +16,9 @@ type CouponRepository interface {
 	// IncrementUsedCountAtomic atomically increments usage only if the coupon is still valid.
 	// Returns true if the increment succeeded, false if the coupon is no longer valid/available.
 	IncrementUsedCountAtomic(ctx context.Context, id uuid.UUID) (bool, error)
+	// GetUserUsageCount returns how many times a specific user has used a coupon.
+	GetUserUsageCount(ctx context.Context, couponID, userID uuid.UUID) (int, error)
+	// IncrementUserUsageAtomic atomically increments the per-user usage count.
+	// Returns true if the increment succeeded, false if the per-user limit was reached.
+	IncrementUserUsageAtomic(ctx context.Context, couponID, userID uuid.UUID, maxUsesPerUser *int) (bool, error)
 }

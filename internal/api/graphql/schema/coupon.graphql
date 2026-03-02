@@ -5,6 +5,7 @@ type Coupon {
     discountValue: String!
     minOrderAmount: String
     maxUses: Int
+    maxUsesPerUser: Int
     usedCount: Int!
     isActive: Boolean!
     validFrom: DateTime
@@ -24,6 +25,7 @@ input CreateCouponInput {
     discountValue: String!
     minOrderAmount: String
     maxUses: Int
+    maxUsesPerUser: Int
     isActive: Boolean!
     validFrom: DateTime
     validUntil: DateTime
@@ -35,6 +37,7 @@ input UpdateCouponInput {
     discountValue: String
     minOrderAmount: String
     maxUses: Int
+    maxUsesPerUser: Int
     isActive: Boolean
     validFrom: DateTime
     validUntil: DateTime

@@ -71,6 +71,7 @@ type ComplexityRoot struct {
 		ID             func(childComplexity int) int
 		IsActive       func(childComplexity int) int
 		MaxUses        func(childComplexity int) int
+		MaxUsesPerUser func(childComplexity int) int
 		MinOrderAmount func(childComplexity int) int
 		UsedCount      func(childComplexity int) int
 		ValidFrom      func(childComplexity int) int
@@ -474,6 +475,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Coupon.MaxUses(childComplexity), true
+	case "Coupon.maxUsesPerUser":
+		if e.ComplexityRoot.Coupon.MaxUsesPerUser == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Coupon.MaxUsesPerUser(childComplexity), true
 	case "Coupon.minOrderAmount":
 		if e.ComplexityRoot.Coupon.MinOrderAmount == nil {
 			break
@@ -2576,6 +2583,35 @@ func (ec *executionContext) fieldContext_Coupon_maxUses(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _Coupon_maxUsesPerUser(ctx context.Context, field graphql.CollectedField, obj *model.Coupon) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Coupon_maxUsesPerUser,
+		func(ctx context.Context) (any, error) {
+			return obj.MaxUsesPerUser, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Coupon_maxUsesPerUser(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Coupon",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Coupon_usedCount(ctx context.Context, field graphql.CollectedField, obj *model.Coupon) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2974,6 +3010,8 @@ func (ec *executionContext) fieldContext_Mutation_createCoupon(ctx context.Conte
 				return ec.fieldContext_Coupon_minOrderAmount(ctx, field)
 			case "maxUses":
 				return ec.fieldContext_Coupon_maxUses(ctx, field)
+			case "maxUsesPerUser":
+				return ec.fieldContext_Coupon_maxUsesPerUser(ctx, field)
 			case "usedCount":
 				return ec.fieldContext_Coupon_usedCount(ctx, field)
 			case "isActive":
@@ -3052,6 +3090,8 @@ func (ec *executionContext) fieldContext_Mutation_updateCoupon(ctx context.Conte
 				return ec.fieldContext_Coupon_minOrderAmount(ctx, field)
 			case "maxUses":
 				return ec.fieldContext_Coupon_maxUses(ctx, field)
+			case "maxUsesPerUser":
+				return ec.fieldContext_Coupon_maxUsesPerUser(ctx, field)
 			case "usedCount":
 				return ec.fieldContext_Coupon_usedCount(ctx, field)
 			case "isActive":
@@ -7412,6 +7452,8 @@ func (ec *executionContext) fieldContext_Query_coupons(_ context.Context, field 
 				return ec.fieldContext_Coupon_minOrderAmount(ctx, field)
 			case "maxUses":
 				return ec.fieldContext_Coupon_maxUses(ctx, field)
+			case "maxUsesPerUser":
+				return ec.fieldContext_Coupon_maxUsesPerUser(ctx, field)
 			case "usedCount":
 				return ec.fieldContext_Coupon_usedCount(ctx, field)
 			case "isActive":
@@ -7479,6 +7521,8 @@ func (ec *executionContext) fieldContext_Query_coupon(ctx context.Context, field
 				return ec.fieldContext_Coupon_minOrderAmount(ctx, field)
 			case "maxUses":
 				return ec.fieldContext_Coupon_maxUses(ctx, field)
+			case "maxUsesPerUser":
+				return ec.fieldContext_Coupon_maxUsesPerUser(ctx, field)
 			case "usedCount":
 				return ec.fieldContext_Coupon_usedCount(ctx, field)
 			case "isActive":
@@ -8623,6 +8667,8 @@ func (ec *executionContext) fieldContext_Subscription_couponUpdated(_ context.Co
 				return ec.fieldContext_Coupon_minOrderAmount(ctx, field)
 			case "maxUses":
 				return ec.fieldContext_Coupon_maxUses(ctx, field)
+			case "maxUsesPerUser":
+				return ec.fieldContext_Coupon_maxUsesPerUser(ctx, field)
 			case "usedCount":
 				return ec.fieldContext_Coupon_usedCount(ctx, field)
 			case "isActive":
@@ -10945,7 +10991,7 @@ func (ec *executionContext) unmarshalInputCreateCouponInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"code", "discountType", "discountValue", "minOrderAmount", "maxUses", "isActive", "validFrom", "validUntil"}
+	fieldsInOrder := [...]string{"code", "discountType", "discountValue", "minOrderAmount", "maxUses", "maxUsesPerUser", "isActive", "validFrom", "validUntil"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10987,6 +11033,13 @@ func (ec *executionContext) unmarshalInputCreateCouponInput(ctx context.Context,
 				return it, err
 			}
 			it.MaxUses = data
+		case "maxUsesPerUser":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxUsesPerUser"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MaxUsesPerUser = data
 		case "isActive":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isActive"))
 			data, err := ec.unmarshalNBoolean2bool(ctx, v)
@@ -11480,7 +11533,7 @@ func (ec *executionContext) unmarshalInputUpdateCouponInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"code", "discountType", "discountValue", "minOrderAmount", "maxUses", "isActive", "validFrom", "validUntil"}
+	fieldsInOrder := [...]string{"code", "discountType", "discountValue", "minOrderAmount", "maxUses", "maxUsesPerUser", "isActive", "validFrom", "validUntil"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11522,6 +11575,13 @@ func (ec *executionContext) unmarshalInputUpdateCouponInput(ctx context.Context,
 				return it, err
 			}
 			it.MaxUses = data
+		case "maxUsesPerUser":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxUsesPerUser"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MaxUsesPerUser = data
 		case "isActive":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isActive"))
 			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
@@ -11931,6 +11991,8 @@ func (ec *executionContext) _Coupon(ctx context.Context, sel ast.SelectionSet, o
 			out.Values[i] = ec._Coupon_minOrderAmount(ctx, field, obj)
 		case "maxUses":
 			out.Values[i] = ec._Coupon_maxUses(ctx, field, obj)
+		case "maxUsesPerUser":
+			out.Values[i] = ec._Coupon_maxUsesPerUser(ctx, field, obj)
 		case "usedCount":
 			out.Values[i] = ec._Coupon_usedCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {

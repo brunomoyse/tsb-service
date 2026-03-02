@@ -41,6 +41,7 @@ type Coupon struct {
 	DiscountValue  string     `json:"discountValue"`
 	MinOrderAmount *string    `json:"minOrderAmount,omitempty"`
 	MaxUses        *int       `json:"maxUses,omitempty"`
+	MaxUsesPerUser *int       `json:"maxUsesPerUser,omitempty"`
 	UsedCount      int        `json:"usedCount"`
 	IsActive       bool       `json:"isActive"`
 	ValidFrom      *time.Time `json:"validFrom,omitempty"`
@@ -60,6 +61,7 @@ type CreateCouponInput struct {
 	DiscountValue  string     `json:"discountValue"`
 	MinOrderAmount *string    `json:"minOrderAmount,omitempty"`
 	MaxUses        *int       `json:"maxUses,omitempty"`
+	MaxUsesPerUser *int       `json:"maxUsesPerUser,omitempty"`
 	IsActive       bool       `json:"isActive"`
 	ValidFrom      *time.Time `json:"validFrom,omitempty"`
 	ValidUntil     *time.Time `json:"validUntil,omitempty"`
@@ -287,6 +289,7 @@ type UpdateCouponInput struct {
 	DiscountValue  *string    `json:"discountValue,omitempty"`
 	MinOrderAmount *string    `json:"minOrderAmount,omitempty"`
 	MaxUses        *int       `json:"maxUses,omitempty"`
+	MaxUsesPerUser *int       `json:"maxUsesPerUser,omitempty"`
 	IsActive       *bool      `json:"isActive,omitempty"`
 	ValidFrom      *time.Time `json:"validFrom,omitempty"`
 	ValidUntil     *time.Time `json:"validUntil,omitempty"`

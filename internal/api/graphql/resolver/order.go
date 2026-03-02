@@ -21,8 +21,8 @@ import (
 	productDomain "tsb-service/internal/modules/product/domain"
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
-	"tsb-service/pkg/utils"
 	es "tsb-service/pkg/email/scaleway"
+	"tsb-service/pkg/utils"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -184,7 +184,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	var couponCode *string
 	var validatedCouponID *uuid.UUID
 	if input.CouponCode != nil && *input.CouponCode != "" {
-		coupon, cd, err := r.CouponService.ValidateCoupon(ctx, *input.CouponCode, total)
+		coupon, cd, err := r.CouponService.ValidateCoupon(ctx, *input.CouponCode, total, userUUID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid coupon: %w", err)
 		}
@@ -234,7 +234,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 	// Atomically reserve coupon usage BEFORE creating the order to prevent race conditions
 	if validatedCouponID != nil {
-		ok, err := r.CouponService.IncrementUsageAtomic(ctx, *validatedCouponID)
+		ok, err := r.CouponService.IncrementUsageAtomic(ctx, *validatedCouponID, userUUID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to reserve coupon: %w", err)
 		}

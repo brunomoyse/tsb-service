@@ -22,6 +22,7 @@ type Coupon struct {
 	DiscountValue  decimal.Decimal `db:"discount_value"`
 	MinOrderAmount *decimal.Decimal `db:"min_order_amount"`
 	MaxUses        *int            `db:"max_uses"`
+	MaxUsesPerUser *int            `db:"max_uses_per_user"`
 	UsedCount      int             `db:"used_count"`
 	IsActive       bool            `db:"is_active"`
 	ValidFrom      *time.Time      `db:"valid_from"`
@@ -30,7 +31,8 @@ type Coupon struct {
 }
 
 // Validate checks whether the coupon can be applied to an order with the given amount.
-func (c *Coupon) Validate(orderAmount decimal.Decimal) error {
+// userUsageCount is the number of times the current user has already used this coupon.
+func (c *Coupon) Validate(orderAmount decimal.Decimal, userUsageCount int) error {
 	if !c.IsActive {
 		return fmt.Errorf("coupon is not active")
 	}
@@ -45,6 +47,10 @@ func (c *Coupon) Validate(orderAmount decimal.Decimal) error {
 
 	if c.MaxUses != nil && c.UsedCount >= *c.MaxUses {
 		return fmt.Errorf("coupon usage limit reached")
+	}
+
+	if c.MaxUsesPerUser != nil && userUsageCount >= *c.MaxUsesPerUser {
+		return fmt.Errorf("coupon per-user usage limit reached")
 	}
 
 	if c.MinOrderAmount != nil && orderAmount.LessThan(*c.MinOrderAmount) {
