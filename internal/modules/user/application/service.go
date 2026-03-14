@@ -109,8 +109,9 @@ func (s *userService) CreateUser(ctx context.Context, firstName string, lastName
 				}
 				verificationURL := fmt.Sprintf("%s/verify?token=%s", apiBaseUrl, verificationToken)
 
+				lang := utils.GetLang(ctx)
 				go func() {
-					err := es.SendVerificationEmail(*updatedUser, utils.GetLang(ctx), verificationURL)
+					err := es.SendVerificationEmail(*updatedUser, lang, verificationURL)
 					if err != nil {
 						zap.L().Error("failed to send verification email", zap.String("user_id", updatedUser.ID.String()), zap.Error(err))
 					}
@@ -141,8 +142,9 @@ func (s *userService) CreateUser(ctx context.Context, firstName string, lastName
 		verificationURL := fmt.Sprintf("%s/verify?token=%s", apiBaseUrl, verificationToken)
 
 		// 3. Send verification email asynchronously in a goroutine.
+		lang := utils.GetLang(ctx)
 		go func() {
-			err = es.SendVerificationEmail(newUser, utils.GetLang(ctx), verificationURL)
+			err = es.SendVerificationEmail(newUser, lang, verificationURL)
 			if err != nil {
 				zap.L().Error("failed to send verification email", zap.String("user_id", newUser.ID.String()), zap.Error(err))
 			}
@@ -363,8 +365,9 @@ func (s *userService) VerifyUserEmail(ctx context.Context, userID string) error 
 	}
 
 	// 2. Send welcome email
+	lang := utils.GetLang(ctx)
 	go func() {
-		err = es.SendWelcomeEmail(*user, utils.GetLang(ctx), os.Getenv("APP_BASE_URL")+"/menu")
+		err = es.SendWelcomeEmail(*user, lang, os.Getenv("APP_BASE_URL")+"/menu")
 		if err != nil {
 			zap.L().Error("failed to send welcome email", zap.String("user_id", user.ID.String()), zap.Error(err))
 		}
@@ -433,8 +436,9 @@ func (s *userService) ResendVerificationEmail(ctx context.Context, userID string
 	}
 	verificationURL := fmt.Sprintf("%s/verify?token=%s", apiBaseUrl, verificationToken)
 
+	lang := utils.GetLang(ctx)
 	go func() {
-		err := es.SendVerificationEmail(*user, utils.GetLang(ctx), verificationURL)
+		err := es.SendVerificationEmail(*user, lang, verificationURL)
 		if err != nil {
 			zap.L().Error("failed to send verification email", zap.String("user_id", user.ID.String()), zap.Error(err))
 		}
@@ -500,8 +504,9 @@ func (s *userService) RequestPasswordReset(ctx context.Context, email string) er
 	appBaseURL := os.Getenv("APP_BASE_URL")
 	resetURL := fmt.Sprintf("%s/reset-password?token=%s", appBaseURL, token)
 
+	lang := utils.GetLang(ctx)
 	go func() {
-		err := es.SendPasswordResetEmail(*user, utils.GetLang(ctx), resetURL)
+		err := es.SendPasswordResetEmail(*user, lang, resetURL)
 		if err != nil {
 			zap.L().Error("failed to send password reset email", zap.String("user_id", user.ID.String()), zap.Error(err))
 		}

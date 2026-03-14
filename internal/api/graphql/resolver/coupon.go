@@ -186,15 +186,23 @@ func (r *subscriptionResolver) CouponUpdated(ctx context.Context) (<-chan *model
 	sub := r.Broker.Subscribe("couponUpdated")
 
 	go func() {
-		<-ctx.Done()
-		r.Broker.Unsubscribe("couponUpdated", sub)
-		close(ch)
-	}()
-
-	go func() {
-		for msg := range sub {
-			if c, ok := msg.(*model.Coupon); ok {
-				ch <- c
+		defer close(ch)
+		defer r.Broker.Unsubscribe("couponUpdated", sub)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-sub:
+				if !ok {
+					return
+				}
+				if c, ok := msg.(*model.Coupon); ok {
+					select {
+					case ch <- c:
+					case <-ctx.Done():
+						return
+					}
+				}
 			}
 		}
 	}()

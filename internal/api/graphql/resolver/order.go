@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	addressApplication "tsb-service/internal/modules/address/application"
@@ -28,6 +29,11 @@ import (
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 )
+
+// emailContext returns a background context with a 30-second timeout for async email operations.
+func emailContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 30*time.Second)
+}
 
 // CreateOrder is the resolver for the createOrder field.
 func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error) {
@@ -98,6 +104,9 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 				return nil, fmt.Errorf("choice %s does not belong to product %s", op.ChoiceID, pid)
 			}
 			unitPrice = unitPrice.Add(choice.PriceModifier)
+			if unitPrice.LessThan(decimal.Zero) {
+				return nil, fmt.Errorf("invalid price for product %s with choice %s: price cannot be negative", pid, op.ChoiceID)
+			}
 			choiceID = op.ChoiceID
 		}
 
@@ -300,11 +309,17 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 		molliePayment, err := r.PaymentService.CreatePayment(ctx, *order, items, *user, address)
 		if err != nil || molliePayment == nil {
+			// Clean up the orphaned order since payment creation failed
+			if delErr := r.OrderService.DeleteOrder(ctx, order.ID); delErr != nil {
+				zap.L().Error("failed to delete orphaned order", zap.String("order_id", order.ID.String()), zap.Error(delErr))
+			}
 			return nil, fmt.Errorf("failed to create payment: %w", err)
 		}
 	} else {
 		// If offline payment, send the notification e-mail already
 		go func() {
+			_, cancel := emailContext()
+			defer cancel()
 			err = es.SendOrderPendingEmail(*user, order.Language, *order, items)
 			if err != nil {
 				zap.L().Error("failed to send order pending email", zap.String("order_id", order.ID.String()), zap.Error(err))
@@ -345,7 +360,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	// If new status is "CONFIRMED" or "PREPARING", send the confirmation email
 	if oldOrder.OrderStatus == orderDomain.OrderStatusPending && (o.OrderStatus == orderDomain.OrderStatusConfirmed || o.OrderStatus == orderDomain.OrderStatusPreparing) {
 		go func() {
-			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
+			ctx, cancel := emailContext()
+			defer cancel()
+			user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
 			if err != nil {
 				zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return
@@ -359,7 +376,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			}
 
 			// 2) fetch all products in one go
-			prodDetailsSlice, err := r.ProductService.GetProductsByIDs(context.Background(), ids)
+			prodDetailsSlice, err := r.ProductService.GetProductsByIDs(ctx, ids)
 			if err != nil {
 				zap.L().Error("failed to retrieve products", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return
@@ -394,7 +411,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 
 			var address *addressDomain.Address
 			if o.AddressID != nil {
-				address, err = r.AddressService.GetAddressByID(context.Background(), *o.AddressID)
+				address, err = r.AddressService.GetAddressByID(ctx, *o.AddressID)
 				if err != nil {
 					zap.L().Error("failed to retrieve address", zap.String("order_id", o.ID.String()), zap.Error(err))
 					return
@@ -411,7 +428,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	// If new status is "AWAITING_PICK_UP" or "OUT_FOR_DELIVERY", send the order ready email
 	if o.OrderStatus == orderDomain.OrderStatusAwaitingUp || o.OrderStatus == orderDomain.OrderStatusOutForDelivery {
 		go func() {
-			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
+			ctx, cancel := emailContext()
+			defer cancel()
+			user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
 			if err != nil {
 				zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return
@@ -427,7 +446,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	// If new status is "PICKED_UP" or "DELIVERED", send the order completed email
 	if o.OrderStatus == orderDomain.OrderStatusPickedUp || o.OrderStatus == orderDomain.OrderStatusDelivered {
 		go func() {
-			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
+			ctx, cancel := emailContext()
+			defer cancel()
+			user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
 			if err != nil {
 				zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return
@@ -445,7 +466,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		(o.OrderStatus == orderDomain.OrderStatusConfirmed || o.OrderStatus == orderDomain.OrderStatusPreparing)
 	if input.EstimatedReadyTime != nil && oldOrder.EstimatedReadyTime != nil && !isInitialConfirmation {
 		go func() {
-			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
+			ctx, cancel := emailContext()
+			defer cancel()
+			user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
 			if err != nil {
 				zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return
@@ -470,7 +493,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			// Send refund issued email
 			if refund != nil {
 				go func() {
-					user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
+					ctx, cancel := emailContext()
+					defer cancel()
+					user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
 					if err != nil {
 						zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
 						return
@@ -486,7 +511,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		}
 
 		go func() {
-			user, err := r.UserService.GetUserByID(context.Background(), o.UserID.String())
+			ctx, cancel := emailContext()
+			defer cancel()
+			user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
 			if err != nil {
 				zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return
@@ -805,15 +832,23 @@ func (r *subscriptionResolver) OrderCreated(ctx context.Context) (<-chan *model.
 	sub := r.Broker.Subscribe("orderCreated")
 
 	go func() {
-		<-ctx.Done()
-		r.Broker.Unsubscribe("orderCreated", sub)
-		close(ch)
-	}()
-
-	go func() {
-		for msg := range sub {
-			if o, ok := msg.(*model.Order); ok {
-				ch <- o
+		defer close(ch)
+		defer r.Broker.Unsubscribe("orderCreated", sub)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-sub:
+				if !ok {
+					return
+				}
+				if o, ok := msg.(*model.Order); ok {
+					select {
+					case ch <- o:
+					case <-ctx.Done():
+						return
+					}
+				}
 			}
 		}
 	}()
@@ -827,15 +862,23 @@ func (r *subscriptionResolver) OrderUpdated(ctx context.Context) (<-chan *model.
 	sub := r.Broker.Subscribe("orderUpdated")
 
 	go func() {
-		<-ctx.Done()
-		r.Broker.Unsubscribe("orderUpdated", sub)
-		close(ch)
-	}()
-
-	go func() {
-		for msg := range sub {
-			if o, ok := msg.(*model.Order); ok {
-				ch <- o
+		defer close(ch)
+		defer r.Broker.Unsubscribe("orderUpdated", sub)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-sub:
+				if !ok {
+					return
+				}
+				if o, ok := msg.(*model.Order); ok {
+					select {
+					case ch <- o:
+					case <-ctx.Done():
+						return
+					}
+				}
 			}
 		}
 	}()
@@ -864,15 +907,23 @@ func (r *subscriptionResolver) MyOrderUpdated(ctx context.Context, orderID uuid.
 	sub := r.Broker.Subscribe(topic)
 
 	go func() {
-		<-ctx.Done()
-		r.Broker.Unsubscribe(topic, sub)
-		close(ch)
-	}()
-
-	go func() {
-		for msg := range sub {
-			if o, ok := msg.(*model.Order); ok {
-				ch <- o
+		defer close(ch)
+		defer r.Broker.Unsubscribe(topic, sub)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-sub:
+				if !ok {
+					return
+				}
+				if o, ok := msg.(*model.Order); ok {
+					select {
+					case ch <- o:
+					case <-ctx.Done():
+						return
+					}
+				}
 			}
 		}
 	}()

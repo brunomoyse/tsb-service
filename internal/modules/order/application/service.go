@@ -19,6 +19,7 @@ type OrderService interface {
 	GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error)
 	GetStatusHistory(ctx context.Context, orderID uuid.UUID) ([]*domain.OrderStatusHistory, error)
 
+	DeleteOrder(ctx context.Context, orderID uuid.UUID) error
 	BatchGetOrderProductsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.OrderProductRaw, error)
 	BatchGetOrdersByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error)
 }
@@ -45,6 +46,10 @@ func (s *orderService) CreateOrder(ctx context.Context, o *domain.Order, op *[]d
 	}
 
 	return order, orderProducts, nil
+}
+
+func (s *orderService) DeleteOrder(ctx context.Context, orderID uuid.UUID) error {
+	return s.repo.DeleteOrder(ctx, orderID)
 }
 
 func (s *orderService) GetPaginatedOrders(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*domain.Order, error) {

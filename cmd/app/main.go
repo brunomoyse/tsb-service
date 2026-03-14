@@ -246,6 +246,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	zap.L().Info("shutting down server")
+	authLimiter.Stop()
 	broker.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
