@@ -73,7 +73,7 @@ func main() {
 	if err != nil {
 		zap.L().Fatal("failed to connect to database", zap.Error(err))
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := db.Ping(); err != nil {
 		zap.L().Fatal("failed to ping database", zap.Error(err))

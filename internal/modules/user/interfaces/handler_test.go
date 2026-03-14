@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -238,10 +237,8 @@ func TestGetSameSiteMode(t *testing.T) {
 }
 
 func TestSetAuthCookies(t *testing.T) {
-	os.Setenv("SESSION_COOKIE_DOMAIN", ".example.com")
-	os.Setenv("APP_ENV", "production")
-	defer os.Unsetenv("SESSION_COOKIE_DOMAIN")
-	defer os.Unsetenv("APP_ENV")
+	t.Setenv("SESSION_COOKIE_DOMAIN", ".example.com")
+	t.Setenv("APP_ENV", "production")
 
 	t.Run("Sets access and refresh cookies", func(t *testing.T) {
 		w := httptest.NewRecorder()
@@ -278,10 +275,8 @@ func TestSetAuthCookies(t *testing.T) {
 }
 
 func TestClearAuthCookies(t *testing.T) {
-	os.Setenv("SESSION_COOKIE_DOMAIN", ".example.com")
-	os.Setenv("APP_ENV", "production")
-	defer os.Unsetenv("SESSION_COOKIE_DOMAIN")
-	defer os.Unsetenv("APP_ENV")
+	t.Setenv("SESSION_COOKIE_DOMAIN", ".example.com")
+	t.Setenv("APP_ENV", "production")
 
 	t.Run("Clears access and refresh cookies", func(t *testing.T) {
 		w := httptest.NewRecorder()
@@ -304,8 +299,7 @@ func TestClearAuthCookies(t *testing.T) {
 }
 
 func TestSameSiteModeOnCookies(t *testing.T) {
-	os.Setenv("SESSION_COOKIE_DOMAIN", "localhost")
-	defer os.Unsetenv("SESSION_COOKIE_DOMAIN")
+	t.Setenv("SESSION_COOKIE_DOMAIN", "localhost")
 
 	t.Run("Cookies always use SameSite=Lax", func(t *testing.T) {
 		w := httptest.NewRecorder()
@@ -325,10 +319,8 @@ func TestSameSiteModeOnCookies(t *testing.T) {
 // --- Login Handler Tests ---
 
 func TestLoginHandler(t *testing.T) {
-	os.Setenv("SESSION_COOKIE_DOMAIN", ".example.com")
-	os.Setenv("APP_ENV", "production")
-	defer os.Unsetenv("SESSION_COOKIE_DOMAIN")
-	defer os.Unsetenv("APP_ENV")
+	t.Setenv("SESSION_COOKIE_DOMAIN", ".example.com")
+	t.Setenv("APP_ENV", "production")
 
 	t.Run("Successful login sets cookies and returns user", func(t *testing.T) {
 		user := testUser()
@@ -514,10 +506,8 @@ func TestRegisterHandler(t *testing.T) {
 // --- Logout Handler Tests ---
 
 func TestLogoutHandler(t *testing.T) {
-	os.Setenv("SESSION_COOKIE_DOMAIN", ".example.com")
-	os.Setenv("APP_ENV", "production")
-	defer os.Unsetenv("SESSION_COOKIE_DOMAIN")
-	defer os.Unsetenv("APP_ENV")
+	t.Setenv("SESSION_COOKIE_DOMAIN", ".example.com")
+	t.Setenv("APP_ENV", "production")
 
 	t.Run("Successful logout clears cookies", func(t *testing.T) {
 		var invalidatedToken string
@@ -586,10 +576,8 @@ func TestLogoutHandler(t *testing.T) {
 // --- Refresh Token Handler Tests ---
 
 func TestRefreshTokenHandler(t *testing.T) {
-	os.Setenv("SESSION_COOKIE_DOMAIN", ".example.com")
-	os.Setenv("APP_ENV", "production")
-	defer os.Unsetenv("SESSION_COOKIE_DOMAIN")
-	defer os.Unsetenv("APP_ENV")
+	t.Setenv("SESSION_COOKIE_DOMAIN", ".example.com")
+	t.Setenv("APP_ENV", "production")
 
 	t.Run("Successful refresh returns new tokens", func(t *testing.T) {
 		user := testUser()
@@ -852,10 +840,8 @@ func TestForgotPasswordHandler(t *testing.T) {
 // --- ResetPassword Handler Tests ---
 
 func TestResetPasswordHandler(t *testing.T) {
-	os.Setenv("SESSION_COOKIE_DOMAIN", ".example.com")
-	os.Setenv("APP_ENV", "production")
-	defer os.Unsetenv("SESSION_COOKIE_DOMAIN")
-	defer os.Unsetenv("APP_ENV")
+	t.Setenv("SESSION_COOKIE_DOMAIN", ".example.com")
+	t.Setenv("APP_ENV", "production")
 
 	t.Run("Successful password reset clears cookies", func(t *testing.T) {
 		svc := &mockUserService{
@@ -924,10 +910,8 @@ func TestResetPasswordHandler(t *testing.T) {
 // --- VerifyEmail Handler Tests ---
 
 func TestVerifyEmailHandler(t *testing.T) {
-	os.Setenv("JWT_SECRET", testJWTSecret)
-	os.Setenv("REDIRECT_EMAIL_VERIFY_SUCCESSFUL", "https://example.com/verified")
-	defer os.Unsetenv("JWT_SECRET")
-	defer os.Unsetenv("REDIRECT_EMAIL_VERIFY_SUCCESSFUL")
+	t.Setenv("JWT_SECRET", testJWTSecret)
+	t.Setenv("REDIRECT_EMAIL_VERIFY_SUCCESSFUL", "https://example.com/verified")
 
 	t.Run("Missing token returns 400", func(t *testing.T) {
 		svc := &mockUserService{}

@@ -14,6 +14,7 @@ type ProductService interface {
 	GetProduct(ctx context.Context, id uuid.UUID) (*domain.Product, error)
 	GetProducts(ctx context.Context) ([]*domain.Product, error)
 	GetProductsByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error)
+	GetProductNamesForInvoice(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error)
 	GetCategories(ctx context.Context) ([]*domain.Category, error)
 	GetCategory(ctx context.Context, id uuid.UUID) (*domain.Category, error)
 	UpdateProduct(ctx context.Context, product *domain.Product) error
@@ -95,6 +96,10 @@ func (s *productService) GetProducts(ctx context.Context) ([]*domain.Product, er
 
 func (s *productService) GetProductsByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error) {
 	return s.repo.FindByIDs(ctx, productIDs)
+}
+
+func (s *productService) GetProductNamesForInvoice(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error) {
+	return s.repo.FindNamesByIDs(ctx, productIDs)
 }
 
 // GetCategories retrieves a list of categories.

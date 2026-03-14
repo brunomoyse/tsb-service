@@ -847,6 +847,9 @@ func (r *queryResolver) MyOrders(ctx context.Context, first *int, page *int) ([]
 
 	// Cast userID to uuid.UUID
 	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
 
 	o, err := r.OrderService.GetPaginatedOrders(ctx, p, f, &userUUID)
 	if err != nil {

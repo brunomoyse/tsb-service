@@ -32,7 +32,7 @@ func main() {
 		zap.L().Error("failed to connect to database", zap.Error(err))
 		os.Exit(1)
 	}
-	defer dbConn.Close()
+	defer func() { _ = dbConn.Close() }()
 
 	// Initialize email service
 	if err := es.InitService(); err != nil {

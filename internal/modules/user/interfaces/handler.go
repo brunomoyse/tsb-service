@@ -391,7 +391,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user info"})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var googleUser GoogleUserInfo
 	if err := json.NewDecoder(resp.Body).Decode(&googleUser); err != nil {

@@ -139,7 +139,7 @@ func UploadProductImage(ctx context.Context, src io.Reader, filename string, slu
 	if err != nil {
 		return fmt.Errorf("upload request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("file service upload failed with status %d", resp.StatusCode)
@@ -178,7 +178,7 @@ func RenameProductImage(ctx context.Context, oldSlug, newSlug string) error {
 	if err != nil {
 		return fmt.Errorf("rename request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("file service rename failed with status %d", resp.StatusCode)
@@ -204,7 +204,7 @@ func DeleteProductImage(ctx context.Context, slug string) error {
 	if err != nil {
 		return fmt.Errorf("delete request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("file service delete failed with status %d", resp.StatusCode)

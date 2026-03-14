@@ -98,8 +98,8 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 		return
 	}
 
-	if externalPayment.Status == "paid" {
-
+	switch externalPayment.Status {
+	case "paid":
 		order, orderProducts, err := h.orderService.GetOrderByID(ctx, payment.OrderID)
 		if err != nil {
 			log.Error("webhook: failed to retrieve order", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
@@ -172,7 +172,7 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 		if err != nil {
 			log.Error("webhook: failed to send order pending email", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
 		}
-	} else if externalPayment.Status == "cancelled" || externalPayment.Status == "failed" || externalPayment.Status == "expired" {
+	case "cancelled", "failed", "expired":
 		log.Info("webhook: payment not paid", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.String("status", externalPayment.Status))
 		canceledStatus := domain.OrderStatusCanceled
 
