@@ -5,6 +5,7 @@ type User {
     lastName: String!
     phoneNumber: String
     isAdmin: Boolean!
+    notifyMarketing: Boolean!
     emailVerifiedAt: DateTime
     deletionRequestedAt: DateTime
     address: Address
@@ -17,6 +18,7 @@ input UpdateUserInput {
     email: String
     phoneNumber: String
     addressId: String
+    notifyMarketing: Boolean
 }
 
 extend type Query {

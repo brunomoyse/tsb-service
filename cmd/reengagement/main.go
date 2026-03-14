@@ -45,6 +45,7 @@ func main() {
 		SELECT u.id, u.first_name, u.last_name, u.email
 		FROM users u
 		WHERE u.email_verified_at IS NOT NULL
+		AND u.notify_marketing = true
 		AND (
 			(SELECT MAX(o.created_at) FROM orders o WHERE o.user_id = u.id) < NOW() - INTERVAL '30 days'
 			OR

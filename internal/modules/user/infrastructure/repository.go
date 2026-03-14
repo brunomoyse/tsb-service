@@ -84,10 +84,10 @@ func (r *UserRepository) UpdateGoogleID(ctx context.Context, userID string, goog
 func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) (*domain.User, error) {
 	query := `
 		UPDATE users
-		SET first_name = $1, last_name = $2, email = $3, phone_number = $4, address_id = $5, email_verified_at = $6
-		WHERE id = $7
+		SET first_name = $1, last_name = $2, email = $3, phone_number = $4, address_id = $5, email_verified_at = $6, notify_marketing = $7
+		WHERE id = $8
 	`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.EmailVerifiedAt, user.ID)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.EmailVerifiedAt, user.NotifyMarketing, user.ID)
 	if err != nil {
 		return nil, err
 	}

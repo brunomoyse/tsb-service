@@ -301,11 +301,12 @@ type UpdateProductInput struct {
 }
 
 type UpdateUserInput struct {
-	FirstName   *string `json:"firstName,omitempty"`
-	LastName    *string `json:"lastName,omitempty"`
-	Email       *string `json:"email,omitempty"`
-	PhoneNumber *string `json:"phoneNumber,omitempty"`
-	AddressID   *string `json:"addressId,omitempty"`
+	FirstName       *string `json:"firstName,omitempty"`
+	LastName        *string `json:"lastName,omitempty"`
+	Email           *string `json:"email,omitempty"`
+	PhoneNumber     *string `json:"phoneNumber,omitempty"`
+	AddressID       *string `json:"addressId,omitempty"`
+	NotifyMarketing *bool   `json:"notifyMarketing,omitempty"`
 }
 
 type User struct {
@@ -315,6 +316,7 @@ type User struct {
 	LastName            string     `json:"lastName"`
 	PhoneNumber         *string    `json:"phoneNumber,omitempty"`
 	IsAdmin             bool       `json:"isAdmin"`
+	NotifyMarketing     bool       `json:"notifyMarketing"`
 	EmailVerifiedAt     *time.Time `json:"emailVerifiedAt,omitempty"`
 	DeletionRequestedAt *time.Time `json:"deletionRequestedAt,omitempty"`
 	Address             *Address   `json:"address,omitempty"`
