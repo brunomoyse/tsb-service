@@ -1,6 +1,7 @@
 package invoice
 
 type labels struct {
+	FilePrefix       string
 	InvoiceTitle     string
 	Date             string
 	OrderRef         string
@@ -32,6 +33,7 @@ type labels struct {
 
 var translations = map[string]labels{
 	"fr": {
+		FilePrefix:       "facture",
 		InvoiceTitle:     "Facture",
 		Date:             "Date",
 		OrderRef:         "Réf. commande",
@@ -61,6 +63,7 @@ var translations = map[string]labels{
 		VATRate:          "Taux TVA",
 	},
 	"en": {
+		FilePrefix:       "invoice",
 		InvoiceTitle:     "Invoice",
 		Date:             "Date",
 		OrderRef:         "Order ref.",
@@ -96,4 +99,9 @@ func getLabels(lang string) labels {
 		return l
 	}
 	return translations["fr"]
+}
+
+// FilePrefix returns the localized invoice file prefix (e.g. "facture", "invoice").
+func FilePrefix(lang string) string {
+	return getLabels(lang).FilePrefix
 }
