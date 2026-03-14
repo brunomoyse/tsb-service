@@ -16,10 +16,10 @@ type User struct {
 	EmailVerifiedAt *time.Time `db:"email_verified_at" json:"emailVerifiedAt"`
 	PhoneNumber     *string    `db:"phone_number" json:"phoneNumber"`
 	AddressID       *string    `db:"address_id" json:"addressId"`
-	PasswordHash    *string    `db:"password_hash" json:"passwordHash"`
-	Salt            *string    `db:"salt" json:"salt"`
-	RememberToken   *string    `db:"remember_token" json:"rememberToken"`
-	GoogleID            *string    `db:"google_id" json:"googleId"`
+	PasswordHash    *string    `db:"password_hash" json:"-"`
+	Salt            *string    `db:"salt" json:"-"`
+	RememberToken   *string    `db:"remember_token" json:"-"`
+	GoogleID            *string    `db:"google_id" json:"-"`
 	IsAdmin             bool       `db:"is_admin" json:"isAdmin"`
 	DeletionRequestedAt *time.Time `db:"deletion_requested_at" json:"deletionRequestedAt"`
 }

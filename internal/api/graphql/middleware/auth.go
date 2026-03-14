@@ -29,10 +29,10 @@ func OptionalAuthMiddleware(secretKey string) gin.HandlerFunc {
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 					return nil, jwt.ErrSignatureInvalid
 				}
-				return []byte(secretKey), nil
+				return utils.DeriveKey(secretKey, "auth"), nil
 			})
 
-			if err == nil && token.Valid && claims.Subject != "" {
+			if err == nil && token.Valid && claims.Subject != "" && claims.Type == "access" {
 				ctxWithUser := utils.SetUserID(c.Request.Context(), claims.Subject)
 				ctxWithUser = utils.SetIsAdmin(ctxWithUser, claims.IsAdmin)
 				c.Request = c.Request.WithContext(ctxWithUser)

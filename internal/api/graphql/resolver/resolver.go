@@ -108,9 +108,9 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, jwtSecret strin
 				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 					return nil, jwt.ErrSignatureInvalid
 				}
-				return []byte(jwtSecret), nil
+				return utils.DeriveKey(jwtSecret, "auth"), nil
 			})
-			if err == nil && token.Valid && claims.Subject != "" {
+			if err == nil && token.Valid && claims.Subject != "" && claims.Type == "access" {
 				ctx = utils.SetUserID(ctx, claims.Subject)
 				ctx = utils.SetIsAdmin(ctx, claims.IsAdmin)
 			}
