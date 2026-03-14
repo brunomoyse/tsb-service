@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-pdf/fpdf"
-	"github.com/shopspring/decimal"
 )
 
 //go:embed fonts/DejaVuSans.ttf
@@ -29,12 +28,6 @@ const (
 	RestaurantEmail   = "tokyosushibar888@gmail.com"
 )
 
-// Belgian VAT rates
-var (
-	VATRateTakeaway = decimal.NewFromFloat(0.06) // 6% for takeaway & delivery
-	VATRateDineIn   = decimal.NewFromFloat(0.12) // 12% for dine-in
-)
-
 type InvoiceData struct {
 	CustomerName  string
 	CustomerEmail string
@@ -47,12 +40,12 @@ type InvoiceData struct {
 
 	Items []InvoiceItem
 
-	Subtotal         string // sum of line totals (TTC) before discounts/fees
+	Subtotal         string // sum of line totals before discounts/fees
 	TakeawayDiscount *string
 	CouponDiscount   *string
 	CouponCode       *string
 	DeliveryFee      *string
-	Total            string // final total TTC
+	Total            string // final total
 
 	Address *InvoiceAddress
 }
@@ -61,8 +54,8 @@ type InvoiceItem struct {
 	Name      string
 	Code      string
 	Quantity  int64
-	UnitPrice string // TTC
-	LineTotal string // TTC
+	UnitPrice string
+	LineTotal string
 }
 
 type InvoiceAddress struct {
@@ -92,30 +85,9 @@ func formatOrderRef(orderID string, orderDate time.Time) string {
 	return fmt.Sprintf("TSB-%d-%s", orderDate.Year(), strings.ToUpper(short))
 }
 
-// exclVAT computes the price excluding VAT from a TTC price.
-// Formula: HT = TTC / (1 + rate), rounded to 2 decimals.
-func exclVAT(ttc, vatRate decimal.Decimal) decimal.Decimal {
-	return ttc.Div(decimal.NewFromInt(1).Add(vatRate)).Round(2)
-}
-
-// formatDec formats a decimal to 2-digit string (e.g. "12.50").
-func formatDec(d decimal.Decimal) string {
-	return d.StringFixed(2)
-}
-
-// VATRateForOrderType returns the applicable VAT rate.
-func VATRateForOrderType(orderType string) decimal.Decimal {
-	if orderType == "DINE_IN" {
-		return VATRateDineIn
-	}
-	return VATRateTakeaway // PICKUP and DELIVERY
-}
-
 // GeneratePDF generates a PDF invoice and returns the raw bytes.
 func GeneratePDF(data InvoiceData) ([]byte, error) {
 	l := getLabels(data.Language)
-	vatRate := VATRateForOrderType(data.OrderType)
-	vatPct := vatRate.Mul(decimal.NewFromInt(100)).IntPart() // 6 or 12
 
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(20, 20, 20)
@@ -158,7 +130,7 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 	pdf.SetFont("DejaVu", "", 9)
 	pdf.CellFormat(usableW, 5, RestaurantAddress, "", 1, "L", false, 0, "")
 	pdf.CellFormat(usableW, 5, fmt.Sprintf("%s: %s  |  %s: %s", l.Phone, RestaurantPhone, l.Email, RestaurantEmail), "", 1, "L", false, 0, "")
-	pdf.CellFormat(usableW, 5, fmt.Sprintf("%s: %s  |  %s: %d%%", l.CompanyNumber, RestaurantCompany, l.VATRate, vatPct), "", 1, "L", false, 0, "")
+	pdf.CellFormat(usableW, 5, fmt.Sprintf("%s: %s", l.CompanyNumber, RestaurantCompany), "", 1, "L", false, 0, "")
 
 	pdf.Ln(6)
 	pdf.SetDrawColor(220, 220, 220)
@@ -208,11 +180,10 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 	pdf.Ln(6)
 
 	// === ITEMS TABLE ===
-	// Columns: Product | Qty | Unit TTC | Total TTC
 	colProduct := usableW * 0.50
 	colQty := usableW * 0.10
-	colUnitTTC := usableW * 0.20
-	colTotalTTC := usableW * 0.20
+	colUnit := usableW * 0.20
+	colTotal := usableW * 0.20
 
 	// Table header
 	pdf.SetFillColor(245, 245, 242)
@@ -220,8 +191,8 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 	pdf.SetFont("DejaVu", "B", 9)
 	pdf.CellFormat(colProduct, 8, l.Product, "", 0, "L", true, 0, "")
 	pdf.CellFormat(colQty, 8, l.Qty, "", 0, "C", true, 0, "")
-	pdf.CellFormat(colUnitTTC, 8, l.UnitPriceInclVAT, "", 0, "R", true, 0, "")
-	pdf.CellFormat(colTotalTTC, 8, l.TotalInclVAT, "", 1, "R", true, 0, "")
+	pdf.CellFormat(colUnit, 8, l.UnitPrice, "", 0, "R", true, 0, "")
+	pdf.CellFormat(colTotal, 8, l.Total, "", 1, "R", true, 0, "")
 
 	// Table rows
 	pdf.SetFont("DejaVu", "", 9)
@@ -239,8 +210,8 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 
 		pdf.CellFormat(colProduct, 7, name, "", 0, "L", fill, 0, "")
 		pdf.CellFormat(colQty, 7, fmt.Sprintf("%d", item.Quantity), "", 0, "C", fill, 0, "")
-		pdf.CellFormat(colUnitTTC, 7, item.UnitPrice+" €", "", 0, "R", fill, 0, "")
-		pdf.CellFormat(colTotalTTC, 7, item.LineTotal+" €", "", 1, "R", fill, 0, "")
+		pdf.CellFormat(colUnit, 7, item.UnitPrice+" €", "", 0, "R", fill, 0, "")
+		pdf.CellFormat(colTotal, 7, item.LineTotal+" €", "", 1, "R", fill, 0, "")
 	}
 
 	pdf.Ln(4)
@@ -265,20 +236,11 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 		pdf.CellFormat(valueW, 6, value+" €", "", 1, "R", false, 0, "")
 	}
 
-	// Parse amounts for VAT computation
-	subtotalTTC, _ := decimal.NewFromString(data.Subtotal)
-	totalTTC, _ := decimal.NewFromString(data.Total)
-
-	subtotalHT := exclVAT(subtotalTTC, vatRate)
-
-	// Subtotal excl. VAT
+	// Subtotal
 	pdf.SetTextColor(60, 60, 60)
-	renderTotalLine(l.SubtotalExclVAT, formatDec(subtotalHT), false)
+	renderTotalLine(l.Subtotal, data.Subtotal, false)
 
-	// Subtotal incl. VAT
-	renderTotalLine(l.SubtotalInclVAT, formatDec(subtotalTTC), false)
-
-	// Discounts (shown as TTC amounts)
+	// Discounts
 	if data.TakeawayDiscount != nil {
 		pdf.SetTextColor(0, 150, 80)
 		renderTotalLine(l.TakeawayDiscount, "- "+*data.TakeawayDiscount, false)
@@ -296,20 +258,21 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 		renderTotalLine(l.DeliveryFee, *data.DeliveryFee, false)
 	}
 
-	// VAT line
-	totalHT := exclVAT(totalTTC, vatRate)
-	vatAmount := totalTTC.Sub(totalHT)
-	pdf.SetTextColor(60, 60, 60)
-	renderTotalLine(fmt.Sprintf("%s (%d%%)", l.VATAmount, vatPct), formatDec(vatAmount), false)
-
 	pdf.Ln(2)
 	pdf.SetDrawColor(200, 50, 50)
 	pdf.Line(totalsX, pdf.GetY(), pageW-rightMargin, pdf.GetY())
 	pdf.Ln(2)
 
-	// Total TTC (bold)
+	// Total (bold)
 	pdf.SetTextColor(30, 30, 30)
-	renderTotalLine(l.Total, formatDec(totalTTC), true)
+	renderTotalLine(l.Total, data.Total, true)
+
+	// VAT included note
+	pdf.Ln(2)
+	pdf.SetTextColor(130, 130, 130)
+	pdf.SetFont("DejaVu", "", 8)
+	pdf.SetX(totalsX)
+	pdf.CellFormat(totalsW, 5, l.VATIncluded, "", 1, "R", false, 0, "")
 
 	// === FOOTER ===
 	pdf.Ln(12)

@@ -13,14 +13,9 @@ type labels struct {
 	DeliveryAddress  string
 	Product          string
 	Qty              string
-	UnitPriceInclVAT string
-	UnitPriceExclVAT string
-	TotalInclVAT     string
-	TotalExclVAT     string
+	UnitPrice        string
 	Total            string
-	SubtotalExclVAT  string
-	SubtotalInclVAT  string
-	VATAmount        string
+	Subtotal         string
 	TakeawayDiscount string
 	CouponDiscount   string
 	DeliveryFee      string
@@ -28,7 +23,7 @@ type labels struct {
 	CompanyNumber    string
 	Phone            string
 	Email            string
-	VATRate          string
+	VATIncluded      string
 }
 
 var translations = map[string]labels{
@@ -45,14 +40,9 @@ var translations = map[string]labels{
 		DeliveryAddress:  "Adresse de livraison",
 		Product:          "Produit",
 		Qty:              "Qté",
-		UnitPriceInclVAT: "P.U. TTC",
-		UnitPriceExclVAT: "P.U. HTVA",
-		TotalInclVAT:     "Total TTC",
-		TotalExclVAT:     "Total HTVA",
-		Total:            "Total TTC",
-		SubtotalExclVAT:  "Sous-total HTVA",
-		SubtotalInclVAT:  "Sous-total TTC",
-		VATAmount:         "TVA",
+		UnitPrice:        "Prix unit.",
+		Total:            "Total",
+		Subtotal:         "Sous-total",
 		TakeawayDiscount: "Remise emporter (-10%)",
 		CouponDiscount:   "Coupon",
 		DeliveryFee:      "Frais de livraison",
@@ -60,7 +50,7 @@ var translations = map[string]labels{
 		CompanyNumber:    "N° d'entreprise",
 		Phone:            "Tél",
 		Email:            "Email",
-		VATRate:          "Taux TVA",
+		VATIncluded:      "TVA comprise",
 	},
 	"en": {
 		FilePrefix:       "invoice",
@@ -75,14 +65,9 @@ var translations = map[string]labels{
 		DeliveryAddress:  "Delivery address",
 		Product:          "Product",
 		Qty:              "Qty",
-		UnitPriceInclVAT: "Unit (incl.)",
-		UnitPriceExclVAT: "Unit (excl.)",
-		TotalInclVAT:     "Total (incl.)",
-		TotalExclVAT:     "Total (excl.)",
-		Total:            "Total (incl. VAT)",
-		SubtotalExclVAT:  "Subtotal (excl. VAT)",
-		SubtotalInclVAT:  "Subtotal (incl. VAT)",
-		VATAmount:         "VAT",
+		UnitPrice:        "Unit price",
+		Total:            "Total",
+		Subtotal:         "Subtotal",
 		TakeawayDiscount: "Takeaway discount (-10%)",
 		CouponDiscount:   "Coupon",
 		DeliveryFee:      "Delivery fee",
@@ -90,7 +75,7 @@ var translations = map[string]labels{
 		CompanyNumber:    "Company no.",
 		Phone:            "Phone",
 		Email:            "Email",
-		VATRate:          "VAT rate",
+		VATIncluded:      "VAT included",
 	},
 }
 
