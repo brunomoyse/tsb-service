@@ -226,6 +226,7 @@ func main() {
 	api.GET("/oauth/google/callback", authLimiter.Middleware(), userHandler.GoogleAuthCallbackHandler)
 
 	strictAuth := middleware.AuthMiddleware(jwtSecret)
+	api.POST("/change-password", strictAuth, userHandler.ChangePasswordHandler)
 	api.GET("/orders/:id/invoice", strictAuth, orderHandler.DownloadInvoice)
 
 	feedbackLimiter := middleware.NewRateLimiter(2.0/60, 2) // 2 req/min per IP

@@ -42,7 +42,8 @@ type mockUserService struct {
 	generateTokensFn         func(ctx context.Context, user domain.User, jwtToken string) (string, string, error)
 	refreshTokenFn           func(ctx context.Context, oldRefreshToken, jwtSecret string) (string, string, *domain.User, error)
 	updateGoogleIDFn         func(ctx context.Context, userID, googleID string) (*domain.User, error)
-	updateMeFn               func(ctx context.Context, userID string, firstName, lastName, email, phoneNumber, addressID *string) (*domain.User, error)
+	updateMeFn               func(ctx context.Context, userID string, firstName, lastName, email, phoneNumber, addressID *string, notifyMarketing *bool) (*domain.User, error)
+	changePasswordFn         func(ctx context.Context, userID, currentPassword, newPassword string) error
 	updateUserPasswordFn     func(ctx context.Context, userID, password, salt string) (*domain.User, error)
 	updateEmailVerifiedAtFn  func(ctx context.Context, userID string) (*domain.User, error)
 	invalidateRefreshTokenFn func(ctx context.Context, refreshToken string) error
@@ -107,11 +108,18 @@ func (m *mockUserService) UpdateGoogleID(ctx context.Context, userID, googleID s
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *mockUserService) UpdateMe(ctx context.Context, userID string, firstName, lastName, email, phoneNumber, addressID *string) (*domain.User, error) {
+func (m *mockUserService) UpdateMe(ctx context.Context, userID string, firstName, lastName, email, phoneNumber, addressID *string, notifyMarketing *bool) (*domain.User, error) {
 	if m.updateMeFn != nil {
-		return m.updateMeFn(ctx, userID, firstName, lastName, email, phoneNumber, addressID)
+		return m.updateMeFn(ctx, userID, firstName, lastName, email, phoneNumber, addressID, notifyMarketing)
 	}
 	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *mockUserService) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
+	if m.changePasswordFn != nil {
+		return m.changePasswordFn(ctx, userID, currentPassword, newPassword)
+	}
+	return fmt.Errorf("not implemented")
 }
 
 func (m *mockUserService) UpdateUserPassword(ctx context.Context, userID, password, salt string) (*domain.User, error) {
@@ -724,7 +732,7 @@ func TestUpdateMeHandler(t *testing.T) {
 		updatedUser.FirstName = "Janet"
 
 		svc := &mockUserService{
-			updateMeFn: func(_ context.Context, userID string, firstName, _, _, _, _ *string) (*domain.User, error) {
+			updateMeFn: func(_ context.Context, userID string, firstName, _, _, _, _ *string, _ *bool) (*domain.User, error) {
 				assert.Equal(t, user.ID.String(), userID)
 				assert.Equal(t, "Janet", *firstName)
 				return &updatedUser, nil
