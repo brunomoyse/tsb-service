@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
 	orderApplication "tsb-service/internal/modules/order/application"
@@ -141,12 +142,21 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 		return
 	}
 
-	// 10. Compute subtotal (sum of line totals before discounts/fees)
-	subtotal := order.TotalPrice.
-		Add(order.TakeawayDiscount).
-		Add(order.CouponDiscount)
-	if order.DeliveryFee != nil {
-		subtotal = subtotal.Sub(*order.DeliveryFee)
+	// 10. Compute subtotal from line items (sum of item totals before discounts/fees)
+	itemsSubtotal := decimal.Zero
+	for _, op := range *orderProducts {
+		itemsSubtotal = itemsSubtotal.Add(op.TotalPrice)
+	}
+
+	// Use order.TotalPrice if available, otherwise compute from items
+	totalPrice := order.TotalPrice
+	if totalPrice.IsZero() && !itemsSubtotal.IsZero() {
+		totalPrice = itemsSubtotal.
+			Sub(order.TakeawayDiscount).
+			Sub(order.CouponDiscount)
+		if order.DeliveryFee != nil {
+			totalPrice = totalPrice.Add(*order.DeliveryFee)
+		}
 	}
 
 	// 11. Build invoice data
@@ -159,8 +169,8 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 		OrderType:     string(order.OrderType),
 		Language:      order.Language,
 		Items:         items,
-		Subtotal:      utils.FormatDecimal(subtotal),
-		Total:         utils.FormatDecimal(order.TotalPrice),
+		Subtotal:      utils.FormatDecimal(itemsSubtotal),
+		Total:         utils.FormatDecimal(totalPrice),
 	}
 
 	if !order.TakeawayDiscount.IsZero() {
