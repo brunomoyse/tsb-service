@@ -34,7 +34,7 @@ func generateToken(userID string, isAdmin bool, tokenType string, duration time.
 		IsAdmin: isAdmin,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(testSecret))
+	return token.SignedString(utils.DeriveKey(testSecret, "auth"))
 }
 
 func TestAuthMiddleware_IsAdmin(t *testing.T) {

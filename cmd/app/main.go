@@ -96,6 +96,10 @@ func main() {
 		zap.L().Error("JWT_SECRET is required")
 		os.Exit(1)
 	}
+	if len(jwtSecret) < 32 {
+		zap.L().Error("JWT_SECRET must be at least 32 characters")
+		os.Exit(1)
+	}
 
 	if err := scaleway.InitService(); err != nil {
 		zap.L().Error("failed to initialize email service", zap.Error(err))

@@ -37,7 +37,7 @@ func AuthMiddleware(secretKey string) gin.HandlerFunc {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrSignatureInvalid
 			}
-			return []byte(secretKey), nil
+			return utils.DeriveKey(secretKey, "auth"), nil
 		})
 
 		// 4) Handle parsing/validation errors
@@ -52,7 +52,7 @@ func AuthMiddleware(secretKey string) gin.HandlerFunc {
 			return
 		}
 
-		if !token.Valid || claims.Subject == "" {
+		if !token.Valid || claims.Subject == "" || claims.Type != "access" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 			return
 		}

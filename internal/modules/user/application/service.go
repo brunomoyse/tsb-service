@@ -93,17 +93,28 @@ func (s *userService) CreateUser(ctx context.Context, firstName string, lastName
 				// Already has a password — true duplicate registration attempt.
 				return nil, fmt.Errorf("user with email %s already exists", user.Email)
 			}
-			// Google-first user: link account by setting password and auto-verify email.
+			// Google-first user: link account by setting password.
 			updatedUser, err := s.repo.UpdateUserPassword(ctx, user.ID.String(), hashedPassword, salt)
 			if err != nil {
 				return nil, fmt.Errorf("failed to update user password: %w", err)
 			}
-			// Auto-verify email (Google already verified it).
+			// Require email verification even for Google-first users registering with password.
+			// We cannot assume the person registering owns the Google account.
 			if updatedUser.EmailVerifiedAt == nil {
-				updatedUser, err = s.repo.UpdateEmailVerifiedAt(ctx, updatedUser.ID.String())
+				apiBaseUrl := os.Getenv("API_BASE_URL")
+				jwtSecret := os.Getenv("JWT_SECRET")
+				verificationToken, err := generateEmailVerificationJWT(*updatedUser, jwtSecret)
 				if err != nil {
-					return nil, fmt.Errorf("failed to verify email: %w", err)
+					return nil, fmt.Errorf("failed to generate verification token: %w", err)
 				}
+				verificationURL := fmt.Sprintf("%s/verify?token=%s", apiBaseUrl, verificationToken)
+
+				go func() {
+					err := es.SendVerificationEmail(*updatedUser, utils.GetLang(ctx), verificationURL)
+					if err != nil {
+						zap.L().Error("failed to send verification email", zap.String("user_id", updatedUser.ID.String()), zap.Error(err))
+					}
+				}()
 			}
 			return updatedUser, nil
 		}
@@ -123,7 +134,10 @@ func (s *userService) CreateUser(ctx context.Context, firstName string, lastName
 		// 2. Build verification URL.
 		apiBaseUrl := os.Getenv("API_BASE_URL")
 		jwtSecret := os.Getenv("JWT_SECRET")
-		verificationToken, _ := generateEmailVerificationJWT(newUser, jwtSecret)
+		verificationToken, err := generateEmailVerificationJWT(newUser, jwtSecret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate verification token: %w", err)
+		}
 		verificationURL := fmt.Sprintf("%s/verify?token=%s", apiBaseUrl, verificationToken)
 
 		// 3. Send verification email asynchronously in a goroutine.
@@ -314,16 +328,15 @@ func (s *userService) RefreshToken(
 		return "", "", nil, fmt.Errorf("failed to generate tokens")
 	}
 
-	// 5. Revoke old refresh token
-	if err := s.repo.InvalidateRefreshToken(ctx, tokenHash); err != nil {
-		return "", "", nil, fmt.Errorf("failed to revoke old refresh token: %w", err)
-	}
-
-	// 6. Store new refresh token
+	// 5. Atomically revoke old token and store new one
 	newTokenHash := hashToken(refreshToken)
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).Unix()
-	if err := s.repo.StoreRefreshToken(ctx, user.ID, newTokenHash, expiresAt); err != nil {
-		return "", "", nil, fmt.Errorf("failed to store new refresh token: %w", err)
+	rotated, err := s.repo.RotateRefreshToken(ctx, tokenHash, user.ID, newTokenHash, expiresAt)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to rotate refresh token: %w", err)
+	}
+	if !rotated {
+		return "", "", nil, fmt.Errorf("token revoked or expired")
 	}
 
 	return accessToken, refreshToken, user, nil
@@ -367,7 +380,7 @@ func (s *userService) validateRefreshToken(tokenString, secret string) (*types.J
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
-		return []byte(secret), nil
+		return utils.DeriveKey(secret, "auth"), nil
 	})
 
 	if err != nil || !token.Valid || claims.Type != "refresh" {
@@ -509,7 +522,7 @@ func (s *userService) ResetPassword(ctx context.Context, token string, newPasswo
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method")
 		}
-		return []byte(jwtSecret), nil
+		return utils.DeriveKey(jwtSecret, "password_reset"), nil
 	})
 	if err != nil {
 		return fmt.Errorf("invalid or expired token")
@@ -528,6 +541,23 @@ func (s *userService) ResetPassword(ctx context.Context, token string, newPasswo
 	userID, ok := claims["sub"].(string)
 	if !ok || userID == "" {
 		return fmt.Errorf("invalid token subject")
+	}
+
+	// Verify token hasn't been used (password hash prefix must match)
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("invalid or expired token")
+	}
+	expectedHash := ""
+	if user.PasswordHash != nil {
+		ph := *user.PasswordHash
+		if len(ph) >= 8 {
+			expectedHash = ph[:8]
+		}
+	}
+	tokenHash, _ := claims["phash"].(string)
+	if tokenHash != expectedHash {
+		return fmt.Errorf("token already used or expired")
 	}
 
 	// Hash new password
@@ -557,16 +587,26 @@ func (s *userService) ResetPassword(ctx context.Context, token string, newPasswo
 func generatePasswordResetJWT(user domain.User, jwtSecret string) (string, error) {
 	expirationTime := time.Now().Add(1 * time.Hour)
 
+	// Include password hash prefix to prevent token reuse after reset
+	phash := ""
+	if user.PasswordHash != nil {
+		ph := *user.PasswordHash
+		if len(ph) >= 8 {
+			phash = ph[:8]
+		}
+	}
+
 	claims := jwt.MapClaims{
 		"sub":     user.ID.String(),
 		"email":   user.Email,
 		"purpose": "password_reset",
+		"phash":   phash,
 		"iat":     time.Now().Unix(),
 		"exp":     expirationTime.Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	tokenString, err := token.SignedString([]byte(jwtSecret))
+	tokenString, err := token.SignedString(utils.DeriveKey(jwtSecret, "password_reset"))
 	if err != nil {
 		return "", err
 	}
@@ -602,7 +642,7 @@ func generateTokens(user domain.User, jwtSecret string) (string, string, error) 
 		IsAdmin: user.IsAdmin,
 	}
 	at := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
-	accessTokenString, err := at.SignedString([]byte(jwtSecret))
+	accessTokenString, err := at.SignedString(utils.DeriveKey(jwtSecret, "auth"))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to sign access token: %w", err)
 	}
@@ -618,7 +658,7 @@ func generateTokens(user domain.User, jwtSecret string) (string, string, error) 
 		IsAdmin: user.IsAdmin,
 	}
 	rt := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
-	refreshTokenString, err := rt.SignedString([]byte(jwtSecret))
+	refreshTokenString, err := rt.SignedString(utils.DeriveKey(jwtSecret, "auth"))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to sign refresh token: %w", err)
 	}
@@ -640,8 +680,8 @@ func generateEmailVerificationJWT(user domain.User, jwtSecret string) (string, e
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	// Sign the token with the provided secret key.
-	tokenString, err := token.SignedString([]byte(jwtSecret))
+	// Sign the token with a purpose-specific key.
+	tokenString, err := token.SignedString(utils.DeriveKey(jwtSecret, "email_verification"))
 	if err != nil {
 		return "", err
 	}
@@ -652,3 +692,4 @@ func hashToken(token string) string {
 	hash := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(hash[:])
 }
+
