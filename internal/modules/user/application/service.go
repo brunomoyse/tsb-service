@@ -28,7 +28,8 @@ import (
 
 type UserService interface {
 	CreateUser(ctx context.Context, firstName string, lastName string, email string, phoneNumber *string, addressID *string, password *string, googleID *string) (*domain.User, error)
-	UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressID *string) (*domain.User, error)
+	UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressID *string, notifyMarketing *bool) (*domain.User, error)
+	ChangePassword(ctx context.Context, userID string, currentPassword string, newPassword string) error
 	Login(ctx context.Context, email string, password string, jwtToken string) (*domain.User, *string, *string, error)
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
@@ -264,7 +265,7 @@ func (s *userService) UpdateGoogleID(ctx context.Context, userID string, googleI
 	return s.repo.UpdateGoogleID(ctx, userID, googleID)
 }
 
-func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressID *string) (*domain.User, error) {
+func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressID *string, notifyMarketing *bool) (*domain.User, error) {
 	user, err := s.repo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -285,8 +286,59 @@ func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *st
 	if addressID != nil {
 		user.AddressID = addressID
 	}
+	if notifyMarketing != nil {
+		user.NotifyMarketing = *notifyMarketing
+	}
 
 	return s.repo.UpdateUser(ctx, user)
+}
+
+func (s *userService) ChangePassword(ctx context.Context, userID string, currentPassword string, newPassword string) error {
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("user not found")
+	}
+
+	// Reject Google-only accounts (no password set)
+	if user.PasswordHash == nil || user.Salt == nil {
+		return fmt.Errorf("google_only_account")
+	}
+
+	// Verify current password
+	hashedCurrent, err := hashPassword(currentPassword, *user.Salt)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+	if subtle.ConstantTimeCompare([]byte(hashedCurrent), []byte(*user.PasswordHash)) != 1 {
+		return fmt.Errorf("wrong_password")
+	}
+
+	// Validate new password strength
+	if err := validatePasswordStrength(newPassword); err != nil {
+		return err
+	}
+
+	// Hash new password
+	salt, err := generateSalt()
+	if err != nil {
+		return fmt.Errorf("failed to generate salt: %w", err)
+	}
+	hashedNew, err := hashPassword(newPassword, salt)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Update password in DB
+	if _, err := s.repo.UpdateUserPassword(ctx, userID, hashedNew, salt); err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	// Invalidate all refresh tokens
+	if err := s.repo.InvalidateAllRefreshTokens(ctx, userID); err != nil {
+		zap.L().Error("failed to invalidate refresh tokens after password change", zap.String("user_id", userID), zap.Error(err))
+	}
+
+	return nil
 }
 
 func (s *userService) UpdateUserPassword(ctx context.Context, userID string, password string, salt string) (*domain.User, error) {

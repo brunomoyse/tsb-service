@@ -32,6 +32,12 @@ type UpdateUserRequest struct {
 	AddressID   *string `json:"addressId"`
 }
 
+// ChangePasswordRequest is used when a logged-in user changes their password.
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 // ForgotPasswordRequest is used when a user requests a password reset.
 type ForgotPasswordRequest struct {
 	Email string `json:"email"`

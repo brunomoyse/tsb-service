@@ -110,7 +110,7 @@ func (h *UserHandler) UpdateMeHandler(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.UpdateMe(ctx, userID, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressID)
+	user, err := h.service.UpdateMe(ctx, userID, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressID, nil)
 	if err != nil {
 		logging.FromContext(ctx).Error("failed to update user profile", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user profile"})
@@ -338,6 +338,41 @@ func (h *UserHandler) ResetPasswordHandler(c *gin.Context) {
 
 	clearAuthCookies(c)
 	c.JSON(http.StatusOK, gin.H{"message": "Password has been reset successfully."})
+}
+
+func (h *UserHandler) ChangePasswordHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	userID := c.GetString("userID")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		return
+	}
+
+	var req ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.CurrentPassword == "" || req.NewPassword == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "current password and new password are required"})
+		return
+	}
+
+	if err := h.service.ChangePassword(ctx, userID, req.CurrentPassword, req.NewPassword); err != nil {
+		errMsg := err.Error()
+		switch {
+		case strings.Contains(errMsg, "wrong_password"):
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "wrong_password"})
+		case strings.Contains(errMsg, "google_only_account"):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "google_only_account"})
+		case strings.Contains(errMsg, "password must"):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "weak_password"})
+		default:
+			logging.FromContext(ctx).Error("failed to change password", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to change password"})
+		}
+		return
+	}
+
+	clearAuthCookies(c)
+	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully."})
 }
 
 func (h *UserHandler) GoogleAuthHandler(c *gin.Context) {
