@@ -160,6 +160,44 @@ func (r *UserRepository) IsRefreshTokenValid(ctx context.Context, tokenHash stri
 	return exists, nil
 }
 
+func (r *UserRepository) RotateRefreshToken(ctx context.Context, oldTokenHash string, userID uuid.UUID, newTokenHash string, expiresAt int64) (bool, error) {
+	tx, err := r.pool.ForContext(ctx).BeginTxx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	// Atomically revoke old token (only if not already revoked)
+	res, err := tx.ExecContext(ctx,
+		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1 AND revoked_at IS NULL`,
+		oldTokenHash)
+	if err != nil {
+		return false, fmt.Errorf("failed to revoke old token: %w", err)
+	}
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return false, nil // Already revoked — reject
+	}
+
+	// Store new token
+	expiresAtTime := time.Unix(expiresAt, 0)
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+		userID, newTokenHash, expiresAtTime)
+	if err != nil {
+		return false, fmt.Errorf("failed to store new token: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return false, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return true, nil
+}
+
 func (r *UserRepository) RequestDeletion(ctx context.Context, userID string) (*domain.User, error) {
 	query := `UPDATE users SET deletion_requested_at = NOW() WHERE id = $1`
 	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID)

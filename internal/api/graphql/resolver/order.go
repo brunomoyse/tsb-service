@@ -168,13 +168,16 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		total = total.Add(fee)
 	}
 
-	// Compute takeaway discount for PICKUP orders
+	// Compute takeaway discount for PICKUP orders (10% on discountable items)
 	takeawayDiscount := decimal.Zero
 	if odType == orderDomain.OrderTypePickUp {
+		discountMap := make(map[uuid.UUID]bool, len(products))
 		for _, p := range products {
-			if p.IsDiscountable {
-				// 10% discount on discountable items
-				takeawayDiscount = takeawayDiscount.Add(p.Price.Mul(decimal.NewFromFloat(0.10)))
+			discountMap[p.ID] = p.IsDiscountable
+		}
+		for _, item := range rawItems {
+			if discountMap[item.ProductID] {
+				takeawayDiscount = takeawayDiscount.Add(item.TotalPrice.Mul(decimal.NewFromFloat(0.10)))
 			}
 		}
 	}
@@ -846,8 +849,15 @@ func (r *subscriptionResolver) MyOrderUpdated(ctx context.Context, orderID uuid.
 	if userID == "" {
 		return nil, fmt.Errorf("UNAUTHENTICATED")
 	}
-	// @todo: verify the order belongs to this user
-	// e.g. if !r.OrderService.BelongsTo(ctx, userID, orderID) { error }
+
+	// Verify the order belongs to this user
+	order, _, err := r.OrderService.GetOrderByID(ctx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("order not found")
+	}
+	if order.UserID.String() != userID {
+		return nil, fmt.Errorf("FORBIDDEN")
+	}
 
 	topic := fmt.Sprintf("orderUpdated:%s", orderID)
 	ch := make(chan *model.Order, 1)

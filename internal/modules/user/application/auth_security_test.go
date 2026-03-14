@@ -11,6 +11,7 @@ import (
 
 	"tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/types"
+	"tsb-service/pkg/utils"
 )
 
 const testJWTSecret = "test-secret-key-for-security-tests"
@@ -108,7 +109,7 @@ func TestGenerateTokensIsAdminClaim(t *testing.T) {
 		// Parse access token and verify IsAdmin
 		claims := &types.JwtClaims{}
 		token, err := jwt.ParseWithClaims(accessToken, claims, func(t *jwt.Token) (any, error) {
-			return []byte(testJWTSecret), nil
+			return utils.DeriveKey(testJWTSecret, "auth"), nil
 		})
 		require.NoError(t, err)
 		require.True(t, token.Valid)
@@ -119,7 +120,7 @@ func TestGenerateTokensIsAdminClaim(t *testing.T) {
 		// Parse refresh token and verify IsAdmin
 		refreshClaims := &types.JwtClaims{}
 		rToken, err := jwt.ParseWithClaims(refreshToken, refreshClaims, func(t *jwt.Token) (any, error) {
-			return []byte(testJWTSecret), nil
+			return utils.DeriveKey(testJWTSecret, "auth"), nil
 		})
 		require.NoError(t, err)
 		require.True(t, rToken.Valid)
@@ -138,7 +139,7 @@ func TestGenerateTokensIsAdminClaim(t *testing.T) {
 
 		claims := &types.JwtClaims{}
 		token, err := jwt.ParseWithClaims(accessToken, claims, func(t *jwt.Token) (any, error) {
-			return []byte(testJWTSecret), nil
+			return utils.DeriveKey(testJWTSecret, "auth"), nil
 		})
 		require.NoError(t, err)
 		require.True(t, token.Valid)
@@ -156,7 +157,7 @@ func TestGenerateTokensIsAdminClaim(t *testing.T) {
 
 		claims := &types.JwtClaims{}
 		_, err = jwt.ParseWithClaims(accessToken, claims, func(t *jwt.Token) (any, error) {
-			return []byte(testJWTSecret), nil
+			return utils.DeriveKey(testJWTSecret, "auth"), nil
 		})
 		require.NoError(t, err)
 		assert.Empty(t, claims.Audience, "Admin flag should not be in Audience field")
@@ -173,13 +174,13 @@ func TestGenerateTokensIsAdminClaim(t *testing.T) {
 
 		accessClaims := &types.JwtClaims{}
 		_, err = jwt.ParseWithClaims(accessToken, accessClaims, func(t *jwt.Token) (any, error) {
-			return []byte(testJWTSecret), nil
+			return utils.DeriveKey(testJWTSecret, "auth"), nil
 		})
 		require.NoError(t, err)
 
 		refreshClaims := &types.JwtClaims{}
 		_, err = jwt.ParseWithClaims(refreshToken, refreshClaims, func(t *jwt.Token) (any, error) {
-			return []byte(testJWTSecret), nil
+			return utils.DeriveKey(testJWTSecret, "auth"), nil
 		})
 		require.NoError(t, err)
 
