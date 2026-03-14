@@ -132,24 +132,28 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 	// === HEADER ===
 	// Logo
 	logoSize := 14.0 // mm
+	headerY := pdf.GetY()
 	logoReader := io.NopCloser(bytes.NewReader(logoPNG))
 	pdf.RegisterImageOptionsReader("logo", fpdf.ImageOptions{ImageType: "PNG"}, logoReader)
-	pdf.ImageOptions("logo", leftMargin, pdf.GetY(), logoSize, logoSize, false, fpdf.ImageOptions{}, 0, "")
+	pdf.ImageOptions("logo", leftMargin, headerY, logoSize, logoSize, false, fpdf.ImageOptions{}, 0, "")
 
-	// Restaurant name next to logo
+	// Restaurant name + invoice title vertically centered with logo
+	textH := 10.0 // line height for 18pt text
+	textY := headerY + (logoSize-textH)/2
+	pdf.SetY(textY)
 	pdf.SetX(leftMargin + logoSize + 3)
 	pdf.SetFont("DejaVu", "B", 18)
 	pdf.SetTextColor(30, 30, 30)
 	nameW := usableW - logoSize - 3 - usableW*0.30
-	pdf.CellFormat(nameW, 10, RestaurantName, "", 0, "L", false, 0, "")
+	pdf.CellFormat(nameW, textH, RestaurantName, "", 0, "L", false, 0, "")
 
 	// Invoice title right-aligned
 	pdf.SetFont("DejaVu", "B", 18)
 	pdf.SetTextColor(200, 50, 50)
-	pdf.CellFormat(usableW*0.30, 10, l.InvoiceTitle, "", 1, "R", false, 0, "")
+	pdf.CellFormat(usableW*0.30, textH, l.InvoiceTitle, "", 1, "R", false, 0, "")
 
 	// Details below logo
-	pdf.SetY(pdf.GetY() + 4)
+	pdf.SetY(headerY + logoSize + 2)
 	pdf.SetTextColor(100, 100, 100)
 	pdf.SetFont("DejaVu", "", 9)
 	pdf.CellFormat(usableW, 5, RestaurantAddress, "", 1, "L", false, 0, "")
