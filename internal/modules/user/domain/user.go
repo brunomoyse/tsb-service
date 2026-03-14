@@ -21,6 +21,7 @@ type User struct {
 	RememberToken   *string    `db:"remember_token" json:"-"`
 	GoogleID            *string    `db:"google_id" json:"-"`
 	IsAdmin             bool       `db:"is_admin" json:"isAdmin"`
+	NotifyMarketing     bool       `db:"notify_marketing" json:"notifyMarketing"`
 	DeletionRequestedAt *time.Time `db:"deletion_requested_at" json:"deletionRequestedAt"`
 }
 
