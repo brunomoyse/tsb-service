@@ -3,6 +3,7 @@ package interfaces
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -206,8 +207,13 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 		return
 	}
 
-	// 13. Stream response
-	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="invoice-%s.pdf"`, orderIDStr))
+	// 13. Build localized filename: e.g. "facture-02-12-2025-bruno-moyse.pdf"
+	prefix := invoice.FilePrefix(order.Language)
+	datePart := order.CreatedAt.Format("02-01-2006")
+	namePart := strings.ToLower(strings.ReplaceAll(user.FirstName+"-"+user.LastName, " ", "-"))
+	filename := fmt.Sprintf("%s-%s-%s.pdf", prefix, datePart, namePart)
+
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	c.Data(http.StatusOK, "application/pdf", pdfBytes)
 }
 
