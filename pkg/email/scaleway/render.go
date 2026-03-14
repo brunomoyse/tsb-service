@@ -679,3 +679,37 @@ func renderReengagementEmailText(path string, u userDomain.User) (string, error)
 	data := prepareReengagementData(u)
 	return renderEmail(path, data, loadTextTemplate)
 }
+
+// --------------------------------------------------------------------------------
+// Feedback (admin-facing)
+// --------------------------------------------------------------------------------
+
+func prepareFeedbackData(name, email, serviceType, feedbackType, message, lang string) any {
+	return struct {
+		Name         string
+		Email        string
+		ServiceType  string
+		FeedbackType string
+		Message      string
+		Language     string
+		LogoURL      string
+	}{
+		Name:         name,
+		Email:        email,
+		ServiceType:  serviceType,
+		FeedbackType: feedbackType,
+		Message:      message,
+		Language:     lang,
+		LogoURL:      logoURL(),
+	}
+}
+
+func renderFeedbackEmailHTML(path, name, email, serviceType, feedbackType, message, lang string) (string, error) {
+	data := prepareFeedbackData(name, email, serviceType, feedbackType, message, lang)
+	return renderEmail(path, data, loadHTMLTemplate)
+}
+
+func renderFeedbackEmailText(path, name, email, serviceType, feedbackType, message, lang string) (string, error) {
+	data := prepareFeedbackData(name, email, serviceType, feedbackType, message, lang)
+	return renderEmail(path, data, loadTextTemplate)
+}

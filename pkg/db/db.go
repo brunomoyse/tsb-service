@@ -125,7 +125,7 @@ func ConnectDualDatabase() (*DBPool, error) {
 
 	adminDB, err := connectWithCreds(adminUser, adminPassword, "admin")
 	if err != nil {
-		customerDB.Close()
+		_ = customerDB.Close()
 		return nil, err
 	}
 	tunePool(adminDB, getEnvInt("DB_ADMIN_MAX_OPEN_CONNS", 10), getEnvInt("DB_ADMIN_MAX_IDLE_CONNS", 2))

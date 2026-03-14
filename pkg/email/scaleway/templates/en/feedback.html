@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Feedback | Tokyo Sushi Bar</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
+<tr><td align="center" style="padding:40px 16px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+    <!-- HEADER -->
+    <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:12px 12px 0 0;">
+        <img src="{{.LogoURL}}" alt="Tokyo Sushi Bar" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
+    </td></tr>
+    <!-- RED ACCENT LINE -->
+    <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <!-- CONTENT -->
+    <tr><td style="background-color:#ffffff;padding:36px;">
+        <p style="margin:0 0 16px;font-size:18px;color:#2D2D2D;font-weight:600;">Customer Feedback ({{.FeedbackType}})</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">A customer has submitted feedback via the contact form.</p>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+        <tr><td style="background-color:#FFF3CD;border:1px solid #D4A017;border-radius:6px;padding:16px;">
+            <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#2D2D2D;"><strong>Name:</strong> {{.Name}}</p>
+            <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#2D2D2D;"><strong>Email:</strong> {{.Email}}</p>
+            <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#2D2D2D;"><strong>Service Type:</strong> {{.ServiceType}}</p>
+            <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#2D2D2D;"><strong>Feedback Type:</strong> {{.FeedbackType}}</p>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;"><strong>Language:</strong> {{.Language}}</p>
+        </td></tr>
+        </table>
+
+        <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#2D2D2D;">Message:</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+        <tr><td style="background-color:#F6F5F2;border-radius:6px;padding:16px;">
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;white-space:pre-wrap;">{{.Message}}</p>
+        </td></tr>
+        </table>
+
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">You can reply directly to the customer at <a href="mailto:{{.Email}}" style="color:#C41E24;">{{.Email}}</a>.</p>
+    </td></tr>
+    <!-- FOOTER -->
+    <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:0 0 12px 12px;">
+        <p style="margin:0;font-size:12px;color:#6B6560;">&copy; 2026 Tokyo Sushi Bar. All rights reserved.</p>
+    </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

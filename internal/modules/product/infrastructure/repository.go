@@ -346,6 +346,36 @@ func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) 
 	return products, nil
 }
 
+// FindNamesByIDs fetches product details by IDs without checking availability.
+// Used for invoices where products may have been made unavailable since the order.
+func (r *ProductRepository) FindNamesByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error) {
+	lang := utils.GetLang(ctx)
+
+	query := `
+        SELECT
+            p.id,
+            p.code,
+            p.price,
+            p.is_discountable,
+            pct.name AS category_name,
+            pt.name  AS name
+        FROM products p
+        LEFT JOIN product_translations pt
+          ON p.id = pt.product_id
+        LEFT JOIN product_category_translations pct
+          ON p.category_id = pct.product_category_id
+        WHERE p.id = ANY($1)
+          AND pt.language = $2
+          AND pct.language = $2
+        ORDER BY p.code;
+    `
+	var products []*domain.ProductOrderDetails
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &products, query, pq.Array(productIDs), lang); err != nil {
+		return nil, err
+	}
+	return products, nil
+}
+
 // FindByCategoryID retrieves products filtered by a specific category ID.
 func (r *ProductRepository) FindByCategoryID(ctx context.Context, categoryID string) ([]*domain.Product, error) {
 	query := `
@@ -530,12 +560,7 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 	if err != nil {
 		return nil, err
 	}
-	defer func(rows *sqlx.Rows) {
-		err := rows.Close()
-		if err != nil {
-
-		}
-	}(rows)
+	defer func() { _ = rows.Close() }()
 
 	// Define a helper struct for scanning rows.
 	type productRow struct {
@@ -888,7 +913,7 @@ func (r *ProductRepository) BatchGetProductTranslations(
 	if err != nil {
 		return nil, fmt.Errorf("failed to query product translations: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// 4) prepare the result map
 	translationsByProduct := make(map[string][]*domain.Translation)
@@ -943,7 +968,7 @@ func (r *ProductRepository) BatchGetCategoryTranslations(
 	if err != nil {
 		return nil, fmt.Errorf("failed to query category translations: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// 4) prepare the result map
 	translationsByCat := make(map[string][]*domain.Translation)
@@ -1117,7 +1142,7 @@ func (r *ProductRepository) queryChoices(ctx context.Context, query string, args
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	type choiceRow struct {
 		ID            uuid.UUID       `db:"id"`

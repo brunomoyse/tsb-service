@@ -1,0 +1,16 @@
+Customer Feedback ({{.FeedbackType}})
+
+A customer has submitted feedback via the contact form.
+
+Name: {{.Name}}
+Email: {{.Email}}
+Service Type: {{.ServiceType}}
+Feedback Type: {{.FeedbackType}}
+Language: {{.Language}}
+
+Message:
+{{.Message}}
+
+You can reply directly to the customer at {{.Email}}.
+
+© 2026 Tokyo Sushi Bar. All rights reserved.

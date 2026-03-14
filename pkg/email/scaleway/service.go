@@ -750,3 +750,41 @@ func SendReengagementEmail(user userDomain.User, lang string) error {
 	logger.Debugf("Email sent to %s with subject: %s", user.Email, subject)
 	return nil
 }
+
+func SendFeedbackEmail(name, email, serviceType, feedbackType, message, lang string) error {
+	newReq := *baseReq
+
+	// Send to admin (same pattern as SendDeletionRequestEmail)
+	adminEmail := os.Getenv("SCW_SENDER_EMAIL")
+	adminName := "Tokyo Sushi Bar Admin"
+	newReq.To = []*temv1alpha1.CreateEmailRequestAddress{
+		{
+			Email: adminEmail,
+			Name:  &adminName,
+		},
+	}
+
+	path := "templates/en/feedback"
+
+	htmlContent, err := renderFeedbackEmailHTML(path, name, email, serviceType, feedbackType, message, lang)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	plainTextContent, err := renderFeedbackEmailText(path, name, email, serviceType, feedbackType, message, lang)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	newReq.Subject = fmt.Sprintf("Customer feedback (%s) - %s", feedbackType, name)
+	newReq.HTML = htmlContent
+	newReq.Text = plainTextContent
+
+	_, err = temClient.CreateEmail(&newReq)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	logger.Debugf("Feedback email sent to admin from %s", email)
+	return nil
+}

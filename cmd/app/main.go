@@ -15,6 +15,7 @@ import (
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 
+	"tsb-service/internal/api/feedback"
 	gqlMiddleware "tsb-service/internal/api/graphql/middleware"
 	"tsb-service/internal/api/graphql/resolver"
 	productApplication "tsb-service/internal/modules/product/application"
@@ -29,6 +30,7 @@ import (
 	orderInfrastructure "tsb-service/internal/modules/order/infrastructure"
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	paymentInfrastructure "tsb-service/internal/modules/payment/infrastructure"
+	orderInterfaces "tsb-service/internal/modules/order/interfaces"
 	paymentInterfaces "tsb-service/internal/modules/payment/interfaces"
 
 	userApplication "tsb-service/internal/modules/user/application"
@@ -80,7 +82,7 @@ func main() {
 		zap.L().Error("failed to connect to database after all attempts", zap.Error(dbErr))
 		os.Exit(1)
 	}
-	defer dbPool.Close()
+	defer func() { _ = dbPool.Close() }()
 
 	// PubSub broker (used by GraphQL subscriptions)
 	broker := pubsub.NewBroker()
@@ -139,6 +141,7 @@ func main() {
 	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, os.Getenv("APP_ENV") != "production")
 	userService := userApplication.NewUserService(userRepo)
 
+	orderHandler := orderInterfaces.NewOrderHandler(orderService, userService, productService)
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService, broker)
 	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
 
@@ -168,7 +171,7 @@ func main() {
 		CustomSchemas:    []string{"capacitor://"},
 		AllowMethods:     []string{"HEAD", "GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept-Language"},
-		ExposeHeaders:    []string{"Content-Length", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length", "Authorization", "Content-Disposition"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
@@ -222,6 +225,12 @@ func main() {
 	api.GET("/oauth/google", authLimiter.Middleware(), userHandler.GoogleAuthHandler)
 	api.GET("/oauth/google/callback", authLimiter.Middleware(), userHandler.GoogleAuthCallbackHandler)
 
+	strictAuth := middleware.AuthMiddleware(jwtSecret)
+	api.GET("/orders/:id/invoice", strictAuth, orderHandler.DownloadInvoice)
+
+	feedbackLimiter := middleware.NewRateLimiter(2.0/60, 2) // 2 req/min per IP
+	api.POST("/feedback", feedbackLimiter.Middleware(), feedback.HandleFeedback)
+
 	// HTTP server
 	// Use ReadHeaderTimeout instead of ReadTimeout, and omit WriteTimeout,
 	// because both set deadlines on the underlying net.Conn that persist after
@@ -247,6 +256,7 @@ func main() {
 	<-quit
 	zap.L().Info("shutting down server")
 	authLimiter.Stop()
+	feedbackLimiter.Stop()
 	broker.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

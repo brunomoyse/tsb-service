@@ -133,7 +133,7 @@ func NewOrder(
 	addrSnapshot *AddressSnapshot,
 ) *Order {
 	var orderExtraJSON types.NullableJSON
-	if orderExtra != nil && len(orderExtra) > 0 {
+	if len(orderExtra) > 0 {
 		jsonBytes, _ := json.Marshal(orderExtra)
 		orderExtraJSON = types.NullableJSON(jsonBytes)
 	}

@@ -5,6 +5,7 @@ go 1.26
 require (
 	github.com/99designs/gqlgen v0.17.88
 	github.com/gin-contrib/cors v1.7.6
+	github.com/go-pdf/fpdf v0.9.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/gosimple/slug v1.15.0
