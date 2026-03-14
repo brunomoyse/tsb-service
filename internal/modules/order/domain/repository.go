@@ -15,4 +15,5 @@ type OrderRepository interface {
 	FindByUserIDs(ctx context.Context, userIDs []string) (map[string][]*Order, error)
 	InsertStatusHistory(ctx context.Context, orderID uuid.UUID, status OrderStatus) error
 	FindStatusHistoryByOrderID(ctx context.Context, orderID uuid.UUID) ([]*OrderStatusHistory, error)
+	DeleteOrder(ctx context.Context, orderID uuid.UUID) error
 }

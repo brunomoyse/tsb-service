@@ -456,7 +456,7 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 				// Send account linked notification email
 				go func() {
 					if emailErr := es.SendAccountLinkedEmail(*user, "fr"); emailErr != nil {
-						logging.FromContext(ctx).Error("failed to send account linked email", zap.String("provider", "google"), zap.Error(emailErr))
+						zap.L().Error("failed to send account linked email", zap.String("provider", "google"), zap.Error(emailErr))
 					}
 				}()
 			}

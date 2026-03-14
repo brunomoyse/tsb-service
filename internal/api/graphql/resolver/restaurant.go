@@ -77,15 +77,23 @@ func (r *subscriptionResolver) RestaurantConfigUpdated(ctx context.Context) (<-c
 	sub := r.Broker.Subscribe("restaurantConfigUpdated")
 
 	go func() {
-		<-ctx.Done()
-		r.Broker.Unsubscribe("restaurantConfigUpdated", sub)
-		close(ch)
-	}()
-
-	go func() {
-		for msg := range sub {
-			if c, ok := msg.(*model.RestaurantConfig); ok {
-				ch <- c
+		defer close(ch)
+		defer r.Broker.Unsubscribe("restaurantConfigUpdated", sub)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-sub:
+				if !ok {
+					return
+				}
+				if c, ok := msg.(*model.RestaurantConfig); ok {
+					select {
+					case ch <- c:
+					case <-ctx.Done():
+						return
+					}
+				}
 			}
 		}
 	}()

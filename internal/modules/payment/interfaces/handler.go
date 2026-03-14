@@ -1,8 +1,10 @@
 package interfaces
 
 import (
+	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -176,20 +178,27 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 
 		err = h.orderService.UpdateOrder(ctx, payment.OrderID, &canceledStatus, nil)
 		if err != nil {
-			log.Error("webhook: failed to update order status", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
-			c.JSON(http.StatusOK, gin.H{"message": "processed"})
-			return
+			log.Warn("webhook: retrying order status update", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
+			err = h.orderService.UpdateOrder(ctx, payment.OrderID, &canceledStatus, nil)
+			if err != nil {
+				log.Error("webhook: failed to update order status after retry", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
+				c.JSON(http.StatusOK, gin.H{"message": "processed"})
+				return
+			}
 		}
 
-		// Send payment failed email
+		// Send payment failed email with a dedicated context (HTTP context may cancel before goroutine finishes)
 		go func() {
-			order, _, orderErr := h.orderService.GetOrderByID(ctx, payment.OrderID)
+			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+
+			order, _, orderErr := h.orderService.GetOrderByID(bgCtx, payment.OrderID)
 			if orderErr != nil || order == nil {
 				log.Error("webhook: failed to retrieve order for payment failed email", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(orderErr))
 				return
 			}
 
-			u, userErr := h.userService.GetUserByID(ctx, order.UserID.String())
+			u, userErr := h.userService.GetUserByID(bgCtx, order.UserID.String())
 			if userErr != nil {
 				log.Error("webhook: failed to retrieve user for payment failed email", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(userErr))
 				return

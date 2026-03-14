@@ -453,15 +453,23 @@ func (r *subscriptionResolver) ProductUpdated(ctx context.Context) (<-chan *mode
 	sub := r.Broker.Subscribe("productUpdated")
 
 	go func() {
-		<-ctx.Done()
-		r.Broker.Unsubscribe("productUpdated", sub)
-		close(ch)
-	}()
-
-	go func() {
-		for msg := range sub {
-			if p, ok := msg.(*model.Product); ok {
-				ch <- p
+		defer close(ch)
+		defer r.Broker.Unsubscribe("productUpdated", sub)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-sub:
+				if !ok {
+					return
+				}
+				if p, ok := msg.(*model.Product); ok {
+					select {
+					case ch <- p:
+					case <-ctx.Done():
+						return
+					}
+				}
 			}
 		}
 	}()

@@ -179,7 +179,7 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 		JOIN product_category_translations pct ON pc.id = pct.product_category_id AND pct.language = 'fr'
 		JOIN product_translations pt ON p.id = pt.product_id AND pt.language = 'fr'
 		WHERE op.order_id = $1
-		ORDER BY p.code ASC, pct.name ASC, pt.name ASC
+		ORDER BY pc."order" ASC, p.code ASC, pt.name ASC
 	`
 
 	var orderProducts []domain.OrderProductRaw
@@ -345,4 +345,31 @@ func (r *OrderRepository) FindStatusHistoryByOrderID(ctx context.Context, orderI
 		return nil, fmt.Errorf("failed to query status history: %w", err)
 	}
 	return history, nil
+}
+
+func (r *OrderRepository) DeleteOrder(ctx context.Context, orderID uuid.UUID) error {
+	tx, err := r.pool.ForContext(ctx).BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if _, err = tx.ExecContext(ctx, `DELETE FROM order_status_history WHERE order_id = $1`, orderID); err != nil {
+		return fmt.Errorf("failed to delete status history: %w", err)
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM order_product WHERE order_id = $1`, orderID); err != nil {
+		return fmt.Errorf("failed to delete order products: %w", err)
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM orders WHERE id = $1`, orderID); err != nil {
+		return fmt.Errorf("failed to delete order: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
 }
