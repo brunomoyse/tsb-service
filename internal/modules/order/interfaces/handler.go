@@ -160,6 +160,33 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 		}
 	}
 
+	// If both are zero but items have unit prices, compute from unit_price * quantity
+	if itemsSubtotal.IsZero() {
+		for _, op := range *orderProducts {
+			itemsSubtotal = itemsSubtotal.Add(op.UnitPrice.Mul(decimal.NewFromInt(op.Quantity)))
+		}
+		if !itemsSubtotal.IsZero() {
+			totalPrice = itemsSubtotal.
+				Sub(order.TakeawayDiscount).
+				Sub(order.CouponDiscount)
+			if order.DeliveryFee != nil {
+				totalPrice = totalPrice.Add(*order.DeliveryFee)
+			}
+		}
+	}
+
+	// Guard: refuse to generate an invoice with zero totals
+	if totalPrice.IsZero() || itemsSubtotal.IsZero() {
+		log.Error("invoice: computed totals are zero, cannot generate",
+			zap.String("order_id", orderIDStr),
+			zap.String("order_total_price", order.TotalPrice.String()),
+			zap.String("items_subtotal", itemsSubtotal.String()),
+			zap.Int("item_count", len(*orderProducts)),
+		)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invoice data incomplete"})
+		return
+	}
+
 	// 11. Build invoice data
 	data := invoice.InvoiceData{
 		CustomerName:  user.FirstName + " " + user.LastName,
