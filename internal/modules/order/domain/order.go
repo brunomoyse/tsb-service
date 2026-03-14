@@ -51,6 +51,15 @@ type Order struct {
 	OrderExtra         types.NullableJSON     `db:"order_extra" json:"orderExtras,omitempty"`
 	Language           string           `db:"language" json:"language"`
 	CouponCode         *string          `db:"coupon_code" json:"couponCode,omitempty"`
+	// Denormalized address fields (snapshot at order time)
+	StreetID         *string  `db:"street_id" json:"streetId,omitempty"`
+	StreetName       *string  `db:"street_name" json:"streetName,omitempty"`
+	HouseNumber      *string  `db:"house_number" json:"houseNumber,omitempty"`
+	BoxNumber        *string  `db:"box_number" json:"boxNumber,omitempty"`
+	MunicipalityName *string  `db:"municipality_name" json:"municipalityName,omitempty"`
+	Postcode         *string  `db:"postcode" json:"postcode,omitempty"`
+	AddressDistance  *float64 `db:"address_distance" json:"addressDistance,omitempty"`
+	IsManualAddress  bool     `db:"is_manual_address" json:"isManualAddress"`
 }
 
 type OrderStatusHistory struct {
@@ -96,6 +105,18 @@ func (o *Order) DiscountAmount() decimal.Decimal {
 	return o.TakeawayDiscount.Add(o.CouponDiscount)
 }
 
+// AddressSnapshot holds the denormalized address fields for an order.
+type AddressSnapshot struct {
+	StreetID         *string
+	StreetName       *string
+	HouseNumber      *string
+	BoxNumber        *string
+	MunicipalityName *string
+	Postcode         *string
+	Distance         *float64
+	IsManual         bool
+}
+
 func NewOrder(
 	userID uuid.UUID,
 	orderType OrderType,
@@ -109,6 +130,7 @@ func NewOrder(
 	takeawayDiscount decimal.Decimal,
 	couponDiscount decimal.Decimal,
 	language string,
+	addrSnapshot *AddressSnapshot,
 ) *Order {
 	var orderExtraJSON types.NullableJSON
 	if orderExtra != nil && len(orderExtra) > 0 {
@@ -118,7 +140,7 @@ func NewOrder(
 
 	language = cmp.Or(language, "fr")
 
-	return &Order{
+	o := &Order{
 		ID:                 uuid.Nil,
 		UserID:             userID,
 		OrderStatus:        OrderStatusPending,
@@ -134,5 +156,18 @@ func NewOrder(
 		CouponDiscount:     couponDiscount,
 		Language:           language,
 	}
+
+	if addrSnapshot != nil {
+		o.StreetID = addrSnapshot.StreetID
+		o.StreetName = addrSnapshot.StreetName
+		o.HouseNumber = addrSnapshot.HouseNumber
+		o.BoxNumber = addrSnapshot.BoxNumber
+		o.MunicipalityName = addrSnapshot.MunicipalityName
+		o.Postcode = addrSnapshot.Postcode
+		o.AddressDistance = addrSnapshot.Distance
+		o.IsManualAddress = addrSnapshot.IsManual
+	}
+
+	return o
 }
 

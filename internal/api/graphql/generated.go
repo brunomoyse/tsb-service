@@ -122,6 +122,7 @@ type ComplexityRoot struct {
 		DisplayCustomerName func(childComplexity int) int
 		EstimatedReadyTime  func(childComplexity int) int
 		ID                  func(childComplexity int) int
+		IsManualAddress     func(childComplexity int) int
 		IsOnlinePayment     func(childComplexity int) int
 		Items               func(childComplexity int) int
 		OrderExtra          func(childComplexity int) int
@@ -223,24 +224,25 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Address           func(childComplexity int, id string) int
-		AddressByLocation func(childComplexity int, streetID string, houseNumber string, boxNumber *string) int
-		BoxNumbers        func(childComplexity int, streetID string, houseNumber string) int
-		Coupon            func(childComplexity int, id uuid.UUID) int
-		Coupons           func(childComplexity int) int
-		HouseNumbers      func(childComplexity int, streetID string) int
-		Me                func(childComplexity int) int
-		MyOrder           func(childComplexity int, id uuid.UUID) int
-		MyOrders          func(childComplexity int, first *int, page *int) int
-		Order             func(childComplexity int, id uuid.UUID) int
-		Orders            func(childComplexity int) int
-		Product           func(childComplexity int, id uuid.UUID) int
-		ProductCategories func(childComplexity int) int
-		ProductCategory   func(childComplexity int, id uuid.UUID) int
-		Products          func(childComplexity int) int
-		RestaurantConfig  func(childComplexity int) int
-		Streets           func(childComplexity int, query string) int
-		ValidateCoupon    func(childComplexity int, code string, orderAmount string) int
+		Address               func(childComplexity int, id string) int
+		AddressByLocation     func(childComplexity int, streetID string, houseNumber string, boxNumber *string) int
+		BoxNumbers            func(childComplexity int, streetID string, houseNumber string) int
+		Coupon                func(childComplexity int, id uuid.UUID) int
+		Coupons               func(childComplexity int) int
+		HouseNumbers          func(childComplexity int, streetID string) int
+		Me                    func(childComplexity int) int
+		MyOrder               func(childComplexity int, id uuid.UUID) int
+		MyOrders              func(childComplexity int, first *int, page *int) int
+		Order                 func(childComplexity int, id uuid.UUID) int
+		Orders                func(childComplexity int) int
+		Product               func(childComplexity int, id uuid.UUID) int
+		ProductCategories     func(childComplexity int) int
+		ProductCategory       func(childComplexity int, id uuid.UUID) int
+		Products              func(childComplexity int) int
+		RestaurantConfig      func(childComplexity int) int
+		StreetAverageDistance func(childComplexity int, streetID string) int
+		Streets               func(childComplexity int, query string) int
+		ValidateCoupon        func(childComplexity int, code string, orderAmount string) int
 	}
 
 	RestaurantConfig struct {
@@ -309,6 +311,7 @@ type OrderResolver interface {
 	Customer(ctx context.Context, obj *model.Order) (*model.User, error)
 	Payment(ctx context.Context, obj *model.Order) (*model.Payment, error)
 	Items(ctx context.Context, obj *model.Order) ([]*model.OrderItem, error)
+	IsManualAddress(ctx context.Context, obj *model.Order) (bool, error)
 	StatusHistory(ctx context.Context, obj *model.Order) ([]*model.OrderStatusHistory, error)
 	DisplayCustomerName(ctx context.Context, obj *model.Order) (string, error)
 	DisplayAddress(ctx context.Context, obj *model.Order) (string, error)
@@ -333,6 +336,7 @@ type QueryResolver interface {
 	BoxNumbers(ctx context.Context, streetID string, houseNumber string) ([]*string, error)
 	Address(ctx context.Context, id string) (*model.Address, error)
 	AddressByLocation(ctx context.Context, streetID string, houseNumber string, boxNumber *string) (*model.Address, error)
+	StreetAverageDistance(ctx context.Context, streetID string) (float64, error)
 	ValidateCoupon(ctx context.Context, code string, orderAmount string) (*model.CouponValidation, error)
 	Coupons(ctx context.Context) ([]*model.Coupon, error)
 	Coupon(ctx context.Context, id uuid.UUID) (*model.Coupon, error)
@@ -778,6 +782,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Order.ID(childComplexity), true
+	case "Order.isManualAddress":
+		if e.ComplexityRoot.Order.IsManualAddress == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Order.IsManualAddress(childComplexity), true
 	case "Order.isOnlinePayment":
 		if e.ComplexityRoot.Order.IsOnlinePayment == nil {
 			break
@@ -1412,6 +1422,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.RestaurantConfig(childComplexity), true
+	case "Query.streetAverageDistance":
+		if e.ComplexityRoot.Query.StreetAverageDistance == nil {
+			break
+		}
+
+		args, err := ec.field_Query_streetAverageDistance_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.StreetAverageDistance(childComplexity, args["streetId"].(string)), true
 	case "Query.streets":
 		if e.ComplexityRoot.Query.Streets == nil {
 			break
@@ -2055,6 +2076,17 @@ func (ec *executionContext) field_Query_product_args(ctx context.Context, rawArg
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_streetAverageDistance_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "streetId", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["streetId"] = arg0
 	return args, nil
 }
 
@@ -3196,6 +3228,8 @@ func (ec *executionContext) fieldContext_Mutation_createOrder(ctx context.Contex
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "isManualAddress":
+				return ec.fieldContext_Order_isManualAddress(ctx, field)
 			case "statusHistory":
 				return ec.fieldContext_Order_statusHistory(ctx, field)
 			case "displayCustomerName":
@@ -3296,6 +3330,8 @@ func (ec *executionContext) fieldContext_Mutation_updateOrder(ctx context.Contex
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "isManualAddress":
+				return ec.fieldContext_Order_isManualAddress(ctx, field)
 			case "statusHistory":
 				return ec.fieldContext_Order_statusHistory(ctx, field)
 			case "displayCustomerName":
@@ -4846,6 +4882,35 @@ func (ec *executionContext) fieldContext_Order_items(_ context.Context, field gr
 				return ec.fieldContext_OrderItem_choice(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type OrderItem", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Order_isManualAddress(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Order_isManualAddress,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Order().IsManualAddress(ctx, obj)
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Order_isManualAddress(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Order",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7341,6 +7406,47 @@ func (ec *executionContext) fieldContext_Query_addressByLocation(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_streetAverageDistance(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_streetAverageDistance,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().StreetAverageDistance(ctx, fc.Args["streetId"].(string))
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_streetAverageDistance(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_streetAverageDistance_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_validateCoupon(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7626,6 +7732,8 @@ func (ec *executionContext) fieldContext_Query_orders(_ context.Context, field g
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "isManualAddress":
+				return ec.fieldContext_Order_isManualAddress(ctx, field)
 			case "statusHistory":
 				return ec.fieldContext_Order_statusHistory(ctx, field)
 			case "displayCustomerName":
@@ -7715,6 +7823,8 @@ func (ec *executionContext) fieldContext_Query_order(ctx context.Context, field 
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "isManualAddress":
+				return ec.fieldContext_Order_isManualAddress(ctx, field)
 			case "statusHistory":
 				return ec.fieldContext_Order_statusHistory(ctx, field)
 			case "displayCustomerName":
@@ -7815,6 +7925,8 @@ func (ec *executionContext) fieldContext_Query_myOrders(ctx context.Context, fie
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "isManualAddress":
+				return ec.fieldContext_Order_isManualAddress(ctx, field)
 			case "statusHistory":
 				return ec.fieldContext_Order_statusHistory(ctx, field)
 			case "displayCustomerName":
@@ -7915,6 +8027,8 @@ func (ec *executionContext) fieldContext_Query_myOrder(ctx context.Context, fiel
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "isManualAddress":
+				return ec.fieldContext_Order_isManualAddress(ctx, field)
 			case "statusHistory":
 				return ec.fieldContext_Order_statusHistory(ctx, field)
 			case "displayCustomerName":
@@ -8761,6 +8875,8 @@ func (ec *executionContext) fieldContext_Subscription_orderCreated(_ context.Con
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "isManualAddress":
+				return ec.fieldContext_Order_isManualAddress(ctx, field)
 			case "statusHistory":
 				return ec.fieldContext_Order_statusHistory(ctx, field)
 			case "displayCustomerName":
@@ -8849,6 +8965,8 @@ func (ec *executionContext) fieldContext_Subscription_orderUpdated(_ context.Con
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "isManualAddress":
+				return ec.fieldContext_Order_isManualAddress(ctx, field)
 			case "statusHistory":
 				return ec.fieldContext_Order_statusHistory(ctx, field)
 			case "displayCustomerName":
@@ -8938,6 +9056,8 @@ func (ec *executionContext) fieldContext_Subscription_myOrderUpdated(ctx context
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "isManualAddress":
+				return ec.fieldContext_Order_isManualAddress(ctx, field)
 			case "statusHistory":
 				return ec.fieldContext_Order_statusHistory(ctx, field)
 			case "displayCustomerName":
@@ -9492,6 +9612,8 @@ func (ec *executionContext) fieldContext_User_orders(_ context.Context, field gr
 				return ec.fieldContext_Order_payment(ctx, field)
 			case "items":
 				return ec.fieldContext_Order_items(ctx, field)
+			case "isManualAddress":
+				return ec.fieldContext_Order_isManualAddress(ctx, field)
 			case "statusHistory":
 				return ec.fieldContext_Order_statusHistory(ctx, field)
 			case "displayCustomerName":
@@ -10953,6 +11075,10 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 func (ec *executionContext) unmarshalInputChoiceTranslationInput(ctx context.Context, obj any) (model.ChoiceTranslationInput, error) {
 	var it model.ChoiceTranslationInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -10986,6 +11112,10 @@ func (ec *executionContext) unmarshalInputChoiceTranslationInput(ctx context.Con
 
 func (ec *executionContext) unmarshalInputCreateCouponInput(ctx context.Context, obj any) (model.CreateCouponInput, error) {
 	var it model.CreateCouponInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11068,12 +11198,16 @@ func (ec *executionContext) unmarshalInputCreateCouponInput(ctx context.Context,
 
 func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, obj any) (model.CreateOrderInput, error) {
 	var it model.CreateOrderInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"orderType", "isOnlinePayment", "addressId", "addressExtra", "orderNote", "orderExtra", "preferredReadyTime", "items", "couponCode"}
+	fieldsInOrder := [...]string{"orderType", "isOnlinePayment", "addressId", "addressExtra", "orderNote", "orderExtra", "preferredReadyTime", "items", "couponCode", "streetId", "houseNumber", "boxNumber", "isManualAddress"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11143,6 +11277,34 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 				return it, err
 			}
 			it.CouponCode = data
+		case "streetId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("streetId"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.StreetID = data
+		case "houseNumber":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("houseNumber"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.HouseNumber = data
+		case "boxNumber":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("boxNumber"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.BoxNumber = data
+		case "isManualAddress":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isManualAddress"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsManualAddress = data
 		}
 	}
 	return it, nil
@@ -11150,6 +11312,10 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 
 func (ec *executionContext) unmarshalInputCreateOrderItemInput(ctx context.Context, obj any) (model.CreateOrderItemInput, error) {
 	var it model.CreateOrderItemInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11190,6 +11356,10 @@ func (ec *executionContext) unmarshalInputCreateOrderItemInput(ctx context.Conte
 
 func (ec *executionContext) unmarshalInputCreateProductChoiceInput(ctx context.Context, obj any) (model.CreateProductChoiceInput, error) {
 	var it model.CreateProductChoiceInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11237,6 +11407,10 @@ func (ec *executionContext) unmarshalInputCreateProductChoiceInput(ctx context.C
 
 func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context, obj any) (model.CreateProductInput, error) {
 	var it model.CreateProductInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11340,6 +11514,10 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 
 func (ec *executionContext) unmarshalInputDayScheduleInput(ctx context.Context, obj any) (model.DayScheduleInput, error) {
 	var it model.DayScheduleInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11387,6 +11565,10 @@ func (ec *executionContext) unmarshalInputDayScheduleInput(ctx context.Context, 
 
 func (ec *executionContext) unmarshalInputOpeningHoursInput(ctx context.Context, obj any) (model.OpeningHoursInput, error) {
 	var it model.OpeningHoursInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11455,6 +11637,10 @@ func (ec *executionContext) unmarshalInputOpeningHoursInput(ctx context.Context,
 
 func (ec *executionContext) unmarshalInputOrderExtraInput(ctx context.Context, obj any) (model.OrderExtraInput, error) {
 	var it model.OrderExtraInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11488,6 +11674,10 @@ func (ec *executionContext) unmarshalInputOrderExtraInput(ctx context.Context, o
 
 func (ec *executionContext) unmarshalInputTranslationInput(ctx context.Context, obj any) (model.TranslationInput, error) {
 	var it model.TranslationInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11528,6 +11718,10 @@ func (ec *executionContext) unmarshalInputTranslationInput(ctx context.Context, 
 
 func (ec *executionContext) unmarshalInputUpdateCouponInput(ctx context.Context, obj any) (model.UpdateCouponInput, error) {
 	var it model.UpdateCouponInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11610,6 +11804,10 @@ func (ec *executionContext) unmarshalInputUpdateCouponInput(ctx context.Context,
 
 func (ec *executionContext) unmarshalInputUpdateOrderInput(ctx context.Context, obj any) (model.UpdateOrderInput, error) {
 	var it model.UpdateOrderInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11643,6 +11841,10 @@ func (ec *executionContext) unmarshalInputUpdateOrderInput(ctx context.Context, 
 
 func (ec *executionContext) unmarshalInputUpdateProductChoiceInput(ctx context.Context, obj any) (model.UpdateProductChoiceInput, error) {
 	var it model.UpdateProductChoiceInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11683,6 +11885,10 @@ func (ec *executionContext) unmarshalInputUpdateProductChoiceInput(ctx context.C
 
 func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context, obj any) (model.UpdateProductInput, error) {
 	var it model.UpdateProductInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -11786,6 +11992,10 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 
 func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, obj any) (model.UpdateUserInput, error) {
 	var it model.UpdateUserInput
+	if obj == nil {
+		return it, nil
+	}
+
 	asMap := map[string]any{}
 	for k, v := range obj.(map[string]any) {
 		asMap[k] = v
@@ -12457,6 +12667,42 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 					}
 				}()
 				res = ec._Order_items(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "isManualAddress":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Order_isManualAddress(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -13407,6 +13653,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_addressByLocation(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "streetAverageDistance":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_streetAverageDistance(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}

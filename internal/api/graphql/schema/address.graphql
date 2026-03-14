@@ -25,4 +25,5 @@ extend type Query {
         houseNumber: String!
         boxNumber: String
     ): Address!
+    streetAverageDistance(streetId: String!): Float!
 }

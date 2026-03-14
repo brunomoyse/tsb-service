@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
@@ -11,6 +12,8 @@ import (
 	paymentDomain "tsb-service/internal/modules/payment/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
 	userDomain "tsb-service/internal/modules/user/domain"
+
+	"github.com/shopspring/decimal"
 )
 
 // Map applies fn to every element of in, returning a new slice.
@@ -74,6 +77,8 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		deliveryFeeStr = &tmp
 	}
 
+	isManual := o.IsManualAddress
+
 	return &model.Order{
 		ID:                 o.ID,
 		CreatedAt:          o.CreatedAt,
@@ -90,6 +95,15 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		OrderNote:          o.OrderNote,
 		OrderExtra:         orderExtra,
 		CouponCode:         o.CouponCode,
+		// Denormalized address fields for Address() resolver
+		AddressID:        o.AddressID,
+		StreetName:       o.StreetName,
+		HouseNumber:      o.HouseNumber,
+		BoxNumber:        o.BoxNumber,
+		MunicipalityName: o.MunicipalityName,
+		Postcode:         o.Postcode,
+		AddressDistance:   o.AddressDistance,
+		IsManualAddr:     &isManual,
 	}
 }
 
@@ -221,6 +235,68 @@ func ToGQLCoupon(c *couponDomain.Coupon) *model.Coupon {
 		ValidUntil:     c.ValidUntil,
 		CreatedAt:      c.CreatedAt,
 	}
+}
+
+// emailContext returns a background context with a 30-second timeout for async email operations.
+func emailContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 30*time.Second)
+}
+
+// deliveryFeeFromDistance computes the delivery fee based on distance in meters.
+func deliveryFeeFromDistance(distance float64) decimal.Decimal {
+	var dFee int64
+	switch {
+	case distance < 4000:
+		dFee = 0
+	case distance < 5000:
+		dFee = 1
+	case distance < 6000:
+		dFee = 2
+	case distance < 7000:
+		dFee = 3
+	case distance < 8000:
+		dFee = 4
+	case distance < 9000:
+		dFee = 5
+	default:
+		dFee = 10
+	}
+	return decimal.NewFromInt(dFee)
+}
+
+// addressFromOrder constructs an addressDomain.Address from an order's denormalized fields.
+func addressFromOrder(o *orderDomain.Order) *addressDomain.Address {
+	if o.StreetName == nil {
+		return nil
+	}
+	addr := &addressDomain.Address{
+		StreetName:       *o.StreetName,
+		MunicipalityName: *o.MunicipalityName,
+		Postcode:         *o.Postcode,
+		HouseNumber:      *o.HouseNumber,
+		BoxNumber:        o.BoxNumber,
+	}
+	if o.AddressID != nil {
+		addr.ID = *o.AddressID
+	}
+	if o.AddressDistance != nil {
+		addr.Distance = *o.AddressDistance
+	}
+	return addr
+}
+
+func derefOrEmpty(s *string) string {
+	if s != nil {
+		return *s
+	}
+	return ""
+}
+
+func derefFloatOrZero(f *float64) float64 {
+	if f != nil {
+		return *f
+	}
+	return 0
 }
 
 func ToGQLProductChoice(c *productDomain.ProductChoice, lang string) *model.ProductChoice {

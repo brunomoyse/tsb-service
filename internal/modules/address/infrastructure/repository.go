@@ -181,6 +181,33 @@ func (r *AddressRepository) BatchGetAddressesByOrderIDs(ctx context.Context, ord
 	return addressMap, nil
 }
 
+func (r *AddressRepository) GetStreetByID(ctx context.Context, streetID string) (*domain.Street, error) {
+	sqlQuery := `
+		SELECT street_id, streetname_fr, municipality_name_fr, postcode
+		FROM streets
+		WHERE street_id = $1;
+	`
+	var street domain.Street
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &street, sqlQuery, streetID); err != nil {
+		return nil, fmt.Errorf("failed to get street by ID: %w", err)
+	}
+	return &street, nil
+}
+
+func (r *AddressRepository) GetStreetAverageDistance(ctx context.Context, streetID string) (float64, error) {
+	sqlQuery := `
+		SELECT COALESCE(AVG(ad.distance), 10000)
+		FROM addresses a
+		JOIN address_distance ad ON a.address_id = ad.address_id
+		WHERE a.street_id = $1;
+	`
+	var avgDistance float64
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &avgDistance, sqlQuery, streetID); err != nil {
+		return 0, fmt.Errorf("failed to get street average distance: %w", err)
+	}
+	return avgDistance, nil
+}
+
 func (r *AddressRepository) BatchGetAddressesByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Address, error) {
 	if len(userIDs) == 0 {
 		return map[string][]*domain.Address{}, nil

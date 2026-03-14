@@ -201,6 +201,12 @@ func (m *mockAddressService) BatchGetAddressesByOrderIDs(_ context.Context, _ []
 func (m *mockAddressService) BatchGetAddressesByUserIDs(_ context.Context, _ []string) (map[string][]*addressDomain.Address, error) {
 	return nil, nil
 }
+func (m *mockAddressService) GetStreetByID(_ context.Context, _ string) (*addressDomain.Street, error) {
+	return nil, nil
+}
+func (m *mockAddressService) GetStreetAverageDistance(_ context.Context, _ string) (float64, error) {
+	return 0, nil
+}
 
 var _ addressApplication.AddressService = (*mockAddressService)(nil)
 
