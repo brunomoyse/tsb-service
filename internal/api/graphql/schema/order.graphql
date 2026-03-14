@@ -20,6 +20,8 @@ type Order {
     payment: Payment
     items: [OrderItem!]!
 
+    isManualAddress: Boolean!
+
     statusHistory: [OrderStatusHistory!]! @admin
 
     # Computed helper fields for display
@@ -75,6 +77,11 @@ input CreateOrderInput {
     preferredReadyTime: DateTime
     items: [CreateOrderItemInput!]!
     couponCode: String
+    # Manual address fields (used when isManualAddress=true)
+    streetId: String
+    houseNumber: String
+    boxNumber: String
+    isManualAddress: Boolean
 }
 
 input CreateOrderItemInput {

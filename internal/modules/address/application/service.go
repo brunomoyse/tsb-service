@@ -11,6 +11,8 @@ type AddressService interface {
 	GetBoxNumbers(ctx context.Context, streetID string, houseNumber string) ([]*string, error)
 	GetFinalAddress(ctx context.Context, streetID string, houseNumber string, boxNumber *string) (*domain.Address, error)
 	GetAddressByID(ctx context.Context, ID string) (*domain.Address, error)
+	GetStreetByID(ctx context.Context, streetID string) (*domain.Street, error)
+	GetStreetAverageDistance(ctx context.Context, streetID string) (float64, error)
 
 	BatchGetAddressesByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.Address, error)
 	BatchGetAddressesByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Address, error)
@@ -64,4 +66,12 @@ func (s *addressService) BatchGetAddressesByOrderIDs(ctx context.Context, orderI
 
 func (s *addressService) BatchGetAddressesByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Address, error) {
 	return s.repo.BatchGetAddressesByUserIDs(ctx, userIDs)
+}
+
+func (s *addressService) GetStreetByID(ctx context.Context, streetID string) (*domain.Street, error) {
+	return s.repo.GetStreetByID(ctx, streetID)
+}
+
+func (s *addressService) GetStreetAverageDistance(ctx context.Context, streetID string) (float64, error) {
+	return s.repo.GetStreetAverageDistance(ctx, streetID)
 }

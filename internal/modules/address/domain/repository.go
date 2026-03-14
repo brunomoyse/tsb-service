@@ -14,4 +14,7 @@ type AddressRepository interface {
 
 	BatchGetAddressesByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*Address, error)
 	BatchGetAddressesByUserIDs(ctx context.Context, userIDs []string) (map[string][]*Address, error)
+
+	GetStreetByID(ctx context.Context, streetID string) (*Street, error)
+	GetStreetAverageDistance(ctx context.Context, streetID string) (float64, error)
 }

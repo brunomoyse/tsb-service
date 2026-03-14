@@ -164,6 +164,8 @@ models:
   ProductChoice:
 
   Order:
+    model:
+      - tsb-service/internal/api/graphql/model.Order
     fields:
       address:
         resolver: true
@@ -180,6 +182,8 @@ models:
       displayCustomerName:
         resolver: true
       displayAddress:
+        resolver: true
+      isManualAddress:
         resolver: true
 
   OrderItem:
