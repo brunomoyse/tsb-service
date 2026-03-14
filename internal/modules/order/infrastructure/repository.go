@@ -261,7 +261,7 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
         JOIN product_category_translations pct ON pc.id = pct.product_category_id AND pct.language = 'fr'
         JOIN product_translations pt ON p.id = pt.product_id AND pt.language = 'fr'
         WHERE op.order_id IN (?)
-        ORDER BY p.code ASC, pct.name ASC, pt.name ASC
+        ORDER BY pc."order" ASC, p.code ASC, pt.name ASC
     `, orderIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build IN query: %w", err)
