@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
@@ -20,6 +21,7 @@ import (
 	"tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/logging"
 	"tsb-service/pkg/oauth2"
+	"tsb-service/pkg/utils"
 	es "tsb-service/pkg/email/scaleway"
 )
 
@@ -143,10 +145,26 @@ func (h *UserHandler) RegisterHandler(c *gin.Context) {
 		return
 	}
 
+	// Validate input lengths.
+	if len(req.FirstName) > 100 || len(req.LastName) > 100 || len(req.Email) > 255 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "input too long"})
+		return
+	}
+
 	user, err := h.service.CreateUser(ctx, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressID, &req.Password, nil)
 	if err != nil {
-		logging.FromContext(ctx).Error("failed to create user", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+		errMsg := err.Error()
+		switch {
+		case strings.Contains(errMsg, "already exists"):
+			c.JSON(http.StatusConflict, gin.H{"error": "email_already_exists"})
+		case strings.Contains(errMsg, "invalid email format"):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_email_format"})
+		case strings.Contains(errMsg, "password must"):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "weak_password"})
+		default:
+			logging.FromContext(ctx).Error("failed to create user", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "registration_failed"})
+		}
 		return
 	}
 
@@ -182,7 +200,7 @@ func (h *UserHandler) VerifyEmailHandler(c *gin.Context) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(jwtSecret), nil
+		return utils.DeriveKey(jwtSecret, "email_verification"), nil
 	})
 	if err != nil {
 		logging.FromContext(c.Request.Context()).Warn("invalid verification token", zap.Error(err))
@@ -425,6 +443,14 @@ func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
 					log.Error("failed to update google ID", zap.String("provider", "google"), zap.Error(err))
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Google ID"})
 					return
+				}
+
+				// Google authenticated the user, so auto-verify their email.
+				if user.EmailVerifiedAt == nil {
+					user, err = h.service.UpdateEmailVerifiedAt(ctx, user.ID.String())
+					if err != nil {
+						log.Error("failed to verify email after Google link", zap.String("provider", "google"), zap.Error(err))
+					}
 				}
 
 				// Send account linked notification email

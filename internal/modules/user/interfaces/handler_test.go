@@ -22,6 +22,7 @@ import (
 	addressDomain "tsb-service/internal/modules/address/domain"
 	"tsb-service/internal/modules/user/application"
 	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/utils"
 )
 
 func init() {
@@ -451,10 +452,29 @@ func TestRegisterHandler(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
+	t.Run("Duplicate email returns 409", func(t *testing.T) {
+		svc := &mockUserService{
+			createUserFn: func(_ context.Context, _, _, _ string, _, _, _, _ *string) (*domain.User, error) {
+				return nil, fmt.Errorf("user with email jane@example.com already exists")
+			},
+		}
+		handler := newTestHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		body := `{"firstName":"Jane","lastName":"Doe","email":"jane@example.com","password":"MyP@ssw0rd"}`
+		c.Request = httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		handler.RegisterHandler(c)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+	})
+
 	t.Run("Service error returns 500", func(t *testing.T) {
 		svc := &mockUserService{
 			createUserFn: func(_ context.Context, _, _, _ string, _, _, _, _ *string) (*domain.User, error) {
-				return nil, fmt.Errorf("duplicate email")
+				return nil, fmt.Errorf("database connection failed")
 			},
 		}
 		handler := newTestHandler(svc)
@@ -989,8 +1009,20 @@ func generateTestJWT(t *testing.T, claims map[string]any) string {
 		mapClaims["iat"] = time.Now().Unix()
 	}
 
+	// Derive signing key based on token purpose
+	purpose, _ := mapClaims["purpose"].(string)
+	var signingKey []byte
+	switch purpose {
+	case "email_verification":
+		signingKey = utils.DeriveKey(testJWTSecret, "email_verification")
+	case "password_reset":
+		signingKey = utils.DeriveKey(testJWTSecret, "password_reset")
+	default:
+		signingKey = utils.DeriveKey(testJWTSecret, "auth")
+	}
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, mapClaims)
-	tokenStr, err := token.SignedString([]byte(testJWTSecret))
+	tokenStr, err := token.SignedString(signingKey)
 	require.NoError(t, err)
 	return tokenStr
 }
