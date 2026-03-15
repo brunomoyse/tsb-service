@@ -108,6 +108,7 @@ type ComplexityRoot struct {
 		UpdatePaymentStatus     func(childComplexity int, orderID uuid.UUID, status string) int
 		UpdateProduct           func(childComplexity int, id uuid.UUID, input model.UpdateProductInput) int
 		UpdateProductChoice     func(childComplexity int, id uuid.UUID, input model.UpdateProductChoiceInput) int
+		UpdateTicketTemplates   func(childComplexity int, templates map[string]any) int
 	}
 
 	Order struct {
@@ -249,6 +250,7 @@ type ComplexityRoot struct {
 		IsCurrentlyOpen func(childComplexity int) int
 		OpeningHours    func(childComplexity int) int
 		OrderingEnabled func(childComplexity int) int
+		TicketTemplates func(childComplexity int) int
 		UpdatedAt       func(childComplexity int) int
 	}
 
@@ -302,6 +304,7 @@ type MutationResolver interface {
 	DeleteProductChoice(ctx context.Context, id uuid.UUID) (bool, error)
 	UpdateOrderingEnabled(ctx context.Context, enabled bool) (*model.RestaurantConfig, error)
 	UpdateOpeningHours(ctx context.Context, hours model.OpeningHoursInput) (*model.RestaurantConfig, error)
+	UpdateTicketTemplates(ctx context.Context, templates map[string]any) (*model.RestaurantConfig, error)
 	UpdateMe(ctx context.Context, input model.UpdateUserInput) (*model.User, error)
 	RequestDeletion(ctx context.Context) (*model.User, error)
 	CancelDeletionRequest(ctx context.Context) (*model.User, error)
@@ -716,6 +719,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.UpdateProductChoice(childComplexity, args["id"].(uuid.UUID), args["input"].(model.UpdateProductChoiceInput)), true
+	case "Mutation.updateTicketTemplates":
+		if e.ComplexityRoot.Mutation.UpdateTicketTemplates == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateTicketTemplates_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateTicketTemplates(childComplexity, args["templates"].(map[string]any)), true
 
 	case "Order.address":
 		if e.ComplexityRoot.Order.Address == nil {
@@ -1475,6 +1489,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.RestaurantConfig.OrderingEnabled(childComplexity), true
+	case "RestaurantConfig.ticketTemplates":
+		if e.ComplexityRoot.RestaurantConfig.TicketTemplates == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RestaurantConfig.TicketTemplates(childComplexity), true
 	case "RestaurantConfig.updatedAt":
 		if e.ComplexityRoot.RestaurantConfig.UpdatedAt == nil {
 			break
@@ -1942,6 +1962,17 @@ func (ec *executionContext) field_Mutation_updateProduct_args(ctx context.Contex
 		return nil, err
 	}
 	args["input"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateTicketTemplates_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "templates", ec.unmarshalNJSON2map)
+	if err != nil {
+		return nil, err
+	}
+	args["templates"] = arg0
 	return args, nil
 }
 
@@ -3893,6 +3924,8 @@ func (ec *executionContext) fieldContext_Mutation_updateOrderingEnabled(ctx cont
 				return ec.fieldContext_RestaurantConfig_orderingEnabled(ctx, field)
 			case "openingHours":
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
+			case "ticketTemplates":
+				return ec.fieldContext_RestaurantConfig_ticketTemplates(ctx, field)
 			case "isCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isCurrentlyOpen(ctx, field)
 			case "updatedAt":
@@ -3957,6 +3990,8 @@ func (ec *executionContext) fieldContext_Mutation_updateOpeningHours(ctx context
 				return ec.fieldContext_RestaurantConfig_orderingEnabled(ctx, field)
 			case "openingHours":
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
+			case "ticketTemplates":
+				return ec.fieldContext_RestaurantConfig_ticketTemplates(ctx, field)
 			case "isCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isCurrentlyOpen(ctx, field)
 			case "updatedAt":
@@ -3973,6 +4008,72 @@ func (ec *executionContext) fieldContext_Mutation_updateOpeningHours(ctx context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateOpeningHours_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateTicketTemplates(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_updateTicketTemplates,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateTicketTemplates(ctx, fc.Args["templates"].(map[string]any))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.RestaurantConfig
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNRestaurantConfig2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐRestaurantConfig,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateTicketTemplates(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "orderingEnabled":
+				return ec.fieldContext_RestaurantConfig_orderingEnabled(ctx, field)
+			case "openingHours":
+				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
+			case "ticketTemplates":
+				return ec.fieldContext_RestaurantConfig_ticketTemplates(ctx, field)
+			case "isCurrentlyOpen":
+				return ec.fieldContext_RestaurantConfig_isCurrentlyOpen(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_RestaurantConfig_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RestaurantConfig", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateTicketTemplates_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -8332,6 +8433,8 @@ func (ec *executionContext) fieldContext_Query_restaurantConfig(_ context.Contex
 				return ec.fieldContext_RestaurantConfig_orderingEnabled(ctx, field)
 			case "openingHours":
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
+			case "ticketTemplates":
+				return ec.fieldContext_RestaurantConfig_ticketTemplates(ctx, field)
 			case "isCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isCurrentlyOpen(ctx, field)
 			case "updatedAt":
@@ -8563,6 +8666,35 @@ func (ec *executionContext) _RestaurantConfig_openingHours(ctx context.Context, 
 }
 
 func (ec *executionContext) fieldContext_RestaurantConfig_openingHours(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RestaurantConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type JSON does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RestaurantConfig_ticketTemplates(ctx context.Context, field graphql.CollectedField, obj *model.RestaurantConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RestaurantConfig_ticketTemplates,
+		func(ctx context.Context) (any, error) {
+			return obj.TicketTemplates, nil
+		},
+		nil,
+		ec.marshalNJSON2map,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RestaurantConfig_ticketTemplates(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "RestaurantConfig",
 		Field:      field,
@@ -9192,6 +9324,8 @@ func (ec *executionContext) fieldContext_Subscription_restaurantConfigUpdated(_ 
 				return ec.fieldContext_RestaurantConfig_orderingEnabled(ctx, field)
 			case "openingHours":
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
+			case "ticketTemplates":
+				return ec.fieldContext_RestaurantConfig_ticketTemplates(ctx, field)
 			case "isCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isCurrentlyOpen(ctx, field)
 			case "updatedAt":
@@ -12495,6 +12629,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "updateTicketTemplates":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateTicketTemplates(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "updateMe":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateMe(ctx, field)
@@ -14075,6 +14216,11 @@ func (ec *executionContext) _RestaurantConfig(ctx context.Context, sel ast.Selec
 			}
 		case "openingHours":
 			out.Values[i] = ec._RestaurantConfig_openingHours(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "ticketTemplates":
+			out.Values[i] = ec._RestaurantConfig_ticketTemplates(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}

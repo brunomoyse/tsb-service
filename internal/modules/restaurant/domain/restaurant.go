@@ -23,6 +23,7 @@ type OpeningHours map[string]*DaySchedule
 type RestaurantConfig struct {
 	OrderingEnabled bool            `db:"ordering_enabled" json:"orderingEnabled"`
 	OpeningHours    json.RawMessage `db:"opening_hours" json:"openingHours"`
+	TicketTemplates json.RawMessage `db:"ticket_templates" json:"ticketTemplates"`
 	UpdatedAt       time.Time       `db:"updated_at" json:"updatedAt"`
 }
 
