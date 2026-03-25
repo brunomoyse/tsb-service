@@ -82,9 +82,15 @@ func NewOIDCVerifier(ctx context.Context, issuerURL, internalURL, clientID strin
 		return nil, err
 	}
 
-	verifier := provider.Verifier(&oidc.Config{
+	verifierCfg := &oidc.Config{
 		ClientID: clientID,
-	})
+	}
+	if internalURL != "" {
+		// When using internal discovery URL, the provider's issuer is the internal URL,
+		// but tokens contain the external issuer. Skip the automatic issuer check.
+		verifierCfg.SkipIssuerCheck = true
+	}
+	verifier := provider.Verifier(verifierCfg)
 
 	return &OIDCVerifier{verifier: verifier, userLookup: userLookup}, nil
 }
