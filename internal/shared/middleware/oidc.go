@@ -3,14 +3,29 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"golang.org/x/oauth2"
 
 	"tsb-service/pkg/utils"
 )
+
+// hostOverrideTransport sets the Host header to the external domain
+// when making requests to an internal Docker URL for OIDC discovery.
+// Zitadel resolves instances by Host header, so this is required.
+type hostOverrideTransport struct {
+	host string
+	base http.RoundTripper
+}
+
+func (t *hostOverrideTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Host = t.host
+	return t.base.RoundTrip(req)
+}
 
 // UserLookup resolves a Zitadel sub to an app user UUID.
 // Implemented by UserService to avoid circular imports.
@@ -37,11 +52,32 @@ type zitadelClaims struct {
 }
 
 // NewOIDCVerifier initializes the OIDC provider and returns a JWT verifier.
-// issuerURL is the Zitadel instance URL (e.g., "http://localhost:8081").
+// issuerURL is the Zitadel instance URL (e.g., "https://auth.example.com").
+// internalURL is optional — when set (e.g., "http://zitadel-api:8080" in Docker),
+// OIDC discovery uses the internal URL while tokens are validated against the external issuer.
 // clientID is the audience expected in the JWT (the Zitadel project ID or app client ID).
 // userLookup resolves Zitadel sub → app user UUID (pass nil to skip, userID will be the raw Zitadel sub).
-func NewOIDCVerifier(ctx context.Context, issuerURL, clientID string, userLookup UserLookup) (*OIDCVerifier, error) {
-	provider, err := oidc.NewProvider(ctx, issuerURL)
+func NewOIDCVerifier(ctx context.Context, issuerURL, internalURL, clientID string, userLookup UserLookup) (*OIDCVerifier, error) {
+	discoveryURL := issuerURL
+	if internalURL != "" {
+		// In Docker, the external issuer (https://...) isn't reachable from the container.
+		// Use the internal URL for discovery but allow the issuer mismatch in the response.
+		// Also override the Host header so Zitadel can resolve the correct instance.
+		discoveryURL = internalURL
+		ctx = oidc.InsecureIssuerURLContext(ctx, internalURL)
+
+		parsed, _ := url.Parse(issuerURL)
+		externalHost := parsed.Host
+		client := &http.Client{
+			Transport: &hostOverrideTransport{
+				host: externalHost,
+				base: http.DefaultTransport,
+			},
+		}
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, client)
+	}
+
+	provider, err := oidc.NewProvider(ctx, discoveryURL)
 	if err != nil {
 		return nil, err
 	}
