@@ -94,7 +94,18 @@ func CreateSessionHandler(c *gin.Context) {
 	}
 
 	if status != http.StatusCreated && status != http.StatusOK {
-		// Forward the error status (401 for bad credentials, etc.)
+		// Parse Zitadel error to return meaningful codes to the frontend
+		var zErr struct {
+			Message string `json:"message"`
+		}
+		_ = json.Unmarshal(respBody, &zErr)
+
+		if strings.Contains(zErr.Message, "not set a password") || strings.Contains(zErr.Message, "COMMAND-3nJ4t") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no_password", "message": "This account uses social login. Please sign in with Google, Facebook, or Apple."})
+			return
+		}
+
+		// Forward other errors as-is (401 for bad credentials, etc.)
 		c.Data(status, "application/json", respBody)
 		return
 	}
