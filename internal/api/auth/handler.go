@@ -10,11 +10,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
 	"tsb-service/pkg/logging"
+	"tsb-service/pkg/utils"
 )
 
 // sessionRequest is the frontend's login request.
@@ -394,6 +396,101 @@ func findZitadelUserByEmail(email string) (string, error) {
 		return searchResp.Result[0].UserID, nil
 	}
 	return "", fmt.Errorf("no user found")
+}
+
+// changePasswordRequest is the frontend's request to change password.
+type changePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
+// ChangePasswordHandler proxies password change to Zitadel's User API.
+// POST /auth/change-password { currentPassword, newPassword }
+// Requires strict auth middleware (needs Zitadel sub from context).
+func ChangePasswordHandler(c *gin.Context) {
+	log := logging.FromContext(c.Request.Context())
+
+	zitadelSub := utils.GetZitadelSub(c.Request.Context())
+	if zitadelSub == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	var req changePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.CurrentPassword == "" || req.NewPassword == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "currentPassword and newPassword are required"})
+		return
+	}
+
+	// Zitadel v2: PUT /v2/users/{userId}/password
+	body := map[string]any{
+		"currentPassword": req.CurrentPassword,
+		"newPassword": map[string]any{
+			"password":       req.NewPassword,
+			"changeRequired": false,
+		},
+	}
+
+	respBody, status, err := zitadelAdminRequest("PUT", "/v2/users/"+zitadelSub+"/password", body)
+	if err != nil {
+		log.Error("zitadel password change failed", zap.Error(err))
+		c.JSON(http.StatusBadGateway, gin.H{"error": "authentication service unavailable"})
+		return
+	}
+
+	if status != http.StatusOK && status != http.StatusCreated {
+		// Map Zitadel errors to frontend-expected error codes
+		var zErr struct {
+			Message string `json:"message"`
+		}
+		_ = json.Unmarshal(respBody, &zErr)
+		msg := zErr.Message
+
+		log.Warn("zitadel password change rejected", zap.Int("status", status), zap.String("message", msg))
+
+		if strings.Contains(msg, "password invalid") || strings.Contains(msg, "COMMAND-3M0fs") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "wrong_password"})
+		} else if strings.Contains(msg, "complexity") || strings.Contains(msg, "COMMAND-oz74F") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "weak_password"})
+		} else {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "password_change_failed"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// HasPasswordHandler checks if the authenticated user has a password set in Zitadel.
+// GET /auth/has-password
+func HasPasswordHandler(c *gin.Context) {
+	zitadelSub := utils.GetZitadelSub(c.Request.Context())
+	if zitadelSub == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
+		return
+	}
+
+	// Zitadel v2: GET /v2/users/{userId}
+	respBody, status, err := zitadelRequest("GET", "/v2/users/"+zitadelSub, nil)
+	if err != nil || status != http.StatusOK {
+		c.JSON(http.StatusOK, gin.H{"hasPassword": false})
+		return
+	}
+
+	var userResp struct {
+		User struct {
+			Human struct {
+				PasswordChanged string `json:"passwordChanged"`
+			} `json:"human"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal(respBody, &userResp); err != nil {
+		c.JSON(http.StatusOK, gin.H{"hasPassword": false})
+		return
+	}
+
+	hasPassword := userResp.User.Human.PasswordChanged != "" && userResp.User.Human.PasswordChanged != "0001-01-01T00:00:00Z"
+	c.JSON(http.StatusOK, gin.H{"hasPassword": hasPassword})
 }
 
 // zitadelRequest makes an authenticated request to the Zitadel API using the service PAT.

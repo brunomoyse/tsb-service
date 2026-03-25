@@ -103,6 +103,7 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 	}
 
 	ctx := utils.SetUserID(c.Request.Context(), userID)
+	ctx = utils.SetZitadelSub(ctx, sub)
 	ctx = utils.SetIsAdmin(ctx, isAdmin)
 	c.Request = c.Request.WithContext(ctx)
 	c.Set(string(utils.UserIDKey), userID)

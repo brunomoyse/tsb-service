@@ -226,6 +226,8 @@ func main() {
 	api.POST("/payments/webhook", paymentHandler.UpdatePaymentStatusHandler)
 
 	strictAuth := oidcVerifier.StrictAuthMiddleware()
+	api.POST("/auth/change-password", strictAuth, auth.ChangePasswordHandler)
+	api.GET("/auth/has-password", strictAuth, auth.HasPasswordHandler)
 	api.GET("/orders/:id/invoice", strictAuth, orderHandler.DownloadInvoice)
 
 	feedbackLimiter := middleware.NewRateLimiter(2.0/60, 2) // 2 req/min per IP
