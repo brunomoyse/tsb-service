@@ -98,6 +98,23 @@ type Product struct {
 	Name         string    `json:"name"`
 }
 
+// CustomerStatsRow holds aggregated order statistics for a single customer.
+type CustomerStatsRow struct {
+	UserID         uuid.UUID       `db:"user_id"`
+	FirstName      string          `db:"first_name"`
+	LastName       string          `db:"last_name"`
+	Email          string          `db:"email"`
+	PhoneNumber    *string         `db:"phone_number"`
+	RegisteredAt   time.Time       `db:"registered_at"`
+	TotalOrders    int             `db:"total_orders"`
+	TotalAmount    decimal.Decimal `db:"total_amount"`
+	AverageAmount  decimal.Decimal `db:"average_amount"`
+	FirstOrderDate time.Time       `db:"first_order_date"`
+	LastOrderDate  time.Time       `db:"last_order_date"`
+	DeliveryCount  int             `db:"delivery_count"`
+	PickupCount    int             `db:"pickup_count"`
+}
+
 // NewOrder is a constructor function that creates a new Order domain object.
 // Prices will be set later in the service layer.
 // DiscountAmount returns the total discount (takeaway + coupon).
