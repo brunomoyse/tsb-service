@@ -4,25 +4,8 @@ import (
 	addressDomain "tsb-service/internal/modules/address/domain"
 	"tsb-service/internal/modules/user/domain"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
-
-// LoginRequest is used when a user attempts to log in.
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-// RegistrationRequest is used when a new user registers.
-type RegistrationRequest struct {
-	FirstName   string  `json:"firstName"`
-	LastName    string  `json:"lastName"`
-	Email       string  `json:"email"`
-	Password    string  `json:"password"`
-	PhoneNumber *string `json:"phoneNumber"`
-	AddressID   *string `json:"addressId"`
-}
 
 type UpdateUserRequest struct {
 	FirstName   *string `json:"firstName"`
@@ -32,32 +15,6 @@ type UpdateUserRequest struct {
 	AddressID   *string `json:"addressId"`
 }
 
-// ChangePasswordRequest is used when a logged-in user changes their password.
-type ChangePasswordRequest struct {
-	CurrentPassword string `json:"currentPassword"`
-	NewPassword     string `json:"newPassword"`
-}
-
-// ForgotPasswordRequest is used when a user requests a password reset.
-type ForgotPasswordRequest struct {
-	Email string `json:"email"`
-}
-
-// ResetPasswordRequest is used when a user resets their password.
-type ResetPasswordRequest struct {
-	Token    string `json:"token"`
-	Password string `json:"password"`
-}
-
-// GoogleAuthRequest is used when a user logs in via Google.
-type GoogleAuthRequest struct {
-	GoogleID  string `json:"googleId"`
-	Email     string `json:"email"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-}
-
-// UserResponse is returned after successful operations involving a user.
 type UserResponse struct {
 	ID          uuid.UUID              `json:"id"`
 	FirstName   string                 `json:"firstName"`
@@ -65,29 +22,6 @@ type UserResponse struct {
 	Email       string                 `json:"email"`
 	PhoneNumber *string                `json:"phoneNumber"`
 	Address     *addressDomain.Address `json:"address"`
-}
-
-type LoginResponse struct {
-	User         *UserResponse `json:"user"`
-	AccessToken  string        `json:"accessToken,omitempty"`
-	RefreshToken string        `json:"refreshToken,omitempty"`
-}
-
-// RefreshTokenRequest is used when a mobile client sends the refresh token in the body.
-type RefreshTokenRequest struct {
-	RefreshToken string `json:"refreshToken"`
-}
-
-// RefreshTokenResponse is returned after a successful token refresh.
-type RefreshTokenResponse struct {
-	User         gin.H  `json:"user"`
-	AccessToken  string `json:"accessToken,omitempty"`
-	RefreshToken string `json:"refreshToken,omitempty"`
-}
-
-// LogoutRequest is used when a mobile client sends the refresh token in the body.
-type LogoutRequest struct {
-	RefreshToken string `json:"refreshToken"`
 }
 
 func NewUserResponse(u *domain.User, a *addressDomain.Address) *UserResponse {
@@ -98,13 +32,5 @@ func NewUserResponse(u *domain.User, a *addressDomain.Address) *UserResponse {
 		Email:       u.Email,
 		PhoneNumber: u.PhoneNumber,
 		Address:     a,
-	}
-}
-
-func NewLoginResponse(u *domain.User, a *addressDomain.Address, accessToken, refreshToken string) *LoginResponse {
-	return &LoginResponse{
-		User:         NewUserResponse(u, a),
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
 	}
 }

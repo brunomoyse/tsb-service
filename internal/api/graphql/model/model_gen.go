@@ -111,6 +111,35 @@ type CreateProductInput struct {
 	Translations   []*TranslationInput `json:"translations"`
 }
 
+type CustomerStats struct {
+	UserID             uuid.UUID     `json:"userId"`
+	FirstName          string        `json:"firstName"`
+	LastName           string        `json:"lastName"`
+	Email              string        `json:"email"`
+	PhoneNumber        *string       `json:"phoneNumber,omitempty"`
+	RegisteredAt       time.Time     `json:"registeredAt"`
+	TotalOrders        int           `json:"totalOrders"`
+	TotalAmount        string        `json:"totalAmount"`
+	AverageOrderAmount string        `json:"averageOrderAmount"`
+	FirstOrderDate     time.Time     `json:"firstOrderDate"`
+	LastOrderDate      time.Time     `json:"lastOrderDate"`
+	PreferredOrderType OrderTypeEnum `json:"preferredOrderType"`
+	DeliveryCount      int           `json:"deliveryCount"`
+	PickupCount        int           `json:"pickupCount"`
+}
+
+type CustomerStatsResponse struct {
+	Summary   *CustomerStatsSummary `json:"summary"`
+	Customers []*CustomerStats      `json:"customers"`
+}
+
+type CustomerStatsSummary struct {
+	TotalCustomers    int    `json:"totalCustomers"`
+	TotalRevenue      string `json:"totalRevenue"`
+	AverageOrderValue string `json:"averageOrderValue"`
+	TotalOrders       int    `json:"totalOrders"`
+}
+
 type DaySchedule struct {
 	Open        string  `json:"open"`
 	Close       string  `json:"close"`
@@ -318,7 +347,6 @@ type User struct {
 	PhoneNumber         *string    `json:"phoneNumber,omitempty"`
 	IsAdmin             bool       `json:"isAdmin"`
 	NotifyMarketing     bool       `json:"notifyMarketing"`
-	EmailVerifiedAt     *time.Time `json:"emailVerifiedAt,omitempty"`
 	DeletionRequestedAt *time.Time `json:"deletionRequestedAt,omitempty"`
 	Address             *Address   `json:"address,omitempty"`
 	Orders              []*Order   `json:"orders,omitempty"`

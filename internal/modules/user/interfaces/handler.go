@@ -1,74 +1,33 @@
 package interfaces
 
 import (
-	"crypto/rand"
-	"database/sql"
-	"encoding/base64"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"net/http"
-	"os"
-	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v4"
 	"go.uber.org/zap"
 
 	addressApplication "tsb-service/internal/modules/address/application"
 	addressDomain "tsb-service/internal/modules/address/domain"
 	"tsb-service/internal/modules/user/application"
-	"tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/logging"
-	"tsb-service/pkg/oauth2"
-	"tsb-service/pkg/utils"
-	es "tsb-service/pkg/email/scaleway"
 )
-
-func isProduction() bool {
-	return os.Getenv("APP_ENV") != "development"
-}
-
-func getSameSiteMode() http.SameSite {
-	return http.SameSiteLaxMode
-}
-
-func setAuthCookies(c *gin.Context, accessToken, refreshToken string) {
-	domain := os.Getenv("SESSION_COOKIE_DOMAIN")
-	secure := isProduction()
-	c.SetSameSite(getSameSiteMode())
-	c.SetCookie("access_token", accessToken, 3600, "/", domain, secure, true)
-	c.SetCookie("refresh_token", refreshToken, 30*24*3600, "/", domain, secure, true)
-}
-
-func clearAuthCookies(c *gin.Context) {
-	domain := os.Getenv("SESSION_COOKIE_DOMAIN")
-	secure := isProduction()
-	c.SetSameSite(getSameSiteMode())
-	c.SetCookie("access_token", "", -1, "/", domain, secure, true)
-	c.SetCookie("refresh_token", "", -1, "/", domain, secure, true)
-}
 
 type UserHandler struct {
 	service        application.UserService
 	addressService addressApplication.AddressService
-	jwtSecret      string
 }
 
 func NewUserHandler(
 	service application.UserService,
 	addressService addressApplication.AddressService,
-	jwtSecret string,
 ) *UserHandler {
 	return &UserHandler{
 		service:        service,
 		addressService: addressService,
-		jwtSecret:      jwtSecret,
 	}
 }
 
 func (h *UserHandler) GetUserProfileHandler(c *gin.Context) {
-	// Retrieve the logged-in user's ID from the Gin context.
 	userID := c.GetString("userID")
 	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "handler: user not authenticated"})
@@ -76,21 +35,18 @@ func (h *UserHandler) GetUserProfileHandler(c *gin.Context) {
 	}
 
 	user, err := h.service.GetUserByID(c, userID)
-
 	if err != nil {
 		logging.FromContext(c.Request.Context()).Error("failed to fetch user profile", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user profile"})
 		return
 	}
 
-	// If user has an address ID, fetch the address details.
 	var address *addressDomain.Address
 	if user.AddressID != nil {
 		address, _ = h.addressService.GetAddressByID(c.Request.Context(), *user.AddressID)
 	}
 
 	res := NewUserResponse(user, address)
-
 	c.JSON(http.StatusOK, res)
 }
 
@@ -117,7 +73,6 @@ func (h *UserHandler) UpdateMeHandler(c *gin.Context) {
 		return
 	}
 
-	// If user has an address ID, fetch the address details.
 	var address *addressDomain.Address
 	if user.AddressID != nil {
 		address, _ = h.addressService.GetAddressByID(c.Request.Context(), *user.AddressID)
@@ -125,447 +80,4 @@ func (h *UserHandler) UpdateMeHandler(c *gin.Context) {
 
 	res := NewUserResponse(user, address)
 	c.JSON(http.StatusOK, res)
-}
-
-func (h *UserHandler) RegisterHandler(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	var req RegistrationRequest
-	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		logging.FromContext(ctx).Warn("invalid request payload", zap.String("handler", "register"), zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request payload"})
-		return
-	}
-
-	// Validate required fields.
-	if req.FirstName == "" || req.LastName == "" || req.Email == "" || req.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "missing required fields",
-		})
-		return
-	}
-
-	// Validate input lengths.
-	if len(req.FirstName) > 100 || len(req.LastName) > 100 || len(req.Email) > 255 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "input too long"})
-		return
-	}
-
-	user, err := h.service.CreateUser(ctx, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressID, &req.Password, nil)
-	if err != nil {
-		errMsg := err.Error()
-		switch {
-		case strings.Contains(errMsg, "already exists"):
-			c.JSON(http.StatusConflict, gin.H{"error": "email_already_exists"})
-		case strings.Contains(errMsg, "invalid email format"):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_email_format"})
-		case strings.Contains(errMsg, "password must"):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "weak_password"})
-		default:
-			logging.FromContext(ctx).Error("failed to create user", zap.Error(err))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "registration_failed"})
-		}
-		return
-	}
-
-	// If user has an address ID, fetch the address details.
-	var address *addressDomain.Address
-	if user.AddressID != nil {
-		address, _ = h.addressService.GetAddressByID(c.Request.Context(), *user.AddressID)
-	}
-
-	res := NewUserResponse(user, address)
-	c.JSON(http.StatusOK, res)
-}
-
-// VerifyEmailHandler validates the verification token and marks the user as verified.
-func (h *UserHandler) VerifyEmailHandler(c *gin.Context) {
-	// Get the token from the query parameter.
-	tokenStr := c.Query("token")
-	if tokenStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "token is required"})
-		return
-	}
-
-	// Load the JWT secret from the environment.
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "server misconfiguration"})
-		return
-	}
-
-	// Parse and validate the token.
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
-		// Ensure the signing method is HMAC.
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return utils.DeriveKey(jwtSecret, "email_verification"), nil
-	})
-	if err != nil {
-		logging.FromContext(c.Request.Context()).Warn("invalid verification token", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token"})
-		return
-	}
-
-	// Validate token claims.
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token claims"})
-		return
-	}
-
-	// Check for a valid subject (user id) and the correct purpose.
-	userID, ok := claims["sub"].(string)
-	if !ok || userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token subject"})
-		return
-	}
-	if claims["purpose"] != "email_verification" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token purpose"})
-		return
-	}
-
-	// Call the service to mark the user as verified.
-	err = h.service.VerifyUserEmail(c.Request.Context(), userID)
-	if err != nil {
-		logging.FromContext(c.Request.Context()).Error("failed to verify email", zap.String("user_id", userID), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify email"})
-		return
-	}
-
-	c.Redirect(http.StatusFound, os.Getenv("REDIRECT_EMAIL_VERIFY_SUCCESSFUL"))
-}
-
-func (h *UserHandler) LoginHandler(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	var req LoginRequest
-
-	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"invalid request payload": err.Error()})
-		return
-	}
-
-	user, accessToken, refreshToken, err := h.service.Login(ctx, req.Email, req.Password, h.jwtSecret)
-	if err != nil {
-		logging.FromContext(ctx).Warn("login failed", zap.Error(err))
-		if err.Error() == "email not verified" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "email_not_verified"})
-			return
-		}
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-		return
-	}
-
-	// If user has an address ID, fetch the address details.
-	var address *addressDomain.Address
-	if user.AddressID != nil {
-		address, _ = h.addressService.GetAddressByID(c.Request.Context(), *user.AddressID)
-	}
-
-	setAuthCookies(c, *accessToken, *refreshToken)
-
-	c.JSON(http.StatusOK, NewLoginResponse(user, address, *accessToken, *refreshToken))
-}
-
-func (h *UserHandler) LogoutHandler(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	// Retrieve refresh token from cookie, fallback to JSON body (mobile clients)
-	refreshToken, _ := c.Cookie("refresh_token")
-	if refreshToken == "" {
-		var req LogoutRequest
-		if err := c.ShouldBindJSON(&req); err == nil && req.RefreshToken != "" {
-			refreshToken = req.RefreshToken
-		}
-	}
-	if refreshToken != "" {
-		if err := h.service.InvalidateRefreshToken(ctx, refreshToken); err != nil {
-			logging.FromContext(ctx).Error("failed to invalidate refresh token", zap.Error(err))
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to complete logout. Please try again.",
-			})
-			return
-		}
-	}
-
-	// Cache headers to prevent caching of logout response
-	c.Header("Cache-Control", "no-store, no-cache, must-revalidate")
-	c.Header("Pragma", "no-cache")
-	c.Header("Expires", "0")
-
-	// Clear authentication cookies
-	clearAuthCookies(c)
-
-	// Return success response
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Logged out successfully",
-	})
-}
-
-func (h *UserHandler) ForgotPasswordHandler(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	var req ForgotPasswordRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.Email == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "valid email is required"})
-		return
-	}
-
-	if err := h.service.RequestPasswordReset(ctx, req.Email); err != nil {
-		logging.FromContext(ctx).Error("password reset request failed", zap.Error(err))
-	}
-
-	// Always return 200 to prevent email enumeration
-	c.JSON(http.StatusOK, gin.H{"message": "If an account with that email exists, a password reset link has been sent."})
-}
-
-func (h *UserHandler) ResetPasswordHandler(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	var req ResetPasswordRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.Token == "" || req.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "token and password are required"})
-		return
-	}
-
-	if err := h.service.ResetPassword(ctx, req.Token, req.Password); err != nil {
-		logging.FromContext(ctx).Warn("password reset failed", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	clearAuthCookies(c)
-	c.JSON(http.StatusOK, gin.H{"message": "Password has been reset successfully."})
-}
-
-func (h *UserHandler) ChangePasswordHandler(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	userID := c.GetString("userID")
-	if userID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
-		return
-	}
-
-	var req ChangePasswordRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.CurrentPassword == "" || req.NewPassword == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "current password and new password are required"})
-		return
-	}
-
-	if err := h.service.ChangePassword(ctx, userID, req.CurrentPassword, req.NewPassword); err != nil {
-		errMsg := err.Error()
-		switch {
-		case strings.Contains(errMsg, "wrong_password"):
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "wrong_password"})
-		case strings.Contains(errMsg, "google_only_account"):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "google_only_account"})
-		case strings.Contains(errMsg, "password must"):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "weak_password"})
-		default:
-			logging.FromContext(ctx).Error("failed to change password", zap.Error(err))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to change password"})
-		}
-		return
-	}
-
-	clearAuthCookies(c)
-	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully."})
-}
-
-func (h *UserHandler) GoogleAuthHandler(c *gin.Context) {
-	state, err := generateStateToken()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate state"})
-		return
-	}
-	c.SetCookie("oauth_state", state, 60, "/", "", true, true)
-
-	// If mobile client, store platform hint so callback can redirect via deep link
-	if c.Query("platform") == "mobile" {
-		c.SetCookie("oauth_platform", "mobile", 60, "/", "", true, true)
-	}
-
-	c.Redirect(http.StatusFound, oauth2.GetGoogleAuthURL(state))
-}
-
-func (h *UserHandler) GoogleAuthCallbackHandler(c *gin.Context) {
-	ctx := c.Request.Context()
-	log := logging.FromContext(ctx)
-
-	// Validate state.
-	state := c.Query("state")
-	storedState, err := c.Cookie("oauth_state")
-	if err != nil || state != storedState {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid state parameter"})
-		return
-	}
-
-	// Exchange code for token.
-	code := c.Query("code")
-	token, err := oauth2.GoogleOAuthConfig.Exchange(ctx, code)
-	if err != nil {
-		log.Error("failed to exchange OAuth code", zap.String("provider", "google"), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to exchange code"})
-		return
-	}
-
-	// Fetch user info from Google.
-	type GoogleUserInfo struct {
-		Sub        string `json:"sub"`
-		Email      string `json:"email"`
-		GivenName  string `json:"given_name"`
-		FamilyName string `json:"family_name"`
-	}
-	client := oauth2.GoogleOAuthConfig.Client(ctx, token)
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
-	if err != nil {
-		log.Error("failed to fetch user info", zap.String("provider", "google"), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user info"})
-		return
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	var googleUser GoogleUserInfo
-	if err := json.NewDecoder(resp.Body).Decode(&googleUser); err != nil {
-		log.Error("failed to parse user info", zap.String("provider", "google"), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse user info"})
-		return
-	}
-
-	// Prepare the auth request DTO.
-	req := GoogleAuthRequest{
-		GoogleID:  googleUser.Sub,
-		Email:     googleUser.Email,
-		FirstName: googleUser.GivenName,
-		LastName:  googleUser.FamilyName,
-	}
-
-	var user *domain.User
-
-	// 1. Try to find the user by Google ID.
-	user, err = h.service.GetUserByGoogleID(ctx, req.GoogleID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		log.Error("error finding user by google ID", zap.String("provider", "google"), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding user by Google ID"})
-		return
-	}
-
-	// 2. If not found by Google ID, try to find by email.
-	if user == nil {
-		user, err = h.service.GetUserByEmail(ctx, req.Email)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			log.Error("error finding user by email", zap.String("provider", "google"), zap.Error(err))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error finding user by email"})
-			return
-		}
-
-		// 3a. If still not found, create a new user.
-		if user == nil {
-			user, err = h.service.CreateUser(ctx, req.FirstName, req.LastName, req.Email, nil, nil, nil, &req.GoogleID)
-			if err != nil {
-				log.Error("failed to create user via OAuth", zap.String("provider", "google"), zap.Error(err))
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
-				return
-			}
-		} else {
-			// 3b. If found by email but without a Google ID, update the user.
-			if user.GoogleID == nil {
-				user, err = h.service.UpdateGoogleID(ctx, user.ID.String(), req.GoogleID)
-				if err != nil {
-					log.Error("failed to update google ID", zap.String("provider", "google"), zap.Error(err))
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update Google ID"})
-					return
-				}
-
-				// Google authenticated the user, so auto-verify their email.
-				if user.EmailVerifiedAt == nil {
-					user, err = h.service.UpdateEmailVerifiedAt(ctx, user.ID.String())
-					if err != nil {
-						log.Error("failed to verify email after Google link", zap.String("provider", "google"), zap.Error(err))
-					}
-				}
-
-				// Send account linked notification email
-				go func() {
-					if emailErr := es.SendAccountLinkedEmail(*user, "fr"); emailErr != nil {
-						zap.L().Error("failed to send account linked email", zap.String("provider", "google"), zap.Error(emailErr))
-					}
-				}()
-			}
-		}
-	}
-
-	// Generate tokens.
-	accessToken, refreshToken, err := h.service.GenerateTokens(ctx, *user, h.jwtSecret)
-	if err != nil {
-		log.Error("failed to generate token", zap.String("provider", "google"), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
-		return
-	}
-
-	// Set tokens as cookies.
-	setAuthCookies(c, accessToken, refreshToken)
-
-	// Check if this is a mobile OAuth flow
-	oauthPlatform, _ := c.Cookie("oauth_platform")
-	if oauthPlatform == "mobile" {
-		// Clear the platform cookie
-		c.SetCookie("oauth_platform", "", -1, "/", "", true, true)
-		// Redirect to custom URL scheme for Capacitor app
-		deepLink := fmt.Sprintf("tokyosushi://oauth/callback?accessToken=%s&refreshToken=%s", accessToken, refreshToken)
-		c.Redirect(http.StatusFound, deepLink)
-		return
-	}
-
-	c.Redirect(http.StatusFound, os.Getenv("REDIRECT_LOGIN_SUCCESSFUL"))
-}
-
-func (h *UserHandler) RefreshTokenHandler(c *gin.Context) {
-	// 1. Get refresh token from cookie, fallback to JSON body (mobile clients)
-	refreshToken, err := c.Cookie("refresh_token")
-	if err != nil || refreshToken == "" {
-		var req RefreshTokenRequest
-		if bindErr := c.ShouldBindJSON(&req); bindErr == nil && req.RefreshToken != "" {
-			refreshToken = req.RefreshToken
-		}
-	}
-	if refreshToken == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
-		return
-	}
-
-	// 2. Process token refresh
-	newAccessToken, newRefreshToken, user, err := h.service.RefreshToken(
-		c.Request.Context(),
-		refreshToken,
-		h.jwtSecret,
-	)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Session expired"})
-		return
-	}
-
-	// 3. Set new cookies
-	setAuthCookies(c, newAccessToken, newRefreshToken)
-
-	// 4. Return tokens + minimal user data
-	c.JSON(http.StatusOK, RefreshTokenResponse{
-		User: gin.H{
-			"id":    user.ID,
-			"email": user.Email,
-		},
-		AccessToken:  newAccessToken,
-		RefreshToken: newRefreshToken,
-	})
-}
-
-func generateStateToken() (string, error) {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("failed to generate state token: %w", err)
-	}
-	return base64.URLEncoding.EncodeToString(b), nil
 }

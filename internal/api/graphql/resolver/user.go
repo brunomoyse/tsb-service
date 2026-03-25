@@ -15,6 +15,8 @@ import (
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/utils"
+
+	"github.com/shopspring/decimal"
 )
 
 // UpdateMe is the resolver for the updateMe field.
@@ -65,20 +67,9 @@ func (r *mutationResolver) CancelDeletionRequest(ctx context.Context) (*model.Us
 	return ToGQLUser(u), nil
 }
 
-// ResendVerificationEmail is the resolver for the resendVerificationEmail field.
-func (r *mutationResolver) ResendVerificationEmail(ctx context.Context) (bool, error) {
-	userID := utils.GetUserID(ctx)
-
-	if err := r.UserService.ResendVerificationEmail(ctx, userID); err != nil {
-		return false, err
-	}
-
-	return true, nil
-}
-
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
-	// Load the userID from the context
+	// The userID in context is the app user UUID (resolved from Zitadel sub by OIDC middleware).
 	userID := utils.GetUserID(ctx)
 
 	u, err := r.UserService.GetUserByID(ctx, userID)
@@ -90,6 +81,60 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 	user := ToGQLUser(u)
 
 	return user, nil
+}
+
+// CustomerStats is the resolver for the customerStats field.
+func (r *queryResolver) CustomerStats(ctx context.Context) (*model.CustomerStatsResponse, error) {
+	rows, err := r.OrderService.GetCustomerStats(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get customer stats: %w", err)
+	}
+
+	customers := make([]*model.CustomerStats, len(rows))
+	totalRevenue := decimal.Zero
+	totalOrders := 0
+
+	for i, row := range rows {
+		preferredType := model.OrderTypeEnumPickup
+		if row.DeliveryCount > row.PickupCount {
+			preferredType = model.OrderTypeEnumDelivery
+		}
+
+		customers[i] = &model.CustomerStats{
+			UserID:             row.UserID,
+			FirstName:          row.FirstName,
+			LastName:           row.LastName,
+			Email:              row.Email,
+			PhoneNumber:        row.PhoneNumber,
+			RegisteredAt:       row.RegisteredAt,
+			TotalOrders:        row.TotalOrders,
+			TotalAmount:        row.TotalAmount.StringFixed(2),
+			AverageOrderAmount: row.AverageAmount.StringFixed(2),
+			FirstOrderDate:     row.FirstOrderDate,
+			LastOrderDate:      row.LastOrderDate,
+			PreferredOrderType: preferredType,
+			DeliveryCount:      row.DeliveryCount,
+			PickupCount:        row.PickupCount,
+		}
+
+		totalRevenue = totalRevenue.Add(row.TotalAmount)
+		totalOrders += row.TotalOrders
+	}
+
+	avgOrderValue := decimal.Zero
+	if totalOrders > 0 {
+		avgOrderValue = totalRevenue.Div(decimal.NewFromInt(int64(totalOrders)))
+	}
+
+	return &model.CustomerStatsResponse{
+		Summary: &model.CustomerStatsSummary{
+			TotalCustomers:    len(customers),
+			TotalRevenue:      totalRevenue.StringFixed(2),
+			AverageOrderValue: avgOrderValue.StringFixed(2),
+			TotalOrders:       totalOrders,
+		},
+		Customers: customers,
+	}, nil
 }
 
 // Address is the resolver for the address field.
