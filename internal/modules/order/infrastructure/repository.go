@@ -385,3 +385,33 @@ func (r *OrderRepository) DeleteOrder(ctx context.Context, orderID uuid.UUID) er
 	}
 	return nil
 }
+
+func (r *OrderRepository) GetCustomerStats(ctx context.Context) ([]*domain.CustomerStatsRow, error) {
+	query := `
+		SELECT
+			u.id AS user_id,
+			u.first_name,
+			u.last_name,
+			u.email,
+			u.phone_number,
+			u.created_at AS registered_at,
+			COUNT(o.id) AS total_orders,
+			COALESCE(SUM(o.total_price), 0) AS total_amount,
+			COALESCE(AVG(o.total_price), 0) AS average_amount,
+			MIN(o.created_at) AS first_order_date,
+			MAX(o.created_at) AS last_order_date,
+			COUNT(CASE WHEN o.order_type = 'DELIVERY' THEN 1 END) AS delivery_count,
+			COUNT(CASE WHEN o.order_type = 'PICKUP' THEN 1 END) AS pickup_count
+		FROM users u
+		INNER JOIN orders o ON u.id = o.user_id
+		WHERE o.order_status NOT IN ('CANCELLED', 'FAILED')
+		GROUP BY u.id, u.first_name, u.last_name, u.email, u.phone_number, u.created_at
+		ORDER BY total_amount DESC
+	`
+
+	var rows []*domain.CustomerStatsRow
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &rows, query); err != nil {
+		return nil, fmt.Errorf("failed to query customer stats: %w", err)
+	}
+	return rows, nil
+}

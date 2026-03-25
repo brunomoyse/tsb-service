@@ -22,6 +22,7 @@ type OrderService interface {
 	DeleteOrder(ctx context.Context, orderID uuid.UUID) error
 	BatchGetOrderProductsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.OrderProductRaw, error)
 	BatchGetOrdersByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error)
+	GetCustomerStats(ctx context.Context) ([]*domain.CustomerStatsRow, error)
 }
 
 type orderService struct {
@@ -103,4 +104,8 @@ func (s *orderService) BatchGetOrderProductsByOrderIDs(ctx context.Context, orde
 
 func (s *orderService) BatchGetOrdersByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error) {
 	return s.repo.FindByUserIDs(ctx, userIDs)
+}
+
+func (s *orderService) GetCustomerStats(ctx context.Context) ([]*domain.CustomerStatsRow, error) {
+	return s.repo.GetCustomerStats(ctx)
 }
