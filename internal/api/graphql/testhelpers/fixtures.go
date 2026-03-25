@@ -197,6 +197,10 @@ func createTestUser(t *testing.T, ctx context.Context, db *sqlx.DB, firstName, l
 		userID, now, now, firstName, lastName, email, now, passwordHash, salt)
 	require.NoError(t, err, "Failed to create test user")
 
+	// Set zitadel_user_id to the UUID string (simulates Zitadel-migrated user)
+	// The me resolver uses FindOrCreateByZitadelID which looks up by this column
+	_, _ = db.ExecContext(ctx, `UPDATE users SET zitadel_user_id = $1 WHERE id = $2`, userID.String(), userID)
+
 	// If is_admin column exists, update it
 	if isAdmin {
 		updateQuery := `UPDATE users SET is_admin = $1 WHERE id = $2`

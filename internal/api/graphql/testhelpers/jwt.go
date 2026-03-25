@@ -5,12 +5,18 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
-
-	"tsb-service/pkg/types"
 )
 
 // TestJWTSecret is a known secret for testing
 const TestJWTSecret = "test-secret-key-for-testing-only"
+
+// testJwtClaims defines JWT claims used in test tokens.
+type testJwtClaims struct {
+	jwt.RegisteredClaims
+	Type    string `json:"type"`
+	ID      string `json:"jti"`
+	IsAdmin bool   `json:"is_admin"`
+}
 
 // GenerateTestAccessToken creates a valid JWT access token for testing
 func GenerateTestAccessToken(userID string, isAdmin bool) (string, error) {
@@ -22,10 +28,8 @@ func GenerateTestRefreshToken(userID string, isAdmin bool) (string, error) {
 	return generateTestToken(userID, isAdmin, "refresh", 30*24*time.Hour)
 }
 
-// generateTestToken is an internal helper to generate JWT tokens for testing
 func generateTestToken(userID string, isAdmin bool, tokenType string, duration time.Duration) (string, error) {
-	// Create token claims with IsAdmin custom field
-	claims := types.JwtClaims{
+	claims := testJwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
@@ -35,22 +39,16 @@ func generateTestToken(userID string, isAdmin bool, tokenType string, duration t
 		IsAdmin: isAdmin,
 	}
 
-	// Create and sign the token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString([]byte(TestJWTSecret))
-	if err != nil {
-		return "", err
-	}
-
-	return signedToken, nil
+	return token.SignedString([]byte(TestJWTSecret))
 }
 
 // GenerateExpiredToken creates an expired JWT token for testing auth failure cases
 func GenerateExpiredToken(userID string, isAdmin bool) (string, error) {
-	claims := types.JwtClaims{
+	claims := testJwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)), // Expired 1 hour ago
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
 		},
 		Type:    "access",
 		ID:      uuid.NewString(),
@@ -58,17 +56,12 @@ func GenerateExpiredToken(userID string, isAdmin bool) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString([]byte(TestJWTSecret))
-	if err != nil {
-		return "", err
-	}
-
-	return signedToken, nil
+	return token.SignedString([]byte(TestJWTSecret))
 }
 
 // ParseTestToken parses a JWT token and extracts userID and isAdmin status
 func ParseTestToken(tokenString string, jwtSecret string) (string, bool, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &types.JwtClaims{}, func(token *jwt.Token) (any, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &testJwtClaims{}, func(token *jwt.Token) (any, error) {
 		return []byte(jwtSecret), nil
 	})
 
@@ -76,7 +69,7 @@ func ParseTestToken(tokenString string, jwtSecret string) (string, bool, error) 
 		return "", false, err
 	}
 
-	if claims, ok := token.Claims.(*types.JwtClaims); ok && token.Valid {
+	if claims, ok := token.Claims.(*testJwtClaims); ok && token.Valid {
 		return claims.Subject, claims.IsAdmin, nil
 	}
 

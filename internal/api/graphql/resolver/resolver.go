@@ -14,8 +14,8 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 
 	"tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/directives"
@@ -26,8 +26,8 @@ import (
 	productApplication "tsb-service/internal/modules/product/application"
 	restaurantApplication "tsb-service/internal/modules/restaurant/application"
 	userApplication "tsb-service/internal/modules/user/application"
+	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/pubsub"
-	"tsb-service/pkg/types"
 	"tsb-service/pkg/utils"
 )
 
@@ -66,7 +66,7 @@ func NewResolver(
 }
 
 // GraphQLHandler defines the GraphQL endpoint with @auth directive injection
-func GraphQLHandler(resolver *Resolver, allowedOrigins []string, jwtSecret string) gin.HandlerFunc {
+func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *middleware.OIDCVerifier) gin.HandlerFunc {
 	cfg := graphql.Config{Resolvers: resolver}
 	cfg.Directives.Auth = directives.Auth
 	cfg.Directives.Admin = directives.Admin
@@ -83,12 +83,16 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, jwtSecret strin
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 			CheckOrigin: func(r *http.Request) bool {
-				origin := r.Header.Get("Origin")
+				origin := strings.TrimRight(strings.ToLower(r.Header.Get("Origin")), "/")
 				for _, allowed := range allowedOrigins {
-					if origin == allowed {
+					if origin == strings.TrimRight(strings.ToLower(allowed), "/") {
 						return true
 					}
 				}
+				zap.L().Warn("WebSocket origin rejected",
+					zap.String("origin", origin),
+					zap.Strings("allowed", allowedOrigins),
+				)
 				return false
 			},
 		},
@@ -103,16 +107,16 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, jwtSecret strin
 				return ctx, &initPayload, nil
 			}
 			tokenStr := strings.TrimPrefix(auth, "Bearer ")
-			claims := &types.JwtClaims{}
-			token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (any, error) {
-				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, jwt.ErrSignatureInvalid
+			sub, isAdmin, err := oidcVerifier.VerifyToken(ctx, tokenStr)
+			if err == nil && sub != "" {
+				// Resolve Zitadel sub → app UUID
+				appID, lookupErr := resolver.UserService.ResolveZitadelID(ctx, sub, "", "", "")
+				if lookupErr == nil {
+					ctx = utils.SetUserID(ctx, appID)
+				} else {
+					ctx = utils.SetUserID(ctx, sub)
 				}
-				return utils.DeriveKey(jwtSecret, "auth"), nil
-			})
-			if err == nil && token.Valid && claims.Subject != "" && claims.Type == "access" {
-				ctx = utils.SetUserID(ctx, claims.Subject)
-				ctx = utils.SetIsAdmin(ctx, claims.IsAdmin)
+				ctx = utils.SetIsAdmin(ctx, isAdmin)
 			}
 			return ctx, &initPayload, nil
 		},

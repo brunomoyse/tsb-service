@@ -15,8 +15,8 @@ import (
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 
+	"tsb-service/internal/api/auth"
 	"tsb-service/internal/api/feedback"
-	gqlMiddleware "tsb-service/internal/api/graphql/middleware"
 	"tsb-service/internal/api/graphql/resolver"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
@@ -35,7 +35,6 @@ import (
 
 	userApplication "tsb-service/internal/modules/user/application"
 	userInfrastructure "tsb-service/internal/modules/user/infrastructure"
-	userInterfaces "tsb-service/internal/modules/user/interfaces"
 
 	addressApplication "tsb-service/internal/modules/address/application"
 	addressInfrastructure "tsb-service/internal/modules/address/infrastructure"
@@ -43,7 +42,6 @@ import (
 	restaurantInfrastructure "tsb-service/internal/modules/restaurant/infrastructure"
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/db"
-	"tsb-service/pkg/oauth2"
 )
 
 func main() {
@@ -93,13 +91,12 @@ func main() {
 		zap.L().Error("MOLLIE_API_TOKEN is required")
 		os.Exit(1)
 	}
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		zap.L().Error("JWT_SECRET is required")
-		os.Exit(1)
-	}
-	if len(jwtSecret) < 32 {
-		zap.L().Error("JWT_SECRET must be at least 32 characters")
+
+	// OIDC env vars (verifier created after userService for user lookup)
+	zitadelIssuer := os.Getenv("ZITADEL_ISSUER")
+	zitadelClientID := os.Getenv("ZITADEL_CLIENT_ID")
+	if zitadelIssuer == "" || zitadelClientID == "" {
+		zap.L().Error("ZITADEL_ISSUER and ZITADEL_CLIENT_ID are required")
 		os.Exit(1)
 	}
 
@@ -107,7 +104,6 @@ func main() {
 		zap.L().Error("failed to initialize email service", zap.Error(err))
 		os.Exit(1)
 	}
-	oauth2.LoadGoogleOAuth()
 
 	mollieTesting := os.Getenv("MOLLIE_TESTING") == "true"
 	var mollieCfg *mollie.Config
@@ -141,9 +137,16 @@ func main() {
 	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, os.Getenv("APP_ENV") != "production")
 	userService := userApplication.NewUserService(userRepo)
 
+	// OIDC verifier — validates JWTs via JWKS + resolves Zitadel sub → app user UUID
+	oidcVerifier, err := middleware.NewOIDCVerifier(context.Background(), zitadelIssuer, zitadelClientID, userService)
+	if err != nil {
+		zap.L().Error("failed to initialize OIDC verifier", zap.Error(err))
+		os.Exit(1)
+	}
+	zap.L().Info("OIDC verifier initialized", zap.String("issuer", zitadelIssuer))
+
 	orderHandler := orderInterfaces.NewOrderHandler(orderService, userService, productService)
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService, broker)
-	userHandler := userInterfaces.NewUserHandler(userService, addressService, jwtSecret)
 
 	// Gin HTTP setup
 	router := gin.New()
@@ -206,27 +209,23 @@ func main() {
 		broker,
 		addressService, couponService, orderService, paymentService, productService, restaurantService, userService,
 	)
-	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL}, jwtSecret)
-	optionalAuth := gqlMiddleware.OptionalAuthMiddleware(jwtSecret)
+	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL}, oidcVerifier)
+	optionalAuth := oidcVerifier.OptionalAuthMiddleware()
 
 	api.POST("/graphql", optionalAuth, graphqlHandler)
 	api.GET("/graphql", optionalAuth, graphqlHandler)
 
+	// Auth proxy endpoints (proxies to Zitadel Session API with service account PAT)
+	authLimiter := middleware.NewRateLimiter(5.0/60, 5) // 5 req/min per IP
+	api.POST("/auth/session", authLimiter.Middleware(), auth.CreateSessionHandler)
+	api.POST("/auth/finalize", authLimiter.Middleware(), auth.FinalizeOIDCHandler)
+	api.POST("/auth/idp/start", authLimiter.Middleware(), auth.StartIdPIntentHandler)
+	api.POST("/auth/idp/session", authLimiter.Middleware(), auth.CreateIdPSessionHandler)
+
 	// Other endpoints
 	api.POST("/payments/webhook", paymentHandler.UpdatePaymentStatusHandler)
-	authLimiter := middleware.NewRateLimiter(5.0/60, 5) // 5 req/min per IP
-	api.POST("/login", authLimiter.Middleware(), userHandler.LoginHandler)
-	api.POST("/register", authLimiter.Middleware(), userHandler.RegisterHandler)
-	api.GET("/verify", userHandler.VerifyEmailHandler)
-	api.POST("/tokens/refresh", authLimiter.Middleware(), userHandler.RefreshTokenHandler)
-	api.POST("/logout", userHandler.LogoutHandler)
-	api.POST("/forgot-password", authLimiter.Middleware(), userHandler.ForgotPasswordHandler)
-	api.POST("/reset-password", authLimiter.Middleware(), userHandler.ResetPasswordHandler)
-	api.GET("/oauth/google", authLimiter.Middleware(), userHandler.GoogleAuthHandler)
-	api.GET("/oauth/google/callback", authLimiter.Middleware(), userHandler.GoogleAuthCallbackHandler)
 
-	strictAuth := middleware.AuthMiddleware(jwtSecret)
-	api.POST("/change-password", strictAuth, userHandler.ChangePasswordHandler)
+	strictAuth := oidcVerifier.StrictAuthMiddleware()
 	api.GET("/orders/:id/invoice", strictAuth, orderHandler.DownloadInvoice)
 
 	feedbackLimiter := middleware.NewRateLimiter(2.0/60, 2) // 2 req/min per IP

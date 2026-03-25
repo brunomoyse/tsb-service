@@ -13,37 +13,16 @@ type User struct {
 	FirstName       string     `db:"first_name" json:"firstName"`
 	LastName        string     `db:"last_name" json:"lastName"`
 	Email           string     `db:"email" json:"email"`
-	EmailVerifiedAt *time.Time `db:"email_verified_at" json:"emailVerifiedAt"`
 	PhoneNumber     *string    `db:"phone_number" json:"phoneNumber"`
 	AddressID       *string    `db:"address_id" json:"addressId"`
+	IsAdmin         bool       `db:"is_admin" json:"isAdmin"`
+	NotifyMarketing bool       `db:"notify_marketing" json:"notifyMarketing"`
+	DeletionRequestedAt *time.Time `db:"deletion_requested_at" json:"deletionRequestedAt"`
+	ZitadelUserID       *string    `db:"zitadel_user_id" json:"-"`
+	// Legacy columns — kept for SELECT * compatibility until DB migration drops them
+	EmailVerifiedAt *time.Time `db:"email_verified_at" json:"-"`
 	PasswordHash    *string    `db:"password_hash" json:"-"`
 	Salt            *string    `db:"salt" json:"-"`
 	RememberToken   *string    `db:"remember_token" json:"-"`
-	GoogleID            *string    `db:"google_id" json:"-"`
-	IsAdmin             bool       `db:"is_admin" json:"isAdmin"`
-	NotifyMarketing     bool       `db:"notify_marketing" json:"notifyMarketing"`
-	DeletionRequestedAt *time.Time `db:"deletion_requested_at" json:"deletionRequestedAt"`
-}
-
-func NewUser(firstName string, lastName string, email string, phoneNumber *string, addressID *string, passwordHash *string, salt *string) User {
-	return User{
-		ID:           uuid.Nil,
-		FirstName:    firstName,
-		LastName:     lastName,
-		Email:        email,
-		PhoneNumber:  phoneNumber,
-		AddressID:    addressID,
-		PasswordHash: passwordHash,
-		Salt:         salt,
-	}
-}
-
-func NewGoogleUser(firstName string, lastName string, email string, googleID string) User {
-	return User{
-		ID:        uuid.Nil,
-		FirstName: firstName,
-		LastName:  lastName,
-		Email:     email,
-		GoogleID:  &googleID,
-	}
+	GoogleID        *string    `db:"google_id" json:"-"`
 }

@@ -3,7 +3,6 @@ package infrastructure
 import (
 	"context"
 	"fmt"
-	"time"
 	"tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/db"
 
@@ -21,12 +20,12 @@ func NewUserRepository(pool *db.DBPool) domain.UserRepository {
 
 func (r *UserRepository) Save(ctx context.Context, user *domain.User) (uuid.UUID, error) {
 	query := `
-		INSERT INTO users (first_name, last_name, email, phone_number, address_id, password_hash, salt, google_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO users (first_name, last_name, email, phone_number, address_id, password_hash, salt, google_id, zitadel_user_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id;
 	`
 	var id uuid.UUID
-	if err := r.pool.ForContext(ctx).QueryRowContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.PasswordHash, user.Salt, user.GoogleID).Scan(&id); err != nil {
+	if err := r.pool.ForContext(ctx).QueryRowContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.PasswordHash, user.Salt, user.GoogleID, user.ZitadelUserID).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
 	user.ID = id
@@ -37,7 +36,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 	var u domain.User
 	query := `
 		SELECT *
-		FROM users 
+		FROM users
 		WHERE email = $1;
 	`
 	if err := r.pool.ForContext(ctx).GetContext(ctx, &u, query, email); err != nil {
@@ -50,7 +49,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User,
 	var u domain.User
 	query := `
 		SELECT *
-		FROM users 
+		FROM users
 		WHERE id = $1;
 	`
 	if err := r.pool.ForContext(ctx).GetContext(ctx, &u, query, id); err != nil {
@@ -59,143 +58,31 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User,
 	return &u, nil
 }
 
-func (r *UserRepository) FindByGoogleID(ctx context.Context, googleID string) (*domain.User, error) {
+func (r *UserRepository) FindByZitadelID(ctx context.Context, zitadelID string) (*domain.User, error) {
 	var u domain.User
 	query := `
 		SELECT *
-		FROM users 
-		WHERE google_id = $1;
+		FROM users
+		WHERE zitadel_user_id = $1;
 	`
-	if err := r.pool.ForContext(ctx).GetContext(ctx, &u, query, googleID); err != nil {
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &u, query, zitadelID); err != nil {
 		return nil, err
 	}
 	return &u, nil
 }
 
-func (r *UserRepository) UpdateGoogleID(ctx context.Context, userID string, googleID string) (*domain.User, error) {
-	query := `UPDATE users SET google_id = $1 WHERE id = $2`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, googleID, userID)
-	if err != nil {
-		return nil, err
-	}
-	return r.FindByID(ctx, userID)
-}
-
 func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) (*domain.User, error) {
 	query := `
 		UPDATE users
-		SET first_name = $1, last_name = $2, email = $3, phone_number = $4, address_id = $5, email_verified_at = $6, notify_marketing = $7
-		WHERE id = $8
+		SET first_name = $1, last_name = $2, email = $3, phone_number = $4, address_id = $5, email_verified_at = $6, notify_marketing = $7, zitadel_user_id = $8
+		WHERE id = $9
 	`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.EmailVerifiedAt, user.NotifyMarketing, user.ID)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.EmailVerifiedAt, user.NotifyMarketing, user.ZitadelUserID, user.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	return r.FindByID(ctx, user.ID.String())
-}
-
-func (r *UserRepository) UpdateUserPassword(ctx context.Context, userID string, passwordHash string, salt string) (*domain.User, error) {
-	query := `UPDATE users SET password_hash = $1, salt = $2 WHERE id = $3`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, passwordHash, salt, userID)
-	if err != nil {
-		return nil, err
-	}
-	return r.FindByID(ctx, userID)
-}
-
-func (r *UserRepository) UpdateEmailVerifiedAt(ctx context.Context, userID string) (*domain.User, error) {
-	query := `UPDATE users SET email_verified_at = NOW() WHERE id = $1`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID)
-	if err != nil {
-		return nil, err
-	}
-	return r.FindByID(ctx, userID)
-}
-
-func (r *UserRepository) StoreRefreshToken(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt int64) error {
-	query := `
-		INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
-		VALUES ($1, $2, $3)
-	`
-	expiresAtTime := time.Unix(expiresAt, 0)
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID, tokenHash, expiresAtTime)
-	return err
-}
-
-func (r *UserRepository) InvalidateRefreshToken(ctx context.Context, tokenHash string) error {
-	query := `
-		UPDATE refresh_tokens
-		SET revoked_at = NOW()
-		WHERE token_hash = $1 AND revoked_at IS NULL
-	`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, tokenHash)
-	return err
-}
-
-func (r *UserRepository) InvalidateAllRefreshTokens(ctx context.Context, userID string) error {
-	query := `
-		UPDATE refresh_tokens
-		SET revoked_at = NOW()
-		WHERE user_id = $1 AND revoked_at IS NULL
-	`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID)
-	return err
-}
-
-func (r *UserRepository) IsRefreshTokenValid(ctx context.Context, tokenHash string) (bool, error) {
-	query := `
-		SELECT EXISTS(
-			SELECT 1 FROM refresh_tokens
-			WHERE token_hash = $1
-			AND revoked_at IS NULL
-			AND expires_at > NOW()
-		)
-	`
-	var exists bool
-	err := r.pool.ForContext(ctx).QueryRowContext(ctx, query, tokenHash).Scan(&exists)
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
-}
-
-func (r *UserRepository) RotateRefreshToken(ctx context.Context, oldTokenHash string, userID uuid.UUID, newTokenHash string, expiresAt int64) (bool, error) {
-	tx, err := r.pool.ForContext(ctx).BeginTxx(ctx, nil)
-	if err != nil {
-		return false, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	// Atomically revoke old token (only if not already revoked)
-	res, err := tx.ExecContext(ctx,
-		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1 AND revoked_at IS NULL`,
-		oldTokenHash)
-	if err != nil {
-		return false, fmt.Errorf("failed to revoke old token: %w", err)
-	}
-	rows, _ := res.RowsAffected()
-	if rows == 0 {
-		return false, nil // Already revoked — reject
-	}
-
-	// Store new token
-	expiresAtTime := time.Unix(expiresAt, 0)
-	_, err = tx.ExecContext(ctx,
-		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-		userID, newTokenHash, expiresAtTime)
-	if err != nil {
-		return false, fmt.Errorf("failed to store new token: %w", err)
-	}
-
-	if err = tx.Commit(); err != nil {
-		return false, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-	return true, nil
 }
 
 func (r *UserRepository) RequestDeletion(ctx context.Context, userID string) (*domain.User, error) {
@@ -224,16 +111,15 @@ func (r *UserRepository) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs [
 	const query = `
     SELECT
       o.id   AS order_id,
-      u.* 
+      u.*
     FROM users AS u
     JOIN orders AS o ON o.user_id = u.id
     WHERE o.id = ANY($1)
     `
 
-	// temp row to capture both order_id and the user fields
 	type userRow struct {
 		OrderID     string `db:"order_id"`
-		domain.User        // embeds all the user columns
+		domain.User
 	}
 
 	var rows []userRow
@@ -241,7 +127,6 @@ func (r *UserRepository) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs [
 		return nil, fmt.Errorf("failed to batch‑get users by order IDs: %w", err)
 	}
 
-	// group users by order ID
 	userMap := make(map[string][]*domain.User, len(rows))
 	for _, row := range rows {
 		u := row.User

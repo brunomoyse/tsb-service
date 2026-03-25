@@ -84,6 +84,35 @@ type ComplexityRoot struct {
 		Valid          func(childComplexity int) int
 	}
 
+	CustomerStats struct {
+		AverageOrderAmount func(childComplexity int) int
+		DeliveryCount      func(childComplexity int) int
+		Email              func(childComplexity int) int
+		FirstName          func(childComplexity int) int
+		FirstOrderDate     func(childComplexity int) int
+		LastName           func(childComplexity int) int
+		LastOrderDate      func(childComplexity int) int
+		PhoneNumber        func(childComplexity int) int
+		PickupCount        func(childComplexity int) int
+		PreferredOrderType func(childComplexity int) int
+		RegisteredAt       func(childComplexity int) int
+		TotalAmount        func(childComplexity int) int
+		TotalOrders        func(childComplexity int) int
+		UserID             func(childComplexity int) int
+	}
+
+	CustomerStatsResponse struct {
+		Customers func(childComplexity int) int
+		Summary   func(childComplexity int) int
+	}
+
+	CustomerStatsSummary struct {
+		AverageOrderValue func(childComplexity int) int
+		TotalCustomers    func(childComplexity int) int
+		TotalOrders       func(childComplexity int) int
+		TotalRevenue      func(childComplexity int) int
+	}
+
 	DaySchedule struct {
 		Close       func(childComplexity int) int
 		DinnerClose func(childComplexity int) int
@@ -92,23 +121,22 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CancelDeletionRequest   func(childComplexity int) int
-		CreateCoupon            func(childComplexity int, input model.CreateCouponInput) int
-		CreateOrder             func(childComplexity int, input model.CreateOrderInput) int
-		CreateProduct           func(childComplexity int, input model.CreateProductInput) int
-		CreateProductChoice     func(childComplexity int, input model.CreateProductChoiceInput) int
-		DeleteProductChoice     func(childComplexity int, id uuid.UUID) int
-		RequestDeletion         func(childComplexity int) int
-		ResendVerificationEmail func(childComplexity int) int
-		UpdateCoupon            func(childComplexity int, id uuid.UUID, input model.UpdateCouponInput) int
-		UpdateMe                func(childComplexity int, input model.UpdateUserInput) int
-		UpdateOpeningHours      func(childComplexity int, hours model.OpeningHoursInput) int
-		UpdateOrder             func(childComplexity int, id uuid.UUID, input model.UpdateOrderInput) int
-		UpdateOrderingEnabled   func(childComplexity int, enabled bool) int
-		UpdatePaymentStatus     func(childComplexity int, orderID uuid.UUID, status string) int
-		UpdateProduct           func(childComplexity int, id uuid.UUID, input model.UpdateProductInput) int
-		UpdateProductChoice     func(childComplexity int, id uuid.UUID, input model.UpdateProductChoiceInput) int
-		UpdateTicketTemplates   func(childComplexity int, templates map[string]any) int
+		CancelDeletionRequest func(childComplexity int) int
+		CreateCoupon          func(childComplexity int, input model.CreateCouponInput) int
+		CreateOrder           func(childComplexity int, input model.CreateOrderInput) int
+		CreateProduct         func(childComplexity int, input model.CreateProductInput) int
+		CreateProductChoice   func(childComplexity int, input model.CreateProductChoiceInput) int
+		DeleteProductChoice   func(childComplexity int, id uuid.UUID) int
+		RequestDeletion       func(childComplexity int) int
+		UpdateCoupon          func(childComplexity int, id uuid.UUID, input model.UpdateCouponInput) int
+		UpdateMe              func(childComplexity int, input model.UpdateUserInput) int
+		UpdateOpeningHours    func(childComplexity int, hours model.OpeningHoursInput) int
+		UpdateOrder           func(childComplexity int, id uuid.UUID, input model.UpdateOrderInput) int
+		UpdateOrderingEnabled func(childComplexity int, enabled bool) int
+		UpdatePaymentStatus   func(childComplexity int, orderID uuid.UUID, status string) int
+		UpdateProduct         func(childComplexity int, id uuid.UUID, input model.UpdateProductInput) int
+		UpdateProductChoice   func(childComplexity int, id uuid.UUID, input model.UpdateProductChoiceInput) int
+		UpdateTicketTemplates func(childComplexity int, templates map[string]any) int
 	}
 
 	Order struct {
@@ -230,6 +258,7 @@ type ComplexityRoot struct {
 		BoxNumbers            func(childComplexity int, streetID string, houseNumber string) int
 		Coupon                func(childComplexity int, id uuid.UUID) int
 		Coupons               func(childComplexity int) int
+		CustomerStats         func(childComplexity int) int
 		HouseNumbers          func(childComplexity int, streetID string) int
 		Me                    func(childComplexity int) int
 		MyOrder               func(childComplexity int, id uuid.UUID) int
@@ -280,7 +309,6 @@ type ComplexityRoot struct {
 		Address             func(childComplexity int) int
 		DeletionRequestedAt func(childComplexity int) int
 		Email               func(childComplexity int) int
-		EmailVerifiedAt     func(childComplexity int) int
 		FirstName           func(childComplexity int) int
 		ID                  func(childComplexity int) int
 		IsAdmin             func(childComplexity int) int
@@ -308,7 +336,6 @@ type MutationResolver interface {
 	UpdateMe(ctx context.Context, input model.UpdateUserInput) (*model.User, error)
 	RequestDeletion(ctx context.Context) (*model.User, error)
 	CancelDeletionRequest(ctx context.Context) (*model.User, error)
-	ResendVerificationEmail(ctx context.Context) (bool, error)
 }
 type OrderResolver interface {
 	Address(ctx context.Context, obj *model.Order) (*model.Address, error)
@@ -354,6 +381,7 @@ type QueryResolver interface {
 	ProductCategories(ctx context.Context) ([]*model.ProductCategory, error)
 	RestaurantConfig(ctx context.Context) (*model.RestaurantConfig, error)
 	Me(ctx context.Context) (*model.User, error)
+	CustomerStats(ctx context.Context) (*model.CustomerStatsResponse, error)
 }
 type RestaurantConfigResolver interface {
 	IsCurrentlyOpen(ctx context.Context, obj *model.RestaurantConfig) (bool, error)
@@ -533,6 +561,129 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.CouponValidation.Valid(childComplexity), true
 
+	case "CustomerStats.averageOrderAmount":
+		if e.ComplexityRoot.CustomerStats.AverageOrderAmount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.AverageOrderAmount(childComplexity), true
+	case "CustomerStats.deliveryCount":
+		if e.ComplexityRoot.CustomerStats.DeliveryCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.DeliveryCount(childComplexity), true
+	case "CustomerStats.email":
+		if e.ComplexityRoot.CustomerStats.Email == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.Email(childComplexity), true
+	case "CustomerStats.firstName":
+		if e.ComplexityRoot.CustomerStats.FirstName == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.FirstName(childComplexity), true
+	case "CustomerStats.firstOrderDate":
+		if e.ComplexityRoot.CustomerStats.FirstOrderDate == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.FirstOrderDate(childComplexity), true
+	case "CustomerStats.lastName":
+		if e.ComplexityRoot.CustomerStats.LastName == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.LastName(childComplexity), true
+	case "CustomerStats.lastOrderDate":
+		if e.ComplexityRoot.CustomerStats.LastOrderDate == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.LastOrderDate(childComplexity), true
+	case "CustomerStats.phoneNumber":
+		if e.ComplexityRoot.CustomerStats.PhoneNumber == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.PhoneNumber(childComplexity), true
+	case "CustomerStats.pickupCount":
+		if e.ComplexityRoot.CustomerStats.PickupCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.PickupCount(childComplexity), true
+	case "CustomerStats.preferredOrderType":
+		if e.ComplexityRoot.CustomerStats.PreferredOrderType == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.PreferredOrderType(childComplexity), true
+	case "CustomerStats.registeredAt":
+		if e.ComplexityRoot.CustomerStats.RegisteredAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.RegisteredAt(childComplexity), true
+	case "CustomerStats.totalAmount":
+		if e.ComplexityRoot.CustomerStats.TotalAmount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.TotalAmount(childComplexity), true
+	case "CustomerStats.totalOrders":
+		if e.ComplexityRoot.CustomerStats.TotalOrders == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.TotalOrders(childComplexity), true
+	case "CustomerStats.userId":
+		if e.ComplexityRoot.CustomerStats.UserID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStats.UserID(childComplexity), true
+
+	case "CustomerStatsResponse.customers":
+		if e.ComplexityRoot.CustomerStatsResponse.Customers == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStatsResponse.Customers(childComplexity), true
+	case "CustomerStatsResponse.summary":
+		if e.ComplexityRoot.CustomerStatsResponse.Summary == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStatsResponse.Summary(childComplexity), true
+
+	case "CustomerStatsSummary.averageOrderValue":
+		if e.ComplexityRoot.CustomerStatsSummary.AverageOrderValue == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStatsSummary.AverageOrderValue(childComplexity), true
+	case "CustomerStatsSummary.totalCustomers":
+		if e.ComplexityRoot.CustomerStatsSummary.TotalCustomers == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStatsSummary.TotalCustomers(childComplexity), true
+	case "CustomerStatsSummary.totalOrders":
+		if e.ComplexityRoot.CustomerStatsSummary.TotalOrders == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStatsSummary.TotalOrders(childComplexity), true
+	case "CustomerStatsSummary.totalRevenue":
+		if e.ComplexityRoot.CustomerStatsSummary.TotalRevenue == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CustomerStatsSummary.TotalRevenue(childComplexity), true
+
 	case "DaySchedule.close":
 		if e.ComplexityRoot.DaySchedule.Close == nil {
 			break
@@ -625,12 +776,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.RequestDeletion(childComplexity), true
-	case "Mutation.resendVerificationEmail":
-		if e.ComplexityRoot.Mutation.ResendVerificationEmail == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Mutation.ResendVerificationEmail(childComplexity), true
 	case "Mutation.updateCoupon":
 		if e.ComplexityRoot.Mutation.UpdateCoupon == nil {
 			break
@@ -1340,6 +1485,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Coupons(childComplexity), true
+	case "Query.customerStats":
+		if e.ComplexityRoot.Query.CustomerStats == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Query.CustomerStats(childComplexity), true
 	case "Query.houseNumbers":
 		if e.ComplexityRoot.Query.HouseNumbers == nil {
 			break
@@ -1606,12 +1757,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.User.Email(childComplexity), true
-	case "User.emailVerifiedAt":
-		if e.ComplexityRoot.User.EmailVerifiedAt == nil {
-			break
-		}
-
-		return e.ComplexityRoot.User.EmailVerifiedAt(childComplexity), true
 	case "User.firstName":
 		if e.ComplexityRoot.User.FirstName == nil {
 			break
@@ -2914,6 +3059,626 @@ func (ec *executionContext) fieldContext_CouponValidation_errorMessage(_ context
 	return fc, nil
 }
 
+func (ec *executionContext) _CustomerStats_userId(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_userId,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_firstName(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_firstName,
+		func(ctx context.Context) (any, error) {
+			return obj.FirstName, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_firstName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_lastName(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_lastName,
+		func(ctx context.Context) (any, error) {
+			return obj.LastName, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_lastName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_email(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_email,
+		func(ctx context.Context) (any, error) {
+			return obj.Email, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_email(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_phoneNumber(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_phoneNumber,
+		func(ctx context.Context) (any, error) {
+			return obj.PhoneNumber, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_phoneNumber(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_registeredAt(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_registeredAt,
+		func(ctx context.Context) (any, error) {
+			return obj.RegisteredAt, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_registeredAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_totalOrders(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_totalOrders,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalOrders, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_totalOrders(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_totalAmount(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_totalAmount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalAmount, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_totalAmount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_averageOrderAmount(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_averageOrderAmount,
+		func(ctx context.Context) (any, error) {
+			return obj.AverageOrderAmount, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_averageOrderAmount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_firstOrderDate(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_firstOrderDate,
+		func(ctx context.Context) (any, error) {
+			return obj.FirstOrderDate, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_firstOrderDate(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_lastOrderDate(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_lastOrderDate,
+		func(ctx context.Context) (any, error) {
+			return obj.LastOrderDate, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_lastOrderDate(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_preferredOrderType(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_preferredOrderType,
+		func(ctx context.Context) (any, error) {
+			return obj.PreferredOrderType, nil
+		},
+		nil,
+		ec.marshalNOrderTypeEnum2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderTypeEnum,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_preferredOrderType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type OrderTypeEnum does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_deliveryCount(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_deliveryCount,
+		func(ctx context.Context) (any, error) {
+			return obj.DeliveryCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_deliveryCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStats_pickupCount(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStats_pickupCount,
+		func(ctx context.Context) (any, error) {
+			return obj.PickupCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStats_pickupCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStatsResponse_summary(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStatsResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStatsResponse_summary,
+		func(ctx context.Context) (any, error) {
+			return obj.Summary, nil
+		},
+		nil,
+		ec.marshalNCustomerStatsSummary2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCustomerStatsSummary,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStatsResponse_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStatsResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "totalCustomers":
+				return ec.fieldContext_CustomerStatsSummary_totalCustomers(ctx, field)
+			case "totalRevenue":
+				return ec.fieldContext_CustomerStatsSummary_totalRevenue(ctx, field)
+			case "averageOrderValue":
+				return ec.fieldContext_CustomerStatsSummary_averageOrderValue(ctx, field)
+			case "totalOrders":
+				return ec.fieldContext_CustomerStatsSummary_totalOrders(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CustomerStatsSummary", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStatsResponse_customers(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStatsResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStatsResponse_customers,
+		func(ctx context.Context) (any, error) {
+			return obj.Customers, nil
+		},
+		nil,
+		ec.marshalNCustomerStats2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCustomerStatsᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStatsResponse_customers(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStatsResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "userId":
+				return ec.fieldContext_CustomerStats_userId(ctx, field)
+			case "firstName":
+				return ec.fieldContext_CustomerStats_firstName(ctx, field)
+			case "lastName":
+				return ec.fieldContext_CustomerStats_lastName(ctx, field)
+			case "email":
+				return ec.fieldContext_CustomerStats_email(ctx, field)
+			case "phoneNumber":
+				return ec.fieldContext_CustomerStats_phoneNumber(ctx, field)
+			case "registeredAt":
+				return ec.fieldContext_CustomerStats_registeredAt(ctx, field)
+			case "totalOrders":
+				return ec.fieldContext_CustomerStats_totalOrders(ctx, field)
+			case "totalAmount":
+				return ec.fieldContext_CustomerStats_totalAmount(ctx, field)
+			case "averageOrderAmount":
+				return ec.fieldContext_CustomerStats_averageOrderAmount(ctx, field)
+			case "firstOrderDate":
+				return ec.fieldContext_CustomerStats_firstOrderDate(ctx, field)
+			case "lastOrderDate":
+				return ec.fieldContext_CustomerStats_lastOrderDate(ctx, field)
+			case "preferredOrderType":
+				return ec.fieldContext_CustomerStats_preferredOrderType(ctx, field)
+			case "deliveryCount":
+				return ec.fieldContext_CustomerStats_deliveryCount(ctx, field)
+			case "pickupCount":
+				return ec.fieldContext_CustomerStats_pickupCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CustomerStats", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStatsSummary_totalCustomers(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStatsSummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStatsSummary_totalCustomers,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCustomers, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStatsSummary_totalCustomers(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStatsSummary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStatsSummary_totalRevenue(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStatsSummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStatsSummary_totalRevenue,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalRevenue, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStatsSummary_totalRevenue(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStatsSummary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStatsSummary_averageOrderValue(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStatsSummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStatsSummary_averageOrderValue,
+		func(ctx context.Context) (any, error) {
+			return obj.AverageOrderValue, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStatsSummary_averageOrderValue(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStatsSummary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CustomerStatsSummary_totalOrders(ctx context.Context, field graphql.CollectedField, obj *model.CustomerStatsSummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_CustomerStatsSummary_totalOrders,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalOrders, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_CustomerStatsSummary_totalOrders(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CustomerStatsSummary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _DaySchedule_open(ctx context.Context, field graphql.CollectedField, obj *model.DaySchedule) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4132,8 +4897,6 @@ func (ec *executionContext) fieldContext_Mutation_updateMe(ctx context.Context, 
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			case "notifyMarketing":
 				return ec.fieldContext_User_notifyMarketing(ctx, field)
-			case "emailVerifiedAt":
-				return ec.fieldContext_User_emailVerifiedAt(ctx, field)
 			case "deletionRequestedAt":
 				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
@@ -4209,8 +4972,6 @@ func (ec *executionContext) fieldContext_Mutation_requestDeletion(_ context.Cont
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			case "notifyMarketing":
 				return ec.fieldContext_User_notifyMarketing(ctx, field)
-			case "emailVerifiedAt":
-				return ec.fieldContext_User_emailVerifiedAt(ctx, field)
 			case "deletionRequestedAt":
 				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
@@ -4275,8 +5036,6 @@ func (ec *executionContext) fieldContext_Mutation_cancelDeletionRequest(_ contex
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			case "notifyMarketing":
 				return ec.fieldContext_User_notifyMarketing(ctx, field)
-			case "emailVerifiedAt":
-				return ec.fieldContext_User_emailVerifiedAt(ctx, field)
 			case "deletionRequestedAt":
 				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
@@ -4285,48 +5044,6 @@ func (ec *executionContext) fieldContext_Mutation_cancelDeletionRequest(_ contex
 				return ec.fieldContext_User_orders(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_resendVerificationEmail(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Mutation_resendVerificationEmail,
-		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Mutation().ResendVerificationEmail(ctx)
-		},
-		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
-			directive0 := next
-
-			directive1 := func(ctx context.Context) (any, error) {
-				if ec.Directives.Auth == nil {
-					var zeroVal bool
-					return zeroVal, errors.New("directive auth is not implemented")
-				}
-				return ec.Directives.Auth(ctx, nil, directive0)
-			}
-
-			next = directive1
-			return next
-		},
-		ec.marshalNBoolean2bool,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Mutation_resendVerificationEmail(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -4850,8 +5567,6 @@ func (ec *executionContext) fieldContext_Order_customer(_ context.Context, field
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			case "notifyMarketing":
 				return ec.fieldContext_User_notifyMarketing(ctx, field)
-			case "emailVerifiedAt":
-				return ec.fieldContext_User_emailVerifiedAt(ctx, field)
 			case "deletionRequestedAt":
 				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
@@ -8497,8 +9212,6 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			case "notifyMarketing":
 				return ec.fieldContext_User_notifyMarketing(ctx, field)
-			case "emailVerifiedAt":
-				return ec.fieldContext_User_emailVerifiedAt(ctx, field)
 			case "deletionRequestedAt":
 				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
@@ -8507,6 +9220,54 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_User_orders(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_customerStats(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_customerStats,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Query().CustomerStats(ctx)
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.CustomerStatsResponse
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNCustomerStatsResponse2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCustomerStatsResponse,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_customerStats(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "summary":
+				return ec.fieldContext_CustomerStatsResponse_summary(ctx, field)
+			case "customers":
+				return ec.fieldContext_CustomerStatsResponse_customers(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CustomerStatsResponse", field.Name)
 		},
 	}
 	return fc, nil
@@ -9622,35 +10383,6 @@ func (ec *executionContext) fieldContext_User_notifyMarketing(_ context.Context,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _User_emailVerifiedAt(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_User_emailVerifiedAt,
-		func(ctx context.Context) (any, error) {
-			return obj.EmailVerifiedAt, nil
-		},
-		nil,
-		ec.marshalODateTime2ᚖtimeᚐTime,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_User_emailVerifiedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "User",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type DateTime does not have child fields")
 		},
 	}
 	return fc, nil
@@ -12478,6 +13210,205 @@ func (ec *executionContext) _CouponValidation(ctx context.Context, sel ast.Selec
 	return out
 }
 
+var customerStatsImplementors = []string{"CustomerStats"}
+
+func (ec *executionContext) _CustomerStats(ctx context.Context, sel ast.SelectionSet, obj *model.CustomerStats) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, customerStatsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CustomerStats")
+		case "userId":
+			out.Values[i] = ec._CustomerStats_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "firstName":
+			out.Values[i] = ec._CustomerStats_firstName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastName":
+			out.Values[i] = ec._CustomerStats_lastName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "email":
+			out.Values[i] = ec._CustomerStats_email(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "phoneNumber":
+			out.Values[i] = ec._CustomerStats_phoneNumber(ctx, field, obj)
+		case "registeredAt":
+			out.Values[i] = ec._CustomerStats_registeredAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalOrders":
+			out.Values[i] = ec._CustomerStats_totalOrders(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalAmount":
+			out.Values[i] = ec._CustomerStats_totalAmount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "averageOrderAmount":
+			out.Values[i] = ec._CustomerStats_averageOrderAmount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "firstOrderDate":
+			out.Values[i] = ec._CustomerStats_firstOrderDate(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastOrderDate":
+			out.Values[i] = ec._CustomerStats_lastOrderDate(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "preferredOrderType":
+			out.Values[i] = ec._CustomerStats_preferredOrderType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deliveryCount":
+			out.Values[i] = ec._CustomerStats_deliveryCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pickupCount":
+			out.Values[i] = ec._CustomerStats_pickupCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var customerStatsResponseImplementors = []string{"CustomerStatsResponse"}
+
+func (ec *executionContext) _CustomerStatsResponse(ctx context.Context, sel ast.SelectionSet, obj *model.CustomerStatsResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, customerStatsResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CustomerStatsResponse")
+		case "summary":
+			out.Values[i] = ec._CustomerStatsResponse_summary(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "customers":
+			out.Values[i] = ec._CustomerStatsResponse_customers(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var customerStatsSummaryImplementors = []string{"CustomerStatsSummary"}
+
+func (ec *executionContext) _CustomerStatsSummary(ctx context.Context, sel ast.SelectionSet, obj *model.CustomerStatsSummary) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, customerStatsSummaryImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CustomerStatsSummary")
+		case "totalCustomers":
+			out.Values[i] = ec._CustomerStatsSummary_totalCustomers(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalRevenue":
+			out.Values[i] = ec._CustomerStatsSummary_totalRevenue(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "averageOrderValue":
+			out.Values[i] = ec._CustomerStatsSummary_averageOrderValue(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalOrders":
+			out.Values[i] = ec._CustomerStatsSummary_totalOrders(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var dayScheduleImplementors = []string{"DaySchedule"}
 
 func (ec *executionContext) _DaySchedule(ctx context.Context, sel ast.SelectionSet, obj *model.DaySchedule) graphql.Marshaler {
@@ -12653,13 +13584,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "cancelDeletionRequest":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_cancelDeletionRequest(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "resendVerificationEmail":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_resendVerificationEmail(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -14167,6 +15091,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "customerStats":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_customerStats(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -14461,8 +15407,6 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
-		case "emailVerifiedAt":
-			out.Values[i] = ec._User_emailVerifiedAt(ctx, field, obj)
 		case "deletionRequestedAt":
 			out.Values[i] = ec._User_deletionRequestedAt(ctx, field, obj)
 		case "address":
@@ -15047,6 +15991,56 @@ func (ec *executionContext) unmarshalNCreateProductChoiceInput2tsbᚑserviceᚋi
 func (ec *executionContext) unmarshalNCreateProductInput2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCreateProductInput(ctx context.Context, v any) (model.CreateProductInput, error) {
 	res, err := ec.unmarshalInputCreateProductInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNCustomerStats2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCustomerStatsᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CustomerStats) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNCustomerStats2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCustomerStats(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNCustomerStats2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCustomerStats(ctx context.Context, sel ast.SelectionSet, v *model.CustomerStats) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CustomerStats(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNCustomerStatsResponse2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCustomerStatsResponse(ctx context.Context, sel ast.SelectionSet, v model.CustomerStatsResponse) graphql.Marshaler {
+	return ec._CustomerStatsResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNCustomerStatsResponse2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCustomerStatsResponse(ctx context.Context, sel ast.SelectionSet, v *model.CustomerStatsResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CustomerStatsResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNCustomerStatsSummary2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCustomerStatsSummary(ctx context.Context, sel ast.SelectionSet, v *model.CustomerStatsSummary) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CustomerStatsSummary(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNDateTime2timeᚐTime(ctx context.Context, v any) (time.Time, error) {

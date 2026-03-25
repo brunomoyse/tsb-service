@@ -3,8 +3,6 @@ package utils
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
 	"fmt"
 	"github.com/shopspring/decimal"
 	"io"
@@ -56,14 +54,6 @@ func SetIsAdmin(ctx context.Context, isAdmin bool) context.Context {
 func GetIsAdmin(ctx context.Context) bool {
 	isAdmin, _ := ctx.Value(IsAdminKey).(bool)
 	return isAdmin
-}
-
-// DeriveKey creates a purpose-specific signing key from the master JWT secret.
-// This ensures tokens signed for one purpose cannot be confused with another.
-func DeriveKey(secret, purpose string) []byte {
-	h := hmac.New(sha256.New, []byte(secret))
-	h.Write([]byte(purpose))
-	return h.Sum(nil)
 }
 
 var (

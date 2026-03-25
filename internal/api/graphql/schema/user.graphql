@@ -6,7 +6,6 @@ type User {
     phoneNumber: String
     isAdmin: Boolean!
     notifyMarketing: Boolean!
-    emailVerifiedAt: DateTime
     deletionRequestedAt: DateTime
     address: Address
     orders: [Order!]
@@ -21,8 +20,38 @@ input UpdateUserInput {
     notifyMarketing: Boolean
 }
 
+type CustomerStats {
+    userId: ID!
+    firstName: String!
+    lastName: String!
+    email: String!
+    phoneNumber: String
+    registeredAt: DateTime!
+    totalOrders: Int!
+    totalAmount: String!
+    averageOrderAmount: String!
+    firstOrderDate: DateTime!
+    lastOrderDate: DateTime!
+    preferredOrderType: OrderTypeEnum!
+    deliveryCount: Int!
+    pickupCount: Int!
+}
+
+type CustomerStatsSummary {
+    totalCustomers: Int!
+    totalRevenue: String!
+    averageOrderValue: String!
+    totalOrders: Int!
+}
+
+type CustomerStatsResponse {
+    summary: CustomerStatsSummary!
+    customers: [CustomerStats!]!
+}
+
 extend type Query {
     me: User! @auth
+    customerStats: CustomerStatsResponse! @admin
 }
 
 extend type Mutation {
@@ -31,5 +60,4 @@ extend type Mutation {
     ): User! @auth
     requestDeletion: User! @auth
     cancelDeletionRequest: User! @auth
-    resendVerificationEmail: Boolean! @auth
 }
