@@ -117,6 +117,14 @@ func CreateSessionHandler(c *gin.Context) {
 		return
 	}
 
+	// Block login if email is not verified
+	if userID, err := findZitadelUserByEmail(req.LoginName); err == nil {
+		if !isZitadelEmailVerified(userID) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "email_not_verified"})
+			return
+		}
+	}
+
 	var zResp zitadelSessionResponse
 	if err := json.Unmarshal(respBody, &zResp); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid response from auth service"})
@@ -855,6 +863,27 @@ func VerifyEmailHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// isZitadelEmailVerified checks if a Zitadel user's email is verified.
+func isZitadelEmailVerified(userID string) bool {
+	respBody, status, err := zitadelRequest("GET", "/v2/users/"+userID, nil)
+	if err != nil || status != http.StatusOK {
+		return false // Deny on error (safe default)
+	}
+	var userResp struct {
+		User struct {
+			Human struct {
+				Email struct {
+					IsVerified bool `json:"isVerified"`
+				} `json:"email"`
+			} `json:"human"`
+		} `json:"user"`
+	}
+	if json.Unmarshal(respBody, &userResp) != nil {
+		return false
+	}
+	return userResp.User.Human.Email.IsVerified
 }
 
 // hasZitadelPassword checks if a Zitadel user has a password set.

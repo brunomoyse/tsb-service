@@ -43,9 +43,10 @@ type OIDCVerifier struct {
 
 // zitadelClaims represents the claims we extract from Zitadel-issued JWT access tokens.
 type zitadelClaims struct {
-	Email      string `json:"email"`
-	GivenName  string `json:"given_name"`
-	FamilyName string `json:"family_name"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
 	// Zitadel encodes project roles as:
 	// "urn:zitadel:iam:org:project:roles": { "admin": { ... } }
 	ProjectRoles map[string]any `json:"urn:zitadel:iam:org:project:roles"`
@@ -122,6 +123,12 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 
 	sub := idToken.Subject
 	if sub == "" {
+		return false
+	}
+
+	// Reject users who haven't verified their email
+	if !claims.EmailVerified {
+		zap.L().Debug("OIDC user email not verified", zap.String("sub", sub), zap.String("email", claims.Email))
 		return false
 	}
 
