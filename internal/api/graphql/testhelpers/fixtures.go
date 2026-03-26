@@ -2,14 +2,12 @@ package testhelpers
 
 import (
 	"context"
-	"encoding/hex"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/argon2"
 )
 
 // TestFixtures holds common test data
@@ -183,23 +181,16 @@ func SeedTestData(t *testing.T, db *sqlx.DB) *TestFixtures {
 // createTestUser inserts a test user into the database
 func createTestUser(t *testing.T, ctx context.Context, db *sqlx.DB, firstName, lastName, email, password string, isAdmin bool) *TestUser {
 	userID := uuid.New()
-	salt := "test-salt"
-	passwordHash := hashPasswordForTest(password, salt)
 
-	// Try to insert with is_admin column first, fall back to without it if column doesn't exist
 	query := `
-		INSERT INTO users (id, created_at, updated_at, first_name, last_name, email, email_verified_at, password_hash, salt)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO users (id, created_at, updated_at, first_name, last_name, email, zitadel_user_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
 	now := time.Now()
 	_, err := db.ExecContext(ctx, query,
-		userID, now, now, firstName, lastName, email, now, passwordHash, salt)
+		userID, now, now, firstName, lastName, email, userID.String())
 	require.NoError(t, err, "Failed to create test user")
-
-	// Set zitadel_user_id to the UUID string (simulates Zitadel-migrated user)
-	// The me resolver uses FindOrCreateByZitadelID which looks up by this column
-	_, _ = db.ExecContext(ctx, `UPDATE users SET zitadel_user_id = $1 WHERE id = $2`, userID.String(), userID)
 
 	// If is_admin column exists, update it
 	if isAdmin {
@@ -307,9 +298,3 @@ func createTestProduct(t *testing.T, ctx context.Context, db *sqlx.DB, product T
 	return &product
 }
 
-// hashPasswordForTest is a simplified password hashing for test data
-func hashPasswordForTest(password, salt string) string {
-	hash := argon2.IDKey([]byte(password), []byte(salt), 1, 64*1024, 4, 32)
-	// Encode as hex to avoid UTF-8 encoding issues in PostgreSQL
-	return hex.EncodeToString(hash)
-}

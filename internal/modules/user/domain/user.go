@@ -19,10 +19,4 @@ type User struct {
 	NotifyMarketing bool       `db:"notify_marketing" json:"notifyMarketing"`
 	DeletionRequestedAt *time.Time `db:"deletion_requested_at" json:"deletionRequestedAt"`
 	ZitadelUserID       *string    `db:"zitadel_user_id" json:"-"`
-	// Legacy columns — kept for SELECT * compatibility until DB migration drops them
-	EmailVerifiedAt *time.Time `db:"email_verified_at" json:"-"`
-	PasswordHash    *string    `db:"password_hash" json:"-"`
-	Salt            *string    `db:"salt" json:"-"`
-	RememberToken   *string    `db:"remember_token" json:"-"`
-	GoogleID        *string    `db:"google_id" json:"-"`
 }

@@ -70,6 +70,10 @@ func getZitadelAdminPAT() string {
 }
 
 func getZitadelURL() string {
+	// Prefer internal Docker URL for API calls (avoids going through reverse proxy/tunnel)
+	if u := os.Getenv("ZITADEL_INTERNAL_URL"); u != "" {
+		return u
+	}
 	return os.Getenv("ZITADEL_ISSUER")
 }
 
