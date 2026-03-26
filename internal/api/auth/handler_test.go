@@ -121,7 +121,7 @@ func TestRegisterHandler_GoogleFirstUserLinking(t *testing.T) {
 			// User has no password (Google-first)
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"passwordChanged":"0001-01-01T00:00:00Z"}}}`))
-		case r.URL.Path == "/v2/users/google-user-123/password" && r.Method == "PUT":
+		case r.URL.Path == "/v2/users/google-user-123/password" && r.Method == "POST":
 			// Password set succeeds
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{}`))
