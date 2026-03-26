@@ -907,6 +907,15 @@ func zitadelRequestWithPAT(method, path string, body any, pat string) ([]byte, i
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+pat)
 
+	// When using internal Docker URL, set Host header to the external domain.
+	// Zitadel resolves instances by Host header.
+	if os.Getenv("ZITADEL_INTERNAL_URL") != "" {
+		req.Host = os.Getenv("ZITADEL_ISSUER")
+		// Strip protocol prefix for Host header
+		req.Host = strings.TrimPrefix(req.Host, "https://")
+		req.Host = strings.TrimPrefix(req.Host, "http://")
+	}
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("request failed: %w", err)
