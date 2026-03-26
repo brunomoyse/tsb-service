@@ -585,7 +585,7 @@ func RegisterHandler(c *gin.Context) {
 						"changeRequired": false,
 					},
 				}
-				pwdResp, pwdStatus, pwdErr := zitadelAdminRequest("PUT", "/v2/users/"+linkedUserID+"/password", pwdBody)
+				pwdResp, pwdStatus, pwdErr := zitadelAdminRequest("POST", "/v2/users/"+linkedUserID+"/password", pwdBody)
 				if pwdErr != nil || (pwdStatus != http.StatusOK && pwdStatus != http.StatusCreated) {
 					var pwdErrMsg struct {
 						Message string `json:"message"`
