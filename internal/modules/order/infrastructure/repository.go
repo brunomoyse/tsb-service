@@ -7,6 +7,7 @@ import (
 	"tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/logging"
+	"tsb-service/pkg/utils"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -178,6 +179,7 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 	}
 
 	// Fetch order products
+	lang := utils.GetLang(ctx)
 	query = `
 		SELECT
 			op.product_id,
@@ -188,15 +190,15 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 		FROM order_product op
 		JOIN products p ON op.product_id = p.id
 		JOIN product_categories pc ON p.category_id = pc.id
-		JOIN product_category_translations pct ON pc.id = pct.product_category_id AND pct.language = 'fr'
-		JOIN product_translations pt ON p.id = pt.product_id AND pt.language = 'fr'
+		JOIN product_category_translations pct ON pc.id = pct.product_category_id AND pct.language = $2
+		JOIN product_translations pt ON p.id = pt.product_id AND pt.language = $2
 		WHERE op.order_id = $1
 		ORDER BY pc."order" ASC, p.code ASC, pt.name ASC
 	`
 
 	var orderProducts []domain.OrderProductRaw
 
-	if err := r.pool.ForContext(ctx).SelectContext(ctx, &orderProducts, query, order.ID); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &orderProducts, query, order.ID, lang); err != nil {
 		return nil, nil, fmt.Errorf("failed to query order products: %w", err)
 	}
 
@@ -259,6 +261,7 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 	}
 
 	// build an IN (…) query with JOIN to products for sorting, expand args with sqlx.In, then rebind for your driver
+	lang := utils.GetLang(ctx)
 	query, args, err := sqlx.In(`
         SELECT
             op.order_id,
@@ -270,11 +273,11 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
         FROM order_product op
         JOIN products p ON op.product_id = p.id
         JOIN product_categories pc ON p.category_id = pc.id
-        JOIN product_category_translations pct ON pc.id = pct.product_category_id AND pct.language = 'fr'
-        JOIN product_translations pt ON p.id = pt.product_id AND pt.language = 'fr'
+        JOIN product_category_translations pct ON pc.id = pct.product_category_id AND pct.language = ?
+        JOIN product_translations pt ON p.id = pt.product_id AND pt.language = ?
         WHERE op.order_id IN (?)
         ORDER BY pc."order" ASC, p.code ASC, pt.name ASC
-    `, orderIDs)
+    `, lang, lang, orderIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build IN query: %w", err)
 	}

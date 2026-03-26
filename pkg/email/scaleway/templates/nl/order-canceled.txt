@@ -1,0 +1,5 @@
+Hallo {{.UserName}},
+
+Helaas moeten wij u meedelen dat uw bestelling is geannuleerd. Als u de betaling reeds hebt uitgevoerd, is een terugbetaling gestart en ontvangt u uw geld binnenkort.
+
+Onze oprechte excuses voor het ongemak. Voor vragen kunt u rechtstreeks contact opnemen met het restaurant op 04 222 98 88.

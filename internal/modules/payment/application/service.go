@@ -117,7 +117,16 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 	cancelUrl := appBaseUrl + "/checkout"
 
 	// Determine locale based on user language.
-	locale := mollie.Locale("fr_FR")
+	localeMap := map[string]mollie.Locale{
+		"fr": "fr_BE",
+		"en": "en_US",
+		"nl": "nl_BE",
+		"zh": "zh_CN",
+	}
+	locale, ok := localeMap[o.Language]
+	if !ok {
+		locale = "fr_BE"
+	}
 
 	// Construct the payment request.
 	paymentRequest := mollie.CreatePayment{

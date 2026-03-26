@@ -1,0 +1,11 @@
+Hallo {{.UserName}},
+
+Helaas konden wij uw betaling niet verwerken. Uw bestelling is geannuleerd.
+
+U kunt op elk moment een nieuwe bestelling plaatsen.
+
+Opnieuw proberen: {{.MenuLink}}
+
+Voor hulp kunt u rechtstreeks contact opnemen met het restaurant op 04 222 98 88.
+
+© 2026 Tokyo Sushi Bar. Alle rechten voorbehouden.

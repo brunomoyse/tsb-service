@@ -104,10 +104,12 @@ func formatEstimatedReadyTime(t *time.Time, lang string) string {
 	frenchDays := []string{"dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"}
 	englishDays := []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 	chineseDays := []string{"星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"}
+	dutchDays := []string{"zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"}
 
 	// Map for month names
 	frenchMonths := []string{"", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"}
 	englishMonths := []string{"", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"}
+	dutchMonths := []string{"", "januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"}
 
 	weekday := int(t.Weekday())
 	day := t.Day()
@@ -138,6 +140,9 @@ func formatEstimatedReadyTime(t *time.Time, lang string) string {
 	case "zh":
 		return fmt.Sprintf("%d年%d月%d日 %s %02d:%02d",
 			year, month, day, chineseDays[weekday], hour, minute)
+	case "nl":
+		return fmt.Sprintf("%s %d %s %d om %02d:%02d",
+			dutchDays[weekday], day, dutchMonths[month], year, hour, minute)
 	default:
 		// Default to French
 		return fmt.Sprintf("%s %d %s %d à %02d:%02d",
@@ -229,31 +234,31 @@ func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o
 	}
 
 	data := struct {
-		UserName           string
-		OrderItems         []OrderProductView
-		OrderType          string
-		SubtotalPrice      string
-		TakeawayDiscount   string
-		HasTakeaway        bool
-		CouponDiscount     string
-		HasCoupon          bool
-		CouponCode         string
-		DeliveryFee        string
-		TotalPrice         string
-		LogoURL            string
+		UserName         string
+		OrderItems       []OrderProductView
+		OrderType        string
+		SubtotalPrice    string
+		TakeawayDiscount string
+		HasTakeaway      bool
+		CouponDiscount   string
+		HasCoupon        bool
+		CouponCode       string
+		DeliveryFee      string
+		TotalPrice       string
+		LogoURL          string
 	}{
-		UserName:           fmt.Sprintf("%s %s", u.FirstName, u.LastName),
-		OrderItems:         orderViews,
-		OrderType:          string(o.OrderType),
-		SubtotalPrice:      utils.FormatDecimal(subtotal),
-		TakeawayDiscount:   utils.FormatDecimal(o.TakeawayDiscount),
-		HasTakeaway:        o.TakeawayDiscount.GreaterThan(decimal.Zero),
-		CouponDiscount:     utils.FormatDecimal(o.CouponDiscount),
-		HasCoupon:          o.CouponDiscount.GreaterThan(decimal.Zero),
-		CouponCode:         couponCode,
-		DeliveryFee:        utils.FormatDecimal(deliveryFee),
-		TotalPrice:         utils.FormatDecimal(o.TotalPrice),
-		LogoURL:            logoURL(),
+		UserName:         fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		OrderItems:       orderViews,
+		OrderType:        string(o.OrderType),
+		SubtotalPrice:    utils.FormatDecimal(subtotal),
+		TakeawayDiscount: utils.FormatDecimal(o.TakeawayDiscount),
+		HasTakeaway:      o.TakeawayDiscount.GreaterThan(decimal.Zero),
+		CouponDiscount:   utils.FormatDecimal(o.CouponDiscount),
+		HasCoupon:        o.CouponDiscount.GreaterThan(decimal.Zero),
+		CouponCode:       couponCode,
+		DeliveryFee:      utils.FormatDecimal(deliveryFee),
+		TotalPrice:       utils.FormatDecimal(o.TotalPrice),
+		LogoURL:          logoURL(),
 	}
 
 	return data, nil

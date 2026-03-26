@@ -10,8 +10,8 @@ import (
 
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/db"
-	"tsb-service/pkg/logging"
 	es "tsb-service/pkg/email/scaleway"
+	"tsb-service/pkg/logging"
 )
 
 func main() {
@@ -41,8 +41,10 @@ func main() {
 	}
 
 	// Query inactive users: verified, last order > 30 days ago OR registered > 30 days with no orders
+	// Also derive the user's preferred language from their most recent order (default to 'fr').
 	query := `
-		SELECT u.id, u.first_name, u.last_name, u.email
+		SELECT u.id, u.first_name, u.last_name, u.email,
+		       COALESCE((SELECT o.language FROM orders o WHERE o.user_id = u.id ORDER BY o.created_at DESC LIMIT 1), 'fr') AS preferred_language
 		FROM users u
 		WHERE u.zitadel_user_id IS NOT NULL
 		AND u.notify_marketing = true
@@ -53,7 +55,12 @@ func main() {
 		)
 	`
 
-	var users []userDomain.User
+	type reengagementUser struct {
+		userDomain.User
+		PreferredLanguage string `db:"preferred_language"`
+	}
+
+	var users []reengagementUser
 	if err := dbConn.Select(&users, query); err != nil {
 		zap.L().Error("failed to query inactive users", zap.Error(err))
 		os.Exit(1)
@@ -64,11 +71,11 @@ func main() {
 	sent := 0
 	failed := 0
 	for _, user := range users {
-		if err := es.SendReengagementEmail(user, "fr"); err != nil {
-			zap.L().Error("failed to send re-engagement email", zap.String("user_id", user.ID.String()), zap.String("email", user.Email), zap.Error(err))
+		if err := es.SendReengagementEmail(user.User, user.PreferredLanguage); err != nil {
+			zap.L().Error("failed to send re-engagement email", zap.String("user_id", user.ID.String()), zap.String("email", user.Email), zap.String("lang", user.PreferredLanguage), zap.Error(err))
 			failed++
 		} else {
-			zap.L().Info("re-engagement email sent", zap.String("user_id", user.ID.String()), zap.String("email", user.Email))
+			zap.L().Info("re-engagement email sent", zap.String("user_id", user.ID.String()), zap.String("email", user.Email), zap.String("lang", user.PreferredLanguage))
 			sent++
 		}
 

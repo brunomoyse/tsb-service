@@ -16,15 +16,14 @@ func LanguageExtractor() gin.HandlerFunc {
 		// Extract the "Accept-Language" header
 		acceptLanguage := c.GetHeader("Accept-Language")
 
-		// Supported languages: add "zh" for Chinese
-		supportedLanguages := []string{"fr", "en", "zh"}
+		// Supported languages
+		supportedLanguages := []string{"fr", "en", "zh", "nl"}
 
 		// Find the best match
 		bestMatch := findBestLanguageMatch(acceptLanguage, supportedLanguages)
 
-		// Ensure only "fr", "zh" or "en" is returned
-		// Default to English if best match is neither French nor Chinese
-		if bestMatch != "fr" && bestMatch != "zh" {
+		// Default to "en" if no supported language matched
+		if bestMatch != "fr" && bestMatch != "zh" && bestMatch != "nl" {
 			bestMatch = "en"
 		}
 

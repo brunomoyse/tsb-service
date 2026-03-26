@@ -94,6 +94,7 @@ func SendVerificationEmail(user userDomain.User, lang string, verificationURL st
 		"en": "Please verify your email",
 		"fr": "Veuillez vérifier votre adresse e-mail",
 		"zh": "验证您的邮箱",
+		"nl": "Bevestig uw e-mailadres",
 	}
 
 	subject, ok := subjects[lang]
@@ -148,6 +149,7 @@ func SendWelcomeEmail(user userDomain.User, lang, menuURL string) error {
 		"en": "Welcome to Tokyo Sushi Bar",
 		"fr": "Bienvenue chez Tokyo Sushi Bar",
 		"zh": "欢迎光临 Tokyo Sushi Bar",
+		"nl": "Welkom bij Tokyo Sushi Bar",
 	}
 
 	subject, ok := subjects[lang]
@@ -202,6 +204,7 @@ func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.
 		"en": "Order pending validation",
 		"fr": "Commande en attente de validation",
 		"zh": "订单待验证",
+		"nl": "Bestelling wacht op bevestiging",
 	}
 
 	subject, ok := subjects[lang]
@@ -256,6 +259,7 @@ func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomai
 		"en": "Order confirmed",
 		"fr": "Commande confirmée",
 		"zh": "订单已确认",
+		"nl": "Bestelling bevestigd",
 	}
 
 	subject, ok := subjects[lang]
@@ -310,6 +314,7 @@ func SendPasswordResetEmail(user userDomain.User, lang string, resetURL string) 
 		"en": "Reset your password",
 		"fr": "Réinitialiser votre mot de passe",
 		"zh": "重置您的密码",
+		"nl": "Wachtwoord opnieuw instellen",
 	}
 
 	subject, ok := subjects[lang]
@@ -364,6 +369,7 @@ func SendOrderCanceledEmail(user userDomain.User, lang string) error {
 		"en": "Order canceled",
 		"fr": "Commande annulée",
 		"zh": "订单已取消",
+		"nl": "Bestelling geannuleerd",
 	}
 
 	subject, ok := subjects[lang]
@@ -415,12 +421,14 @@ func SendOrderReadyEmail(user userDomain.User, lang string, order orderDomain.Or
 			"en": "Your order is on its way!",
 			"fr": "Votre commande est en route !",
 			"zh": "您的订单正在配送中！",
+			"nl": "Uw bestelling is onderweg!",
 		}
 	} else {
 		subjects = map[string]string{
 			"en": "Your order is ready!",
 			"fr": "Votre commande est prête !",
 			"zh": "您的订单已准备好！",
+			"nl": "Uw bestelling is klaar!",
 		}
 	}
 
@@ -468,6 +476,7 @@ func SendOrderCompletedEmail(user userDomain.User, lang string) error {
 		"en": "Thank you for your order!",
 		"fr": "Merci pour votre commande !",
 		"zh": "感谢您的订单！",
+		"nl": "Bedankt voor uw bestelling!",
 	}
 
 	subject, ok := subjects[lang]
@@ -514,6 +523,7 @@ func SendPaymentFailedEmail(user userDomain.User, lang string) error {
 		"en": "Payment unsuccessful",
 		"fr": "Paiement non abouti",
 		"zh": "付款未成功",
+		"nl": "Betaling mislukt",
 	}
 
 	subject, ok := subjects[lang]
@@ -560,6 +570,7 @@ func SendRefundIssuedEmail(user userDomain.User, lang string, refundAmount strin
 		"en": "Your refund has been issued",
 		"fr": "Votre remboursement a été effectué",
 		"zh": "您的退款已处理",
+		"nl": "Uw terugbetaling is uitgevoerd",
 	}
 
 	subject, ok := subjects[lang]
@@ -606,6 +617,7 @@ func SendAccountLinkedEmail(user userDomain.User, lang string) error {
 		"en": "Google account linked",
 		"fr": "Compte Google associé",
 		"zh": "Google 帐户已关联",
+		"nl": "Google-account gekoppeld",
 	}
 
 	subject, ok := subjects[lang]
@@ -652,6 +664,7 @@ func SendReadyTimeUpdatedEmail(user userDomain.User, lang string, order orderDom
 		"en": "Updated estimated time",
 		"fr": "Horaire estimé modifié",
 		"zh": "预计时间已更新",
+		"nl": "Geschatte tijd bijgewerkt",
 	}
 
 	subject, ok := subjects[lang]
@@ -736,6 +749,7 @@ func SendReengagementEmail(user userDomain.User, lang string) error {
 		"en": "We miss you at Tokyo Sushi Bar!",
 		"fr": "Vous nous manquez chez Tokyo Sushi Bar !",
 		"zh": "Tokyo Sushi Bar 想念您！",
+		"nl": "Wij missen u bij Tokyo Sushi Bar!",
 	}
 
 	subject, ok := subjects[lang]
