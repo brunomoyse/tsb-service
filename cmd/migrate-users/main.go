@@ -13,22 +13,18 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	_ "github.com/lib/pq"
 	"github.com/joho/godotenv"
 )
 
 type appUser struct {
-	ID              string
-	Email           string
-	FirstName       string
-	LastName        string
-	PhoneNumber     *string
-	PasswordHash    *string
-	Salt            *string
-	EmailVerifiedAt *time.Time
-	ZitadelUserID   *string
+	ID            string
+	Email         string
+	FirstName     string
+	LastName      string
+	PhoneNumber   *string
+	ZitadelUserID *string
 }
 
 type zitadelCreateUserResponse struct {
@@ -60,7 +56,7 @@ func main() {
 
 	// Fetch users not yet migrated
 	rows, err := db.Query(`
-		SELECT id, email, first_name, last_name, phone_number, password_hash, salt, email_verified_at, zitadel_user_id
+		SELECT id, email, first_name, last_name, phone_number, zitadel_user_id
 		FROM users
 		WHERE zitadel_user_id IS NULL AND email != ''
 		ORDER BY created_at
@@ -73,7 +69,7 @@ func main() {
 	var users []appUser
 	for rows.Next() {
 		var u appUser
-		if err := rows.Scan(&u.ID, &u.Email, &u.FirstName, &u.LastName, &u.PhoneNumber, &u.PasswordHash, &u.Salt, &u.EmailVerifiedAt, &u.ZitadelUserID); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.FirstName, &u.LastName, &u.PhoneNumber, &u.ZitadelUserID); err != nil {
 			log.Fatalf("Failed to scan user: %v", err)
 		}
 		users = append(users, u)
@@ -112,7 +108,7 @@ func createZitadelUser(baseURL, pat string, u appUser) (string, error) {
 		},
 		"email": map[string]any{
 			"email":           u.Email,
-			"isEmailVerified": u.EmailVerifiedAt != nil,
+			"isEmailVerified": true,
 		},
 	}
 
@@ -121,13 +117,6 @@ func createZitadelUser(baseURL, pat string, u appUser) (string, error) {
 		body["phone"] = map[string]any{
 			"phone": *u.PhoneNumber,
 		}
-	}
-
-	// Note: Argon2ID hash import not supported in Zitadel v4.13.
-	// Users with passwords will need to use "Forgot password" on first login.
-	// Users are created without password — Zitadel will handle password set/reset.
-	if u.PasswordHash != nil {
-		log.Printf("  (password not imported — user will need to reset via Zitadel)")
 	}
 
 	jsonBody, err := json.Marshal(body)

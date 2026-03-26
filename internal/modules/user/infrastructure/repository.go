@@ -20,12 +20,12 @@ func NewUserRepository(pool *db.DBPool) domain.UserRepository {
 
 func (r *UserRepository) Save(ctx context.Context, user *domain.User) (uuid.UUID, error) {
 	query := `
-		INSERT INTO users (first_name, last_name, email, phone_number, address_id, password_hash, salt, google_id, zitadel_user_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO users (first_name, last_name, email, phone_number, address_id, zitadel_user_id)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id;
 	`
 	var id uuid.UUID
-	if err := r.pool.ForContext(ctx).QueryRowContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.PasswordHash, user.Salt, user.GoogleID, user.ZitadelUserID).Scan(&id); err != nil {
+	if err := r.pool.ForContext(ctx).QueryRowContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.ZitadelUserID).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
 	user.ID = id
@@ -74,10 +74,10 @@ func (r *UserRepository) FindByZitadelID(ctx context.Context, zitadelID string) 
 func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) (*domain.User, error) {
 	query := `
 		UPDATE users
-		SET first_name = $1, last_name = $2, email = $3, phone_number = $4, address_id = $5, email_verified_at = $6, notify_marketing = $7, zitadel_user_id = $8
-		WHERE id = $9
+		SET first_name = $1, last_name = $2, email = $3, phone_number = $4, address_id = $5, notify_marketing = $6, zitadel_user_id = $7
+		WHERE id = $8
 	`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.EmailVerifiedAt, user.NotifyMarketing, user.ZitadelUserID, user.ID)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.NotifyMarketing, user.ZitadelUserID, user.ID)
 	if err != nil {
 		return nil, err
 	}
