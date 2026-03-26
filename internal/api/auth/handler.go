@@ -573,6 +573,31 @@ func RegisterHandler(c *gin.Context) {
 		log.Warn("zitadel user creation rejected", zap.Int("status", status), zap.String("message", msg))
 
 		if status == http.StatusConflict || strings.Contains(msg, "already exists") {
+			// Google-first user linking: if user exists without a password, set the password
+			if linkedUserID, findErr := findZitadelUserByEmail(req.Email); findErr == nil && !hasZitadelPassword(linkedUserID) {
+				pwdBody := map[string]any{
+					"newPassword": map[string]any{
+						"password":       req.Password,
+						"changeRequired": false,
+					},
+				}
+				pwdResp, pwdStatus, pwdErr := zitadelAdminRequest("PUT", "/v2/users/"+linkedUserID+"/password", pwdBody)
+				if pwdErr != nil || (pwdStatus != http.StatusOK && pwdStatus != http.StatusCreated) {
+					var pwdErrMsg struct {
+						Message string `json:"message"`
+					}
+					_ = json.Unmarshal(pwdResp, &pwdErrMsg)
+					if strings.Contains(pwdErrMsg.Message, "complexity") {
+						c.JSON(http.StatusBadRequest, gin.H{"error": "weak_password", "message": "weak_password"})
+					} else {
+						c.JSON(http.StatusBadRequest, gin.H{"error": "registration_failed", "message": pwdErrMsg.Message})
+					}
+					return
+				}
+				log.Info("linked password to social-login user", zap.String("email", req.Email))
+				c.JSON(http.StatusCreated, gin.H{"success": true})
+				return
+			}
 			c.JSON(http.StatusConflict, gin.H{"error": "email_already_exists"})
 		} else if strings.Contains(msg, "complexity") || strings.Contains(msg, "COMMAND-oz74F") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "weak_password", "message": "weak_password"})
@@ -827,6 +852,26 @@ func VerifyEmailHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// hasZitadelPassword checks if a Zitadel user has a password set.
+func hasZitadelPassword(userID string) bool {
+	respBody, status, err := zitadelRequest("GET", "/v2/users/"+userID, nil)
+	if err != nil || status != http.StatusOK {
+		return true // Assume has password on error (safe default)
+	}
+	var userResp struct {
+		User struct {
+			Human struct {
+				PasswordChanged string `json:"passwordChanged"`
+			} `json:"human"`
+		} `json:"user"`
+	}
+	if json.Unmarshal(respBody, &userResp) != nil {
+		return true
+	}
+	return userResp.User.Human.PasswordChanged != "" &&
+		userResp.User.Human.PasswordChanged != "0001-01-01T00:00:00Z"
 }
 
 // zitadelRequest makes an authenticated request to the Zitadel API using the service PAT.
