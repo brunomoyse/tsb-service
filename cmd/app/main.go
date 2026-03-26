@@ -217,7 +217,7 @@ func main() {
 	api.GET("/graphql", optionalAuth, graphqlHandler)
 
 	// Auth proxy endpoints (proxies to Zitadel Session API with service account PAT)
-	authLimiter := middleware.NewRateLimiter(5.0/60, 5) // 5 req/min per IP
+	authLimiter := middleware.NewRateLimiter(15.0/60, 10) // 15 req/min per IP, burst of 10
 	api.POST("/auth/session", authLimiter.Middleware(), auth.CreateSessionHandler)
 	api.POST("/auth/finalize", authLimiter.Middleware(), auth.FinalizeOIDCHandler)
 	api.POST("/auth/idp/start", authLimiter.Middleware(), auth.StartIdPIntentHandler)
