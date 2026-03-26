@@ -222,6 +222,10 @@ func main() {
 	api.POST("/auth/finalize", authLimiter.Middleware(), auth.FinalizeOIDCHandler)
 	api.POST("/auth/idp/start", authLimiter.Middleware(), auth.StartIdPIntentHandler)
 	api.POST("/auth/idp/session", authLimiter.Middleware(), auth.CreateIdPSessionHandler)
+	api.POST("/auth/register", authLimiter.Middleware(), auth.RegisterHandler)
+	api.POST("/auth/password/request-reset", authLimiter.Middleware(), auth.RequestPasswordResetHandler)
+	api.POST("/auth/password/reset", authLimiter.Middleware(), auth.SetNewPasswordHandler)
+	api.POST("/auth/verify-email", authLimiter.Middleware(), auth.VerifyEmailHandler)
 
 	// Other endpoints
 	api.POST("/payments/webhook", paymentHandler.UpdatePaymentStatusHandler)

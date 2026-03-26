@@ -56,6 +56,11 @@ func InitService() error {
 	return nil
 }
 
+// IsInitialized returns true if the Scaleway TEM client has been initialized.
+func IsInitialized() bool {
+	return baseReq != nil
+}
+
 func SendVerificationEmail(user userDomain.User, lang string, verificationURL string) error {
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
