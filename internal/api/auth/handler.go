@@ -612,16 +612,15 @@ func RegisterHandler(c *gin.Context) {
 	}
 
 	// Parse the verification code from Zitadel's response
+	// Zitadel returns { "userId": "...", "emailCode": "..." } at the top level
 	var createResp struct {
-		UserID string `json:"userId"`
-		Email  struct {
-			VerificationCode string `json:"verificationCode"`
-		} `json:"email"`
+		UserID    string `json:"userId"`
+		EmailCode string `json:"emailCode"`
 	}
-	if err := json.Unmarshal(respBody, &createResp); err == nil && createResp.Email.VerificationCode != "" && scaleway.IsInitialized() {
+	if err := json.Unmarshal(respBody, &createResp); err == nil && createResp.EmailCode != "" && scaleway.IsInitialized() {
 		appBaseURL := os.Getenv("APP_BASE_URL")
 		verifyLink := fmt.Sprintf("%s/%s/auth/verify?userId=%s&code=%s",
-			appBaseURL, lang, createResp.UserID, createResp.Email.VerificationCode)
+			appBaseURL, lang, createResp.UserID, createResp.EmailCode)
 
 		user := userDomain.User{
 			FirstName: req.FirstName,
