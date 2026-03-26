@@ -1,0 +1,9 @@
+Hallo {{.UserName}},
+
+Bedankt dat u voor Tokyo Sushi Bar hebt gekozen! Wij hopen dat u van uw maaltijd hebt genoten.
+
+Wij zouden u graag snel weer verwelkomen.
+
+Opnieuw bestellen: {{.MenuLink}}
+
+© 2026 Tokyo Sushi Bar. Alle rechten voorbehouden.

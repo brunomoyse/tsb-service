@@ -1,0 +1,42 @@
+Hallo {{.UserName}},
+
+Bedankt voor uw bestelling bij Tokyo Sushi Bar! Wij zijn blij u te melden dat uw bestelling door het restaurant is bevestigd.
+
+{{if .EstimatedReadyTime}}
+{{if eq .OrderType "DELIVERY"}}Uw bestelling wordt geleverd op {{.EstimatedReadyTime}} (geschatte tijd).{{else if eq .OrderType "PICKUP"}}Uw bestelling is beschikbaar voor afhaling op {{.EstimatedReadyTime}} (geschatte tijd).{{end}}
+{{else}}
+Wij informeren u zodra de geschatte tijd is bepaald.
+{{end}}
+
+Besteloverzicht:
+{{range .OrderItems}}
+Product:  {{.Name}}
+Aantal:   {{.Quantity}}
+Prijs:    {{.TotalPrice}} €
+
+{{end}}
+Subtotaal:                 {{.SubtotalPrice}} €
+{{if eq .OrderType "DELIVERY"}}
+Leveringskosten:           {{.DeliveryFee}} €
+{{end}}
+{{if .HasTakeaway}}
+Afhaalkorting (-10%):      -{{.TakeawayDiscount}} €
+{{end}}
+{{if .HasCoupon}}
+Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}}: -{{.CouponDiscount}} €
+{{end}}
+Totaal:                    {{.TotalPrice}} €
+
+{{if .Address}}
+Leveringsadres:
+{{.Address.StreetName}} {{.Address.HouseNumber}}{{if .Address.BoxNumber}} (Bus {{.Address.BoxNumber}}){{end}}
+{{.Address.MunicipalityName}}, {{.Address.Postcode}}
+{{end}}
+
+Om de status van uw bestelling te volgen, klikt u op de volgende link: {{.StatusLink}}
+
+Hebt u vragen over uw bestelling? Neem gerust contact met ons op. Wij danken u voor uw vertrouwen en kijken ernaar uit u te verwennen met onze authentieke sushi-ervaring.
+
+Als u deze bestelling niet hebt geplaatst, kunt u deze e-mail negeren.
+
+© 2026 Tokyo Sushi Bar. Alle rechten voorbehouden.

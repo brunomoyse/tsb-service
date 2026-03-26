@@ -1,0 +1,11 @@
+Hallo {{.UserName}},
+
+{{if .EstimatedReadyTime}}
+{{if eq .OrderType "DELIVERY"}}De geschatte leveringstijd van uw bestelling is bijgewerkt naar: {{.EstimatedReadyTime}}.{{else if eq .OrderType "PICKUP"}}De geschatte afhaaltijd van uw bestelling is bijgewerkt naar: {{.EstimatedReadyTime}}.{{end}}
+{{end}}
+
+Onze excuses voor het ongemak.
+
+Bestelling volgen: {{.StatusLink}}
+
+© 2026 Tokyo Sushi Bar. Alle rechten voorbehouden.
