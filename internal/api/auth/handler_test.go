@@ -104,6 +104,72 @@ func TestRegisterHandler_DuplicateEmail(t *testing.T) {
 	assert.Equal(t, "email_already_exists", resp["error"])
 }
 
+func TestRegisterHandler_GoogleFirstUserLinking(t *testing.T) {
+	callCount := 0
+	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		switch {
+		case r.URL.Path == "/v2/users/human" && r.Method == "POST":
+			// User creation returns 409 (already exists via Google)
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"code":6,"message":"user already exists"}`))
+		case r.URL.Path == "/v2/users" && r.Method == "POST":
+			// Email search finds the existing Google user
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"result":[{"userId":"google-user-123"}]}`))
+		case r.URL.Path == "/v2/users/google-user-123" && r.Method == "GET":
+			// User has no password (Google-first)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"passwordChanged":"0001-01-01T00:00:00Z"}}}`))
+		case r.URL.Path == "/v2/users/google-user-123/password" && r.Method == "PUT":
+			// Password set succeeds
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	reqBody := `{"firstName":"John","lastName":"Doe","email":"google@example.com","password":"P@ssw0rd!"}`
+	w, c := ginContext("POST", "/auth/register", reqBody)
+
+	RegisterHandler(c)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, true, resp["success"])
+}
+
+func TestRegisterHandler_ExistingUserWithPassword(t *testing.T) {
+	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/users/human" && r.Method == "POST":
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"code":6,"message":"user already exists"}`))
+		case r.URL.Path == "/v2/users" && r.Method == "POST":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"result":[{"userId":"existing-user-456"}]}`))
+		case r.URL.Path == "/v2/users/existing-user-456" && r.Method == "GET":
+			// User already has a password
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"passwordChanged":"2026-01-15T10:30:00Z"}}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	reqBody := `{"firstName":"John","lastName":"Doe","email":"existing@example.com","password":"P@ssw0rd!"}`
+	w, c := ginContext("POST", "/auth/register", reqBody)
+
+	RegisterHandler(c)
+
+	assert.Equal(t, http.StatusConflict, w.Code)
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "email_already_exists", resp["error"])
+}
+
 func TestRegisterHandler_WeakPassword(t *testing.T) {
 	setupMockZitadel(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
