@@ -865,6 +865,92 @@ func VerifyEmailHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+// resendVerificationRequest is the frontend's request to resend a verification email.
+type resendVerificationRequest struct {
+	Email string `json:"email"`
+	Lang  string `json:"lang,omitempty"`
+}
+
+// ResendVerificationHandler resends the email verification code via Scaleway.
+// POST /auth/resend-verification { email, lang? }
+func ResendVerificationHandler(c *gin.Context) {
+	log := logging.FromContext(c.Request.Context())
+
+	var req resendVerificationRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.Email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email is required"})
+		return
+	}
+
+	lang := req.Lang
+	if lang == "" {
+		lang = "fr"
+	}
+
+	// Find user by email
+	userID, err := findZitadelUserByEmail(req.Email)
+	if err != nil {
+		// Silent success to prevent email enumeration
+		c.JSON(http.StatusOK, gin.H{"success": true})
+		return
+	}
+
+	// Check if already verified
+	if isZitadelEmailVerified(userID) {
+		c.JSON(http.StatusOK, gin.H{"success": true})
+		return
+	}
+
+	// Request a new verification code from Zitadel
+	respBody, _, err := zitadelAdminRequest("POST", "/v2/users/"+userID+"/email/resend", map[string]any{
+		"returnCode": map[string]any{},
+	})
+	if err != nil {
+		log.Error("zitadel resend verification failed", zap.Error(err))
+		c.JSON(http.StatusOK, gin.H{"success": true})
+		return
+	}
+
+	// Parse the verification code and send our own email
+	var codeResp struct {
+		VerificationCode string `json:"verificationCode"`
+	}
+	if err := json.Unmarshal(respBody, &codeResp); err == nil && codeResp.VerificationCode != "" && scaleway.IsInitialized() {
+		// Fetch user profile for the email template
+		firstName := req.Email // Fallback
+		userResp, uStatus, err := zitadelRequest("GET", "/v2/users/"+userID, nil)
+		if err == nil && uStatus == http.StatusOK {
+			var u struct {
+				User struct {
+					Human struct {
+						Profile struct {
+							GivenName  string `json:"givenName"`
+							FamilyName string `json:"familyName"`
+						} `json:"profile"`
+					} `json:"human"`
+				} `json:"user"`
+			}
+			if json.Unmarshal(userResp, &u) == nil && u.User.Human.Profile.GivenName != "" {
+				firstName = u.User.Human.Profile.GivenName
+			}
+		}
+
+		appBaseURL := os.Getenv("APP_BASE_URL")
+		verifyLink := fmt.Sprintf("%s/%s/auth/verify?userId=%s&code=%s",
+			appBaseURL, lang, userID, codeResp.VerificationCode)
+
+		user := userDomain.User{
+			FirstName: firstName,
+			Email:     req.Email,
+		}
+		if err := scaleway.SendVerificationEmail(user, lang, verifyLink); err != nil {
+			log.Error("failed to send verification email", zap.Error(err))
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 // isZitadelEmailVerified checks if a Zitadel user's email is verified.
 func isZitadelEmailVerified(userID string) bool {
 	respBody, status, err := zitadelRequest("GET", "/v2/users/"+userID, nil)

@@ -226,6 +226,7 @@ func main() {
 	api.POST("/auth/password/request-reset", authLimiter.Middleware(), auth.RequestPasswordResetHandler)
 	api.POST("/auth/password/reset", authLimiter.Middleware(), auth.SetNewPasswordHandler)
 	api.POST("/auth/verify-email", authLimiter.Middleware(), auth.VerifyEmailHandler)
+	api.POST("/auth/resend-verification", authLimiter.Middleware(), auth.ResendVerificationHandler)
 
 	// Other endpoints
 	api.POST("/payments/webhook", paymentHandler.UpdatePaymentStatusHandler)
