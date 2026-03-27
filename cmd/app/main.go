@@ -45,10 +45,8 @@ import (
 )
 
 func main() {
-	// Load .env file
-	if err := godotenv.Load(); err != nil {
-		panic("Warning: .env file not found")
-	}
+	// Load .env file if present; env vars set externally (e.g. Kubernetes secrets) take precedence.
+	_ = godotenv.Load()
 
 	// Initialize structured logger
 	logLevel := cmp.Or(os.Getenv("LOG_LEVEL"), "info")
