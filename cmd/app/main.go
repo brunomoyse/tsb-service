@@ -191,7 +191,7 @@ func main() {
 	})
 
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{appBaseURL, appDashboardURL, "capacitor://localhost", "http://localhost"},
+		AllowOrigins:     []string{appBaseURL, appDashboardURL, "capacitor://localhost", "http://localhost", "https://localhost"},
 		CustomSchemas:    []string{"capacitor://"},
 		AllowMethods:     []string{"HEAD", "GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept-Language"},
