@@ -38,9 +38,12 @@ import (
 
 	addressApplication "tsb-service/internal/modules/address/application"
 	addressInfrastructure "tsb-service/internal/modules/address/infrastructure"
+	notificationApplication "tsb-service/internal/modules/notification/application"
+	notificationInfrastructure "tsb-service/internal/modules/notification/infrastructure"
 	restaurantApplication "tsb-service/internal/modules/restaurant/application"
 	restaurantInfrastructure "tsb-service/internal/modules/restaurant/infrastructure"
 	"tsb-service/internal/shared/middleware"
+	"tsb-service/pkg/apns"
 	"tsb-service/pkg/db"
 )
 
@@ -121,6 +124,7 @@ func main() {
 	// Repos / services / handlers
 	addressRepo := addressInfrastructure.NewAddressRepository(dbPool)
 	couponRepo := couponInfrastructure.NewCouponRepository(dbPool)
+	notificationRepo := notificationInfrastructure.NewNotificationRepository(dbPool)
 	orderRepo := orderInfrastructure.NewOrderRepository(dbPool)
 	paymentRepo := paymentInfrastructure.NewPaymentRepository(dbPool)
 	productRepo := productInfrastructure.NewProductRepository(dbPool)
@@ -129,6 +133,7 @@ func main() {
 
 	addressService := addressApplication.NewAddressService(addressRepo)
 	couponService := couponApplication.NewCouponService(couponRepo)
+	notificationService := notificationApplication.NewNotificationService(notificationRepo)
 	orderService := orderApplication.NewOrderService(orderRepo)
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient)
 	productService := productApplication.NewProductService(productRepo)
@@ -143,6 +148,23 @@ func main() {
 		os.Exit(1)
 	}
 	zap.L().Info("OIDC verifier initialized", zap.String("issuer", zitadelIssuer))
+
+	// APNs client for iOS push notifications (optional — non-fatal if not configured)
+	var apnsClient *apns.Client
+	apnsKeyPath := os.Getenv("APNS_AUTH_KEY_PATH")
+	apnsKeyID := os.Getenv("APNS_KEY_ID")
+	apnsTeamID := os.Getenv("APNS_TEAM_ID")
+	apnsBundleID := cmp.Or(os.Getenv("APNS_BUNDLE_ID"), "be.tokyosushibarliege.app")
+	if apnsKeyPath != "" && apnsKeyID != "" && apnsTeamID != "" {
+		isProduction := os.Getenv("APP_ENV") == "production"
+		var apnsErr error
+		apnsClient, apnsErr = apns.NewClient(apnsKeyPath, apnsKeyID, apnsTeamID, apnsBundleID, isProduction)
+		if apnsErr != nil {
+			zap.L().Error("failed to initialize APNs client", zap.Error(apnsErr))
+		} else {
+			zap.L().Info("APNs client initialized")
+		}
+	}
 
 	orderHandler := orderInterfaces.NewOrderHandler(orderService, userService, productService)
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService, broker)
@@ -205,10 +227,10 @@ func main() {
 
 	// GraphQL
 	rootResolver := resolver.NewResolver(
-		broker,
-		addressService, couponService, orderService, paymentService, productService, restaurantService, userService,
+		broker, apnsClient,
+		addressService, couponService, notificationService, orderService, paymentService, productService, restaurantService, userService,
 	)
-	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL}, oidcVerifier)
+	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL, "capacitor://localhost"}, oidcVerifier)
 	optionalAuth := oidcVerifier.OptionalAuthMiddleware()
 
 	api.POST("/graphql", optionalAuth, graphqlHandler)
@@ -218,6 +240,8 @@ func main() {
 	authLimiter := middleware.NewRateLimiter(15.0/60, 10) // 15 req/min per IP, burst of 10
 	api.POST("/auth/session", authLimiter.Middleware(), auth.CreateSessionHandler)
 	api.POST("/auth/finalize", authLimiter.Middleware(), auth.FinalizeOIDCHandler)
+	api.POST("/auth/authorize-proxy", authLimiter.Middleware(), auth.AuthorizeProxyHandler)
+	api.POST("/auth/token-exchange", authLimiter.Middleware(), auth.TokenExchangeHandler)
 	api.POST("/auth/idp/start", authLimiter.Middleware(), auth.StartIdPIntentHandler)
 	api.POST("/auth/idp/session", authLimiter.Middleware(), auth.CreateIdPSessionHandler)
 	api.POST("/auth/register", authLimiter.Middleware(), auth.RegisterHandler)

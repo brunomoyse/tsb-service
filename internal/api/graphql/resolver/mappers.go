@@ -6,11 +6,14 @@ import (
 	"strings"
 	"time"
 	"tsb-service/internal/api/graphql/model"
+	"fmt"
+
 	addressDomain "tsb-service/internal/modules/address/domain"
 	couponDomain "tsb-service/internal/modules/coupon/domain"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	paymentDomain "tsb-service/internal/modules/payment/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
+	restaurantDomain "tsb-service/internal/modules/restaurant/domain"
 	userDomain "tsb-service/internal/modules/user/domain"
 
 	"github.com/shopspring/decimal"
@@ -301,6 +304,84 @@ func derefFloatOrZero(f *float64) float64 {
 		return *f
 	}
 	return 0
+}
+
+func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.RestaurantConfig, now time.Time, isOpenNow bool) error {
+	if preferred == nil {
+		if !isOpenNow {
+			return fmt.Errorf("fixed time is required while the restaurant is closed")
+		}
+		return nil
+	}
+
+	nowLocal := now.In(now.Location())
+	slot := preferred.In(now.Location())
+
+	if slot.Year() != nowLocal.Year() || slot.Month() != nowLocal.Month() || slot.Day() != nowLocal.Day() {
+		return fmt.Errorf("preferred ready time must be on the same day")
+	}
+
+	if slot.Before(nowLocal.Add(1 * time.Hour)) {
+		return fmt.Errorf("preferred ready time must be at least 1 hour from now")
+	}
+
+	if slot.Minute()%15 != 0 || slot.Second() != 0 || slot.Nanosecond() != 0 {
+		return fmt.Errorf("preferred ready time must be aligned to 15-minute slots")
+	}
+
+	hours, err := config.GetOpeningHours()
+	if err != nil {
+		return fmt.Errorf("failed to parse opening hours")
+	}
+
+	dayName := strings.ToLower(nowLocal.Weekday().String())
+	schedule, exists := hours[dayName]
+	if !exists || schedule == nil {
+		return fmt.Errorf("restaurant is closed today")
+	}
+
+	slotMins := slot.Hour()*60 + slot.Minute()
+	if !isSlotInAllowedInterval(slotMins, schedule) {
+		return fmt.Errorf("preferred ready time is outside allowed opening slots")
+	}
+
+	return nil
+}
+
+func isSlotInAllowedInterval(slotMins int, schedule *restaurantDomain.DaySchedule) bool {
+	intervals := make([][2]string, 0, 2)
+	intervals = append(intervals, [2]string{schedule.Open, schedule.Close})
+	if schedule.DinnerOpen != "" && schedule.DinnerClose != "" {
+		intervals = append(intervals, [2]string{schedule.DinnerOpen, schedule.DinnerClose})
+	}
+
+	for _, interval := range intervals {
+		openMins, okOpen := parseHHMMToMinutes(interval[0])
+		closeMins, okClose := parseHHMMToMinutes(interval[1])
+		if !okOpen || !okClose {
+			continue
+		}
+		firstAllowed := openMins + 30
+		if slotMins >= firstAllowed && slotMins <= closeMins {
+			return true
+		}
+	}
+
+	return false
+}
+
+func parseHHMMToMinutes(hhmm string) (int, bool) {
+	parts := strings.Split(hhmm, ":")
+	if len(parts) != 2 {
+		return 0, false
+	}
+
+	hour, err := time.Parse("15:04", hhmm)
+	if err != nil {
+		return 0, false
+	}
+
+	return hour.Hour()*60 + hour.Minute(), true
 }
 
 func ToGQLProductChoice(c *productDomain.ProductChoice, lang string) *model.ProductChoice {

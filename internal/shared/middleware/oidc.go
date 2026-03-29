@@ -2,28 +2,35 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
+	"github.com/zitadel/zitadel-go/v3/pkg/authorization"
+	"github.com/zitadel/zitadel-go/v3/pkg/authorization/oauth"
+	"github.com/zitadel/zitadel-go/v3/pkg/zitadel"
 	"go.uber.org/zap"
-	"golang.org/x/oauth2"
 
 	"tsb-service/pkg/utils"
 )
 
-// hostOverrideTransport sets the Host header to the external domain
-// when making requests to an internal Docker URL for OIDC discovery.
-// Zitadel resolves instances by Host header, so this is required.
-type hostOverrideTransport struct {
-	host string
-	base http.RoundTripper
+// internalRouteTransport rewrites outgoing requests to use a Docker-internal URL
+// while preserving the external Host header. This is necessary because Zitadel
+// resolves instances by Host header, and the external URL may not be reachable
+// from inside the Docker network.
+type internalRouteTransport struct {
+	externalHost   string // e.g., "auth.tokyosushibarliege.be"
+	internalScheme string // e.g., "http"
+	internalHost   string // e.g., "zitadel-api:8080"
+	base           http.RoundTripper
 }
 
-func (t *hostOverrideTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Host = t.host
+func (t *internalRouteTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Host = t.externalHost
+	req.URL.Scheme = t.internalScheme
+	req.URL.Host = t.internalHost
 	return t.base.RoundTrip(req)
 }
 
@@ -37,63 +44,60 @@ type UserLookup interface {
 
 // OIDCVerifier validates Zitadel JWTs via JWKS (no network call per request).
 type OIDCVerifier struct {
-	verifier   *oidc.IDTokenVerifier
+	authorizer *authorization.Authorizer[*oauth.IntrospectionContext]
 	userLookup UserLookup
 }
 
-// zitadelClaims represents the claims we extract from Zitadel-issued JWT access tokens.
-type zitadelClaims struct {
-	Email         string `json:"email"`
-	EmailVerified bool   `json:"email_verified"`
-	GivenName     string `json:"given_name"`
-	FamilyName    string `json:"family_name"`
-	// Zitadel encodes project roles as:
-	// "urn:zitadel:iam:org:project:roles": { "admin": { ... } }
-	ProjectRoles map[string]any `json:"urn:zitadel:iam:org:project:roles"`
-}
-
-// NewOIDCVerifier initializes the OIDC provider and returns a JWT verifier.
+// NewOIDCVerifier initializes the Zitadel Go SDK authorizer for local JWT validation.
 // issuerURL is the Zitadel instance URL (e.g., "https://auth.example.com").
 // internalURL is optional — when set (e.g., "http://zitadel-api:8080" in Docker),
-// OIDC discovery uses the internal URL while tokens are validated against the external issuer.
+// OIDC discovery and JWKS requests are routed to the internal URL while the external
+// domain is preserved as the Host header and issuer.
 // clientID is the audience expected in the JWT (the Zitadel project ID or app client ID).
 // userLookup resolves Zitadel sub → app user UUID (pass nil to skip, userID will be the raw Zitadel sub).
 func NewOIDCVerifier(ctx context.Context, issuerURL, internalURL, clientID string, userLookup UserLookup) (*OIDCVerifier, error) {
-	discoveryURL := issuerURL
-	if internalURL != "" {
-		// In Docker, the external issuer (https://...) isn't reachable from the container.
-		// Use the internal URL for discovery but allow the issuer mismatch in the response.
-		// Also override the Host header so Zitadel can resolve the correct instance.
-		discoveryURL = internalURL
-		ctx = oidc.InsecureIssuerURLContext(ctx, internalURL)
+	parsed, err := url.Parse(issuerURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid issuer URL: %w", err)
+	}
+	domain := parsed.Host
 
-		parsed, _ := url.Parse(issuerURL)
-		externalHost := parsed.Host
-		client := &http.Client{
-			Transport: &hostOverrideTransport{
-				host: externalHost,
-				base: http.DefaultTransport,
+	// Build the Zitadel configuration and HTTP client
+	var httpClient *http.Client
+	if internalURL != "" {
+		// In Docker, route requests to the internal URL while keeping the external Host header.
+		// The SDK uses the external domain for issuer validation (matches the JWT iss claim),
+		// and the transport rewrites the actual HTTP connection to the internal address.
+		internalParsed, parseErr := url.Parse(internalURL)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid internal URL: %w", parseErr)
+		}
+		httpClient = &http.Client{
+			Transport: &internalRouteTransport{
+				externalHost:   domain,
+				internalScheme: internalParsed.Scheme,
+				internalHost:   internalParsed.Host,
+				base:           http.DefaultTransport,
 			},
 		}
-		ctx = context.WithValue(ctx, oauth2.HTTPClient, client)
 	}
 
-	provider, err := oidc.NewProvider(ctx, discoveryURL)
+	z := zitadel.New(domain)
+
+	// Initialize with local JWT validation (JWKS-based, no per-request introspection)
+	var verifierInit authorization.VerifierInitializer[*oauth.IntrospectionContext]
+	if httpClient != nil {
+		verifierInit = oauth.WithJWT(clientID, httpClient)
+	} else {
+		verifierInit = oauth.DefaultJWTAuthorization(clientID)
+	}
+
+	authZ, err := authorization.New(ctx, z, verifierInit)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize Zitadel authorizer: %w", err)
 	}
 
-	verifierCfg := &oidc.Config{
-		ClientID: clientID,
-	}
-	if internalURL != "" {
-		// When using internal discovery URL, the provider's issuer is the internal URL,
-		// but tokens contain the external issuer. Skip the automatic issuer check.
-		verifierCfg.SkipIssuerCheck = true
-	}
-	verifier := provider.Verifier(verifierCfg)
-
-	return &OIDCVerifier{verifier: verifier, userLookup: userLookup}, nil
+	return &OIDCVerifier{authorizer: authZ, userLookup: userLookup}, nil
 }
 
 // extractToken gets the token from Authorization header (or cookie as fallback).
@@ -109,42 +113,28 @@ func extractToken(c *gin.Context) string {
 
 // verifyAndSetContext verifies the JWT and sets userID/isAdmin in context.
 func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool {
-	idToken, err := v.verifier.Verify(c.Request.Context(), tokenStr)
+	authCtx, err := v.authorizer.CheckAuthorization(c.Request.Context(), "Bearer "+tokenStr)
 	if err != nil {
 		zap.L().Debug("OIDC token verification failed", zap.Error(err))
 		return false
 	}
 
-	var claims zitadelClaims
-	if err := idToken.Claims(&claims); err != nil {
-		zap.L().Debug("failed to parse OIDC claims", zap.Error(err))
-		return false
-	}
-
-	sub := idToken.Subject
+	sub := authCtx.UserID()
 	if sub == "" {
 		return false
 	}
 
-	// Reject users who haven't verified their email
-	if !claims.EmailVerified {
-		zap.L().Debug("OIDC user email not verified", zap.String("sub", sub), zap.String("email", claims.Email))
-		return false
-	}
-
-	isAdmin := false
-	if claims.ProjectRoles != nil {
-		if _, ok := claims.ProjectRoles["admin"]; ok {
-			isAdmin = true
-		}
-	}
+	isAdmin := authCtx.IsGrantedRole("admin")
 
 	// Resolve Zitadel sub → app user UUID (with JIT provisioning)
 	userID := sub
 	if v.userLookup != nil {
-		appID, err := v.userLookup.ResolveZitadelID(c.Request.Context(), sub, claims.Email, claims.GivenName, claims.FamilyName)
-		if err != nil {
-			zap.L().Warn("failed to resolve Zitadel user", zap.String("sub", sub), zap.Error(err))
+		appID, lookupErr := v.userLookup.ResolveZitadelID(
+			c.Request.Context(), sub,
+			authCtx.Email, authCtx.GivenName, authCtx.FamilyName,
+		)
+		if lookupErr != nil {
+			zap.L().Warn("failed to resolve Zitadel user", zap.String("sub", sub), zap.Error(lookupErr))
 			// Fall back to raw sub — downstream will handle the error
 		} else {
 			userID = appID
@@ -192,21 +182,10 @@ func (v *OIDCVerifier) OptionalAuthMiddleware() gin.HandlerFunc {
 // VerifyToken verifies a raw JWT string and returns the subject and admin status.
 // Used by WebSocket InitFunc. Returns the raw Zitadel sub (no DB lookup).
 func (v *OIDCVerifier) VerifyToken(ctx context.Context, tokenStr string) (subject string, isAdmin bool, err error) {
-	idToken, err := v.verifier.Verify(ctx, tokenStr)
+	authCtx, err := v.authorizer.CheckAuthorization(ctx, "Bearer "+tokenStr)
 	if err != nil {
 		return "", false, err
 	}
 
-	var claims zitadelClaims
-	if err := idToken.Claims(&claims); err != nil {
-		return "", false, err
-	}
-
-	if claims.ProjectRoles != nil {
-		if _, ok := claims.ProjectRoles["admin"]; ok {
-			isAdmin = true
-		}
-	}
-
-	return idToken.Subject, isAdmin, nil
+	return authCtx.UserID(), authCtx.IsGrantedRole("admin"), nil
 }
