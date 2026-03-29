@@ -204,6 +204,18 @@ func AuthorizeProxyHandler(c *gin.Context) {
 		return
 	}
 
+	// Rewrite the authorize URL to use the internal Zitadel address (if configured)
+	// to avoid Cloudflare Tunnel hairpin (public domain → Cloudflare → Tunnel → same server → 502)
+	if internalURL := getZitadelURL(); internalURL != "" {
+		if parsed, err := url.Parse(req.AuthorizeURL); err == nil {
+			if internal, err2 := url.Parse(internalURL); err2 == nil {
+				parsed.Scheme = internal.Scheme
+				parsed.Host = internal.Host
+				req.AuthorizeURL = parsed.String()
+			}
+		}
+	}
+
 	// Follow the redirect chain to capture the authRequestID from the Location header
 	var redirectURL string
 	httpClient := &http.Client{
