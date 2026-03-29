@@ -355,7 +355,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 				}
 			}
 		}
-		molliePayment, err := r.PaymentService.CreatePayment(ctx, *order, items, *user, address)
+		molliePayment, err := r.PaymentService.CreatePayment(ctx, *order, items, *user, address, input.PaymentRedirectURL)
 		if err != nil || molliePayment == nil {
 			// Clean up the orphaned order since payment creation failed
 			if delErr := r.OrderService.DeleteOrder(ctx, order.ID); delErr != nil {

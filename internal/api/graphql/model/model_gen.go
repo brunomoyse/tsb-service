@@ -81,6 +81,7 @@ type CreateOrderInput struct {
 	HouseNumber        *string                 `json:"houseNumber,omitempty"`
 	BoxNumber          *string                 `json:"boxNumber,omitempty"`
 	IsManualAddress    *bool                   `json:"isManualAddress,omitempty"`
+	PaymentRedirectURL *string                 `json:"paymentRedirectUrl,omitempty"`
 }
 
 type CreateOrderItemInput struct {

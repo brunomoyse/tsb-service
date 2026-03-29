@@ -14,7 +14,7 @@ import (
 )
 
 type PaymentService interface {
-	CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct, u userDomain.User, a *addressDomain.Address) (*domain.MolliePayment, error)
+	CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct, u userDomain.User, a *addressDomain.Address, customRedirectURL *string) (*domain.MolliePayment, error)
 	CreateFullRefund(ctx context.Context, externalPaymentID string) (*mollie.Refund, error)
 	UpdatePaymentStatus(ctx context.Context, externalMolliePaymentID string) error
 	UpdatePaymentStatusByOrderID(ctx context.Context, orderID uuid.UUID, status string) (*domain.MolliePayment, error)
@@ -37,7 +37,7 @@ func NewPaymentService(repo domain.PaymentRepository, mollieClient mollie.Client
 	}
 }
 
-func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct, u userDomain.User, a *addressDomain.Address) (*domain.MolliePayment, error) {
+func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct, u userDomain.User, a *addressDomain.Address, customRedirectURL *string) (*domain.MolliePayment, error) {
 	var lines []mollie.PaymentLines
 
 	// line items
@@ -114,6 +114,9 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 	}
 
 	redirectUrl := appBaseUrl + "/order-completed/" + o.ID.String()
+	if customRedirectURL != nil && *customRedirectURL != "" {
+		redirectUrl = *customRedirectURL + "/" + o.ID.String()
+	}
 	cancelUrl := appBaseUrl + "/checkout"
 
 	// Determine locale based on user language.

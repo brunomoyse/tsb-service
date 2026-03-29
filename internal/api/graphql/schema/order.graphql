@@ -82,6 +82,8 @@ input CreateOrderInput {
     houseNumber: String
     boxNumber: String
     isManualAddress: Boolean
+    # Custom redirect URL for Mollie payment (native apps use custom URL scheme)
+    paymentRedirectUrl: String
 }
 
 input CreateOrderItemInput {

@@ -12363,7 +12363,7 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"orderType", "isOnlinePayment", "addressId", "addressExtra", "orderNote", "orderExtra", "preferredReadyTime", "items", "couponCode", "streetId", "houseNumber", "boxNumber", "isManualAddress"}
+	fieldsInOrder := [...]string{"orderType", "isOnlinePayment", "addressId", "addressExtra", "orderNote", "orderExtra", "preferredReadyTime", "items", "couponCode", "streetId", "houseNumber", "boxNumber", "isManualAddress", "paymentRedirectUrl"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12461,6 +12461,13 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 				return it, err
 			}
 			it.IsManualAddress = data
+		case "paymentRedirectUrl":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("paymentRedirectUrl"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PaymentRedirectURL = data
 		}
 	}
 	return it, nil
