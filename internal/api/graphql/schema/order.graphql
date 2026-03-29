@@ -105,6 +105,11 @@ extend type Query {
 extend type Mutation {
     createOrder(input: CreateOrderInput!): Order! @auth
     updateOrder(id: ID!, input: UpdateOrderInput!): Order! @admin
+
+    # Push notification token management
+    registerLiveActivityToken(orderId: ID!, pushToken: String!): Boolean! @auth
+    registerDeviceToken(deviceToken: String!, platform: String!): Boolean! @auth
+    unregisterDeviceToken(deviceToken: String!): Boolean! @auth
 }
 
 extend type Subscription {

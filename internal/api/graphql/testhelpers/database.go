@@ -169,7 +169,6 @@ func (td *TestDatabase) TruncateAllTables(t *testing.T) {
 		"products",
 		"product_category_translations",
 		"product_categories",
-		"refresh_tokens",
 		"address_distances",
 		"users",
 	}

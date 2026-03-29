@@ -21,32 +21,38 @@ import (
 	"tsb-service/internal/api/graphql/directives"
 	addressApplication "tsb-service/internal/modules/address/application"
 	couponApplication "tsb-service/internal/modules/coupon/application"
+	notificationApplication "tsb-service/internal/modules/notification/application"
 	orderApplication "tsb-service/internal/modules/order/application"
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	productApplication "tsb-service/internal/modules/product/application"
 	restaurantApplication "tsb-service/internal/modules/restaurant/application"
 	userApplication "tsb-service/internal/modules/user/application"
 	"tsb-service/internal/shared/middleware"
+	"tsb-service/pkg/apns"
 	"tsb-service/pkg/pubsub"
 	"tsb-service/pkg/utils"
 )
 
 type Resolver struct {
-	Broker            *pubsub.Broker
-	AddressService    addressApplication.AddressService
-	CouponService     couponApplication.CouponService
-	OrderService      orderApplication.OrderService
-	PaymentService    paymentApplication.PaymentService
-	ProductService    productApplication.ProductService
-	RestaurantService restaurantApplication.RestaurantService
-	UserService       userApplication.UserService
+	Broker              *pubsub.Broker
+	APNsClient          *apns.Client // nil if APNs not configured
+	AddressService      addressApplication.AddressService
+	CouponService       couponApplication.CouponService
+	NotificationService notificationApplication.NotificationService
+	OrderService        orderApplication.OrderService
+	PaymentService      paymentApplication.PaymentService
+	ProductService      productApplication.ProductService
+	RestaurantService   restaurantApplication.RestaurantService
+	UserService         userApplication.UserService
 }
 
 // NewResolver constructs the Resolver with required services.
 func NewResolver(
 	broker *pubsub.Broker,
+	apnsClient *apns.Client,
 	addressService addressApplication.AddressService,
 	couponService couponApplication.CouponService,
+	notificationService notificationApplication.NotificationService,
 	orderService orderApplication.OrderService,
 	paymentService paymentApplication.PaymentService,
 	productService productApplication.ProductService,
@@ -54,14 +60,16 @@ func NewResolver(
 	userService userApplication.UserService,
 ) *Resolver {
 	return &Resolver{
-		Broker:            broker,
-		AddressService:    addressService,
-		CouponService:     couponService,
-		OrderService:      orderService,
-		PaymentService:    paymentService,
-		ProductService:    productService,
-		RestaurantService: restaurantService,
-		UserService:       userService,
+		Broker:              broker,
+		APNsClient:          apnsClient,
+		AddressService:      addressService,
+		CouponService:       couponService,
+		NotificationService: notificationService,
+		OrderService:        orderService,
+		PaymentService:      paymentService,
+		ProductService:      productService,
+		RestaurantService:   restaurantService,
+		UserService:         userService,
 	}
 }
 

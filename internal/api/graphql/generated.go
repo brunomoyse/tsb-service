@@ -121,22 +121,25 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CancelDeletionRequest func(childComplexity int) int
-		CreateCoupon          func(childComplexity int, input model.CreateCouponInput) int
-		CreateOrder           func(childComplexity int, input model.CreateOrderInput) int
-		CreateProduct         func(childComplexity int, input model.CreateProductInput) int
-		CreateProductChoice   func(childComplexity int, input model.CreateProductChoiceInput) int
-		DeleteProductChoice   func(childComplexity int, id uuid.UUID) int
-		RequestDeletion       func(childComplexity int) int
-		UpdateCoupon          func(childComplexity int, id uuid.UUID, input model.UpdateCouponInput) int
-		UpdateMe              func(childComplexity int, input model.UpdateUserInput) int
-		UpdateOpeningHours    func(childComplexity int, hours model.OpeningHoursInput) int
-		UpdateOrder           func(childComplexity int, id uuid.UUID, input model.UpdateOrderInput) int
-		UpdateOrderingEnabled func(childComplexity int, enabled bool) int
-		UpdatePaymentStatus   func(childComplexity int, orderID uuid.UUID, status string) int
-		UpdateProduct         func(childComplexity int, id uuid.UUID, input model.UpdateProductInput) int
-		UpdateProductChoice   func(childComplexity int, id uuid.UUID, input model.UpdateProductChoiceInput) int
-		UpdateTicketTemplates func(childComplexity int, templates map[string]any) int
+		CancelDeletionRequest     func(childComplexity int) int
+		CreateCoupon              func(childComplexity int, input model.CreateCouponInput) int
+		CreateOrder               func(childComplexity int, input model.CreateOrderInput) int
+		CreateProduct             func(childComplexity int, input model.CreateProductInput) int
+		CreateProductChoice       func(childComplexity int, input model.CreateProductChoiceInput) int
+		DeleteProductChoice       func(childComplexity int, id uuid.UUID) int
+		RegisterDeviceToken       func(childComplexity int, deviceToken string, platform string) int
+		RegisterLiveActivityToken func(childComplexity int, orderID uuid.UUID, pushToken string) int
+		RequestDeletion           func(childComplexity int) int
+		UnregisterDeviceToken     func(childComplexity int, deviceToken string) int
+		UpdateCoupon              func(childComplexity int, id uuid.UUID, input model.UpdateCouponInput) int
+		UpdateMe                  func(childComplexity int, input model.UpdateUserInput) int
+		UpdateOpeningHours        func(childComplexity int, hours model.OpeningHoursInput) int
+		UpdateOrder               func(childComplexity int, id uuid.UUID, input model.UpdateOrderInput) int
+		UpdateOrderingEnabled     func(childComplexity int, enabled bool) int
+		UpdatePaymentStatus       func(childComplexity int, orderID uuid.UUID, status string) int
+		UpdateProduct             func(childComplexity int, id uuid.UUID, input model.UpdateProductInput) int
+		UpdateProductChoice       func(childComplexity int, id uuid.UUID, input model.UpdateProductChoiceInput) int
+		UpdateTicketTemplates     func(childComplexity int, templates map[string]any) int
 	}
 
 	Order struct {
@@ -324,6 +327,9 @@ type MutationResolver interface {
 	UpdateCoupon(ctx context.Context, id uuid.UUID, input model.UpdateCouponInput) (*model.Coupon, error)
 	CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error)
 	UpdateOrder(ctx context.Context, id uuid.UUID, input model.UpdateOrderInput) (*model.Order, error)
+	RegisterLiveActivityToken(ctx context.Context, orderID uuid.UUID, pushToken string) (bool, error)
+	RegisterDeviceToken(ctx context.Context, deviceToken string, platform string) (bool, error)
+	UnregisterDeviceToken(ctx context.Context, deviceToken string) (bool, error)
 	UpdatePaymentStatus(ctx context.Context, orderID uuid.UUID, status string) (*model.Payment, error)
 	CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error)
 	UpdateProduct(ctx context.Context, id uuid.UUID, input model.UpdateProductInput) (*model.Product, error)
@@ -770,12 +776,45 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteProductChoice(childComplexity, args["id"].(uuid.UUID)), true
+	case "Mutation.registerDeviceToken":
+		if e.ComplexityRoot.Mutation.RegisterDeviceToken == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_registerDeviceToken_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.RegisterDeviceToken(childComplexity, args["deviceToken"].(string), args["platform"].(string)), true
+	case "Mutation.registerLiveActivityToken":
+		if e.ComplexityRoot.Mutation.RegisterLiveActivityToken == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_registerLiveActivityToken_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.RegisterLiveActivityToken(childComplexity, args["orderId"].(uuid.UUID), args["pushToken"].(string)), true
 	case "Mutation.requestDeletion":
 		if e.ComplexityRoot.Mutation.RequestDeletion == nil {
 			break
 		}
 
 		return e.ComplexityRoot.Mutation.RequestDeletion(childComplexity), true
+	case "Mutation.unregisterDeviceToken":
+		if e.ComplexityRoot.Mutation.UnregisterDeviceToken == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unregisterDeviceToken_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UnregisterDeviceToken(childComplexity, args["deviceToken"].(string)), true
 	case "Mutation.updateCoupon":
 		if e.ComplexityRoot.Mutation.UpdateCoupon == nil {
 			break
@@ -1994,6 +2033,49 @@ func (ec *executionContext) field_Mutation_deleteProductChoice_args(ctx context.
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_registerDeviceToken_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "deviceToken", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["deviceToken"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "platform", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["platform"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_registerLiveActivityToken_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "orderId", ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["orderId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "pushToken", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["pushToken"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unregisterDeviceToken_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "deviceToken", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["deviceToken"] = arg0
 	return args, nil
 }
 
@@ -4153,6 +4235,168 @@ func (ec *executionContext) fieldContext_Mutation_updateOrder(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateOrder_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_registerLiveActivityToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_registerLiveActivityToken,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().RegisterLiveActivityToken(ctx, fc.Args["orderId"].(uuid.UUID), fc.Args["pushToken"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_registerLiveActivityToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_registerLiveActivityToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_registerDeviceToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_registerDeviceToken,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().RegisterDeviceToken(ctx, fc.Args["deviceToken"].(string), fc.Args["platform"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_registerDeviceToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_registerDeviceToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_unregisterDeviceToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_unregisterDeviceToken,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UnregisterDeviceToken(ctx, fc.Args["deviceToken"].(string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_unregisterDeviceToken(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_unregisterDeviceToken_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -13500,6 +13744,27 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateOrder":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateOrder(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "registerLiveActivityToken":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_registerLiveActivityToken(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "registerDeviceToken":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_registerDeviceToken(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unregisterDeviceToken":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unregisterDeviceToken(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
