@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -205,10 +206,13 @@ func AuthorizeProxyHandler(c *gin.Context) {
 	}
 
 	// Rewrite the authorize URL to use the internal Zitadel address (if configured)
-	// to avoid Cloudflare Tunnel hairpin (public domain → Cloudflare → Tunnel → same server → 502)
-	if internalURL := getZitadelURL(); internalURL != "" {
+	// to avoid Cloudflare Tunnel hairpin (public domain → Cloudflare → Tunnel → same server → 502).
+	// Preserve the original host for the Host header (Zitadel uses virtual hosting).
+	var originalHost string
+	if internalURL := os.Getenv("ZITADEL_INTERNAL_URL"); internalURL != "" {
 		if parsed, err := url.Parse(req.AuthorizeURL); err == nil {
 			if internal, err2 := url.Parse(internalURL); err2 == nil {
+				originalHost = parsed.Host
 				parsed.Scheme = internal.Scheme
 				parsed.Host = internal.Host
 				req.AuthorizeURL = parsed.String()
@@ -219,13 +223,24 @@ func AuthorizeProxyHandler(c *gin.Context) {
 	// Follow the redirect chain to capture the authRequestID from the Location header
 	var redirectURL string
 	httpClient := &http.Client{
+		Timeout: 10 * time.Second,
 		CheckRedirect: func(r *http.Request, via []*http.Request) error {
 			redirectURL = r.URL.String()
 			return http.ErrUseLastResponse
 		},
 	}
 
-	resp, err := httpClient.Get(req.AuthorizeURL)
+	httpReq, err := http.NewRequest("GET", req.AuthorizeURL, nil)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "invalid authorize URL"})
+		return
+	}
+	// Set the original public Host header so Zitadel's virtual hosting resolves correctly
+	if originalHost != "" {
+		httpReq.Host = originalHost
+	}
+
+	resp, err := httpClient.Do(httpReq)
 	if err != nil {
 		logging.FromContext(c.Request.Context()).Error("authorize proxy failed", zap.Error(err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": "failed to reach authorization server"})
