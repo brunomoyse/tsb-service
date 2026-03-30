@@ -44,6 +44,7 @@ import (
 	restaurantInfrastructure "tsb-service/internal/modules/restaurant/infrastructure"
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/apns"
+	"tsb-service/pkg/fcm"
 	"tsb-service/pkg/db"
 )
 
@@ -166,6 +167,19 @@ func main() {
 		}
 	}
 
+	// FCM client for Android push notifications (optional — non-fatal if not configured)
+	// Uses GOOGLE_APPLICATION_CREDENTIALS env var for service account authentication
+	var fcmClient *fcm.Client
+	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
+		var fcmErr error
+		fcmClient, fcmErr = fcm.NewClient()
+		if fcmErr != nil {
+			zap.L().Error("failed to initialize FCM client", zap.Error(fcmErr))
+		} else {
+			zap.L().Info("FCM client initialized")
+		}
+	}
+
 	orderHandler := orderInterfaces.NewOrderHandler(orderService, userService, productService)
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService, broker)
 
@@ -227,7 +241,7 @@ func main() {
 
 	// GraphQL
 	rootResolver := resolver.NewResolver(
-		broker, apnsClient,
+		broker, apnsClient, fcmClient,
 		addressService, couponService, notificationService, orderService, paymentService, productService, restaurantService, userService,
 	)
 	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL, "capacitor://localhost"}, oidcVerifier)
