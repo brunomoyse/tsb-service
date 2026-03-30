@@ -82,7 +82,11 @@ func (c *Client) UpdateLiveActivity(pushToken string, contentState map[string]an
 	return nil
 }
 
+// ErrTokenInvalid indicates the device token is no longer valid and should be removed.
+var ErrTokenInvalid = fmt.Errorf("device token is invalid")
+
 // SendAlert sends a standard alert push notification (visible in Notification Center).
+// Returns ErrTokenInvalid if APNs reports the token as bad/unregistered.
 func (c *Client) SendAlert(deviceToken, title, body string, data map[string]string) error {
 	alert := map[string]string{
 		"title": title,
@@ -122,6 +126,9 @@ func (c *Client) SendAlert(deviceToken, title, body string, data map[string]stri
 			zap.Int("status", res.StatusCode),
 			zap.String("reason", res.Reason),
 		)
+		if res.Reason == apns2.ReasonBadDeviceToken || res.Reason == apns2.ReasonUnregistered || res.Reason == apns2.ReasonExpiredToken {
+			return ErrTokenInvalid
+		}
 	}
 	return nil
 }

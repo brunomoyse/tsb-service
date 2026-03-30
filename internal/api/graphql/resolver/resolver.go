@@ -29,6 +29,7 @@ import (
 	userApplication "tsb-service/internal/modules/user/application"
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/apns"
+	"tsb-service/pkg/fcm"
 	"tsb-service/pkg/pubsub"
 	"tsb-service/pkg/utils"
 )
@@ -36,6 +37,7 @@ import (
 type Resolver struct {
 	Broker              *pubsub.Broker
 	APNsClient          *apns.Client // nil if APNs not configured
+	FCMClient           *fcm.Client  // nil if FCM not configured
 	AddressService      addressApplication.AddressService
 	CouponService       couponApplication.CouponService
 	NotificationService notificationApplication.NotificationService
@@ -50,6 +52,7 @@ type Resolver struct {
 func NewResolver(
 	broker *pubsub.Broker,
 	apnsClient *apns.Client,
+	fcmClient *fcm.Client,
 	addressService addressApplication.AddressService,
 	couponService couponApplication.CouponService,
 	notificationService notificationApplication.NotificationService,
@@ -62,6 +65,7 @@ func NewResolver(
 	return &Resolver{
 		Broker:              broker,
 		APNsClient:          apnsClient,
+		FCMClient:           fcmClient,
 		AddressService:      addressService,
 		CouponService:       couponService,
 		NotificationService: notificationService,

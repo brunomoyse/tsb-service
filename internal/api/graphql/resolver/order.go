@@ -7,6 +7,7 @@ package resolver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"tsb-service/internal/api/graphql/model"
 	addressApplication "tsb-service/internal/modules/address/application"
 	addressDomain "tsb-service/internal/modules/address/domain"
+	notificationApplication "tsb-service/internal/modules/notification/application"
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	paymentApplication "tsb-service/internal/modules/payment/application"
@@ -23,6 +25,7 @@ import (
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/apns"
+	"tsb-service/pkg/fcm"
 	es "tsb-service/pkg/email/scaleway"
 	"tsb-service/pkg/utils"
 
@@ -615,6 +618,52 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			// Cleanup tokens after terminal status
 			if isTerminal {
 				_ = r.NotificationService.CleanupLiveActivityTokens(context.Background(), id)
+			}
+		}()
+	}
+
+	// Send standard alert push notifications to user's devices (non-blocking)
+	if r.APNsClient != nil {
+		go func() {
+			deviceTokens, tokenErr := r.NotificationService.GetDeviceTokens(context.Background(), o.UserID)
+			if tokenErr != nil || len(deviceTokens) == 0 {
+				return
+			}
+
+			msg := notificationApplication.GetOrderStatusNotification(o.OrderStatus, o.Language, string(o.OrderType))
+			if msg.Body == "" {
+				return
+			}
+
+			data := map[string]string{
+				"orderId": id.String(),
+				"status":  string(o.OrderStatus),
+			}
+
+			for _, dt := range deviceTokens {
+				if dt.Platform == "ios" && r.APNsClient != nil {
+					if pushErr := r.APNsClient.SendAlert(dt.DeviceToken, msg.Title, msg.Body, data); pushErr != nil {
+						if errors.Is(pushErr, apns.ErrTokenInvalid) {
+							_ = r.NotificationService.UnregisterDeviceToken(context.Background(), o.UserID, dt.DeviceToken)
+						} else {
+							zap.L().Error("failed to send alert push",
+								zap.String("order_id", id.String()),
+								zap.Error(pushErr),
+							)
+						}
+					}
+				} else if dt.Platform == "android" && r.FCMClient != nil {
+					if pushErr := r.FCMClient.SendAlert(dt.DeviceToken, msg.Title, msg.Body, data); pushErr != nil {
+						if errors.Is(pushErr, fcm.ErrTokenInvalid) {
+							_ = r.NotificationService.UnregisterDeviceToken(context.Background(), o.UserID, dt.DeviceToken)
+						} else {
+							zap.L().Error("failed to send FCM push",
+								zap.String("order_id", id.String()),
+								zap.Error(pushErr),
+							)
+						}
+					}
+				}
 			}
 		}()
 	}
