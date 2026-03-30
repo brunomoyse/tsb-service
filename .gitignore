@@ -3,5 +3,6 @@
 .claude/
 
 # Build artifacts
+/app
 main
 tsb-service

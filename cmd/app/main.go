@@ -150,6 +150,19 @@ func main() {
 	}
 	zap.L().Info("OIDC verifier initialized", zap.String("issuer", zitadelIssuer))
 
+	// Initialize auth proxy handlers with pre-resolved configuration
+	auth.Init(auth.Config{
+		ZitadelIssuer:      zitadelIssuer,
+		ZitadelInternalURL: zitadelInternalURL,
+		ZitadelClientID:    zitadelClientID,
+		NativeClientID:     os.Getenv("ZITADEL_NATIVE_CLIENT_ID"),
+		ServicePAT:         os.Getenv("ZITADEL_SERVICE_PAT"),
+		AdminPAT:           os.Getenv("ZITADEL_ADMIN_PAT"),
+		AppBaseURL:         os.Getenv("APP_BASE_URL"),
+		IdPGoogleID:        os.Getenv("ZITADEL_IDP_GOOGLE_ID"),
+		IdPAppleID:         os.Getenv("ZITADEL_IDP_APPLE_ID"),
+	})
+
 	// APNs client for iOS push notifications (optional — non-fatal if not configured)
 	var apnsClient *apns.Client
 	apnsKeyPath := os.Getenv("APNS_AUTH_KEY_PATH")
