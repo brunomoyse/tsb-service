@@ -189,9 +189,14 @@ func toDomainTranslationsPtr(in []*model.TranslationInput) []productDomain.Trans
 	return out
 }
 
-func toGQLRestaurantConfig(orderingEnabled bool, openingHoursRaw json.RawMessage, ticketTemplatesRaw json.RawMessage, updatedAt time.Time) *model.RestaurantConfig {
+func toGQLRestaurantConfig(orderingEnabled bool, openingHoursRaw json.RawMessage, orderingHoursRaw json.RawMessage, ticketTemplatesRaw json.RawMessage, updatedAt time.Time) *model.RestaurantConfig {
 	var openingHours map[string]any
 	_ = json.Unmarshal(openingHoursRaw, &openingHours)
+
+	var orderingHours map[string]any
+	if len(orderingHoursRaw) > 0 && string(orderingHoursRaw) != "null" {
+		_ = json.Unmarshal(orderingHoursRaw, &orderingHours)
+	}
 
 	var ticketTemplates map[string]any
 	_ = json.Unmarshal(ticketTemplatesRaw, &ticketTemplates)
@@ -199,6 +204,7 @@ func toGQLRestaurantConfig(orderingEnabled bool, openingHoursRaw json.RawMessage
 	return &model.RestaurantConfig{
 		OrderingEnabled: orderingEnabled,
 		OpeningHours:    openingHours,
+		OrderingHours:   orderingHours,
 		TicketTemplates: ticketTemplates,
 		UpdatedAt:       updatedAt,
 	}
@@ -329,15 +335,19 @@ func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.R
 		return fmt.Errorf("preferred ready time must be aligned to 15-minute slots")
 	}
 
-	hours, err := config.GetOpeningHours()
-	if err != nil {
-		return fmt.Errorf("failed to parse opening hours")
+	// Use ordering hours if set, otherwise fall back to opening hours
+	hours, err := config.GetOrderingHours()
+	if err != nil || hours == nil {
+		hours, err = config.GetOpeningHours()
+		if err != nil {
+			return fmt.Errorf("failed to parse opening hours")
+		}
 	}
 
 	dayName := strings.ToLower(nowLocal.Weekday().String())
 	schedule, exists := hours[dayName]
 	if !exists || schedule == nil {
-		return fmt.Errorf("restaurant is closed today")
+		return fmt.Errorf("ordering is closed today")
 	}
 
 	slotMins := slot.Hour()*60 + slot.Minute()

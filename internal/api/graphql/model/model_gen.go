@@ -264,11 +264,13 @@ type Query struct {
 }
 
 type RestaurantConfig struct {
-	OrderingEnabled bool           `json:"orderingEnabled"`
-	OpeningHours    map[string]any `json:"openingHours"`
-	TicketTemplates map[string]any `json:"ticketTemplates"`
-	IsCurrentlyOpen bool           `json:"isCurrentlyOpen"`
-	UpdatedAt       time.Time      `json:"updatedAt"`
+	OrderingEnabled         bool           `json:"orderingEnabled"`
+	OpeningHours            map[string]any `json:"openingHours"`
+	OrderingHours           map[string]any `json:"orderingHours,omitempty"`
+	TicketTemplates         map[string]any `json:"ticketTemplates"`
+	IsCurrentlyOpen         bool           `json:"isCurrentlyOpen"`
+	IsOrderingCurrentlyOpen bool           `json:"isOrderingCurrentlyOpen"`
+	UpdatedAt               time.Time      `json:"updatedAt"`
 }
 
 type Street struct {

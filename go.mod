@@ -22,7 +22,6 @@ require (
 	github.com/zitadel/zitadel-go/v3 v3.28.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/time v0.15.0
-	google.golang.org/api v0.273.0
 )
 
 require (
@@ -118,6 +117,7 @@ require (
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/tools v0.42.0 // indirect
+	google.golang.org/api v0.273.0 // indirect
 	google.golang.org/appengine/v2 v2.0.6 // indirect
 	google.golang.org/genproto v0.0.0-20260316180232-0b37fe3546d5 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260316180232-0b37fe3546d5 // indirect

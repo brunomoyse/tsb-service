@@ -23,6 +23,7 @@ type OpeningHours map[string]*DaySchedule
 type RestaurantConfig struct {
 	OrderingEnabled bool            `db:"ordering_enabled" json:"orderingEnabled"`
 	OpeningHours    json.RawMessage `db:"opening_hours" json:"openingHours"`
+	OrderingHours   json.RawMessage `db:"ordering_hours" json:"orderingHours"`
 	TicketTemplates json.RawMessage `db:"ticket_templates" json:"ticketTemplates"`
 	UpdatedAt       time.Time       `db:"updated_at" json:"updatedAt"`
 }
@@ -43,7 +44,34 @@ func (c *RestaurantConfig) IsCurrentlyOpen(now time.Time) bool {
 	if err != nil {
 		return false
 	}
+	return isWithinSchedule(hours, now)
+}
 
+// GetOrderingHours parses the JSONB ordering_hours into a typed map.
+// Returns nil if ordering_hours is not set.
+func (c *RestaurantConfig) GetOrderingHours() (OpeningHours, error) {
+	if len(c.OrderingHours) == 0 || string(c.OrderingHours) == "null" {
+		return nil, nil
+	}
+	var hours OpeningHours
+	if err := json.Unmarshal(c.OrderingHours, &hours); err != nil {
+		return nil, fmt.Errorf("parse ordering hours: %w", err)
+	}
+	return hours, nil
+}
+
+// IsOrderingCurrentlyOpen checks if ordering is within scheduled hours.
+// Falls back to opening hours if ordering hours are not configured.
+func (c *RestaurantConfig) IsOrderingCurrentlyOpen(now time.Time) bool {
+	orderingHours, err := c.GetOrderingHours()
+	if err != nil || orderingHours == nil {
+		return c.IsCurrentlyOpen(now)
+	}
+	return isWithinSchedule(orderingHours, now)
+}
+
+// isWithinSchedule checks if the given time falls within any period of the schedule for that day.
+func isWithinSchedule(hours OpeningHours, now time.Time) bool {
 	dayName := strings.ToLower(now.Weekday().String())
 	schedule, exists := hours[dayName]
 	if !exists || schedule == nil {
@@ -52,12 +80,10 @@ func (c *RestaurantConfig) IsCurrentlyOpen(now time.Time) bool {
 
 	currentTime := now.Format("15:04")
 
-	// Check lunch period
 	if currentTime >= schedule.Open && currentTime < schedule.Close {
 		return true
 	}
 
-	// Check dinner period if defined
 	if schedule.DinnerOpen != "" && schedule.DinnerClose != "" {
 		if currentTime >= schedule.DinnerOpen && currentTime < schedule.DinnerClose {
 			return true
@@ -67,10 +93,10 @@ func (c *RestaurantConfig) IsCurrentlyOpen(now time.Time) bool {
 	return false
 }
 
-// IsOrderingAllowed returns true if ordering is enabled AND the restaurant is currently open.
+// IsOrderingAllowed returns true if ordering is enabled AND within ordering schedule.
 func (c *RestaurantConfig) IsOrderingAllowed(now time.Time) bool {
 	if !c.OrderingEnabled {
 		return false
 	}
-	return c.IsCurrentlyOpen(now)
+	return c.IsOrderingCurrentlyOpen(now)
 }

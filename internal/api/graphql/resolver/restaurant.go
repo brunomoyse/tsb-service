@@ -20,7 +20,7 @@ func (r *mutationResolver) UpdateOrderingEnabled(ctx context.Context, enabled bo
 	if err != nil {
 		return nil, fmt.Errorf("update ordering enabled: %w", err)
 	}
-	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.TicketTemplates, config.UpdatedAt)
+	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.TicketTemplates, config.UpdatedAt)
 	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
 	return gqlConfig, nil
 }
@@ -45,7 +45,32 @@ func (r *mutationResolver) UpdateOpeningHours(ctx context.Context, hours model.O
 	if err != nil {
 		return nil, fmt.Errorf("update opening hours: %w", err)
 	}
-	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.TicketTemplates, config.UpdatedAt)
+	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.TicketTemplates, config.UpdatedAt)
+	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
+	return gqlConfig, nil
+}
+
+// UpdateOrderingHours is the resolver for the updateOrderingHours field.
+func (r *mutationResolver) UpdateOrderingHours(ctx context.Context, hours model.OpeningHoursInput) (*model.RestaurantConfig, error) {
+	hoursMap := map[string]any{
+		"monday":    toScheduleMap(hours.Monday),
+		"tuesday":   toScheduleMap(hours.Tuesday),
+		"wednesday": toScheduleMap(hours.Wednesday),
+		"thursday":  toScheduleMap(hours.Thursday),
+		"friday":    toScheduleMap(hours.Friday),
+		"saturday":  toScheduleMap(hours.Saturday),
+		"sunday":    toScheduleMap(hours.Sunday),
+	}
+	hoursJSON, err := json.Marshal(hoursMap)
+	if err != nil {
+		return nil, fmt.Errorf("marshal ordering hours: %w", err)
+	}
+
+	config, err := r.RestaurantService.UpdateOrderingHours(ctx, hoursJSON)
+	if err != nil {
+		return nil, fmt.Errorf("update ordering hours: %w", err)
+	}
+	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.TicketTemplates, config.UpdatedAt)
 	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
 	return gqlConfig, nil
 }
@@ -60,7 +85,7 @@ func (r *mutationResolver) UpdateTicketTemplates(ctx context.Context, templates 
 	if err != nil {
 		return nil, fmt.Errorf("update ticket templates: %w", err)
 	}
-	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.TicketTemplates, config.UpdatedAt)
+	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.TicketTemplates, config.UpdatedAt)
 	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
 	return gqlConfig, nil
 }
@@ -71,7 +96,7 @@ func (r *queryResolver) RestaurantConfig(ctx context.Context) (*model.Restaurant
 	if err != nil {
 		return nil, fmt.Errorf("get restaurant config: %w", err)
 	}
-	return toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.TicketTemplates, config.UpdatedAt), nil
+	return toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.TicketTemplates, config.UpdatedAt), nil
 }
 
 // IsCurrentlyOpen is the resolver for the isCurrentlyOpen field.
@@ -82,6 +107,17 @@ func (r *restaurantConfigResolver) IsCurrentlyOpen(ctx context.Context, obj *mod
 		return false, fmt.Errorf("get restaurant config: %w", err)
 	}
 	return config.IsCurrentlyOpen(time.Now()), nil
+}
+
+// IsOrderingCurrentlyOpen is the resolver for the isOrderingCurrentlyOpen field.
+// Returns whether ordering is within the configured ordering hours schedule.
+// Falls back to opening hours if ordering hours are not set.
+func (r *restaurantConfigResolver) IsOrderingCurrentlyOpen(ctx context.Context, obj *model.RestaurantConfig) (bool, error) {
+	config, err := r.RestaurantService.GetConfig(ctx)
+	if err != nil {
+		return false, fmt.Errorf("get restaurant config: %w", err)
+	}
+	return config.IsOrderingCurrentlyOpen(time.Now()), nil
 }
 
 // RestaurantConfigUpdated is the resolver for the restaurantConfigUpdated field.

@@ -13,6 +13,7 @@ type RestaurantService interface {
 	IsDevMode() bool
 	UpdateOrderingEnabled(ctx context.Context, enabled bool) (*domain.RestaurantConfig, error)
 	UpdateOpeningHours(ctx context.Context, hours json.RawMessage) (*domain.RestaurantConfig, error)
+	UpdateOrderingHours(ctx context.Context, hours json.RawMessage) (*domain.RestaurantConfig, error)
 	UpdateTicketTemplates(ctx context.Context, templates json.RawMessage) (*domain.RestaurantConfig, error)
 }
 
@@ -51,6 +52,10 @@ func (s *restaurantService) UpdateOrderingEnabled(ctx context.Context, enabled b
 
 func (s *restaurantService) UpdateOpeningHours(ctx context.Context, hours json.RawMessage) (*domain.RestaurantConfig, error) {
 	return s.repo.UpdateOpeningHours(ctx, hours)
+}
+
+func (s *restaurantService) UpdateOrderingHours(ctx context.Context, hours json.RawMessage) (*domain.RestaurantConfig, error) {
+	return s.repo.UpdateOrderingHours(ctx, hours)
 }
 
 func (s *restaurantService) UpdateTicketTemplates(ctx context.Context, templates json.RawMessage) (*domain.RestaurantConfig, error) {

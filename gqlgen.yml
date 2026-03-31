@@ -204,6 +204,8 @@ models:
     fields:
       isCurrentlyOpen:
         resolver: true
+      isOrderingCurrentlyOpen:
+        resolver: true
 
   User:
     fields:
