@@ -8,8 +8,10 @@ type DaySchedule {
 type RestaurantConfig {
     orderingEnabled: Boolean!
     openingHours: JSON!
+    orderingHours: JSON
     ticketTemplates: JSON!
     isCurrentlyOpen: Boolean!
+    isOrderingCurrentlyOpen: Boolean!
     updatedAt: DateTime!
 }
 
@@ -37,6 +39,7 @@ extend type Query {
 extend type Mutation {
     updateOrderingEnabled(enabled: Boolean!): RestaurantConfig! @admin
     updateOpeningHours(hours: OpeningHoursInput!): RestaurantConfig! @admin
+    updateOrderingHours(hours: OpeningHoursInput!): RestaurantConfig! @admin
     updateTicketTemplates(templates: JSON!): RestaurantConfig! @admin
 }
 

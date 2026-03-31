@@ -25,8 +25,8 @@ import (
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/apns"
-	"tsb-service/pkg/fcm"
 	es "tsb-service/pkg/email/scaleway"
+	"tsb-service/pkg/fcm"
 	"tsb-service/pkg/utils"
 
 	"github.com/google/uuid"
@@ -47,7 +47,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 
 		now := time.Now()
-		isOpenNow := config.IsCurrentlyOpen(now)
+		isOpenNow := config.IsOrderingCurrentlyOpen(now)
 		if err := validatePreferredReadyTime(input.PreferredReadyTime, config, now, isOpenNow); err != nil {
 			return nil, err
 		}
