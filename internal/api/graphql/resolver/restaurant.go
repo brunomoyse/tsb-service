@@ -75,15 +75,13 @@ func (r *queryResolver) RestaurantConfig(ctx context.Context) (*model.Restaurant
 }
 
 // IsCurrentlyOpen is the resolver for the isCurrentlyOpen field.
+// Returns whether the restaurant is open right now based on the opening hours schedule.
 func (r *restaurantConfigResolver) IsCurrentlyOpen(ctx context.Context, obj *model.RestaurantConfig) (bool, error) {
-	if r.RestaurantService.IsDevMode() {
-		return true, nil
-	}
 	config, err := r.RestaurantService.GetConfig(ctx)
 	if err != nil {
 		return false, fmt.Errorf("get restaurant config: %w", err)
 	}
-	return config.IsOrderingAllowed(time.Now()), nil
+	return config.IsCurrentlyOpen(time.Now()), nil
 }
 
 // RestaurantConfigUpdated is the resolver for the restaurantConfigUpdated field.
