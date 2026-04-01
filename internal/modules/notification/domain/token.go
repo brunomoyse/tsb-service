@@ -22,6 +22,7 @@ type DevicePushToken struct {
 	UserID      uuid.UUID `db:"user_id"`
 	DeviceToken string    `db:"device_token"`
 	Platform    string    `db:"platform"` // "ios" or "android"
+	Role        string    `db:"role"`     // "user" or "admin"
 	CreatedAt   time.Time `db:"created_at"`
 	UpdatedAt   time.Time `db:"updated_at"`
 }
@@ -35,7 +36,8 @@ type NotificationRepository interface {
 	DeleteExpiredLiveActivityTokens(ctx context.Context) error
 
 	// Device push tokens (per-user)
-	SaveDeviceToken(ctx context.Context, userID uuid.UUID, deviceToken, platform string) error
+	SaveDeviceToken(ctx context.Context, userID uuid.UUID, deviceToken, platform, role string) error
 	FindDeviceTokensByUserID(ctx context.Context, userID uuid.UUID) ([]DevicePushToken, error)
+	FindDeviceTokensByRole(ctx context.Context, role string) ([]DevicePushToken, error)
 	DeleteDeviceToken(ctx context.Context, userID uuid.UUID, deviceToken string) error
 }

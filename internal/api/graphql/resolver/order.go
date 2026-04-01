@@ -384,6 +384,48 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	// 11) Publish subscription
 	r.Broker.Publish("orderCreated", gql)
 
+	// 12) Send push notification to admin devices (non-blocking)
+	if r.FCMClient != nil || r.APNsClient != nil {
+		go func() {
+			adminTokens, tokenErr := r.NotificationService.GetAdminDeviceTokens(context.Background())
+			if tokenErr != nil || len(adminTokens) == 0 {
+				return
+			}
+
+			msg := notificationApplication.GetNewOrderNotification(orderLang, string(odType), order.TotalPrice.StringFixed(2))
+			data := map[string]string{
+				"orderId": order.ID.String(),
+				"type":    "new_order",
+			}
+
+			for _, dt := range adminTokens {
+				if dt.Platform == "android" && r.FCMClient != nil {
+					if pushErr := r.FCMClient.SendAlert(dt.DeviceToken, msg.Title, msg.Body, data); pushErr != nil {
+						if errors.Is(pushErr, fcm.ErrTokenInvalid) {
+							_ = r.NotificationService.UnregisterDeviceToken(context.Background(), dt.UserID, dt.DeviceToken)
+						} else {
+							zap.L().Error("failed to send admin FCM push",
+								zap.String("order_id", order.ID.String()),
+								zap.Error(pushErr),
+							)
+						}
+					}
+				} else if dt.Platform == "ios" && r.APNsClient != nil {
+					if pushErr := r.APNsClient.SendAlert(dt.DeviceToken, msg.Title, msg.Body, data); pushErr != nil {
+						if errors.Is(pushErr, apns.ErrTokenInvalid) {
+							_ = r.NotificationService.UnregisterDeviceToken(context.Background(), dt.UserID, dt.DeviceToken)
+						} else {
+							zap.L().Error("failed to send admin APNs push",
+								zap.String("order_id", order.ID.String()),
+								zap.Error(pushErr),
+							)
+						}
+					}
+				}
+			}
+		}()
+	}
+
 	return gql, nil
 }
 
@@ -715,7 +757,12 @@ func (r *mutationResolver) RegisterDeviceToken(ctx context.Context, deviceToken 
 		return false, fmt.Errorf("platform must be 'ios' or 'android'")
 	}
 
-	if err := r.NotificationService.RegisterDeviceToken(ctx, uid, deviceToken, platform); err != nil {
+	role := "user"
+	if utils.GetIsAdmin(ctx) {
+		role = "admin"
+	}
+
+	if err := r.NotificationService.RegisterDeviceToken(ctx, uid, deviceToken, platform, role); err != nil {
 		return false, fmt.Errorf("failed to register device token: %w", err)
 	}
 

@@ -66,15 +66,16 @@ func (r *notificationRepository) DeleteExpiredLiveActivityTokens(ctx context.Con
 
 // ──────────────────── Device Push Tokens ────────────────────
 
-func (r *notificationRepository) SaveDeviceToken(ctx context.Context, userID uuid.UUID, deviceToken, platform string) error {
+func (r *notificationRepository) SaveDeviceToken(ctx context.Context, userID uuid.UUID, deviceToken, platform, role string) error {
 	query := `
-		INSERT INTO device_push_tokens (user_id, device_token, platform)
-		VALUES ($1, $2, $3)
+		INSERT INTO device_push_tokens (user_id, device_token, platform, role)
+		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (user_id, device_token) DO UPDATE SET
 			platform = EXCLUDED.platform,
+			role = EXCLUDED.role,
 			updated_at = now()
 	`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID, deviceToken, platform)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID, deviceToken, platform, role)
 	if err != nil {
 		return fmt.Errorf("save device token: %w", err)
 	}
@@ -83,13 +84,26 @@ func (r *notificationRepository) SaveDeviceToken(ctx context.Context, userID uui
 
 func (r *notificationRepository) FindDeviceTokensByUserID(ctx context.Context, userID uuid.UUID) ([]domain.DevicePushToken, error) {
 	query := `
-		SELECT id, user_id, device_token, platform, created_at, updated_at
+		SELECT id, user_id, device_token, platform, role, created_at, updated_at
 		FROM device_push_tokens
 		WHERE user_id = $1
 	`
 	var tokens []domain.DevicePushToken
 	if err := r.pool.ForContext(ctx).SelectContext(ctx, &tokens, query, userID); err != nil {
 		return nil, fmt.Errorf("find device tokens: %w", err)
+	}
+	return tokens, nil
+}
+
+func (r *notificationRepository) FindDeviceTokensByRole(ctx context.Context, role string) ([]domain.DevicePushToken, error) {
+	query := `
+		SELECT id, user_id, device_token, platform, role, created_at, updated_at
+		FROM device_push_tokens
+		WHERE role = $1
+	`
+	var tokens []domain.DevicePushToken
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &tokens, query, role); err != nil {
+		return nil, fmt.Errorf("find device tokens by role: %w", err)
 	}
 	return tokens, nil
 }
