@@ -18,7 +18,7 @@ func NewRestaurantRepository(pool *db.DBPool) domain.RestaurantRepository {
 func (r *RestaurantRepository) GetConfig(ctx context.Context) (*domain.RestaurantConfig, error) {
 	var config domain.RestaurantConfig
 	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
-		`SELECT ordering_enabled, opening_hours, ordering_hours, ticket_templates, updated_at FROM restaurant_config WHERE id = TRUE`)
+		`SELECT ordering_enabled, opening_hours, ordering_hours, updated_at FROM restaurant_config WHERE id = TRUE`)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func (r *RestaurantRepository) UpdateOrderingEnabled(ctx context.Context, enable
 	var config domain.RestaurantConfig
 	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
 		`UPDATE restaurant_config SET ordering_enabled = $1, updated_at = NOW() WHERE id = TRUE
-		 RETURNING ordering_enabled, opening_hours, ordering_hours, ticket_templates, updated_at`, enabled)
+		 RETURNING ordering_enabled, opening_hours, ordering_hours, updated_at`, enabled)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (r *RestaurantRepository) UpdateOpeningHours(ctx context.Context, hours jso
 	var config domain.RestaurantConfig
 	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
 		`UPDATE restaurant_config SET opening_hours = $1, updated_at = NOW() WHERE id = TRUE
-		 RETURNING ordering_enabled, opening_hours, ordering_hours, ticket_templates, updated_at`, hours)
+		 RETURNING ordering_enabled, opening_hours, ordering_hours, updated_at`, hours)
 	if err != nil {
 		return nil, err
 	}
@@ -51,18 +51,7 @@ func (r *RestaurantRepository) UpdateOrderingHours(ctx context.Context, hours js
 	var config domain.RestaurantConfig
 	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
 		`UPDATE restaurant_config SET ordering_hours = $1, updated_at = NOW() WHERE id = TRUE
-		 RETURNING ordering_enabled, opening_hours, ordering_hours, ticket_templates, updated_at`, hours)
-	if err != nil {
-		return nil, err
-	}
-	return &config, nil
-}
-
-func (r *RestaurantRepository) UpdateTicketTemplates(ctx context.Context, templates json.RawMessage) (*domain.RestaurantConfig, error) {
-	var config domain.RestaurantConfig
-	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
-		`UPDATE restaurant_config SET ticket_templates = $1, updated_at = NOW() WHERE id = TRUE
-		 RETURNING ordering_enabled, opening_hours, ordering_hours, ticket_templates, updated_at`, templates)
+		 RETURNING ordering_enabled, opening_hours, ordering_hours, updated_at`, hours)
 	if err != nil {
 		return nil, err
 	}

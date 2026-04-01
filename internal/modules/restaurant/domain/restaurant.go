@@ -22,10 +22,9 @@ type OpeningHours map[string]*DaySchedule
 // RestaurantConfig represents the single-row restaurant configuration.
 type RestaurantConfig struct {
 	OrderingEnabled bool            `db:"ordering_enabled" json:"orderingEnabled"`
-	OpeningHours    json.RawMessage `db:"opening_hours" json:"openingHours"`
-	OrderingHours   json.RawMessage `db:"ordering_hours" json:"orderingHours"`
-	TicketTemplates json.RawMessage `db:"ticket_templates" json:"ticketTemplates"`
-	UpdatedAt       time.Time       `db:"updated_at" json:"updatedAt"`
+	OpeningHours  json.RawMessage `db:"opening_hours" json:"openingHours"`
+	OrderingHours json.RawMessage `db:"ordering_hours" json:"orderingHours"`
+	UpdatedAt     time.Time       `db:"updated_at" json:"updatedAt"`
 }
 
 // GetOpeningHours parses the JSONB opening_hours into a typed map.

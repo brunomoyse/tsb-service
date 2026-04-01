@@ -8,6 +8,7 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"time"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	addressApplication "tsb-service/internal/modules/address/application"
@@ -87,8 +88,21 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 }
 
 // CustomerStats is the resolver for the customerStats field.
-func (r *queryResolver) CustomerStats(ctx context.Context) (*model.CustomerStatsResponse, error) {
-	rows, err := r.OrderService.GetCustomerStats(ctx)
+func (r *queryResolver) CustomerStats(ctx context.Context, input *model.CustomerStatsInput) (*model.CustomerStatsResponse, error) {
+	var startDate, endDate *time.Time
+	var orderType *string
+	var minOrders *int
+	if input != nil {
+		startDate = input.StartDate
+		endDate = input.EndDate
+		if input.OrderType != nil {
+			ot := input.OrderType.String()
+			orderType = &ot
+		}
+		minOrders = input.MinOrders
+	}
+
+	rows, err := r.OrderService.GetCustomerStats(ctx, startDate, endDate, orderType, minOrders)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get customer stats: %w", err)
 	}

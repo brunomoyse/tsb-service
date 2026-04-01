@@ -389,7 +389,7 @@ func (r *OrderRepository) DeleteOrder(ctx context.Context, orderID uuid.UUID) er
 	return nil
 }
 
-func (r *OrderRepository) GetCustomerStats(ctx context.Context) ([]*domain.CustomerStatsRow, error) {
+func (r *OrderRepository) GetCustomerStats(ctx context.Context, startDate, endDate *time.Time, orderType *string, minOrders *int) ([]*domain.CustomerStatsRow, error) {
 	query := `
 		SELECT
 			u.id AS user_id,
@@ -408,12 +408,38 @@ func (r *OrderRepository) GetCustomerStats(ctx context.Context) ([]*domain.Custo
 		FROM users u
 		INNER JOIN orders o ON u.id = o.user_id
 		WHERE o.order_status NOT IN ('CANCELLED', 'FAILED')
-		GROUP BY u.id, u.first_name, u.last_name, u.email, u.phone_number, u.created_at
-		ORDER BY total_amount DESC
 	`
 
+	args := []interface{}{}
+	argIdx := 1
+
+	if startDate != nil {
+		query += fmt.Sprintf(" AND o.created_at >= $%d", argIdx)
+		args = append(args, *startDate)
+		argIdx++
+	}
+	if endDate != nil {
+		query += fmt.Sprintf(" AND o.created_at <= $%d", argIdx)
+		args = append(args, *endDate)
+		argIdx++
+	}
+	if orderType != nil {
+		query += fmt.Sprintf(" AND o.order_type = $%d", argIdx)
+		args = append(args, *orderType)
+		argIdx++
+	}
+
+	query += " GROUP BY u.id, u.first_name, u.last_name, u.email, u.phone_number, u.created_at"
+
+	if minOrders != nil && *minOrders > 1 {
+		query += fmt.Sprintf(" HAVING COUNT(o.id) >= $%d", argIdx)
+		args = append(args, *minOrders)
+	}
+
+	query += " ORDER BY total_amount DESC"
+
 	var rows []*domain.CustomerStatsRow
-	if err := r.pool.ForContext(ctx).SelectContext(ctx, &rows, query); err != nil {
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &rows, query, args...); err != nil {
 		return nil, fmt.Errorf("failed to query customer stats: %w", err)
 	}
 	return rows, nil

@@ -20,7 +20,7 @@ func (r *mutationResolver) UpdateOrderingEnabled(ctx context.Context, enabled bo
 	if err != nil {
 		return nil, fmt.Errorf("update ordering enabled: %w", err)
 	}
-	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.TicketTemplates, config.UpdatedAt)
+	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.UpdatedAt)
 	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
 	return gqlConfig, nil
 }
@@ -45,7 +45,7 @@ func (r *mutationResolver) UpdateOpeningHours(ctx context.Context, hours model.O
 	if err != nil {
 		return nil, fmt.Errorf("update opening hours: %w", err)
 	}
-	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.TicketTemplates, config.UpdatedAt)
+	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.UpdatedAt)
 	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
 	return gqlConfig, nil
 }
@@ -70,22 +70,7 @@ func (r *mutationResolver) UpdateOrderingHours(ctx context.Context, hours model.
 	if err != nil {
 		return nil, fmt.Errorf("update ordering hours: %w", err)
 	}
-	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.TicketTemplates, config.UpdatedAt)
-	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
-	return gqlConfig, nil
-}
-
-// UpdateTicketTemplates is the resolver for the updateTicketTemplates field.
-func (r *mutationResolver) UpdateTicketTemplates(ctx context.Context, templates map[string]any) (*model.RestaurantConfig, error) {
-	templatesJSON, err := json.Marshal(templates)
-	if err != nil {
-		return nil, fmt.Errorf("marshal ticket templates: %w", err)
-	}
-	config, err := r.RestaurantService.UpdateTicketTemplates(ctx, templatesJSON)
-	if err != nil {
-		return nil, fmt.Errorf("update ticket templates: %w", err)
-	}
-	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.TicketTemplates, config.UpdatedAt)
+	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.UpdatedAt)
 	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
 	return gqlConfig, nil
 }
@@ -96,7 +81,7 @@ func (r *queryResolver) RestaurantConfig(ctx context.Context) (*model.Restaurant
 	if err != nil {
 		return nil, fmt.Errorf("get restaurant config: %w", err)
 	}
-	return toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.TicketTemplates, config.UpdatedAt), nil
+	return toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.UpdatedAt), nil
 }
 
 // IsCurrentlyOpen is the resolver for the isCurrentlyOpen field.

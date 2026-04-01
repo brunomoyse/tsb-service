@@ -49,9 +49,16 @@ type CustomerStatsResponse {
     customers: [CustomerStats!]!
 }
 
+input CustomerStatsInput {
+    startDate: DateTime
+    endDate: DateTime
+    orderType: OrderTypeEnum
+    minOrders: Int
+}
+
 extend type Query {
     me: User! @auth
-    customerStats: CustomerStatsResponse! @admin
+    customerStats(input: CustomerStatsInput): CustomerStatsResponse! @admin
 }
 
 extend type Mutation {
