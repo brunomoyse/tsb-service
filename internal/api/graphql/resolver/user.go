@@ -80,6 +80,9 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 
 	user := ToGQLUser(u)
 
+	// Override DB isAdmin with authoritative Zitadel role from JWT
+	user.IsAdmin = utils.GetIsAdmin(ctx)
+
 	return user, nil
 }
 
