@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -16,5 +17,5 @@ type OrderRepository interface {
 	InsertStatusHistory(ctx context.Context, orderID uuid.UUID, status OrderStatus) error
 	FindStatusHistoryByOrderID(ctx context.Context, orderID uuid.UUID) ([]*OrderStatusHistory, error)
 	DeleteOrder(ctx context.Context, orderID uuid.UUID) error
-	GetCustomerStats(ctx context.Context) ([]*CustomerStatsRow, error)
+	GetCustomerStats(ctx context.Context, startDate, endDate *time.Time, orderType *string, minOrders *int) ([]*CustomerStatsRow, error)
 }

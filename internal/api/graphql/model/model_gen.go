@@ -129,6 +129,13 @@ type CustomerStats struct {
 	PickupCount        int           `json:"pickupCount"`
 }
 
+type CustomerStatsInput struct {
+	StartDate *time.Time     `json:"startDate,omitempty"`
+	EndDate   *time.Time     `json:"endDate,omitempty"`
+	OrderType *OrderTypeEnum `json:"orderType,omitempty"`
+	MinOrders *int           `json:"minOrders,omitempty"`
+}
+
 type CustomerStatsResponse struct {
 	Summary   *CustomerStatsSummary `json:"summary"`
 	Customers []*CustomerStats      `json:"customers"`
@@ -267,7 +274,6 @@ type RestaurantConfig struct {
 	OrderingEnabled         bool           `json:"orderingEnabled"`
 	OpeningHours            map[string]any `json:"openingHours"`
 	OrderingHours           map[string]any `json:"orderingHours,omitempty"`
-	TicketTemplates         map[string]any `json:"ticketTemplates"`
 	IsCurrentlyOpen         bool           `json:"isCurrentlyOpen"`
 	IsOrderingCurrentlyOpen bool           `json:"isOrderingCurrentlyOpen"`
 	UpdatedAt               time.Time      `json:"updatedAt"`

@@ -10,5 +10,4 @@ type RestaurantRepository interface {
 	UpdateOrderingEnabled(ctx context.Context, enabled bool) (*RestaurantConfig, error)
 	UpdateOpeningHours(ctx context.Context, hours json.RawMessage) (*RestaurantConfig, error)
 	UpdateOrderingHours(ctx context.Context, hours json.RawMessage) (*RestaurantConfig, error)
-	UpdateTicketTemplates(ctx context.Context, templates json.RawMessage) (*RestaurantConfig, error)
 }

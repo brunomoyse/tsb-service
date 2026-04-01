@@ -14,7 +14,6 @@ type RestaurantService interface {
 	UpdateOrderingEnabled(ctx context.Context, enabled bool) (*domain.RestaurantConfig, error)
 	UpdateOpeningHours(ctx context.Context, hours json.RawMessage) (*domain.RestaurantConfig, error)
 	UpdateOrderingHours(ctx context.Context, hours json.RawMessage) (*domain.RestaurantConfig, error)
-	UpdateTicketTemplates(ctx context.Context, templates json.RawMessage) (*domain.RestaurantConfig, error)
 }
 
 type restaurantService struct {
@@ -56,8 +55,4 @@ func (s *restaurantService) UpdateOpeningHours(ctx context.Context, hours json.R
 
 func (s *restaurantService) UpdateOrderingHours(ctx context.Context, hours json.RawMessage) (*domain.RestaurantConfig, error) {
 	return s.repo.UpdateOrderingHours(ctx, hours)
-}
-
-func (s *restaurantService) UpdateTicketTemplates(ctx context.Context, templates json.RawMessage) (*domain.RestaurantConfig, error) {
-	return s.repo.UpdateTicketTemplates(ctx, templates)
 }

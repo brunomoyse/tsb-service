@@ -188,7 +188,7 @@ func toDomainTranslationsPtr(in []*model.TranslationInput) []productDomain.Trans
 	return out
 }
 
-func toGQLRestaurantConfig(orderingEnabled bool, openingHoursRaw json.RawMessage, orderingHoursRaw json.RawMessage, ticketTemplatesRaw json.RawMessage, updatedAt time.Time) *model.RestaurantConfig {
+func toGQLRestaurantConfig(orderingEnabled bool, openingHoursRaw json.RawMessage, orderingHoursRaw json.RawMessage, updatedAt time.Time) *model.RestaurantConfig {
 	var openingHours map[string]any
 	_ = json.Unmarshal(openingHoursRaw, &openingHours)
 
@@ -197,14 +197,10 @@ func toGQLRestaurantConfig(orderingEnabled bool, openingHoursRaw json.RawMessage
 		_ = json.Unmarshal(orderingHoursRaw, &orderingHours)
 	}
 
-	var ticketTemplates map[string]any
-	_ = json.Unmarshal(ticketTemplatesRaw, &ticketTemplates)
-
 	return &model.RestaurantConfig{
 		OrderingEnabled: orderingEnabled,
 		OpeningHours:    openingHours,
 		OrderingHours:   orderingHours,
-		TicketTemplates: ticketTemplates,
 		UpdatedAt:       updatedAt,
 	}
 }
