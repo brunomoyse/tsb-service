@@ -192,12 +192,6 @@ func createTestUser(t *testing.T, ctx context.Context, db *sqlx.DB, firstName, l
 		userID, now, now, firstName, lastName, email, userID.String())
 	require.NoError(t, err, "Failed to create test user")
 
-	// If is_admin column exists, update it
-	if isAdmin {
-		updateQuery := `UPDATE users SET is_admin = $1 WHERE id = $2`
-		_, _ = db.ExecContext(ctx, updateQuery, isAdmin, userID)
-	}
-
 	return &TestUser{
 		ID:        userID,
 		FirstName: firstName,

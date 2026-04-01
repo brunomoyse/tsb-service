@@ -15,7 +15,6 @@ type User struct {
 	Email           string     `db:"email" json:"email"`
 	PhoneNumber     *string    `db:"phone_number" json:"phoneNumber"`
 	AddressID       *string    `db:"address_id" json:"addressId"`
-	IsAdmin         bool       `db:"is_admin" json:"isAdmin"`
 	NotifyMarketing bool       `db:"notify_marketing" json:"notifyMarketing"`
 	DeletionRequestedAt *time.Time `db:"deletion_requested_at" json:"deletionRequestedAt"`
 	ZitadelUserID       *string    `db:"zitadel_user_id" json:"-"`
