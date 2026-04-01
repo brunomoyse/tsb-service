@@ -1,6 +1,10 @@
 package application
 
-import orderDomain "tsb-service/internal/modules/order/domain"
+import (
+	"fmt"
+
+	orderDomain "tsb-service/internal/modules/order/domain"
+)
 
 type notificationText struct {
 	Title string
@@ -70,6 +74,54 @@ var orderNotificationTexts = map[string]map[orderDomain.OrderStatus]notification
 		orderDomain.OrderStatusCanceled:       {Title: "Bestelling geannuleerd", Body: "Uw bestelling is geannuleerd."},
 		orderDomain.OrderStatusFailed:         {Title: "Bestelling mislukt", Body: "Er is een probleem met uw bestelling."},
 	},
+}
+
+// GetNewOrderNotification returns localized push notification text for admin devices when a new order is created.
+func GetNewOrderNotification(language, orderType, total string) notificationText {
+	texts := newOrderTexts[language]
+	if texts == nil {
+		texts = newOrderTexts["fr"]
+	}
+
+	var typeKey string
+	switch language {
+	case "en":
+		if orderType == "PICKUP" {
+			typeKey = "pickup"
+		} else {
+			typeKey = "delivery"
+		}
+	case "zh":
+		if orderType == "PICKUP" {
+			typeKey = "自取"
+		} else {
+			typeKey = "外送"
+		}
+	case "nl":
+		if orderType == "PICKUP" {
+			typeKey = "afhaling"
+		} else {
+			typeKey = "levering"
+		}
+	default: // fr
+		if orderType == "PICKUP" {
+			typeKey = "retrait"
+		} else {
+			typeKey = "livraison"
+		}
+	}
+
+	return notificationText{
+		Title: texts.Title,
+		Body:  fmt.Sprintf(texts.Body, typeKey, total),
+	}
+}
+
+var newOrderTexts = map[string]*notificationText{
+	"fr": {Title: "Nouvelle commande", Body: "Nouvelle commande %s de %s€"},
+	"en": {Title: "New order", Body: "New %s order for %s€"},
+	"zh": {Title: "新订单", Body: "新%s订单 %s€"},
+	"nl": {Title: "Nieuwe bestelling", Body: "Nieuwe %s bestelling van %s€"},
 }
 
 var pickupOverrides = map[string]map[orderDomain.OrderStatus]notificationText{
