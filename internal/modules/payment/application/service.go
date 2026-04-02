@@ -35,7 +35,7 @@ type PaymentService interface {
 	// HandlePaymentPaid processes a paid payment: verifies amount, enriches order, sends email.
 	// Returns the domain order for the caller to publish to PubSub (avoids circular import with resolver).
 	HandlePaymentPaid(ctx context.Context, orderID uuid.UUID) (*orderDomain.Order, error)
-	HandlePaymentFailed(ctx context.Context, orderID uuid.UUID) error
+	HandlePaymentFailed(ctx context.Context, orderID uuid.UUID) (*orderDomain.Order, error)
 
 	BatchGetPaymentsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.MolliePayment, error)
 }
@@ -344,22 +344,23 @@ func (s *paymentService) HandlePaymentPaid(ctx context.Context, orderID uuid.UUI
 
 // HandlePaymentFailed handles the business logic when a payment is cancelled/failed/expired:
 // updates order status to CANCELLED and sends failure email.
-func (s *paymentService) HandlePaymentFailed(ctx context.Context, orderID uuid.UUID) error {
+func (s *paymentService) HandlePaymentFailed(ctx context.Context, orderID uuid.UUID) (*orderDomain.Order, error) {
 	canceledStatus := orderDomain.OrderStatusCanceled
 	if err := s.orderService.UpdateOrder(ctx, orderID, &canceledStatus, nil); err != nil {
-		return fmt.Errorf("failed to update order status: %w", err)
+		return nil, fmt.Errorf("failed to update order status: %w", err)
+	}
+
+	// Fetch the updated order for PubSub notification and email
+	order, _, orderErr := s.orderService.GetOrderByID(ctx, orderID)
+	if orderErr != nil || order == nil {
+		zap.L().Error("failed to retrieve order after payment failure", zap.String("order_id", orderID.String()), zap.Error(orderErr))
+		return nil, nil
 	}
 
 	// Send failure email asynchronously
 	go func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-
-		order, _, orderErr := s.orderService.GetOrderByID(bgCtx, orderID)
-		if orderErr != nil || order == nil {
-			zap.L().Error("failed to retrieve order for payment failed email", zap.String("order_id", orderID.String()), zap.Error(orderErr))
-			return
-		}
 
 		u, userErr := s.userService.GetUserByID(bgCtx, order.UserID.String())
 		if userErr != nil {
@@ -372,7 +373,7 @@ func (s *paymentService) HandlePaymentFailed(ctx context.Context, orderID uuid.U
 		}
 	}()
 
-	return nil
+	return order, nil
 }
 
 // mapExternalPayment converts a Mollie SDK payment object to the domain struct.

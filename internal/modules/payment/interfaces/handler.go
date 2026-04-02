@@ -1,6 +1,7 @@
 package interfaces
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -83,11 +84,18 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 		if handleErr != nil {
 			log.Error("webhook: failed to handle paid payment", zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(handleErr))
 		} else if order != nil {
-			h.broker.Publish("orderUpdated", resolver.ToGQLOrder(order))
+			gqlOrder := resolver.ToGQLOrder(order)
+			h.broker.Publish("orderUpdated", gqlOrder)
+			h.broker.Publish(fmt.Sprintf("orderUpdated:%s", orderID), gqlOrder)
 		}
 	case paymentDomain.PaymentStatusCanceled, paymentDomain.PaymentStatusFailed, paymentDomain.PaymentStatusExpired:
-		if handleErr := h.service.HandlePaymentFailed(ctx, *orderID); handleErr != nil {
+		order, handleErr := h.service.HandlePaymentFailed(ctx, *orderID)
+		if handleErr != nil {
 			log.Error("webhook: failed to handle failed payment", zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(handleErr))
+		} else if order != nil {
+			gqlOrder := resolver.ToGQLOrder(order)
+			h.broker.Publish("orderUpdated", gqlOrder)
+			h.broker.Publish(fmt.Sprintf("orderUpdated:%s", orderID), gqlOrder)
 		}
 	}
 
