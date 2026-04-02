@@ -581,29 +581,27 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	if o.OrderStatus == orderDomain.OrderStatusCanceled {
 		payment, err := r.PaymentService.GetPaymentByOrderID(ctx, o.ID)
 		if err == nil && payment != nil {
-			refund, refundErr := r.PaymentService.CreateFullRefund(ctx, payment.MolliePaymentID)
+			refundErr := r.PaymentService.CreateFullRefund(ctx, payment.MolliePaymentID)
 			if refundErr != nil {
 				return nil, fmt.Errorf("failed to initiate refund: %w", refundErr)
 			}
 
 			// Send refund issued email
-			if refund != nil {
-				go func() {
-					ctx, cancel := emailContext()
-					defer cancel()
-					user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
-					if err != nil {
-						zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
-						return
-					}
+			go func() {
+				ctx, cancel := emailContext()
+				defer cancel()
+				user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
+				if err != nil {
+					zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
+					return
+				}
 
-					refundAmount := utils.FormatDecimal(o.TotalPrice)
-					err = es.SendRefundIssuedEmail(*user, lang, refundAmount)
-					if err != nil {
-						zap.L().Error("failed to send refund issued email", zap.String("order_id", o.ID.String()), zap.Error(err))
-					}
-				}()
-			}
+				refundAmount := utils.FormatDecimal(o.TotalPrice)
+				err = es.SendRefundIssuedEmail(*user, lang, refundAmount)
+				if err != nil {
+					zap.L().Error("failed to send refund issued email", zap.String("order_id", o.ID.String()), zap.Error(err))
+				}
+			}()
 		}
 
 		go func() {

@@ -2,13 +2,11 @@ package infrastructure
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 	"tsb-service/internal/modules/payment/domain"
 	"tsb-service/pkg/db"
 
-	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
@@ -24,114 +22,14 @@ func NewPaymentRepository(pool *db.DBPool) domain.PaymentRepository {
 	}
 }
 
-// Save converts a Mollie payment object to your domain type and inserts it into the mollie_payments table.
-func (r *PaymentRepository) Save(ctx context.Context, external mollie.Payment, orderID uuid.UUID) (*domain.MolliePayment, error) {
+// Save inserts a domain MolliePayment into the database.
+// The caller (application service) is responsible for mapping external Mollie data to the domain struct.
+func (r *PaymentRepository) Save(ctx context.Context, payment *domain.MolliePayment) error {
 	var err error
 
-	// Convert external monetary fields (which are strings) into decimals.
-	amount, err := decimal.NewFromString(external.Amount.Value)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert amount: %w", err)
-	}
-
-	amountRefunded := decimal.Zero
-	if external.AmountRefunded != nil {
-		amountRefunded, err = decimal.NewFromString(external.AmountRefunded.Value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert amountRefunded: %w", err)
-		}
-	}
-
-	amountRemaining := decimal.Zero
-	if external.AmountRemaining != nil {
-		amountRemaining, err = decimal.NewFromString(external.AmountRemaining.Value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert amountRemaining: %w", err)
-		}
-	}
-
-	amountCaptured := decimal.Zero
-	if external.AmountCaptured != nil {
-		amountCaptured, err = decimal.NewFromString(external.AmountCaptured.Value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert amountCaptured: %w", err)
-		}
-	}
-
-	amountChargedBack := decimal.Zero
-	if external.AmountChargedBack != nil {
-		amountChargedBack, err = decimal.NewFromString(external.AmountChargedBack.Value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert amountChargedBack: %w", err)
-		}
-	}
-
-	settlementAmount := decimal.Zero
-	if external.SettlementAmount != nil {
-		settlementAmount, err = decimal.NewFromString(external.SettlementAmount.Value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert settlementAmount: %w", err)
-		}
-	}
-
-	// Marshal Metadata into a JSON string.
-	var metadataJSON string
-	if external.Metadata != nil {
-		raw, err := json.Marshal(external.Metadata)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal metadata: %w", err)
-		}
-		metadataJSON = string(raw)
-	} else {
-		metadataJSON = "null"
-	}
-
-	// Marshal Links into a JSON string.
-	raw, err := json.Marshal(external.Links)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal links: %w", err)
-	}
-	linksJSON := string(raw)
-
-	// Build the domain MolliePayment object.
-	domainPayment := &domain.MolliePayment{
-		Resource:                        &external.Resource,
-		MolliePaymentID:                 external.ID,
-		Status:                          mollie.OrderStatus(external.Status),
-		Description:                     &external.Description,
-		CancelURL:                       &external.CancelURL,
-		WebhookURL:                      &external.WebhookURL,
-		CountryCode:                     &external.CountryCode,
-		RestrictPaymentMethodsToCountry: &external.RestrictPaymentMethodsToCountry,
-		ProfileID:                       &external.ProfileID,
-		SettlementID:                    &external.SettlementID,
-		OrderID:                         orderID,
-		IsCancelable:                    external.IsCancelable,
-		Mode:                            nil, // fill in if needed
-		Locale:                          nil, // fill in if needed
-		Method:                          nil, // fill in if needed
-		// We store the JSON strings as []byte if your columns are JSONB in DB
-		Metadata:          []byte(metadataJSON),
-		Links:             []byte(linksJSON),
-		CreatedAt:         *external.CreatedAt,
-		AuthorizedAt:      external.AuthorizedAt,
-		PaidAt:            external.PaidAt,
-		CanceledAt:        external.CanceledAt,
-		ExpiresAt:         external.ExpiresAt,
-		ExpiredAt:         external.ExpiredAt,
-		FailedAt:          external.FailedAt,
-		Amount:            amount,
-		AmountRefunded:    amountRefunded,
-		AmountRemaining:   amountRemaining,
-		AmountCaptured:    amountCaptured,
-		AmountChargedBack: amountChargedBack,
-		SettlementAmount:  settlementAmount,
-	}
-
-	// Begin a transaction.
 	tx, err := r.pool.ForContext(ctx).BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
 		if err != nil {
@@ -139,8 +37,6 @@ func (r *PaymentRepository) Save(ctx context.Context, external mollie.Payment, o
 		}
 	}()
 
-	// Insert the domainPayment into the database.
-	// Ensure the columns match your DB schema exactly.
 	const query = `
         INSERT INTO mollie_payments (
             resource, mollie_payment_id, status, description, cancel_url,
@@ -164,60 +60,59 @@ func (r *PaymentRepository) Save(ctx context.Context, external mollie.Payment, o
 		CreatedAt time.Time `db:"created_at"`
 	}
 	err = tx.GetContext(ctx, &inserted, query,
-		domainPayment.Resource,
-		domainPayment.MolliePaymentID,
-		domainPayment.Status,
-		domainPayment.Description,
-		domainPayment.CancelURL,
-		domainPayment.WebhookURL,
-		domainPayment.CountryCode,
-		domainPayment.RestrictPaymentMethodsToCountry,
-		domainPayment.ProfileID,
-		domainPayment.SettlementID,
-		domainPayment.OrderID,
-		domainPayment.IsCancelable,
-		domainPayment.Mode,
-		domainPayment.Locale,
-		domainPayment.Method,
-		string(domainPayment.Metadata), // pass JSON strings to JSONB columns
-		string(domainPayment.Links),
-		domainPayment.CreatedAt,
-		domainPayment.AuthorizedAt,
-		domainPayment.PaidAt,
-		domainPayment.CanceledAt,
-		domainPayment.ExpiresAt,
-		domainPayment.ExpiredAt,
-		domainPayment.FailedAt,
-		domainPayment.Amount,
-		domainPayment.AmountRefunded,
-		domainPayment.AmountRemaining,
-		domainPayment.AmountCaptured,
-		domainPayment.AmountChargedBack,
-		domainPayment.SettlementAmount,
+		payment.Resource,
+		payment.MolliePaymentID,
+		payment.Status,
+		payment.Description,
+		payment.CancelURL,
+		payment.WebhookURL,
+		payment.CountryCode,
+		payment.RestrictPaymentMethodsToCountry,
+		payment.ProfileID,
+		payment.SettlementID,
+		payment.OrderID,
+		payment.IsCancelable,
+		payment.Mode,
+		payment.Locale,
+		payment.Method,
+		string(payment.Metadata),
+		string(payment.Links),
+		payment.CreatedAt,
+		payment.AuthorizedAt,
+		payment.PaidAt,
+		payment.CanceledAt,
+		payment.ExpiresAt,
+		payment.ExpiredAt,
+		payment.FailedAt,
+		payment.Amount,
+		payment.AmountRefunded,
+		payment.AmountRemaining,
+		payment.AmountCaptured,
+		payment.AmountChargedBack,
+		payment.SettlementAmount,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to insert mollie payment: %w", err)
+		return fmt.Errorf("failed to insert mollie payment: %w", err)
 	}
 
-	// Assign the auto-generated values back to the domain object.
-	domainPayment.ID = inserted.ID
-	domainPayment.CreatedAt = inserted.CreatedAt
+	payment.ID = inserted.ID
+	payment.CreatedAt = inserted.CreatedAt
 
 	if err = tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return domainPayment, nil
+	return nil
 }
 
-func (r *PaymentRepository) MarkAsRefund(ctx context.Context, externalPaymentID string, amount *mollie.Amount) error {
+func (r *PaymentRepository) MarkAsRefund(ctx context.Context, externalPaymentID string, refundedAmount decimal.Decimal) error {
 	const query = `
 		UPDATE mollie_payments
 		SET amount_refunded = $1
 		WHERE mollie_payment_id = $2;
 	`
 
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, amount.Value, externalPaymentID)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, refundedAmount, externalPaymentID)
 	if err != nil {
 		return fmt.Errorf("failed to mark payment as refunded: %w", err)
 	}
@@ -225,18 +120,29 @@ func (r *PaymentRepository) MarkAsRefund(ctx context.Context, externalPaymentID 
 	return nil
 }
 
-func (r *PaymentRepository) RefreshStatus(ctx context.Context, externalPayment mollie.Payment) (*uuid.UUID, error) {
+// RefreshStatus updates the payment status and all associated timestamps.
+func (r *PaymentRepository) RefreshStatus(ctx context.Context, externalPaymentID string, update *domain.PaymentStatusUpdate) (*uuid.UUID, error) {
 	const query = `
 		UPDATE mollie_payments
-		SET status = $1
-		WHERE mollie_payment_id = $2
+		SET status = $1,
+		    paid_at = $2,
+		    authorized_at = $3,
+		    canceled_at = $4,
+		    expired_at = $5,
+		    failed_at = $6
+		WHERE mollie_payment_id = $7
 		RETURNING order_id;
 	`
 
 	var orderID uuid.UUID
 	err := r.pool.ForContext(ctx).GetContext(ctx, &orderID, query,
-		externalPayment.Status,
-		externalPayment.ID,
+		update.Status,
+		update.PaidAt,
+		update.AuthorizedAt,
+		update.CanceledAt,
+		update.ExpiredAt,
+		update.FailedAt,
+		externalPaymentID,
 	)
 
 	if err != nil {
@@ -246,7 +152,7 @@ func (r *PaymentRepository) RefreshStatus(ctx context.Context, externalPayment m
 	return &orderID, nil
 }
 
-func (r *PaymentRepository) UpdateStatusByOrderID(ctx context.Context, orderID uuid.UUID, status mollie.OrderStatus) (*domain.MolliePayment, error) {
+func (r *PaymentRepository) UpdateStatusByOrderID(ctx context.Context, orderID uuid.UUID, status domain.PaymentStatus) (*domain.MolliePayment, error) {
 	const query = `
 		UPDATE mollie_payments
 		SET status = $1

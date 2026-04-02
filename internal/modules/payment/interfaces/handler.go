@@ -1,55 +1,37 @@
 package interfaces
 
 import (
-	"context"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"tsb-service/internal/api/graphql/resolver"
-	orderApplication "tsb-service/internal/modules/order/application"
-	"tsb-service/internal/modules/order/domain"
 	paymentApplication "tsb-service/internal/modules/payment/application"
-	productApplication "tsb-service/internal/modules/product/application"
-	productDomain "tsb-service/internal/modules/product/domain"
-	userApplication "tsb-service/internal/modules/user/application"
+	paymentDomain "tsb-service/internal/modules/payment/domain"
 	"tsb-service/pkg/logging"
 	"tsb-service/pkg/pubsub"
 	"tsb-service/pkg/utils"
-	es "tsb-service/pkg/email/scaleway"
 )
 
 type PaymentHandler struct {
-	service        paymentApplication.PaymentService
-	orderService   orderApplication.OrderService
-	userService    userApplication.UserService
-	productService productApplication.ProductService
-	broker         *pubsub.Broker
+	service paymentApplication.PaymentService
+	broker  *pubsub.Broker
 }
 
-func NewPaymentHandler(
-	service paymentApplication.PaymentService,
-	orderService orderApplication.OrderService,
-	userService userApplication.UserService,
-	productService productApplication.ProductService,
-	broker *pubsub.Broker,
-) *PaymentHandler {
-	return &PaymentHandler{
-		service:        service,
-		orderService:   orderService,
-		userService:    userService,
-		productService: productService,
-		broker:         broker,
-	}
+func NewPaymentHandler(service paymentApplication.PaymentService, broker *pubsub.Broker) *PaymentHandler {
+	return &PaymentHandler{service: service, broker: broker}
 }
 
+// UpdatePaymentStatusHandler handles Mollie webhook callbacks.
+//
+// Security model: Mollie standard webhooks do NOT include a signature header.
+// The webhook body contains only a payment ID (e.g. "tr_xxx"). We always re-fetch
+// the payment from the Mollie API to get the authoritative status. This means a
+// spoofed webhook cannot change payment state — the Mollie API is the source of truth.
 func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
-	// Webhook is a server-to-server call that needs write access to orders/payments,
-	// so use the admin DB pool.
+	// Webhook is a server-to-server call that needs write access to orders/payments.
 	ctx := utils.SetIsAdmin(c.Request.Context(), true)
 	log := logging.FromContext(ctx)
 
@@ -64,7 +46,7 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 
 	// Validate Mollie payment ID format
 	if !strings.HasPrefix(req.ExternalMolliePaymentID, "tr_") {
-		log.Warn("webhook: invalid payment ID format", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID))
+		log.Warn("webhook: invalid payment ID format", zap.String("payment_id", req.ExternalMolliePaymentID))
 		c.JSON(http.StatusOK, gin.H{"message": "ignored"})
 		return
 	}
@@ -72,143 +54,42 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 	// Verify payment exists in our DB before calling Mollie API
 	payment, err := h.service.GetPaymentByExternalID(ctx, req.ExternalMolliePaymentID)
 	if err != nil {
-		log.Warn("webhook: unknown payment ID", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
+		log.Warn("webhook: unknown payment ID", zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
 		c.JSON(http.StatusOK, gin.H{"message": "unknown payment"})
 		return
 	}
 
-	// Fetch the external payment status from Mollie
-	_, externalPayment, err := h.service.GetExternalPaymentByID(ctx, req.ExternalMolliePaymentID)
+	previousStatus := payment.Status
+
+	// Fetch latest status from Mollie and update local DB (status + timestamps).
+	// Returns 500 on transient failures so Mollie retries naturally.
+	statusUpdate, orderID, err := h.service.UpdatePaymentStatus(ctx, req.ExternalMolliePaymentID)
 	if err != nil {
-		log.Error("webhook: failed to retrieve external payment", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
-		c.JSON(http.StatusOK, gin.H{"message": "processed"})
+		log.Error("webhook: failed to update payment status", zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "temporary failure"})
 		return
 	}
 
-	// Idempotency check: if local status already matches Mollie status, skip processing
-	if string(payment.Status) == externalPayment.Status {
+	// Idempotency: if status hasn't changed, timestamps were refreshed but no business logic needed
+	if statusUpdate.Status == previousStatus {
 		c.JSON(http.StatusOK, gin.H{"message": "already processed"})
 		return
 	}
 
-	err = h.service.UpdatePaymentStatus(c, req.ExternalMolliePaymentID)
-	if err != nil {
-		log.Error("webhook: failed to update payment status", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
-		c.JSON(http.StatusOK, gin.H{"message": "processed"})
-		return
+	// Delegate business logic to the service layer
+	switch statusUpdate.Status {
+	case paymentDomain.PaymentStatusPaid:
+		order, handleErr := h.service.HandlePaymentPaid(ctx, *orderID)
+		if handleErr != nil {
+			log.Error("webhook: failed to handle paid payment", zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(handleErr))
+		} else if order != nil {
+			h.broker.Publish("orderUpdated", resolver.ToGQLOrder(order))
+		}
+	case paymentDomain.PaymentStatusCanceled, paymentDomain.PaymentStatusFailed, paymentDomain.PaymentStatusExpired:
+		if handleErr := h.service.HandlePaymentFailed(ctx, *orderID); handleErr != nil {
+			log.Error("webhook: failed to handle failed payment", zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(handleErr))
+		}
 	}
 
-	switch externalPayment.Status {
-	case "paid":
-		order, orderProducts, err := h.orderService.GetOrderByID(ctx, payment.OrderID)
-		if err != nil {
-			log.Error("webhook: failed to retrieve order", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
-			c.JSON(http.StatusOK, gin.H{"message": "processed"})
-			return
-		}
-		if order == nil {
-			log.Error("webhook: order not found for payment", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID))
-			c.JSON(http.StatusOK, gin.H{"message": "processed"})
-			return
-		}
-		if orderProducts == nil {
-			log.Error("webhook: no order products found", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID))
-			c.JSON(http.StatusOK, gin.H{"message": "processed"})
-			return
-		}
-
-		// 3. Load product details for the products in the order.
-		productIDs := make([]string, len(*orderProducts))
-		for i, op := range *orderProducts {
-			productIDs[i] = op.ProductID.String()
-		}
-
-		products, err := h.productService.GetProductsByIDs(ctx, productIDs)
-		if err != nil {
-			log.Error("webhook: failed to retrieve products", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
-			c.JSON(http.StatusOK, gin.H{"message": "processed"})
-			return
-		}
-
-		// Build a lookup map: productID -> product details.
-		productMap := make(map[uuid.UUID]productDomain.ProductOrderDetails, len(products))
-		for _, p := range products {
-			productMap[p.ID] = *p
-		}
-
-		// 4. Enrich order products with product details.
-		orderProductsResponse := make([]domain.OrderProduct, len(*orderProducts))
-		for i, op := range *orderProducts {
-			prod, ok := productMap[op.ProductID]
-			if !ok {
-				log.Error("webhook: product not found", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.String("product_id", op.ProductID.String()))
-				c.JSON(http.StatusOK, gin.H{"message": "processed"})
-				return
-			}
-			orderProductsResponse[i] = domain.OrderProduct{
-				Product: domain.Product{
-					ID:           prod.ID,
-					Code:         prod.Code,
-					CategoryName: prod.CategoryName,
-					Name:         prod.Name,
-				},
-				Quantity:   op.Quantity,
-				UnitPrice:  op.UnitPrice,
-				TotalPrice: op.TotalPrice,
-			}
-		}
-
-		u, err := h.userService.GetUserByID(ctx, order.UserID.String())
-
-		if err != nil {
-			log.Error("webhook: failed to retrieve user", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
-			c.JSON(http.StatusOK, gin.H{"message": "processed"})
-			return
-		}
-
-		h.broker.Publish("orderUpdated", resolver.ToGQLOrder(order))
-
-		err = es.SendOrderPendingEmail(*u, order.Language, *order, orderProductsResponse)
-		if err != nil {
-			log.Error("webhook: failed to send order pending email", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
-		}
-	case "cancelled", "failed", "expired":
-		log.Info("webhook: payment not paid", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.String("status", externalPayment.Status))
-		canceledStatus := domain.OrderStatusCanceled
-
-		err = h.orderService.UpdateOrder(ctx, payment.OrderID, &canceledStatus, nil)
-		if err != nil {
-			log.Warn("webhook: retrying order status update", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
-			err = h.orderService.UpdateOrder(ctx, payment.OrderID, &canceledStatus, nil)
-			if err != nil {
-				log.Error("webhook: failed to update order status after retry", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
-				c.JSON(http.StatusOK, gin.H{"message": "processed"})
-				return
-			}
-		}
-
-		// Send payment failed email with a dedicated context (HTTP context may cancel before goroutine finishes)
-		go func() {
-			bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-
-			order, _, orderErr := h.orderService.GetOrderByID(bgCtx, payment.OrderID)
-			if orderErr != nil || order == nil {
-				log.Error("webhook: failed to retrieve order for payment failed email", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(orderErr))
-				return
-			}
-
-			u, userErr := h.userService.GetUserByID(bgCtx, order.UserID.String())
-			if userErr != nil {
-				log.Error("webhook: failed to retrieve user for payment failed email", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(userErr))
-				return
-			}
-
-			if emailErr := es.SendPaymentFailedEmail(*u, order.Language); emailErr != nil {
-				log.Error("webhook: failed to send payment failed email", zap.String("component", "webhook"), zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(emailErr))
-			}
-		}()
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "payment status updated successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "processed"})
 }
