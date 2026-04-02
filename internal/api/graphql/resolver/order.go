@@ -1088,7 +1088,7 @@ func (r *queryResolver) MyOrder(ctx context.Context, id uuid.UUID) (*model.Order
 
 	// @TODO: Remove when the service layer check is implemented.
 	if o.UserID.String() != userID {
-		return nil, fmt.Errorf("user is not owned by this order")
+		return nil, fmt.Errorf("order is not owned by this user")
 	}
 
 	// Map the order to the GraphQL model

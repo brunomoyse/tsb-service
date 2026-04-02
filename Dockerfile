@@ -25,15 +25,21 @@ RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-service cmd/app/main.g
 # Step 7: Use base alpine image to create the final image
 FROM alpine:3.23
 
-# Step 8: Set the working directory and environment variables
+# Step 8: Create non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Step 9: Set the working directory and environment variables
 WORKDIR /app
 
-# Step 9: Copy binaries and migration files from the build container
+# Step 10: Copy binaries and migration files from the build container
 COPY --from=builder /app/tsb-service .
 COPY --from=builder /app/tsb-migrate .
 COPY --from=builder /app/migrations ./migrations
 
-# Step 10: Expose the port the app listens on
+# Step 11: Switch to non-root user
+USER appuser
+
+# Step 12: Expose the port the app listens on
 EXPOSE 8080
 
 # Step 11: Health check

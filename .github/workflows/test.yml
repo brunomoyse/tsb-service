@@ -62,7 +62,6 @@ jobs:
         with:
           version: latest
           args: --timeout=5m
-        continue-on-error: true
 
   build:
     name: Build Application
