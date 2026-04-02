@@ -136,10 +136,10 @@ func main() {
 	couponService := couponApplication.NewCouponService(couponRepo)
 	notificationService := notificationApplication.NewNotificationService(notificationRepo)
 	orderService := orderApplication.NewOrderService(orderRepo)
-	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient)
 	productService := productApplication.NewProductService(productRepo)
 	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, os.Getenv("APP_ENV") != "production")
 	userService := userApplication.NewUserService(userRepo)
+	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService)
 
 	// OIDC verifier — validates JWTs via JWKS + resolves Zitadel sub → app user UUID
 	zitadelInternalURL := os.Getenv("ZITADEL_INTERNAL_URL") // Optional: internal Docker URL for OIDC discovery
@@ -194,7 +194,7 @@ func main() {
 	}
 
 	orderHandler := orderInterfaces.NewOrderHandler(orderService, userService, productService)
-	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, orderService, userService, productService, broker)
+	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, broker)
 
 	// Gin HTTP setup
 	router := gin.New()
