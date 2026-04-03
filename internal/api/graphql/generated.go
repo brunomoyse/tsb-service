@@ -168,6 +168,17 @@ type ComplexityRoot struct {
 		UpdatedAt           func(childComplexity int) int
 	}
 
+	OrderHistoryResponse struct {
+		Orders  func(childComplexity int) int
+		Summary func(childComplexity int) int
+	}
+
+	OrderHistorySummary struct {
+		AverageOrder func(childComplexity int) int
+		TotalOrders  func(childComplexity int) int
+		TotalRevenue func(childComplexity int) int
+	}
+
 	OrderItem struct {
 		Choice     func(childComplexity int) int
 		ChoiceID   func(childComplexity int) int
@@ -268,6 +279,7 @@ type ComplexityRoot struct {
 		MyOrder               func(childComplexity int, id uuid.UUID) int
 		MyOrders              func(childComplexity int, first *int, page *int) int
 		Order                 func(childComplexity int, id uuid.UUID) int
+		OrderHistory          func(childComplexity int, input *model.OrderHistoryInput) int
 		Orders                func(childComplexity int) int
 		Product               func(childComplexity int, id uuid.UUID) int
 		ProductCategories     func(childComplexity int) int
@@ -382,6 +394,7 @@ type QueryResolver interface {
 	Orders(ctx context.Context) ([]*model.Order, error)
 	Order(ctx context.Context, id uuid.UUID) (*model.Order, error)
 	CustomerOrders(ctx context.Context, userID uuid.UUID, first *int, page *int) ([]*model.Order, error)
+	OrderHistory(ctx context.Context, input *model.OrderHistoryInput) (*model.OrderHistoryResponse, error)
 	MyOrders(ctx context.Context, first *int, page *int) ([]*model.Order, error)
 	MyOrder(ctx context.Context, id uuid.UUID) (*model.Order, error)
 	Product(ctx context.Context, id uuid.UUID) (*model.Product, error)
@@ -1058,6 +1071,38 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Order.UpdatedAt(childComplexity), true
 
+	case "OrderHistoryResponse.orders":
+		if e.ComplexityRoot.OrderHistoryResponse.Orders == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderHistoryResponse.Orders(childComplexity), true
+	case "OrderHistoryResponse.summary":
+		if e.ComplexityRoot.OrderHistoryResponse.Summary == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderHistoryResponse.Summary(childComplexity), true
+
+	case "OrderHistorySummary.averageOrder":
+		if e.ComplexityRoot.OrderHistorySummary.AverageOrder == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderHistorySummary.AverageOrder(childComplexity), true
+	case "OrderHistorySummary.totalOrders":
+		if e.ComplexityRoot.OrderHistorySummary.TotalOrders == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderHistorySummary.TotalOrders(childComplexity), true
+	case "OrderHistorySummary.totalRevenue":
+		if e.ComplexityRoot.OrderHistorySummary.TotalRevenue == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderHistorySummary.TotalRevenue(childComplexity), true
+
 	case "OrderItem.choice":
 		if e.ComplexityRoot.OrderItem.Choice == nil {
 			break
@@ -1601,6 +1646,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Order(childComplexity, args["id"].(uuid.UUID)), true
+	case "Query.orderHistory":
+		if e.ComplexityRoot.Query.OrderHistory == nil {
+			break
+		}
+
+		args, err := ec.field_Query_orderHistory_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.OrderHistory(childComplexity, args["input"].(*model.OrderHistoryInput)), true
 	case "Query.orders":
 		if e.ComplexityRoot.Query.Orders == nil {
 			break
@@ -1883,6 +1939,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputDayScheduleInput,
 		ec.unmarshalInputOpeningHoursInput,
 		ec.unmarshalInputOrderExtraInput,
+		ec.unmarshalInputOrderHistoryInput,
 		ec.unmarshalInputTranslationInput,
 		ec.unmarshalInputUpdateCouponInput,
 		ec.unmarshalInputUpdateOrderInput,
@@ -2367,6 +2424,17 @@ func (ec *executionContext) field_Query_myOrders_args(ctx context.Context, rawAr
 		return nil, err
 	}
 	args["page"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_orderHistory_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalOOrderHistoryInput2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderHistoryInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -6164,6 +6232,207 @@ func (ec *executionContext) fieldContext_Order_displayAddress(_ context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _OrderHistoryResponse_orders(ctx context.Context, field graphql.CollectedField, obj *model.OrderHistoryResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OrderHistoryResponse_orders,
+		func(ctx context.Context) (any, error) {
+			return obj.Orders, nil
+		},
+		nil,
+		ec.marshalNOrder2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OrderHistoryResponse_orders(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderHistoryResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Order_id(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Order_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Order_updatedAt(ctx, field)
+			case "status":
+				return ec.fieldContext_Order_status(ctx, field)
+			case "type":
+				return ec.fieldContext_Order_type(ctx, field)
+			case "isOnlinePayment":
+				return ec.fieldContext_Order_isOnlinePayment(ctx, field)
+			case "discountAmount":
+				return ec.fieldContext_Order_discountAmount(ctx, field)
+			case "deliveryFee":
+				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "totalPrice":
+				return ec.fieldContext_Order_totalPrice(ctx, field)
+			case "preferredReadyTime":
+				return ec.fieldContext_Order_preferredReadyTime(ctx, field)
+			case "estimatedReadyTime":
+				return ec.fieldContext_Order_estimatedReadyTime(ctx, field)
+			case "addressExtra":
+				return ec.fieldContext_Order_addressExtra(ctx, field)
+			case "orderNote":
+				return ec.fieldContext_Order_orderNote(ctx, field)
+			case "orderExtra":
+				return ec.fieldContext_Order_orderExtra(ctx, field)
+			case "couponCode":
+				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "address":
+				return ec.fieldContext_Order_address(ctx, field)
+			case "customer":
+				return ec.fieldContext_Order_customer(ctx, field)
+			case "payment":
+				return ec.fieldContext_Order_payment(ctx, field)
+			case "items":
+				return ec.fieldContext_Order_items(ctx, field)
+			case "isManualAddress":
+				return ec.fieldContext_Order_isManualAddress(ctx, field)
+			case "statusHistory":
+				return ec.fieldContext_Order_statusHistory(ctx, field)
+			case "displayCustomerName":
+				return ec.fieldContext_Order_displayCustomerName(ctx, field)
+			case "displayAddress":
+				return ec.fieldContext_Order_displayAddress(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Order", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderHistoryResponse_summary(ctx context.Context, field graphql.CollectedField, obj *model.OrderHistoryResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OrderHistoryResponse_summary,
+		func(ctx context.Context) (any, error) {
+			return obj.Summary, nil
+		},
+		nil,
+		ec.marshalNOrderHistorySummary2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderHistorySummary,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OrderHistoryResponse_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderHistoryResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "totalOrders":
+				return ec.fieldContext_OrderHistorySummary_totalOrders(ctx, field)
+			case "totalRevenue":
+				return ec.fieldContext_OrderHistorySummary_totalRevenue(ctx, field)
+			case "averageOrder":
+				return ec.fieldContext_OrderHistorySummary_averageOrder(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type OrderHistorySummary", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderHistorySummary_totalOrders(ctx context.Context, field graphql.CollectedField, obj *model.OrderHistorySummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OrderHistorySummary_totalOrders,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalOrders, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OrderHistorySummary_totalOrders(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderHistorySummary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderHistorySummary_totalRevenue(ctx context.Context, field graphql.CollectedField, obj *model.OrderHistorySummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OrderHistorySummary_totalRevenue,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalRevenue, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OrderHistorySummary_totalRevenue(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderHistorySummary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderHistorySummary_averageOrder(ctx context.Context, field graphql.CollectedField, obj *model.OrderHistorySummary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OrderHistorySummary_averageOrder,
+		func(ctx context.Context) (any, error) {
+			return obj.AverageOrder, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OrderHistorySummary_averageOrder(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderHistorySummary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _OrderItem_product(ctx context.Context, field graphql.CollectedField, obj *model.OrderItem) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9085,6 +9354,66 @@ func (ec *executionContext) fieldContext_Query_customerOrders(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_customerOrders_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_orderHistory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_orderHistory,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().OrderHistory(ctx, fc.Args["input"].(*model.OrderHistoryInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.OrderHistoryResponse
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNOrderHistoryResponse2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderHistoryResponse,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_orderHistory(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "orders":
+				return ec.fieldContext_OrderHistoryResponse_orders(ctx, field)
+			case "summary":
+				return ec.fieldContext_OrderHistoryResponse_summary(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type OrderHistoryResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_orderHistory_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -13098,6 +13427,85 @@ func (ec *executionContext) unmarshalInputOrderExtraInput(ctx context.Context, o
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputOrderHistoryInput(ctx context.Context, obj any) (model.OrderHistoryInput, error) {
+	var it model.OrderHistoryInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	if _, present := asMap["first"]; !present {
+		asMap["first"] = 20
+	}
+	if _, present := asMap["page"]; !present {
+		asMap["page"] = 1
+	}
+
+	fieldsInOrder := [...]string{"startDate", "endDate", "status", "orderType", "search", "first", "page"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "startDate":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("startDate"))
+			data, err := ec.unmarshalODateTime2ᚖtimeᚐTime(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.StartDate = data
+		case "endDate":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("endDate"))
+			data, err := ec.unmarshalODateTime2ᚖtimeᚐTime(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EndDate = data
+		case "status":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("status"))
+			data, err := ec.unmarshalOOrderStatusEnum2ᚖtsbᚑserviceᚋinternalᚋmodulesᚋorderᚋdomainᚐOrderStatus(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Status = data
+		case "orderType":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("orderType"))
+			data, err := ec.unmarshalOOrderTypeEnum2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderTypeEnum(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.OrderType = data
+		case "search":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("search"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Search = data
+		case "first":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("first"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.First = data
+		case "page":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("page"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Page = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputTranslationInput(ctx context.Context, obj any) (model.TranslationInput, error) {
 	var it model.TranslationInput
 	if obj == nil {
@@ -14513,6 +14921,99 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 	return out
 }
 
+var orderHistoryResponseImplementors = []string{"OrderHistoryResponse"}
+
+func (ec *executionContext) _OrderHistoryResponse(ctx context.Context, sel ast.SelectionSet, obj *model.OrderHistoryResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, orderHistoryResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("OrderHistoryResponse")
+		case "orders":
+			out.Values[i] = ec._OrderHistoryResponse_orders(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "summary":
+			out.Values[i] = ec._OrderHistoryResponse_summary(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var orderHistorySummaryImplementors = []string{"OrderHistorySummary"}
+
+func (ec *executionContext) _OrderHistorySummary(ctx context.Context, sel ast.SelectionSet, obj *model.OrderHistorySummary) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, orderHistorySummaryImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("OrderHistorySummary")
+		case "totalOrders":
+			out.Values[i] = ec._OrderHistorySummary_totalOrders(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalRevenue":
+			out.Values[i] = ec._OrderHistorySummary_totalRevenue(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "averageOrder":
+			out.Values[i] = ec._OrderHistorySummary_averageOrder(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var orderItemImplementors = []string{"OrderItem"}
 
 func (ec *executionContext) _OrderItem(ctx context.Context, sel ast.SelectionSet, obj *model.OrderItem) graphql.Marshaler {
@@ -15460,6 +15961,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_customerOrders(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "orderHistory":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_orderHistory(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -16759,6 +17282,30 @@ func (ec *executionContext) unmarshalNOrderExtraInput2ᚖtsbᚑserviceᚋinterna
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNOrderHistoryResponse2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderHistoryResponse(ctx context.Context, sel ast.SelectionSet, v model.OrderHistoryResponse) graphql.Marshaler {
+	return ec._OrderHistoryResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNOrderHistoryResponse2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderHistoryResponse(ctx context.Context, sel ast.SelectionSet, v *model.OrderHistoryResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._OrderHistoryResponse(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNOrderHistorySummary2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderHistorySummary(ctx context.Context, sel ast.SelectionSet, v *model.OrderHistorySummary) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._OrderHistorySummary(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNOrderItem2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.OrderItem) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -17457,6 +18004,14 @@ func (ec *executionContext) unmarshalOOrderExtraInput2ᚕᚖtsbᚑserviceᚋinte
 		}
 	}
 	return res, nil
+}
+
+func (ec *executionContext) unmarshalOOrderHistoryInput2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderHistoryInput(ctx context.Context, v any) (*model.OrderHistoryInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputOrderHistoryInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOOrderStatusEnum2ᚖtsbᚑserviceᚋinternalᚋmodulesᚋorderᚋdomainᚐOrderStatus(ctx context.Context, v any) (*domain.OrderStatus, error) {

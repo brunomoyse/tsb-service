@@ -180,6 +180,27 @@ type OrderExtraInput struct {
 	Options []string `json:"options,omitempty"`
 }
 
+type OrderHistoryInput struct {
+	StartDate *time.Time          `json:"startDate,omitempty"`
+	EndDate   *time.Time          `json:"endDate,omitempty"`
+	Status    *domain.OrderStatus `json:"status,omitempty"`
+	OrderType *OrderTypeEnum      `json:"orderType,omitempty"`
+	Search    *string             `json:"search,omitempty"`
+	First     *int                `json:"first,omitempty"`
+	Page      *int                `json:"page,omitempty"`
+}
+
+type OrderHistoryResponse struct {
+	Orders  []*Order             `json:"orders"`
+	Summary *OrderHistorySummary `json:"summary"`
+}
+
+type OrderHistorySummary struct {
+	TotalOrders  int    `json:"totalOrders"`
+	TotalRevenue string `json:"totalRevenue"`
+	AverageOrder string `json:"averageOrder"`
+}
+
 type OrderItem struct {
 	Product    *Product       `json:"product"`
 	ProductID  uuid.UUID      `json:"productID"`

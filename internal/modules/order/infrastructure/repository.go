@@ -254,6 +254,90 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 	return orders, nil
 }
 
+func (r *OrderRepository) FindFiltered(ctx context.Context, filter domain.OrderHistoryFilter) ([]*domain.Order, *domain.OrderHistorySummary, error) {
+	if filter.Page < 1 {
+		filter.Page = 1
+	}
+	if filter.Limit < 1 {
+		filter.Limit = 20
+	}
+
+	var conditions []string
+	var args []any
+	idx := 1
+
+	if filter.StartDate != nil {
+		conditions = append(conditions, fmt.Sprintf("o.created_at >= $%d", idx))
+		args = append(args, *filter.StartDate)
+		idx++
+	}
+	if filter.EndDate != nil {
+		conditions = append(conditions, fmt.Sprintf("o.created_at <= $%d", idx))
+		args = append(args, *filter.EndDate)
+		idx++
+	}
+	if filter.Status != nil {
+		conditions = append(conditions, fmt.Sprintf("o.order_status = $%d", idx))
+		args = append(args, string(*filter.Status))
+		idx++
+	}
+	if filter.OrderType != nil {
+		conditions = append(conditions, fmt.Sprintf("o.order_type = $%d", idx))
+		args = append(args, string(*filter.OrderType))
+		idx++
+	}
+	if filter.Search != nil && *filter.Search != "" {
+		conditions = append(conditions, fmt.Sprintf("(u.first_name ILIKE $%d OR u.last_name ILIKE $%d)", idx, idx))
+		args = append(args, "%"+*filter.Search+"%")
+		idx++
+	}
+
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = "WHERE " + conditions[0]
+		for _, c := range conditions[1:] {
+			whereClause += " AND " + c
+		}
+	}
+
+	// Summary query
+	summaryQuery := fmt.Sprintf(`
+		SELECT COUNT(*) as total_orders,
+			   COALESCE(SUM(o.total_price), 0) as total_revenue,
+			   COALESCE(AVG(o.total_price), 0) as average_order
+		FROM orders o
+		LEFT JOIN users u ON o.user_id = u.id
+		%s
+	`, whereClause)
+
+	var summary domain.OrderHistorySummary
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &summary, summaryQuery, args...); err != nil {
+		logging.FromContext(ctx).Error("error querying order history summary", zap.Error(err))
+		return nil, nil, fmt.Errorf("failed to query order history summary: %w", err)
+	}
+
+	// Orders query with pagination
+	offset := (filter.Page - 1) * filter.Limit
+	ordersQuery := fmt.Sprintf(`
+		SELECT o.*
+		FROM orders o
+		LEFT JOIN users u ON o.user_id = u.id
+		%s
+		ORDER BY o.created_at DESC
+		LIMIT $%d OFFSET $%d
+	`, whereClause, idx, idx+1)
+
+	orderArgs := append(args, filter.Limit, offset) //nolint:gocritic
+
+	var orders []*domain.Order
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &orders, ordersQuery, orderArgs...); err != nil {
+		logging.FromContext(ctx).Error("error querying order history", zap.Error(err))
+		return nil, nil, fmt.Errorf("failed to query order history: %w", err)
+	}
+
+	return orders, &summary, nil
+}
+
 func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.OrderProductRaw, error) {
 	if len(orderIDs) == 0 {
 		// must be []*domain.OrderProductRaw, not []domain.OrderProductRaw
