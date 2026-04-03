@@ -257,7 +257,7 @@ func main() {
 		broker, apnsClient, fcmClient,
 		addressService, couponService, notificationService, orderService, paymentService, productService, restaurantService, userService,
 	)
-	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL, "capacitor://localhost"}, oidcVerifier)
+	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL, "capacitor://localhost", "https://localhost"}, oidcVerifier)
 	optionalAuth := oidcVerifier.OptionalAuthMiddleware()
 
 	api.POST("/graphql", optionalAuth, graphqlHandler)
