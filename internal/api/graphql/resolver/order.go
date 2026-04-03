@@ -521,7 +521,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		}()
 	}
 
-	// If new status is "AWAITING_PICK_UP" or "OUT_FOR_DELIVERY", send the order ready email
+	// Send order ready email for actionable statuses:
+	// - AWAITING_PICK_UP: pickup customers need to come get their order
+	// - OUT_FOR_DELIVERY: delivery customers need to know food is on its way
 	if o.OrderStatus == orderDomain.OrderStatusAwaitingUp || o.OrderStatus == orderDomain.OrderStatusOutForDelivery {
 		go func() {
 			ctx, cancel := emailContext()
@@ -535,24 +537,6 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			err = es.SendOrderReadyEmail(*user, lang, *o)
 			if err != nil {
 				zap.L().Error("failed to send order ready email", zap.String("order_id", o.ID.String()), zap.Error(err))
-			}
-		}()
-	}
-
-	// If new status is "PICKED_UP" or "DELIVERED", send the order completed email
-	if o.OrderStatus == orderDomain.OrderStatusPickedUp || o.OrderStatus == orderDomain.OrderStatusDelivered {
-		go func() {
-			ctx, cancel := emailContext()
-			defer cancel()
-			user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
-			if err != nil {
-				zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
-				return
-			}
-
-			err = es.SendOrderCompletedEmail(*user, lang)
-			if err != nil {
-				zap.L().Error("failed to send order completed email", zap.String("order_id", o.ID.String()), zap.Error(err))
 			}
 		}()
 	}
