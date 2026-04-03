@@ -261,6 +261,7 @@ type ComplexityRoot struct {
 		BoxNumbers            func(childComplexity int, streetID string, houseNumber string) int
 		Coupon                func(childComplexity int, id uuid.UUID) int
 		Coupons               func(childComplexity int) int
+		CustomerOrders        func(childComplexity int, userID uuid.UUID, first *int, page *int) int
 		CustomerStats         func(childComplexity int, input *model.CustomerStatsInput) int
 		HouseNumbers          func(childComplexity int, streetID string) int
 		Me                    func(childComplexity int) int
@@ -380,6 +381,7 @@ type QueryResolver interface {
 	Coupon(ctx context.Context, id uuid.UUID) (*model.Coupon, error)
 	Orders(ctx context.Context) ([]*model.Order, error)
 	Order(ctx context.Context, id uuid.UUID) (*model.Order, error)
+	CustomerOrders(ctx context.Context, userID uuid.UUID, first *int, page *int) ([]*model.Order, error)
 	MyOrders(ctx context.Context, first *int, page *int) ([]*model.Order, error)
 	MyOrder(ctx context.Context, id uuid.UUID) (*model.Order, error)
 	Product(ctx context.Context, id uuid.UUID) (*model.Product, error)
@@ -1526,6 +1528,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Coupons(childComplexity), true
+	case "Query.customerOrders":
+		if e.ComplexityRoot.Query.CustomerOrders == nil {
+			break
+		}
+
+		args, err := ec.field_Query_customerOrders_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.CustomerOrders(childComplexity, args["userId"].(uuid.UUID), args["first"].(*int), args["page"].(*int)), true
 	case "Query.customerStats":
 		if e.ComplexityRoot.Query.CustomerStats == nil {
 			break
@@ -2284,6 +2297,27 @@ func (ec *executionContext) field_Query_coupon_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_customerOrders_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "userId", ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["userId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "first", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "page", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["page"] = arg2
 	return args, nil
 }
 
@@ -8955,6 +8989,108 @@ func (ec *executionContext) fieldContext_Query_order(ctx context.Context, field 
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_customerOrders(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_customerOrders,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().CustomerOrders(ctx, fc.Args["userId"].(uuid.UUID), fc.Args["first"].(*int), fc.Args["page"].(*int))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal []*model.Order
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNOrder2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_customerOrders(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Order_id(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Order_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_Order_updatedAt(ctx, field)
+			case "status":
+				return ec.fieldContext_Order_status(ctx, field)
+			case "type":
+				return ec.fieldContext_Order_type(ctx, field)
+			case "isOnlinePayment":
+				return ec.fieldContext_Order_isOnlinePayment(ctx, field)
+			case "discountAmount":
+				return ec.fieldContext_Order_discountAmount(ctx, field)
+			case "deliveryFee":
+				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "totalPrice":
+				return ec.fieldContext_Order_totalPrice(ctx, field)
+			case "preferredReadyTime":
+				return ec.fieldContext_Order_preferredReadyTime(ctx, field)
+			case "estimatedReadyTime":
+				return ec.fieldContext_Order_estimatedReadyTime(ctx, field)
+			case "addressExtra":
+				return ec.fieldContext_Order_addressExtra(ctx, field)
+			case "orderNote":
+				return ec.fieldContext_Order_orderNote(ctx, field)
+			case "orderExtra":
+				return ec.fieldContext_Order_orderExtra(ctx, field)
+			case "couponCode":
+				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "address":
+				return ec.fieldContext_Order_address(ctx, field)
+			case "customer":
+				return ec.fieldContext_Order_customer(ctx, field)
+			case "payment":
+				return ec.fieldContext_Order_payment(ctx, field)
+			case "items":
+				return ec.fieldContext_Order_items(ctx, field)
+			case "isManualAddress":
+				return ec.fieldContext_Order_isManualAddress(ctx, field)
+			case "statusHistory":
+				return ec.fieldContext_Order_statusHistory(ctx, field)
+			case "displayCustomerName":
+				return ec.fieldContext_Order_displayCustomerName(ctx, field)
+			case "displayAddress":
+				return ec.fieldContext_Order_displayAddress(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Order", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_customerOrders_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_myOrders(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -15302,6 +15438,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_order(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "customerOrders":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_customerOrders(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
