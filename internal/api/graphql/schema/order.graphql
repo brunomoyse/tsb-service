@@ -100,6 +100,7 @@ input UpdateOrderInput {
 extend type Query {
     orders: [Order!]! @admin
     order(id: ID!): Order! @admin
+    customerOrders(userId: ID!, first: Int = 20, page: Int = 1): [Order!]! @admin
     myOrders (first: Int = 5, page: Int = 1): [Order!]! @auth
     myOrder(id: ID!): Order! @auth
 }

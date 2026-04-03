@@ -992,7 +992,7 @@ func (r *orderItemResolver) Choice(ctx context.Context, obj *model.OrderItem) (*
 
 // Orders is the resolver for the orders field.
 func (r *queryResolver) Orders(ctx context.Context) ([]*model.Order, error) {
-	o, err := r.OrderService.GetPaginatedOrders(ctx, 1, 20, nil)
+	o, err := r.OrderService.GetPaginatedOrders(ctx, 1, 200, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get orders: %w", err)
 	}
@@ -1019,6 +1019,31 @@ func (r *queryResolver) Order(ctx context.Context, id uuid.UUID) (*model.Order, 
 	order := ToGQLOrder(o)
 
 	return order, nil
+}
+
+// CustomerOrders is the resolver for the customerOrders field.
+func (r *queryResolver) CustomerOrders(ctx context.Context, userID uuid.UUID, first *int, page *int) ([]*model.Order, error) {
+	const (
+		defaultFirst = 20
+		defaultPage  = 1
+	)
+	f := defaultFirst
+	if first != nil && *first > 0 {
+		f = *first
+	}
+	p := defaultPage
+	if page != nil && *page > 0 {
+		p = *page
+	}
+
+	o, err := r.OrderService.GetPaginatedOrders(ctx, p, f, &userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get customer orders: %w", err)
+	}
+
+	return Map(o, func(order *orderDomain.Order) *model.Order {
+		return ToGQLOrder(order)
+	}), nil
 }
 
 // MyOrders is the resolver for the myOrders field.
