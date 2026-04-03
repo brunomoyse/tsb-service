@@ -97,10 +97,32 @@ input UpdateOrderInput {
     estimatedReadyTime: DateTime
 }
 
+input OrderHistoryInput {
+    startDate: DateTime
+    endDate: DateTime
+    status: OrderStatusEnum
+    orderType: OrderTypeEnum
+    search: String
+    first: Int = 20
+    page: Int = 1
+}
+
+type OrderHistorySummary {
+    totalOrders: Int!
+    totalRevenue: String!
+    averageOrder: String!
+}
+
+type OrderHistoryResponse {
+    orders: [Order!]!
+    summary: OrderHistorySummary!
+}
+
 extend type Query {
     orders: [Order!]! @admin
     order(id: ID!): Order! @admin
     customerOrders(userId: ID!, first: Int = 20, page: Int = 1): [Order!]! @admin
+    orderHistory(input: OrderHistoryInput): OrderHistoryResponse! @admin
     myOrders (first: Int = 5, page: Int = 1): [Order!]! @auth
     myOrder(id: ID!): Order! @auth
 }

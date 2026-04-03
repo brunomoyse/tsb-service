@@ -1046,6 +1046,53 @@ func (r *queryResolver) CustomerOrders(ctx context.Context, userID uuid.UUID, fi
 	}), nil
 }
 
+// OrderHistory is the resolver for the orderHistory field.
+func (r *queryResolver) OrderHistory(ctx context.Context, input *model.OrderHistoryInput) (*model.OrderHistoryResponse, error) {
+	filter := orderDomain.OrderHistoryFilter{
+		Page:  1,
+		Limit: 20,
+	}
+
+	if input != nil {
+		if input.First != nil && *input.First > 0 {
+			filter.Limit = *input.First
+		}
+		if input.Page != nil && *input.Page > 0 {
+			filter.Page = *input.Page
+		}
+		filter.StartDate = input.StartDate
+		filter.EndDate = input.EndDate
+		filter.Search = input.Search
+
+		if input.Status != nil {
+			s := orderDomain.OrderStatus(*input.Status)
+			filter.Status = &s
+		}
+		if input.OrderType != nil {
+			t := orderDomain.OrderType(*input.OrderType)
+			filter.OrderType = &t
+		}
+	}
+
+	orders, summary, err := r.OrderService.GetOrderHistory(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order history: %w", err)
+	}
+
+	gqlOrders := Map(orders, func(order *orderDomain.Order) *model.Order {
+		return ToGQLOrder(order)
+	})
+
+	return &model.OrderHistoryResponse{
+		Orders: gqlOrders,
+		Summary: &model.OrderHistorySummary{
+			TotalOrders:  summary.TotalOrders,
+			TotalRevenue: summary.TotalRevenue,
+			AverageOrder: summary.AverageOrder,
+		},
+	}, nil
+}
+
 // MyOrders is the resolver for the myOrders field.
 func (r *queryResolver) MyOrders(ctx context.Context, first *int, page *int) ([]*model.Order, error) {
 	const (
