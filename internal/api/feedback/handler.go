@@ -1,7 +1,10 @@
 package feedback
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -13,12 +16,41 @@ import (
 )
 
 type FeedbackRequest struct {
-	Name         string `json:"name" binding:"required,max=100"`
-	Email        string `json:"email" binding:"required,email,max=255"`
-	ServiceType  string `json:"serviceType" binding:"required,oneof=takeaway dine-in delivery"`
-	FeedbackType string `json:"feedbackType" binding:"required,oneof=improvement complaint compliment"`
-	Message      string `json:"message" binding:"required,min=10,max=2000"`
-	Website      string `json:"website"` // honeypot — should always be empty
+	Name           string `json:"name" binding:"required,max=100"`
+	Email          string `json:"email" binding:"required,email,max=255"`
+	ServiceType    string `json:"serviceType" binding:"required,oneof=takeaway dine-in delivery"`
+	FeedbackType   string `json:"feedbackType" binding:"required,oneof=improvement complaint compliment"`
+	Message        string `json:"message" binding:"required,min=10,max=2000"`
+	Website        string `json:"website"`        // honeypot — should always be empty
+	TurnstileToken string `json:"turnstileToken"` // Cloudflare Turnstile token
+}
+
+type turnstileResponse struct {
+	Success bool `json:"success"`
+}
+
+func verifyTurnstile(token, remoteIP string) bool {
+	secret := os.Getenv("TURNSTILE_SECRET_KEY")
+	if secret == "" {
+		// Turnstile not configured — skip verification
+		return true
+	}
+
+	resp, err := http.PostForm("https://challenges.cloudflare.com/turnstile/v0/siteverify", url.Values{
+		"secret":   {secret},
+		"response": {token},
+		"remoteip": {remoteIP},
+	})
+	if err != nil {
+		return false
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var result turnstileResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return false
+	}
+	return result.Success
 }
 
 func HandleFeedback(c *gin.Context) {
@@ -34,6 +66,13 @@ func HandleFeedback(c *gin.Context) {
 	// Return 200 to not tip off the bot.
 	if req.Website != "" {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		return
+	}
+
+	// Verify Turnstile token
+	if !verifyTurnstile(req.TurnstileToken, c.ClientIP()) {
+		log.Warn("turnstile verification failed", zap.String("client_ip", c.ClientIP()))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "captcha_failed"})
 		return
 	}
 
