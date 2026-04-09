@@ -127,7 +127,7 @@ require (
 )
 
 require (
-	github.com/VictorAvelar/mollie-api-go/v4 v4.15.0
+	github.com/VictorAvelar/mollie-api-go/v4 v4.16.0
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
