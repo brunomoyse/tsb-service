@@ -22,9 +22,16 @@ type OpeningHours map[string]*DaySchedule
 // RestaurantConfig represents the single-row restaurant configuration.
 type RestaurantConfig struct {
 	OrderingEnabled bool            `db:"ordering_enabled" json:"orderingEnabled"`
-	OpeningHours  json.RawMessage `db:"opening_hours" json:"openingHours"`
-	OrderingHours json.RawMessage `db:"ordering_hours" json:"orderingHours"`
-	UpdatedAt     time.Time       `db:"updated_at" json:"updatedAt"`
+	// SystemDisableReason is populated when ordering was disabled
+	// automatically by the system (e.g. HubRise circuit breaker).
+	// NULL means either ordering is enabled, or the admin manually
+	// disabled it. The distinction lets tsb-core render a different
+	// message ("rappelez-nous" for system, generic otherwise) and
+	// lets admin manual toggles override automatic re-enables.
+	SystemDisableReason *string         `db:"system_disable_reason" json:"systemDisableReason"`
+	OpeningHours        json.RawMessage `db:"opening_hours" json:"openingHours"`
+	OrderingHours       json.RawMessage `db:"ordering_hours" json:"orderingHours"`
+	UpdatedAt           time.Time       `db:"updated_at" json:"updatedAt"`
 }
 
 // GetOpeningHours parses the JSONB opening_hours into a typed map.

@@ -67,6 +67,12 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 
 	// 3. Map domain → GraphQL and return
 	gqlProd := ToGQLProduct(prod, userLang)
+
+	// 4. Trigger async HubRise catalog push (debounced).
+	if r.ChangeLogger != nil {
+		r.ChangeLogger.AfterCommit(ctx)
+	}
+
 	return gqlProd, nil
 }
 
@@ -179,6 +185,11 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 	gqlProd := ToGQLProduct(prod, userLang)
 	r.Broker.Publish("productUpdated", gqlProd)
 
+	// 9. Trigger async HubRise catalog push (debounced).
+	if r.ChangeLogger != nil {
+		r.ChangeLogger.AfterCommit(ctx)
+	}
+
 	return gqlProd, nil
 }
 
@@ -212,6 +223,9 @@ func (r *mutationResolver) CreateProductChoice(ctx context.Context, input model.
 		return nil, fmt.Errorf("failed to create product choice: %w", err)
 	}
 
+	if r.ChangeLogger != nil {
+		r.ChangeLogger.AfterCommit(ctx)
+	}
 	return ToGQLProductChoice(choice, userLang), nil
 }
 
@@ -251,6 +265,9 @@ func (r *mutationResolver) UpdateProductChoice(ctx context.Context, id uuid.UUID
 		return nil, fmt.Errorf("failed to update product choice: %w", err)
 	}
 
+	if r.ChangeLogger != nil {
+		r.ChangeLogger.AfterCommit(ctx)
+	}
 	return ToGQLProductChoice(choice, userLang), nil
 }
 
@@ -258,6 +275,9 @@ func (r *mutationResolver) UpdateProductChoice(ctx context.Context, id uuid.UUID
 func (r *mutationResolver) DeleteProductChoice(ctx context.Context, id uuid.UUID) (bool, error) {
 	if err := r.ProductService.DeleteChoice(ctx, id); err != nil {
 		return false, fmt.Errorf("failed to delete product choice: %w", err)
+	}
+	if r.ChangeLogger != nil {
+		r.ChangeLogger.AfterCommit(ctx)
 	}
 	return true, nil
 }

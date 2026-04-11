@@ -7,6 +7,10 @@ type DaySchedule {
 
 type RestaurantConfig {
     orderingEnabled: Boolean!
+    # Populated when ordering was disabled automatically by the
+    # system (e.g. HubRise circuit breaker). NULL means either
+    # ordering is enabled or the admin manually disabled it.
+    systemDisableReason: String
     openingHours: JSON!
     orderingHours: JSON
     isCurrentlyOpen: Boolean!

@@ -295,6 +295,7 @@ type Query struct {
 
 type RestaurantConfig struct {
 	OrderingEnabled         bool           `json:"orderingEnabled"`
+	SystemDisableReason     *string        `json:"systemDisableReason,omitempty"`
 	OpeningHours            map[string]any `json:"openingHours"`
 	OrderingHours           map[string]any `json:"orderingHours,omitempty"`
 	IsCurrentlyOpen         bool           `json:"isCurrentlyOpen"`
