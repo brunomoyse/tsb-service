@@ -298,6 +298,7 @@ type ComplexityRoot struct {
 		OpeningHours            func(childComplexity int) int
 		OrderingEnabled         func(childComplexity int) int
 		OrderingHours           func(childComplexity int) int
+		SystemDisableReason     func(childComplexity int) int
 		UpdatedAt               func(childComplexity int) int
 	}
 
@@ -1774,6 +1775,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.RestaurantConfig.OrderingHours(childComplexity), true
+	case "RestaurantConfig.systemDisableReason":
+		if e.ComplexityRoot.RestaurantConfig.SystemDisableReason == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RestaurantConfig.SystemDisableReason(childComplexity), true
 	case "RestaurantConfig.updatedAt":
 		if e.ComplexityRoot.RestaurantConfig.UpdatedAt == nil {
 			break
@@ -5069,6 +5076,8 @@ func (ec *executionContext) fieldContext_Mutation_updateOrderingEnabled(ctx cont
 			switch field.Name {
 			case "orderingEnabled":
 				return ec.fieldContext_RestaurantConfig_orderingEnabled(ctx, field)
+			case "systemDisableReason":
+				return ec.fieldContext_RestaurantConfig_systemDisableReason(ctx, field)
 			case "openingHours":
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
 			case "orderingHours":
@@ -5137,6 +5146,8 @@ func (ec *executionContext) fieldContext_Mutation_updateOpeningHours(ctx context
 			switch field.Name {
 			case "orderingEnabled":
 				return ec.fieldContext_RestaurantConfig_orderingEnabled(ctx, field)
+			case "systemDisableReason":
+				return ec.fieldContext_RestaurantConfig_systemDisableReason(ctx, field)
 			case "openingHours":
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
 			case "orderingHours":
@@ -5205,6 +5216,8 @@ func (ec *executionContext) fieldContext_Mutation_updateOrderingHours(ctx contex
 			switch field.Name {
 			case "orderingEnabled":
 				return ec.fieldContext_RestaurantConfig_orderingEnabled(ctx, field)
+			case "systemDisableReason":
+				return ec.fieldContext_RestaurantConfig_systemDisableReason(ctx, field)
 			case "openingHours":
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
 			case "orderingHours":
@@ -9934,6 +9947,8 @@ func (ec *executionContext) fieldContext_Query_restaurantConfig(_ context.Contex
 			switch field.Name {
 			case "orderingEnabled":
 				return ec.fieldContext_RestaurantConfig_orderingEnabled(ctx, field)
+			case "systemDisableReason":
+				return ec.fieldContext_RestaurantConfig_systemDisableReason(ctx, field)
 			case "openingHours":
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
 			case "orderingHours":
@@ -10207,6 +10222,35 @@ func (ec *executionContext) fieldContext_RestaurantConfig_orderingEnabled(_ cont
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RestaurantConfig_systemDisableReason(ctx context.Context, field graphql.CollectedField, obj *model.RestaurantConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RestaurantConfig_systemDisableReason,
+		func(ctx context.Context) (any, error) {
+			return obj.SystemDisableReason, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_RestaurantConfig_systemDisableReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RestaurantConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -10916,6 +10960,8 @@ func (ec *executionContext) fieldContext_Subscription_restaurantConfigUpdated(_ 
 			switch field.Name {
 			case "orderingEnabled":
 				return ec.fieldContext_RestaurantConfig_orderingEnabled(ctx, field)
+			case "systemDisableReason":
+				return ec.fieldContext_RestaurantConfig_systemDisableReason(ctx, field)
 			case "openingHours":
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
 			case "orderingHours":
@@ -16309,6 +16355,8 @@ func (ec *executionContext) _RestaurantConfig(ctx context.Context, sel ast.Selec
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "systemDisableReason":
+			out.Values[i] = ec._RestaurantConfig_systemDisableReason(ctx, field, obj)
 		case "openingHours":
 			out.Values[i] = ec._RestaurantConfig_openingHours(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
