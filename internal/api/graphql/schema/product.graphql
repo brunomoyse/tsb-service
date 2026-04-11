@@ -14,6 +14,10 @@ type Product {
     price: String!
     slug: String!
 
+    # Belgian VAT categorization — one of: food, beverage, zero_rated, out_of_scope.
+    # The concrete VAT rate / SCE 2.0 code depends on the order service type.
+    vatCategory: String!
+
     # Generated based on Accept-Language header
     name: String!
     description: String
@@ -70,6 +74,7 @@ input CreateProductInput {
     isVisible: Boolean!
     pieceCount: Int
     price: String!
+    vatCategory: String!
     translations: [TranslationInput!]!
 }
 
@@ -85,6 +90,7 @@ input UpdateProductInput {
     isVisible: Boolean
     pieceCount: Int
     price: String
+    vatCategory: String
     translations: [TranslationInput!]
 }
 

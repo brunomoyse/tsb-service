@@ -109,6 +109,7 @@ type CreateProductInput struct {
 	IsVisible      bool                `json:"isVisible"`
 	PieceCount     *int                `json:"pieceCount,omitempty"`
 	Price          string              `json:"price"`
+	VatCategory    string              `json:"vatCategory"`
 	Translations   []*TranslationInput `json:"translations"`
 }
 
@@ -264,6 +265,7 @@ type Product struct {
 	PieceCount     *int             `json:"pieceCount,omitempty"`
 	Price          string           `json:"price"`
 	Slug           string           `json:"slug"`
+	VatCategory    string           `json:"vatCategory"`
 	Name           string           `json:"name"`
 	Description    *string          `json:"description,omitempty"`
 	Category       *ProductCategory `json:"category"`
@@ -357,6 +359,7 @@ type UpdateProductInput struct {
 	IsVisible      *bool               `json:"isVisible,omitempty"`
 	PieceCount     *int                `json:"pieceCount,omitempty"`
 	Price          *string             `json:"price,omitempty"`
+	VatCategory    *string             `json:"vatCategory,omitempty"`
 	Translations   []*TranslationInput `json:"translations,omitempty"`
 }
 

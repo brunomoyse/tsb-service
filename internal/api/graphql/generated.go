@@ -247,6 +247,7 @@ type ComplexityRoot struct {
 		Price          func(childComplexity int) int
 		Slug           func(childComplexity int) int
 		Translations   func(childComplexity int) int
+		VatCategory    func(childComplexity int) int
 	}
 
 	ProductCategory struct {
@@ -1454,6 +1455,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Product.Translations(childComplexity), true
+	case "Product.vatCategory":
+		if e.ComplexityRoot.Product.VatCategory == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Product.VatCategory(childComplexity), true
 
 	case "ProductCategory.id":
 		if e.ComplexityRoot.ProductCategory.ID == nil {
@@ -4710,6 +4717,8 @@ func (ec *executionContext) fieldContext_Mutation_createProduct(ctx context.Cont
 				return ec.fieldContext_Product_price(ctx, field)
 			case "slug":
 				return ec.fieldContext_Product_slug(ctx, field)
+			case "vatCategory":
+				return ec.fieldContext_Product_vatCategory(ctx, field)
 			case "name":
 				return ec.fieldContext_Product_name(ctx, field)
 			case "description":
@@ -4800,6 +4809,8 @@ func (ec *executionContext) fieldContext_Mutation_updateProduct(ctx context.Cont
 				return ec.fieldContext_Product_price(ctx, field)
 			case "slug":
 				return ec.fieldContext_Product_slug(ctx, field)
+			case "vatCategory":
+				return ec.fieldContext_Product_vatCategory(ctx, field)
 			case "name":
 				return ec.fieldContext_Product_name(ctx, field)
 			case "description":
@@ -6481,6 +6492,8 @@ func (ec *executionContext) fieldContext_OrderItem_product(_ context.Context, fi
 				return ec.fieldContext_Product_price(ctx, field)
 			case "slug":
 				return ec.fieldContext_Product_slug(ctx, field)
+			case "vatCategory":
+				return ec.fieldContext_Product_vatCategory(ctx, field)
 			case "name":
 				return ec.fieldContext_Product_name(ctx, field)
 			case "description":
@@ -8020,6 +8033,35 @@ func (ec *executionContext) fieldContext_Product_slug(_ context.Context, field g
 	return fc, nil
 }
 
+func (ec *executionContext) _Product_vatCategory(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Product_vatCategory,
+		func(ctx context.Context) (any, error) {
+			return obj.VatCategory, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Product_vatCategory(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Product",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Product_name(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8334,6 +8376,8 @@ func (ec *executionContext) fieldContext_ProductCategory_products(_ context.Cont
 				return ec.fieldContext_Product_price(ctx, field)
 			case "slug":
 				return ec.fieldContext_Product_slug(ctx, field)
+			case "vatCategory":
+				return ec.fieldContext_Product_vatCategory(ctx, field)
 			case "name":
 				return ec.fieldContext_Product_name(ctx, field)
 			case "description":
@@ -9673,6 +9717,8 @@ func (ec *executionContext) fieldContext_Query_product(ctx context.Context, fiel
 				return ec.fieldContext_Product_price(ctx, field)
 			case "slug":
 				return ec.fieldContext_Product_slug(ctx, field)
+			case "vatCategory":
+				return ec.fieldContext_Product_vatCategory(ctx, field)
 			case "name":
 				return ec.fieldContext_Product_name(ctx, field)
 			case "description":
@@ -9749,6 +9795,8 @@ func (ec *executionContext) fieldContext_Query_products(_ context.Context, field
 				return ec.fieldContext_Product_price(ctx, field)
 			case "slug":
 				return ec.fieldContext_Product_slug(ctx, field)
+			case "vatCategory":
+				return ec.fieldContext_Product_vatCategory(ctx, field)
 			case "name":
 				return ec.fieldContext_Product_name(ctx, field)
 			case "description":
@@ -10823,6 +10871,8 @@ func (ec *executionContext) fieldContext_Subscription_productUpdated(_ context.C
 				return ec.fieldContext_Product_price(ctx, field)
 			case "slug":
 				return ec.fieldContext_Product_slug(ctx, field)
+			case "vatCategory":
+				return ec.fieldContext_Product_vatCategory(ctx, field)
 			case "name":
 				return ec.fieldContext_Product_name(ctx, field)
 			case "description":
@@ -13120,7 +13170,7 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"categoryId", "code", "image", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegan", "isVisible", "pieceCount", "price", "translations"}
+	fieldsInOrder := [...]string{"categoryId", "code", "image", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegan", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -13204,6 +13254,13 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Price = data
+		case "vatCategory":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("vatCategory"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.VatCategory = data
 		case "translations":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("translations"))
 			data, err := ec.unmarshalNTranslationInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTranslationInputᚄ(ctx, v)
@@ -13728,7 +13785,7 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"categoryID", "code", "image", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegan", "isVisible", "pieceCount", "price", "translations"}
+	fieldsInOrder := [...]string{"categoryID", "code", "image", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegan", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -13812,6 +13869,13 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Price = data
+		case "vatCategory":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("vatCategory"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.VatCategory = data
 		case "translations":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("translations"))
 			data, err := ec.unmarshalOTranslationInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTranslationInputᚄ(ctx, v)
@@ -15364,6 +15428,11 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "slug":
 			out.Values[i] = ec._Product_slug(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "vatCategory":
+			out.Values[i] = ec._Product_vatCategory(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}

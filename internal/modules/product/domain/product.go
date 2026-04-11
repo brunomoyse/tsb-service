@@ -21,6 +21,7 @@ type Product struct {
 	IsVegan        bool            `db:"is_vegan" json:"isVegan"`
 	IsSpicy        bool            `db:"is_spicy" json:"isSpicy"`
 	IsDiscountable bool            `db:"is_discountable" json:"isDiscountable"`
+	VatCategory    VatCategory     `db:"vat_category" json:"vatCategory"`
 	CategoryID     uuid.UUID       `db:"category_id" json:"categoryId"`
 	CreatedAt      time.Time       `db:"created_at" json:"createdAt"`
 	UpdatedAt      time.Time       `db:"updated_at" json:"updatedAt"`
@@ -64,7 +65,7 @@ type ProductOrderDetails struct {
 	IsDiscountable bool            `db:"is_discountable" json:"isDiscountable"`
 }
 
-func NewProduct(price decimal.Decimal, categoryID uuid.UUID, isVisible bool, isAvailable bool, translations []Translation) (*Product, error) {
+func NewProduct(price decimal.Decimal, categoryID uuid.UUID, isVisible bool, isAvailable bool, vatCategory VatCategory, translations []Translation) (*Product, error) {
 	if isVisible {
 		// For visible products, require at least 3 translations.
 		if len(translations) < 3 {
@@ -78,11 +79,16 @@ func NewProduct(price decimal.Decimal, categoryID uuid.UUID, isVisible bool, isA
 		}
 	}
 
+	if !vatCategory.IsValid() {
+		return nil, errors.New("invalid vat category")
+	}
+
 	return &Product{
 		ID:           uuid.New(),
 		Price:        price,
 		IsVisible:    isVisible,
 		IsAvailable:  isAvailable,
+		VatCategory:  vatCategory,
 		CategoryID:   categoryID,
 		Translations: translations,
 	}, nil
