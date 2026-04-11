@@ -33,6 +33,11 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 		return nil, fmt.Errorf("invalid price format: %w", err)
 	}
 
+	vatCategory := domain.VatCategory(input.VatCategory)
+	if !vatCategory.IsValid() {
+		return nil, fmt.Errorf("invalid vatCategory: %q", input.VatCategory)
+	}
+
 	prod, err := r.ProductService.CreateProduct(
 		ctx,
 		input.CategoryID,
@@ -45,6 +50,7 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 		input.IsVegan,
 		input.IsSpicy,
 		input.IsDiscountable,
+		vatCategory,
 		toDomainTranslations(input.Translations),
 	)
 
@@ -108,6 +114,13 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 	}
 	if input.IsSpicy != nil {
 		prod.IsSpicy = *input.IsSpicy
+	}
+	if input.VatCategory != nil {
+		vc := domain.VatCategory(*input.VatCategory)
+		if !vc.IsValid() {
+			return nil, fmt.Errorf("invalid vatCategory: %q", *input.VatCategory)
+		}
+		prod.VatCategory = vc
 	}
 	if input.Translations != nil {
 		prod.Translations = toDomainTranslationsPtr(input.Translations)

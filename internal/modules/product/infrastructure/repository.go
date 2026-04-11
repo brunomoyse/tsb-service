@@ -84,8 +84,8 @@ func (r *ProductRepository) Create(ctx context.Context, product *domain.Product)
 
 	// Insert the product.
 	query := `
-		INSERT INTO products (id, price, code, piece_count, slug, is_visible, is_available, is_halal, is_vegan, is_spicy, is_discountable, category_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		INSERT INTO products (id, price, code, piece_count, slug, is_visible, is_available, is_halal, is_vegan, is_spicy, is_discountable, vat_category, category_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
 	_, err = tx.ExecContext(ctx, query,
 		product.ID.String(),
@@ -99,6 +99,7 @@ func (r *ProductRepository) Create(ctx context.Context, product *domain.Product)
 		product.IsVegan,
 		product.IsSpicy,
 		product.IsDiscountable,
+		string(product.VatCategory),
 		product.CategoryID.String(),
 	)
 	if err != nil {
@@ -188,7 +189,8 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 		    is_vegan = $9,
 		    is_spicy = $10,
 		    is_discountable = $11,
-		    category_id = $12
+		    vat_category = $12,
+		    category_id = $13
 		WHERE id = $1
 	`
 	_, err = tx.ExecContext(ctx, updateQuery,
@@ -203,6 +205,7 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 		product.IsVegan,
 		product.IsSpicy,
 		product.IsDiscountable,
+		string(product.VatCategory),
 		product.CategoryID.String(),
 	)
 	if err != nil {
@@ -254,6 +257,7 @@ func (r *ProductRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain
             p.is_vegan,
             p.is_spicy,
             p.is_discountable,
+            p.vat_category,
             p.category_id,
             p.created_at,
             p.updated_at,
@@ -289,6 +293,7 @@ func (r *ProductRepository) FindAll(ctx context.Context) ([]*domain.Product, err
             p.is_vegan,
             p.is_spicy,
             p.is_discountable,
+            p.vat_category,
             p.category_id,
             p.created_at,
             p.updated_at,
@@ -379,7 +384,7 @@ func (r *ProductRepository) FindNamesByIDs(ctx context.Context, productIDs []str
 // FindByCategoryID retrieves products filtered by a specific category ID.
 func (r *ProductRepository) FindByCategoryID(ctx context.Context, categoryID string) ([]*domain.Product, error) {
 	query := `
-        SELECT 
+        SELECT
             p.id,
             p.price,
             p.code,
@@ -390,6 +395,8 @@ func (r *ProductRepository) FindByCategoryID(ctx context.Context, categoryID str
             p.is_halal,
             p.is_vegan,
             p.is_spicy,
+            p.is_discountable,
+            p.vat_category,
             p.category_id,
             p.created_at,
             p.updated_at,
@@ -575,6 +582,7 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 		IsVegan          bool            `db:"is_vegan"`
 		IsSpicy          bool            `db:"is_spicy"`
 		IsDiscountable   bool            `db:"is_discountable"`
+		VatCategory      string          `db:"vat_category"`
 		CategoryID       string          `db:"category_id"`
 		CreatedAt        time.Time       `db:"created_at"`
 		UpdatedAt        time.Time       `db:"updated_at"`
@@ -611,6 +619,7 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 				IsVegan:        row.IsVegan,
 				IsSpicy:        row.IsSpicy,
 				IsDiscountable: row.IsDiscountable,
+				VatCategory:    domain.VatCategory(row.VatCategory),
 				CategoryID:     categoryID,
 				CreatedAt:      row.CreatedAt,
 				UpdatedAt:      row.UpdatedAt,
@@ -813,6 +822,7 @@ func (r *ProductRepository) FindByCategoryIDs(ctx context.Context, categoryIDs [
             p.is_vegan,
             p.is_spicy,
             p.is_discountable,
+            p.vat_category,
             p.category_id,
             p.created_at,
             p.updated_at,
@@ -860,6 +870,7 @@ func (r *ProductRepository) BatchGetProductByIDs(ctx context.Context, productIDs
             p.is_vegan,
             p.is_spicy,
             p.is_discountable,
+            p.vat_category,
             p.category_id,
             p.created_at,
             p.updated_at,
