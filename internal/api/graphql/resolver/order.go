@@ -381,8 +381,12 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	// 10) Map to GraphQL model
 	gql := ToGQLOrder(order)
 
-	// 11) Publish subscription
-	r.Broker.Publish("orderCreated", gql)
+	// 11) Publish subscription. Online-payment orders are only published to
+	// the admin dashboard once the Mollie webhook confirms payment (see
+	// payment/interfaces/handler.go) — unpaid orders are not actionable.
+	if !input.IsOnlinePayment {
+		r.Broker.Publish("orderCreated", gql)
+	}
 
 	// 12) Send push notification to admin devices (non-blocking)
 	if r.FCMClient != nil || r.APNsClient != nil {
