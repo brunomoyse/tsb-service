@@ -1,0 +1,22 @@
+type PosDevice {
+    id: ID!
+    label: String!
+    serialNumber: String!
+    registeredAt: DateTime!
+    lastSeenAt: DateTime
+    revokedAt: DateTime
+}
+
+extend type User {
+    rrn: String @admin
+}
+
+extend type Query {
+    posDevices: [PosDevice!]! @admin
+}
+
+extend type Mutation {
+    setUserRrn(userId: ID!, rrn: String!): User! @admin
+    setUserPin(userId: ID!, pin: String!): User! @admin
+    revokePosDevice(id: ID!): PosDevice! @admin
+}

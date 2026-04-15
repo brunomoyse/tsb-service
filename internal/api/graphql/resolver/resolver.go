@@ -24,6 +24,7 @@ import (
 	notificationApplication "tsb-service/internal/modules/notification/application"
 	orderApplication "tsb-service/internal/modules/order/application"
 	paymentApplication "tsb-service/internal/modules/payment/application"
+	posApplication "tsb-service/internal/modules/pos/application"
 	productApplication "tsb-service/internal/modules/product/application"
 	restaurantApplication "tsb-service/internal/modules/restaurant/application"
 	userApplication "tsb-service/internal/modules/user/application"
@@ -46,6 +47,7 @@ type Resolver struct {
 	ProductService      productApplication.ProductService
 	RestaurantService   restaurantApplication.RestaurantService
 	UserService         userApplication.UserService
+	PosService          *posApplication.Service
 }
 
 // NewResolver constructs the Resolver with required services.
@@ -61,6 +63,7 @@ func NewResolver(
 	productService productApplication.ProductService,
 	restaurantService restaurantApplication.RestaurantService,
 	userService userApplication.UserService,
+	posService *posApplication.Service,
 ) *Resolver {
 	return &Resolver{
 		Broker:              broker,
@@ -74,6 +77,7 @@ func NewResolver(
 		ProductService:      productService,
 		RestaurantService:   restaurantService,
 		UserService:         userService,
+		PosService:          posService,
 	}
 }
 

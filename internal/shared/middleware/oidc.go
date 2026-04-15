@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/zitadel/zitadel-go/v3/pkg/authorization"
 	"github.com/zitadel/zitadel-go/v3/pkg/authorization/oauth"
 	"github.com/zitadel/zitadel-go/v3/pkg/zitadel"
@@ -42,10 +43,19 @@ type UserLookup interface {
 	ResolveZitadelID(ctx context.Context, zitadelID, email, firstName, lastName string) (appUserID string, err error)
 }
 
+// AppJWTVerifier is a secondary verifier for tsb-service-signed JWTs issued by
+// the POS /auth/rrn-login endpoint. It lets shop-floor devices hit GraphQL with
+// an app token instead of a Zitadel JWT — see internal/modules/pos.
+type AppJWTVerifier interface {
+	VerifyAccessToken(token string) (userID uuid.UUID, isAdmin bool, err error)
+}
+
 // OIDCVerifier validates Zitadel JWTs via JWKS (no network call per request).
+// Optionally verifies app-signed POS JWTs as a fallback when Zitadel validation fails.
 type OIDCVerifier struct {
 	authorizer *authorization.Authorizer[*oauth.IntrospectionContext]
 	userLookup UserLookup
+	appJWT     AppJWTVerifier // optional
 }
 
 // NewOIDCVerifier initializes the Zitadel Go SDK authorizer for local JWT validation.
@@ -100,6 +110,31 @@ func NewOIDCVerifier(ctx context.Context, issuerURL, internalURL, clientID strin
 	return &OIDCVerifier{authorizer: authZ, userLookup: userLookup}, nil
 }
 
+// SetAppJWTVerifier registers the optional POS JWT verifier. Call this after
+// constructing the POS service so StrictAuth / OptionalAuth fall back to it
+// when a bearer token is not a valid Zitadel JWT.
+func (v *OIDCVerifier) SetAppJWTVerifier(appJWT AppJWTVerifier) {
+	v.appJWT = appJWT
+}
+
+// tryVerifyAppJWT attempts to validate a POS-issued HS256 token. Returns true
+// on success and populates userID/isAdmin in the Gin context exactly like the
+// Zitadel path would.
+func (v *OIDCVerifier) tryVerifyAppJWT(c *gin.Context, tokenStr string) bool {
+	if v.appJWT == nil {
+		return false
+	}
+	userID, isAdmin, err := v.appJWT.VerifyAccessToken(tokenStr)
+	if err != nil || userID == uuid.Nil {
+		return false
+	}
+	ctx := utils.SetUserID(c.Request.Context(), userID.String())
+	ctx = utils.SetIsAdmin(ctx, isAdmin)
+	c.Request = c.Request.WithContext(ctx)
+	c.Set(string(utils.UserIDKey), userID.String())
+	return true
+}
+
 // extractToken gets the token from Authorization header (or cookie as fallback).
 func extractToken(c *gin.Context) string {
 	if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
@@ -150,7 +185,8 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 	return true
 }
 
-// StrictAuthMiddleware validates a Zitadel JWT and aborts with 401 if invalid.
+// StrictAuthMiddleware validates a Zitadel JWT (or an app-signed POS JWT) and
+// aborts with 401 if both paths reject the token.
 func (v *OIDCVerifier) StrictAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := extractToken(c)
@@ -159,33 +195,47 @@ func (v *OIDCVerifier) StrictAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		if !v.verifyAndSetContext(c, tokenStr) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+		if v.verifyAndSetContext(c, tokenStr) {
+			c.Next()
 			return
 		}
-
-		c.Next()
+		if v.tryVerifyAppJWT(c, tokenStr) {
+			c.Next()
+			return
+		}
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 	}
 }
 
-// OptionalAuthMiddleware parses a Zitadel JWT if present. Never aborts.
+// OptionalAuthMiddleware parses a Zitadel JWT (or POS app JWT) if present.
+// Never aborts — unauthenticated requests pass through with no context values.
 func (v *OIDCVerifier) OptionalAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := extractToken(c)
-		if tokenStr != "" {
-			v.verifyAndSetContext(c, tokenStr)
+		if tokenStr == "" {
+			c.Next()
+			return
+		}
+		if !v.verifyAndSetContext(c, tokenStr) {
+			v.tryVerifyAppJWT(c, tokenStr)
 		}
 		c.Next()
 	}
 }
 
 // VerifyToken verifies a raw JWT string and returns the subject and admin status.
-// Used by WebSocket InitFunc. Returns the raw Zitadel sub (no DB lookup).
+// Used by the GraphQL WebSocket InitFunc. Tries Zitadel first, then falls back
+// to the POS app JWT verifier. Returns the raw Zitadel sub (no DB lookup) for
+// Zitadel tokens, or the app user UUID for POS tokens.
 func (v *OIDCVerifier) VerifyToken(ctx context.Context, tokenStr string) (subject string, isAdmin bool, err error) {
-	authCtx, err := v.authorizer.CheckAuthorization(ctx, "Bearer "+tokenStr)
-	if err != nil {
-		return "", false, err
+	authCtx, zitadelErr := v.authorizer.CheckAuthorization(ctx, "Bearer "+tokenStr)
+	if zitadelErr == nil {
+		return authCtx.UserID(), authCtx.IsGrantedRole("admin"), nil
 	}
-
-	return authCtx.UserID(), authCtx.IsGrantedRole("admin"), nil
+	if v.appJWT != nil {
+		if uid, admin, appErr := v.appJWT.VerifyAccessToken(tokenStr); appErr == nil {
+			return uid.String(), admin, nil
+		}
+	}
+	return "", false, zitadelErr
 }
