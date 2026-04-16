@@ -148,7 +148,8 @@ func main() {
 
 	// OIDC verifier — validates JWTs via JWKS + resolves Zitadel sub → app user UUID
 	zitadelInternalURL := os.Getenv("ZITADEL_INTERNAL_URL") // Optional: internal Docker URL for OIDC discovery
-	oidcVerifier, err := middleware.NewOIDCVerifier(context.Background(), zitadelIssuer, zitadelInternalURL, zitadelClientID, userService)
+	zitadelProjectID := os.Getenv("ZITADEL_PROJECT_ID") // used for project-specific role claim fallback
+	oidcVerifier, err := middleware.NewOIDCVerifier(context.Background(), zitadelIssuer, zitadelInternalURL, zitadelClientID, zitadelProjectID, userService)
 	if err != nil {
 		zap.L().Error("failed to initialize OIDC verifier", zap.Error(err))
 		os.Exit(1)

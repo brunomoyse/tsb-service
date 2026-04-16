@@ -56,6 +56,7 @@ type OIDCVerifier struct {
 	authorizer *authorization.Authorizer[*oauth.IntrospectionContext]
 	userLookup UserLookup
 	appJWT     AppJWTVerifier // optional
+	projectID  string         // Zitadel project ID for project-specific role claim fallback
 }
 
 // NewOIDCVerifier initializes the Zitadel Go SDK authorizer for local JWT validation.
@@ -65,7 +66,11 @@ type OIDCVerifier struct {
 // domain is preserved as the Host header and issuer.
 // clientID is the audience expected in the JWT (the Zitadel project ID or app client ID).
 // userLookup resolves Zitadel sub → app user UUID (pass nil to skip, userID will be the raw Zitadel sub).
-func NewOIDCVerifier(ctx context.Context, issuerURL, internalURL, clientID string, userLookup UserLookup) (*OIDCVerifier, error) {
+// NewOIDCVerifier initializes the Zitadel Go SDK authorizer for local JWT validation.
+// projectID is the Zitadel project ID used to check the project-specific role claim
+// (urn:zitadel:iam:org:project:{projectID}:roles) as a fallback when the generic
+// role claim is not present in JWT access tokens.
+func NewOIDCVerifier(ctx context.Context, issuerURL, internalURL, clientID, projectID string, userLookup UserLookup) (*OIDCVerifier, error) {
 	parsed, err := url.Parse(issuerURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid issuer URL: %w", err)
@@ -107,7 +112,7 @@ func NewOIDCVerifier(ctx context.Context, issuerURL, internalURL, clientID strin
 		return nil, fmt.Errorf("failed to initialize Zitadel authorizer: %w", err)
 	}
 
-	return &OIDCVerifier{authorizer: authZ, userLookup: userLookup}, nil
+	return &OIDCVerifier{authorizer: authZ, userLookup: userLookup, projectID: projectID}, nil
 }
 
 // SetAppJWTVerifier registers the optional POS JWT verifier. Call this after
@@ -159,7 +164,13 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 		return false
 	}
 
+	// Try the generic claim first (works with introspection), then fall back
+	// to the project-specific claim path (works with JWT access tokens where
+	// the role is under urn:zitadel:iam:org:project:{projectID}:roles).
 	isAdmin := authCtx.IsGrantedRole("admin")
+	if !isAdmin && v.projectID != "" {
+		isAdmin = authCtx.IsGrantedRoleInProject(v.projectID, "admin", "")
+	}
 
 	// Resolve Zitadel sub → app user UUID (with JIT provisioning)
 	userID := sub
