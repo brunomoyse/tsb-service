@@ -11,14 +11,16 @@ import (
 // SHA-256 hash; the plaintext is returned once at enrollment and stored on the
 // device's EncryptedSharedPreferences.
 type Device struct {
-	ID               uuid.UUID  `db:"id"`
-	SerialNumber     string     `db:"serial_number"`
-	DeviceSecretHash string     `db:"device_secret_hash"`
-	Label            string     `db:"label"`
-	RegisteredBy     uuid.UUID  `db:"registered_by"`
-	RegisteredAt     time.Time  `db:"registered_at"`
-	LastSeenAt       *time.Time `db:"last_seen_at"`
-	RevokedAt        *time.Time `db:"revoked_at"`
+	ID                  uuid.UUID  `db:"id"`
+	SerialNumber        string     `db:"serial_number"`
+	DeviceSecretHash    string     `db:"device_secret_hash"`
+	Label               string     `db:"label"`
+	RegisteredBy        uuid.UUID  `db:"registered_by"`
+	RegisteredAt        time.Time  `db:"registered_at"`
+	LastSeenAt          *time.Time `db:"last_seen_at"`
+	RevokedAt           *time.Time `db:"revoked_at"`
+	FCMToken            *string    `db:"fcm_token"`
+	FCMTokenUpdatedAt   *time.Time `db:"fcm_token_updated_at"`
 }
 
 // RefreshToken is the server-side record for an opaque refresh token; the
@@ -42,6 +44,8 @@ type DeviceRepository interface {
 	TouchLastSeen(ctx context.Context, id uuid.UUID) error
 	Revoke(ctx context.Context, id uuid.UUID) error
 	ListActive(ctx context.Context) ([]Device, error)
+	UpdateFCMToken(ctx context.Context, deviceID uuid.UUID, token string) error
+	FindActiveFCMTokens(ctx context.Context) ([]string, error)
 }
 
 type RefreshTokenRepository interface {

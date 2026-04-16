@@ -337,6 +337,31 @@ func (s *Service) issueTokens(ctx context.Context, userID, deviceID uuid.UUID, i
 	}, nil
 }
 
+// ---- FCM token management
+
+// FCMTokenInput carries the FCM registration token and HMAC proof from the device.
+type FCMTokenInput struct {
+	DeviceID  uuid.UUID
+	FCMToken  string
+	Timestamp int64
+	Nonce     string
+	HMAC      string
+}
+
+// UpdateDeviceFCMToken validates the HMAC and stores the FCM token for a device.
+func (s *Service) UpdateDeviceFCMToken(ctx context.Context, in FCMTokenInput) error {
+	payload := fmt.Sprintf("%s|%s|%d|%s", in.DeviceID, in.FCMToken, in.Timestamp, in.Nonce)
+	if _, err := s.verifyDeviceRequest(ctx, in.DeviceID, in.Timestamp, in.Nonce, in.HMAC, payload); err != nil {
+		return err
+	}
+	return s.devices.UpdateFCMToken(ctx, in.DeviceID, in.FCMToken)
+}
+
+// GetActiveFCMTokens returns FCM tokens for all non-revoked POS devices.
+func (s *Service) GetActiveFCMTokens(ctx context.Context) ([]string, error) {
+	return s.devices.FindActiveFCMTokens(ctx)
+}
+
 // ---- admin helpers (RRN/PIN management)
 
 // SetUserRRN assigns an RRN to a user. Callers must be admin.

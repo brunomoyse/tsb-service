@@ -427,6 +427,21 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 					}
 				}
 			}
+
+			// Also notify POS devices (Sunmi handhelds) via FCM.
+			if r.PosService != nil && r.FCMClient != nil {
+				posTokens, posErr := r.PosService.GetActiveFCMTokens(context.Background())
+				if posErr == nil {
+					for _, token := range posTokens {
+						if pushErr := r.FCMClient.SendAlert(token, msg.Title, msg.Body, data); pushErr != nil {
+							zap.L().Warn("failed to send POS FCM push",
+								zap.String("order_id", order.ID.String()),
+								zap.Error(pushErr),
+							)
+						}
+					}
+				}
+			}
 		}()
 	}
 

@@ -80,6 +80,21 @@ func (r *DeviceRepository) ListActive(ctx context.Context) ([]domain.Device, err
 	return out, nil
 }
 
+func (r *DeviceRepository) UpdateFCMToken(ctx context.Context, deviceID uuid.UUID, token string) error {
+	const q = `UPDATE pos_devices SET fcm_token = $2, fcm_token_updated_at = now() WHERE id = $1 AND revoked_at IS NULL`
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, q, deviceID, token)
+	return err
+}
+
+func (r *DeviceRepository) FindActiveFCMTokens(ctx context.Context) ([]string, error) {
+	const q = `SELECT fcm_token FROM pos_devices WHERE revoked_at IS NULL AND fcm_token IS NOT NULL`
+	var tokens []string
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &tokens, q); err != nil {
+		return nil, err
+	}
+	return tokens, nil
+}
+
 // ---- Refresh tokens
 
 type RefreshTokenRepository struct {

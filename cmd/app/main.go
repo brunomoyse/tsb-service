@@ -324,6 +324,8 @@ func main() {
 	api.POST("/pos/auth/refresh", posLimiter.Middleware(), posHandler.Refresh)
 	// Enrollment requires a valid Zitadel admin JWT.
 	api.POST("/pos/devices/enroll", oidcVerifier.StrictAuthMiddleware(), posHandler.Enroll)
+	// FCM token registration — HMAC-signed, no Zitadel session required.
+	api.PATCH("/pos/devices/fcm-token", posLimiter.Middleware(), posHandler.UpdateFCMToken)
 
 	// Other endpoints
 	api.POST("/payments/webhook", paymentHandler.UpdatePaymentStatusHandler)
