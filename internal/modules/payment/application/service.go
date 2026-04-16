@@ -348,7 +348,7 @@ func (s *paymentService) HandlePaymentPaid(ctx context.Context, orderID uuid.UUI
 // updates order status to CANCELLED and sends failure email.
 func (s *paymentService) HandlePaymentFailed(ctx context.Context, orderID uuid.UUID) (*orderDomain.Order, error) {
 	canceledStatus := orderDomain.OrderStatusCanceled
-	if err := s.orderService.UpdateOrder(ctx, orderID, &canceledStatus, nil); err != nil {
+	if err := s.orderService.UpdateOrder(ctx, orderID, &canceledStatus, nil, nil); err != nil {
 		return nil, fmt.Errorf("failed to update order status: %w", err)
 	}
 

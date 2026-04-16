@@ -264,13 +264,15 @@ func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o
 	return data, nil
 }
 
-func prepareOrderCanceledData(u userDomain.User) (any, error) {
+func prepareOrderCanceledData(u userDomain.User, reason string) (any, error) {
 	data := struct {
 		UserName string
 		LogoURL  string
+		Reason   string
 	}{
 		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
 		LogoURL:  logoURL(),
+		Reason:   reason,
 	}
 
 	return data, nil
@@ -423,8 +425,8 @@ func renderOrderPendingEmailText(path string, u userDomain.User, op []orderDomai
 }
 
 // renderOrderCanceledEmailHTML renders the HTML version of the order canceled email.
-func renderOrderCanceledEmailHTML(path string, u userDomain.User) (string, error) {
-	data, err := prepareOrderCanceledData(u)
+func renderOrderCanceledEmailHTML(path string, u userDomain.User, reason string) (string, error) {
+	data, err := prepareOrderCanceledData(u, reason)
 	if err != nil {
 		return "", err
 	}
@@ -432,8 +434,8 @@ func renderOrderCanceledEmailHTML(path string, u userDomain.User) (string, error
 }
 
 // renderOrderCanceledEmailText renders the plain text version of the order canceled email.
-func renderOrderCanceledEmailText(path string, u userDomain.User) (string, error) {
-	data, err := prepareOrderCanceledData(u)
+func renderOrderCanceledEmailText(path string, u userDomain.User, reason string) (string, error) {
+	data, err := prepareOrderCanceledData(u, reason)
 	if err != nil {
 		return "", err
 	}

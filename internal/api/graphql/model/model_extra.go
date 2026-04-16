@@ -27,6 +27,7 @@ type Order struct {
 	OrderNote          *string            `json:"orderNote,omitempty"`
 	OrderExtra         map[string]any     `json:"orderExtra,omitempty"`
 	CouponCode         *string            `json:"couponCode,omitempty"`
+	CancellationReason *domain.OrderCancellationReason `json:"cancellationReason,omitempty"`
 
 	// Non-schema fields: denormalized address for Address() resolver
 	AddressID        *string  `json:"-"`

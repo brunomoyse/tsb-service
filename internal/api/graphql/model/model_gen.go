@@ -352,8 +352,9 @@ type UpdateCouponInput struct {
 }
 
 type UpdateOrderInput struct {
-	Status             *domain.OrderStatus `json:"status,omitempty"`
-	EstimatedReadyTime *time.Time          `json:"estimatedReadyTime,omitempty"`
+	Status             *domain.OrderStatus             `json:"status,omitempty"`
+	EstimatedReadyTime *time.Time                      `json:"estimatedReadyTime,omitempty"`
+	CancellationReason *domain.OrderCancellationReason `json:"cancellationReason,omitempty"`
 }
 
 type UpdateProductChoiceInput struct {

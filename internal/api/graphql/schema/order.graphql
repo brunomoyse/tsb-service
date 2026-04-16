@@ -14,6 +14,7 @@ type Order {
     orderNote: String
     orderExtra: JSON
     couponCode: String
+    cancellationReason: OrderCancellationReason
 
     address: Address
     customer: User
@@ -62,6 +63,13 @@ enum OrderTypeEnum {
     PICKUP
 }
 
+enum OrderCancellationReason {
+    OUT_OF_STOCK
+    KITCHEN_CLOSED
+    DELIVERY_AREA
+    OTHER
+}
+
 input OrderExtraInput {
     name: String!
     options: [String!]
@@ -95,6 +103,7 @@ input CreateOrderItemInput {
 input UpdateOrderInput {
     status: OrderStatusEnum
     estimatedReadyTime: DateTime
+    cancellationReason: OrderCancellationReason
 }
 
 input OrderHistoryInput {

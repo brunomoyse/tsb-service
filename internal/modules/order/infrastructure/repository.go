@@ -155,10 +155,10 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 func (r *OrderRepository) Update(ctx context.Context, order *domain.Order) error {
 	query := `
 		UPDATE orders
-		SET order_status = $1, estimated_ready_time = $2, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $3;
+		SET order_status = $1, estimated_ready_time = $2, cancellation_reason = $3, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $4;
 	`
-	if _, err := r.pool.ForContext(ctx).ExecContext(ctx, query, order.OrderStatus, order.EstimatedReadyTime, order.ID); err != nil {
+	if _, err := r.pool.ForContext(ctx).ExecContext(ctx, query, order.OrderStatus, order.EstimatedReadyTime, order.CancellationReason, order.ID); err != nil {
 		return fmt.Errorf("failed to update order: %w", err)
 	}
 	return nil
