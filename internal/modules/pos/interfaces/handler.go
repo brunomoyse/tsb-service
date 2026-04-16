@@ -1,7 +1,10 @@
 package interfaces
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -13,11 +16,19 @@ import (
 )
 
 type Handler struct {
-	svc *application.Service
+	svc          *application.Service
+	userinfoURL  string // Zitadel userinfo endpoint for admin check
+	internalURL  string // Optional Docker-internal Zitadel URL
+	externalHost string // External host header for internal requests
 }
 
-func NewHandler(svc *application.Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *application.Service, userinfoURL, internalURL, externalHost string) *Handler {
+	return &Handler{
+		svc:          svc,
+		userinfoURL:  userinfoURL,
+		internalURL:  internalURL,
+		externalHost: externalHost,
+	}
 }
 
 // ---- DTOs
@@ -66,11 +77,13 @@ func (h *Handler) Enroll(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	// NOTE: admin role check is intentionally skipped here. The Zitadel OIDC
-	// login via StrictAuthMiddleware is the access gate — only people who can
-	// sign into Zitadel can reach this endpoint. Zitadel native-app JWTs don't
-	// include project role claims, so IsGrantedRole("admin") is always false.
-	// A proper fix would use Zitadel introspection or the userinfo endpoint.
+	// Zitadel native-app JWT access tokens don't include project role claims.
+	// Check admin status via the Zitadel userinfo endpoint instead.
+	token := c.GetHeader("Authorization")
+	if !h.isAdminViaUserinfo(token) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "admin required"})
+		return
+	}
 	adminID, err := uuid.Parse(utils.GetUserID(c.Request.Context()))
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "no admin user"})
@@ -164,6 +177,72 @@ func respondAuthError(c *gin.Context, err error) {
 		zap.L().Warn("pos auth error", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 	}
+}
+
+// isAdminViaUserinfo calls the Zitadel /oidc/v1/userinfo endpoint with the
+// bearer token and checks if any of the project role claims contain "admin".
+// This is a network call but only happens during device enrollment (once per device).
+func (h *Handler) isAdminViaUserinfo(authHeader string) bool {
+	if authHeader == "" {
+		return false
+	}
+	url := h.userinfoURL
+	if h.internalURL != "" {
+		url = h.internalURL + "/oidc/v1/userinfo"
+	}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		zap.L().Warn("failed to build userinfo request", zap.Error(err))
+		return false
+	}
+	req.Header.Set("Authorization", authHeader)
+	if h.externalHost != "" {
+		req.Host = h.externalHost
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		zap.L().Warn("userinfo request failed", zap.Error(err))
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		zap.L().Warn("userinfo non-200", zap.Int("status", resp.StatusCode))
+		return false
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false
+	}
+	var info map[string]interface{}
+	if err := json.Unmarshal(body, &info); err != nil {
+		return false
+	}
+	// Check all claim keys matching urn:zitadel:iam:org:project:*:roles for "admin"
+	for k, v := range info {
+		if len(k) > 30 && k[:30] == "urn:zitadel:iam:org:project:" {
+			if roles, ok := v.(map[string]interface{}); ok {
+				if _, hasAdmin := roles["admin"]; hasAdmin {
+					return true
+				}
+			}
+		}
+	}
+	// Also check the generic claim
+	if roles, ok := info["urn:zitadel:iam:org:project:roles"].(map[string]interface{}); ok {
+		if _, hasAdmin := roles["admin"]; hasAdmin {
+			return true
+		}
+	}
+	zap.L().Warn("admin role not found in userinfo", zap.String("keys", fmt.Sprintf("%v", keys(info))))
+	return false
+}
+
+func keys(m map[string]interface{}) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
 }
 
 func toTokenResponse(t *application.TokenPair) tokenResponse {

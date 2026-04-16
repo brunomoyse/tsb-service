@@ -5,6 +5,7 @@ import (
 	"context"
 	cryptoRand "crypto/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -177,7 +178,17 @@ func main() {
 		posDeviceRepo, posRefreshRepo, posUserRepo,
 	)
 	oidcVerifier.SetAppJWTVerifier(posService)
-	posHandler := posInterfaces.NewHandler(posService)
+	posHandler := posInterfaces.NewHandler(
+		posService,
+		zitadelIssuer+"/oidc/v1/userinfo",
+		os.Getenv("ZITADEL_INTERNAL_URL"),
+		func() string {
+			if u, err := url.Parse(zitadelIssuer); err == nil {
+				return u.Host
+			}
+			return ""
+		}(),
+	)
 
 	// Initialize auth proxy handlers with pre-resolved configuration
 	auth.Init(auth.Config{
