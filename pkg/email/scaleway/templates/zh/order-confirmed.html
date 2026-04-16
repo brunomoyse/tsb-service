@@ -10,7 +10,7 @@
 <tr><td align="center" style="padding:40px 16px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
     <!-- HEADER -->
-    <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:12px 12px 0 0;">
+    <tr><td style="background-color:#ffffff;padding:24px 36px;text-align:center;border-radius:12px 12px 0 0;">
         <img src="{{.LogoURL}}" alt="Tokyo Sushi Bar" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
     </td></tr>
     <!-- RED ACCENT LINE -->
@@ -41,21 +41,38 @@
             <tr>
                 <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">{{.Name}}</td>
                 <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">{{.Quantity}}</td>
-                <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;border-bottom:1px solid #E8E4DF;text-align:right;">{{.TotalPrice}} &euro;</td>
+                <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;border-bottom:1px solid #E8E4DF;text-align:right;">{{.TotalPrice}}&nbsp;&euro;</td>
             </tr>
             {{end}}
         </table>
-        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>小计：</strong> <span style="float:right;">{{.SubtotalPrice}} &euro;</span></p>
-        {{if .HasTakeaway}}
-        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>自取折扣 (-10%)：</strong> <span style="float:right;">-{{.TakeawayDiscount}} &euro;</span></p>
-        {{end}}
-        {{if .HasCoupon}}
-        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>优惠券{{if .CouponCode}}（{{.CouponCode}}）{{end}}：</strong> <span style="float:right;">-{{.CouponDiscount}} &euro;</span></p>
-        {{end}}
-        {{if eq .OrderType "DELIVERY"}}
-        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>配送费：</strong> <span style="float:right;">{{.DeliveryFee}} &euro;</span></p>
-        {{end}}
-        <p style="margin:12px 0 0;font-size:15px;color:#2D2D2D;border-top:2px solid #E8E4DF;padding-top:12px;"><strong>总计：</strong> <span style="float:right;"><strong>{{.TotalPrice}} &euro;</strong></span></p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0 0;">
+            <tr>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">小计：</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">{{.SubtotalPrice}}&nbsp;&euro;</td>
+            </tr>
+            {{if .HasTakeaway}}
+            <tr>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">自取折扣 (-10%)：</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">-{{.TakeawayDiscount}}&nbsp;&euro;</td>
+            </tr>
+            {{end}}
+            {{if .HasCoupon}}
+            <tr>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">优惠券{{if .CouponCode}}（{{.CouponCode}}）{{end}}：</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">-{{.CouponDiscount}}&nbsp;&euro;</td>
+            </tr>
+            {{end}}
+            {{if eq .OrderType "DELIVERY"}}
+            <tr>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">配送费：</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">{{.DeliveryFee}}&nbsp;&euro;</td>
+            </tr>
+            {{end}}
+            <tr>
+                <td style="padding:12px 0 0;border-top:2px solid #E8E4DF;font-size:16px;font-weight:600;color:#2D2D2D;">总计：</td>
+                <td style="padding:12px 0 0;border-top:2px solid #E8E4DF;font-size:16px;font-weight:600;color:#2D2D2D;text-align:right;white-space:nowrap;">{{.TotalPrice}}&nbsp;&euro;</td>
+            </tr>
+        </table>
         {{if .Address}}
         <p style="margin:24px 0 8px;font-size:16px;font-weight:600;color:#2D2D2D;">配送地址</p>
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">

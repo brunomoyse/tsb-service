@@ -10,7 +10,7 @@
 <tr><td align="center" style="padding:40px 16px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
     <!-- HEADER -->
-    <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:12px 12px 0 0;">
+    <tr><td style="background-color:#ffffff;padding:24px 36px;text-align:center;border-radius:12px 12px 0 0;">
         <img src="{{.LogoURL}}" alt="Tokyo Sushi Bar" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
     </td></tr>
     <!-- RED ACCENT LINE -->
@@ -31,25 +31,38 @@
             <tr>
                 <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">{{.Name}}</td>
                 <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;text-align:center;border-bottom:1px solid #E8E4DF;">{{.Quantity}}</td>
-                <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;text-align:right;border-bottom:1px solid #E8E4DF;">{{.TotalPrice}} &euro;</td>
+                <td style="padding:10px 12px;font-size:14px;color:#2D2D2D;text-align:right;border-bottom:1px solid #E8E4DF;">{{.TotalPrice}}&nbsp;&euro;</td>
             </tr>
             {{end}}
         </table>
 
-        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>Subtotal:</strong> <span style="float:right;">{{.SubtotalPrice}} &euro;</span></p>
-        {{if .HasTakeaway}}
-        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>Takeaway Discount (-10%):</strong> <span style="float:right;">-{{.TakeawayDiscount}} &euro;</span></p>
-        {{end}}
-        {{if .HasCoupon}}
-        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}}:</strong> <span style="float:right;">-{{.CouponDiscount}} &euro;</span></p>
-        {{end}}
-        {{if eq .OrderType "DELIVERY"}}
-        <p style="margin:8px 0;font-size:14px;color:#2D2D2D;"><strong>Delivery Fee:</strong> <span style="float:right;">{{.DeliveryFee}} &euro;</span></p>
-        {{end}}
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0 0;border-top:2px solid #E8E4DF;">
-        <tr><td style="padding:12px 0;">
-            <p style="margin:0;font-size:16px;font-weight:600;color:#2D2D2D;"><strong>Total:</strong> <span style="float:right;">{{.TotalPrice}} &euro;</span></p>
-        </td></tr>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0 0;">
+            <tr>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Subtotal:</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">{{.SubtotalPrice}}&nbsp;&euro;</td>
+            </tr>
+            {{if .HasTakeaway}}
+            <tr>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Takeaway Discount (-10%):</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">-{{.TakeawayDiscount}}&nbsp;&euro;</td>
+            </tr>
+            {{end}}
+            {{if .HasCoupon}}
+            <tr>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}}:</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">-{{.CouponDiscount}}&nbsp;&euro;</td>
+            </tr>
+            {{end}}
+            {{if eq .OrderType "DELIVERY"}}
+            <tr>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Delivery Fee:</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">{{.DeliveryFee}}&nbsp;&euro;</td>
+            </tr>
+            {{end}}
+            <tr>
+                <td style="padding:12px 0 0;border-top:2px solid #E8E4DF;font-size:16px;font-weight:600;color:#2D2D2D;">Total:</td>
+                <td style="padding:12px 0 0;border-top:2px solid #E8E4DF;font-size:16px;font-weight:600;color:#2D2D2D;text-align:right;white-space:nowrap;">{{.TotalPrice}}&nbsp;&euro;</td>
+            </tr>
         </table>
 
         <p style="margin:20px 0 0;font-size:14px;line-height:1.6;color:#2D2D2D;">If you have any questions about your order, please do not hesitate to contact us. We appreciate your trust in us and look forward to delighting you with our authentic sushi experience.</p>
