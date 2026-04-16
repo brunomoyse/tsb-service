@@ -75,3 +75,23 @@ type PosUser struct {
 	PinLockedUntil      *time.Time `db:"pin_locked_until"`
 	IsAdmin             bool       `db:"-"` // derived from Zitadel roles elsewhere
 }
+
+// Staff is a POS-only staff member that does not require a Zitadel account.
+type Staff struct {
+	ID                uuid.UUID  `db:"id"`
+	DisplayName       string     `db:"display_name"`
+	RRNHash           string     `db:"rrn_hash"`
+	PinHash           string     `db:"pin_hash"`
+	FailedPinAttempts int        `db:"failed_pin_attempts"`
+	PinLockedUntil    *time.Time `db:"pin_locked_until"`
+	CreatedAt         time.Time  `db:"created_at"`
+}
+
+type StaffRepository interface {
+	Insert(ctx context.Context, s *Staff) error
+	FindByRRNHash(ctx context.Context, rrnHash string) (*Staff, error)
+	List(ctx context.Context) ([]Staff, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+	IncrementFailedAttempts(ctx context.Context, id uuid.UUID, lockedUntil *time.Time) error
+	ResetFailedAttempts(ctx context.Context, id uuid.UUID) error
+}

@@ -261,6 +261,12 @@ type PosDevice struct {
 	RevokedAt    *time.Time `json:"revokedAt,omitempty"`
 }
 
+type PosStaff struct {
+	ID          uuid.UUID `json:"id"`
+	DisplayName string    `json:"displayName"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
 type Product struct {
 	Code           *string          `json:"code,omitempty"`
 	CreatedAt      time.Time        `json:"createdAt"`
