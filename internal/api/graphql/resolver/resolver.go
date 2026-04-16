@@ -100,6 +100,10 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 			WriteBufferSize: 1024,
 			CheckOrigin: func(r *http.Request) bool {
 				origin := strings.TrimRight(strings.ToLower(r.Header.Get("Origin")), "/")
+				// Native apps (Android/iOS) don't send an Origin header — allow empty
+				if origin == "" {
+					return true
+				}
 				for _, allowed := range allowedOrigins {
 					if origin == strings.TrimRight(strings.ToLower(allowed), "/") {
 						return true
