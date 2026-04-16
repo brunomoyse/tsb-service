@@ -47,8 +47,7 @@ func (c *Client) SendAlert(registrationToken, title, body string, data map[strin
 			Priority: "high",
 			Notification: &messaging.AndroidNotification{
 				Sound:       "default",
-				ChannelID:   "order_updates",
-				ClickAction: "FLUTTER_NOTIFICATION_CLICK",
+				ChannelID: "orders",
 			},
 		},
 	}

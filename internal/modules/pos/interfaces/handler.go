@@ -60,6 +60,14 @@ type refreshDTO struct {
 	HMAC         string `json:"hmac"         binding:"required"`
 }
 
+type fcmTokenDTO struct {
+	DeviceID  string `json:"deviceId"  binding:"required,uuid"`
+	FCMToken  string `json:"fcmToken"  binding:"required"`
+	Timestamp int64  `json:"timestamp" binding:"required"`
+	Nonce     string `json:"nonce"     binding:"required"`
+	HMAC      string `json:"hmac"      binding:"required"`
+}
+
 type tokenResponse struct {
 	AccessToken  string `json:"accessToken"`
 	RefreshToken string `json:"refreshToken"`
@@ -157,6 +165,32 @@ func (h *Handler) Refresh(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, toTokenResponse(tokens))
+}
+
+// UpdateFCMToken registers or refreshes the FCM push token for a device.
+// The request is HMAC-signed identically to RrnLogin/Refresh.
+func (h *Handler) UpdateFCMToken(c *gin.Context) {
+	var body fcmTokenDTO
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	deviceID, err := uuid.Parse(body.DeviceID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid deviceId"})
+		return
+	}
+	if err := h.svc.UpdateDeviceFCMToken(c.Request.Context(), application.FCMTokenInput{
+		DeviceID:  deviceID,
+		FCMToken:  body.FCMToken,
+		Timestamp: body.Timestamp,
+		Nonce:     body.Nonce,
+		HMAC:      body.HMAC,
+	}); err != nil {
+		respondAuthError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func respondAuthError(c *gin.Context, err error) {
