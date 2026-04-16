@@ -59,10 +59,11 @@ type Service struct {
 	devices  domain.DeviceRepository
 	refresh  domain.RefreshTokenRepository
 	posUsers domain.PosUserRepository
+	staff    domain.StaffRepository
 }
 
-func NewService(cfg Config, d domain.DeviceRepository, r domain.RefreshTokenRepository, u domain.PosUserRepository) *Service {
-	return &Service{cfg: cfg, devices: d, refresh: r, posUsers: u}
+func NewService(cfg Config, d domain.DeviceRepository, r domain.RefreshTokenRepository, u domain.PosUserRepository, s domain.StaffRepository) *Service {
+	return &Service{cfg: cfg, devices: d, refresh: r, posUsers: u, staff: s}
 }
 
 // ---- enrollment
@@ -150,6 +151,26 @@ func (s *Service) RrnLogin(ctx context.Context, in RrnLoginInput, isAdmin bool) 
 		return nil, err
 	}
 
+	// Check pos_staff table first (no Zitadel account required).
+	if staffMember, err := s.staff.FindByRRNHash(ctx, rrnHash(s.cfg.JWTSecret, in.RRN)); err == nil {
+		if staffMember.PinLockedUntil != nil && time.Now().Before(*staffMember.PinLockedUntil) {
+			return nil, ErrPinLocked
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(staffMember.PinHash), []byte(in.PIN)); err != nil {
+			var lockedUntil *time.Time
+			if staffMember.FailedPinAttempts+1 >= s.cfg.MaxFailedAttempts {
+				t := time.Now().Add(s.cfg.PinLockDuration)
+				lockedUntil = &t
+			}
+			_ = s.staff.IncrementFailedAttempts(ctx, staffMember.ID, lockedUntil)
+			return nil, ErrInvalidPin
+		}
+		_ = s.staff.ResetFailedAttempts(ctx, staffMember.ID)
+		_ = s.devices.TouchLastSeen(ctx, device.ID)
+		return s.issueTokens(ctx, staffMember.ID, device.ID, isAdmin)
+	}
+
+	// Fall back to Zitadel-linked users (legacy path).
 	user, err := s.posUsers.FindByRRN(ctx, in.RRN)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -177,6 +198,47 @@ func (s *Service) RrnLogin(ctx context.Context, in RrnLoginInput, isAdmin bool) 
 	_ = s.devices.TouchLastSeen(ctx, device.ID)
 
 	return s.issueTokens(ctx, user.ID, device.ID, isAdmin)
+}
+
+// ---- staff management
+
+// CreateStaff creates a POS-only staff member (no Zitadel account required).
+func (s *Service) CreateStaff(ctx context.Context, displayName, rrn, pin string) (*domain.Staff, error) {
+	rrn = strings.TrimSpace(rrn)
+	if len(rrn) != 11 {
+		return nil, errors.New("RRN must be 11 digits")
+	}
+	for _, r := range rrn {
+		if r < '0' || r > '9' {
+			return nil, errors.New("RRN must be digits only")
+		}
+	}
+	if len(pin) < 4 || len(pin) > 6 {
+		return nil, errors.New("PIN must be 4-6 digits")
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(pin), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	member := &domain.Staff{
+		DisplayName: strings.TrimSpace(displayName),
+		RRNHash:     rrnHash(s.cfg.JWTSecret, rrn),
+		PinHash:     string(hash),
+	}
+	if err := s.staff.Insert(ctx, member); err != nil {
+		return nil, err
+	}
+	return member, nil
+}
+
+// ListStaff returns all POS-only staff members.
+func (s *Service) ListStaff(ctx context.Context) ([]domain.Staff, error) {
+	return s.staff.List(ctx)
+}
+
+// DeleteStaff removes a POS-only staff member by ID.
+func (s *Service) DeleteStaff(ctx context.Context, id uuid.UUID) error {
+	return s.staff.Delete(ctx, id)
 }
 
 // RefreshInput mirrors RrnLoginInput but for the refresh grant.
@@ -332,6 +394,14 @@ func (s *Service) VerifyAccessToken(tokenStr string) (uuid.UUID, bool, error) {
 }
 
 // ---- utilities
+
+// rrnHash derives a deterministic HMAC-SHA256 of an RRN keyed on the JWT
+// secret so the plaintext RRN is never stored in the database.
+func rrnHash(secret []byte, rrn string) string {
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte("rrn:" + rrn))
+	return hex.EncodeToString(mac.Sum(nil))
+}
 
 func sha256Hex(b []byte) string {
 	sum := sha256.Sum256(b)

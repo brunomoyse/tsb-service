@@ -191,3 +191,61 @@ func (r *PosUserRepository) ResetFailedAttempts(ctx context.Context, userID uuid
 	_, err := r.pool.ForContext(ctx).ExecContext(ctx, q, userID)
 	return err
 }
+
+// ---- POS staff repository
+
+type StaffRepository struct {
+	pool *db.DBPool
+}
+
+func NewStaffRepository(pool *db.DBPool) domain.StaffRepository {
+	return &StaffRepository{pool: pool}
+}
+
+func (r *StaffRepository) Insert(ctx context.Context, s *domain.Staff) error {
+	const q = `
+		INSERT INTO pos_staff (display_name, rrn_hash, pin_hash)
+		VALUES ($1, $2, $3)
+		RETURNING id, created_at`
+	return r.pool.ForContext(ctx).QueryRowxContext(ctx, q, s.DisplayName, s.RRNHash, s.PinHash).Scan(&s.ID, &s.CreatedAt)
+}
+
+func (r *StaffRepository) FindByRRNHash(ctx context.Context, rrnHash string) (*domain.Staff, error) {
+	var s domain.Staff
+	const q = `SELECT * FROM pos_staff WHERE rrn_hash = $1`
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &s, q, rrnHash); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+func (r *StaffRepository) List(ctx context.Context) ([]domain.Staff, error) {
+	const q = `SELECT * FROM pos_staff ORDER BY display_name`
+	var out []domain.Staff
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &out, q); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (r *StaffRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	const q = `DELETE FROM pos_staff WHERE id = $1`
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, q, id)
+	return err
+}
+
+func (r *StaffRepository) IncrementFailedAttempts(ctx context.Context, id uuid.UUID, lockedUntil *time.Time) error {
+	const q = `
+		UPDATE pos_staff
+		SET failed_pin_attempts = failed_pin_attempts + 1,
+		    pin_locked_until = COALESCE($2, pin_locked_until)
+		WHERE id = $1`
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, q, id, lockedUntil)
+	return err
+}
+
+func (r *StaffRepository) ResetFailedAttempts(ctx context.Context, id uuid.UUID) error {
+	const q = `UPDATE pos_staff SET failed_pin_attempts = 0, pin_locked_until = NULL WHERE id = $1`
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, q, id)
+	return err
+}

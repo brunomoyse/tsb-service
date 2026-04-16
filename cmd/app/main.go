@@ -173,9 +173,10 @@ func main() {
 	posDeviceRepo := posInfrastructure.NewDeviceRepository(dbPool)
 	posRefreshRepo := posInfrastructure.NewRefreshTokenRepository(dbPool)
 	posUserRepo := posInfrastructure.NewPosUserRepository(dbPool)
+	posStaffRepo := posInfrastructure.NewStaffRepository(dbPool)
 	posService := posApplication.NewService(
 		posApplication.DefaultConfig(posJWTSecret),
-		posDeviceRepo, posRefreshRepo, posUserRepo,
+		posDeviceRepo, posRefreshRepo, posUserRepo, posStaffRepo,
 	)
 	oidcVerifier.SetAppJWTVerifier(posService)
 	posHandler := posInterfaces.NewHandler(
