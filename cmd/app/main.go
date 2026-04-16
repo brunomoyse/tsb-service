@@ -3,7 +3,9 @@ package main
 import (
 	"cmp"
 	"context"
+	cryptoRand "crypto/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -38,6 +40,10 @@ import (
 	paymentInfrastructure "tsb-service/internal/modules/payment/infrastructure"
 	orderInterfaces "tsb-service/internal/modules/order/interfaces"
 	paymentInterfaces "tsb-service/internal/modules/payment/interfaces"
+
+	posApplication "tsb-service/internal/modules/pos/application"
+	posInfrastructure "tsb-service/internal/modules/pos/infrastructure"
+	posInterfaces "tsb-service/internal/modules/pos/interfaces"
 
 	userApplication "tsb-service/internal/modules/user/application"
 	userInfrastructure "tsb-service/internal/modules/user/infrastructure"
@@ -150,12 +156,47 @@ func main() {
 
 	// OIDC verifier — validates JWTs via JWKS + resolves Zitadel sub → app user UUID
 	zitadelInternalURL := os.Getenv("ZITADEL_INTERNAL_URL") // Optional: internal Docker URL for OIDC discovery
-	oidcVerifier, err := middleware.NewOIDCVerifier(context.Background(), zitadelIssuer, zitadelInternalURL, zitadelClientID, userService)
+	zitadelProjectID := os.Getenv("ZITADEL_PROJECT_ID") // used for project-specific role claim fallback
+	oidcVerifier, err := middleware.NewOIDCVerifier(context.Background(), zitadelIssuer, zitadelInternalURL, zitadelClientID, zitadelProjectID, userService)
 	if err != nil {
 		zap.L().Error("failed to initialize OIDC verifier", zap.Error(err))
 		os.Exit(1)
 	}
 	zap.L().Info("OIDC verifier initialized", zap.String("issuer", zitadelIssuer))
+
+	// POS (shop-floor handheld) auth module — RRN + PIN with device HMAC.
+	// Falls back to a generated ephemeral secret if POS_JWT_SECRET is unset so
+	// dev servers start cleanly; production MUST set POS_JWT_SECRET.
+	posJWTSecret := []byte(os.Getenv("POS_JWT_SECRET"))
+	if len(posJWTSecret) == 0 {
+		zap.L().Warn("POS_JWT_SECRET not set — generating ephemeral secret (tokens invalid on restart)")
+		ephemeral := make([]byte, 32)
+		if _, err := cryptoRand.Read(ephemeral); err != nil {
+			zap.L().Error("rand for POS_JWT_SECRET failed", zap.Error(err))
+			os.Exit(1)
+		}
+		posJWTSecret = ephemeral
+	}
+	posDeviceRepo := posInfrastructure.NewDeviceRepository(dbPool)
+	posRefreshRepo := posInfrastructure.NewRefreshTokenRepository(dbPool)
+	posUserRepo := posInfrastructure.NewPosUserRepository(dbPool)
+	posStaffRepo := posInfrastructure.NewStaffRepository(dbPool)
+	posService := posApplication.NewService(
+		posApplication.DefaultConfig(posJWTSecret),
+		posDeviceRepo, posRefreshRepo, posUserRepo, posStaffRepo,
+	)
+	oidcVerifier.SetAppJWTVerifier(posService)
+	posHandler := posInterfaces.NewHandler(
+		posService,
+		zitadelIssuer+"/oidc/v1/userinfo",
+		os.Getenv("ZITADEL_INTERNAL_URL"),
+		func() string {
+			if u, err := url.Parse(zitadelIssuer); err == nil {
+				return u.Host
+			}
+			return ""
+		}(),
+	)
 
 	// Initialize auth proxy handlers with pre-resolved configuration
 	auth.Init(auth.Config{
@@ -407,7 +448,7 @@ func main() {
 	// GraphQL
 	rootResolver := resolver.NewResolver(
 		broker, apnsClient, fcmClient,
-		addressService, couponService, notificationService, orderService, paymentService, productService, restaurantService, userService,
+		addressService, couponService, notificationService, orderService, paymentService, productService, restaurantService, userService, posService
 		changeLogger,
 	)
 	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL, "capacitor://localhost", "https://localhost"}, oidcVerifier)
@@ -429,6 +470,15 @@ func main() {
 	api.POST("/auth/password/reset", authLimiter.Middleware(), auth.SetNewPasswordHandler)
 	api.POST("/auth/verify-email", authLimiter.Middleware(), auth.VerifyEmailHandler)
 	api.POST("/auth/resend-verification", authLimiter.Middleware(), auth.ResendVerificationHandler)
+
+	// POS (Sunmi V3H handheld) auth endpoints
+	posLimiter := middleware.NewRateLimiter(30.0/60, 10) // 30 req/min per IP
+	api.POST("/pos/auth/rrn-login", posLimiter.Middleware(), posHandler.RrnLogin)
+	api.POST("/pos/auth/refresh", posLimiter.Middleware(), posHandler.Refresh)
+	// Enrollment requires a valid Zitadel admin JWT.
+	api.POST("/pos/devices/enroll", oidcVerifier.StrictAuthMiddleware(), posHandler.Enroll)
+	// FCM token registration — HMAC-signed, no Zitadel session required.
+	api.PATCH("/pos/devices/fcm-token", posLimiter.Middleware(), posHandler.UpdateFCMToken)
 
 	// Other endpoints
 	api.POST("/payments/webhook", paymentHandler.UpdatePaymentStatusHandler)

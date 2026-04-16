@@ -2,6 +2,7 @@ package application
 
 import (
 	"fmt"
+	"time"
 
 	orderDomain "tsb-service/internal/modules/order/domain"
 )
@@ -31,6 +32,24 @@ func GetOrderStatusNotification(status orderDomain.OrderStatus, language string,
 	}
 
 	return msg
+}
+
+// GetReadyTimeUpdatedNotification returns localized push notification text when
+// the estimated ready time is updated.
+func GetReadyTimeUpdatedNotification(language string, estimatedReadyTime *time.Time) notificationText {
+	if estimatedReadyTime == nil {
+		return notificationText{Title: "Tokyo Sushi Bar", Body: ""}
+	}
+
+	texts := readyTimeUpdatedTexts[language]
+	if texts == nil {
+		texts = readyTimeUpdatedTexts["fr"]
+	}
+
+	return notificationText{
+		Title: texts.Title,
+		Body:  fmt.Sprintf(texts.Body, formatReadyTimeForNotification(*estimatedReadyTime, language)),
+	}
 }
 
 var orderNotificationTexts = map[string]map[orderDomain.OrderStatus]notificationText{
@@ -122,6 +141,36 @@ var newOrderTexts = map[string]*notificationText{
 	"en": {Title: "New order", Body: "New %s order for %s€"},
 	"zh": {Title: "新订单", Body: "新%s订单 %s€"},
 	"nl": {Title: "Nieuwe bestelling", Body: "Nieuwe %s bestelling van %s€"},
+}
+
+var readyTimeUpdatedTexts = map[string]*notificationText{
+	"fr": {Title: "Heure de retrait mise a jour", Body: "Nouvelle heure estimee: %s."},
+	"en": {Title: "Ready time updated", Body: "New estimated ready time: %s."},
+	"zh": {Title: "预计完成时间已更新", Body: "新的预计完成时间：%s。"},
+	"nl": {Title: "Afhaaltijd bijgewerkt", Body: "Nieuwe geschatte afhaaltijd: %s."},
+}
+
+func formatReadyTimeForNotification(t time.Time, language string) string {
+	hour := t.Hour()
+	minute := t.Minute()
+
+	if language == "en" {
+		period := "AM"
+		displayHour := hour
+		if hour >= 12 {
+			period = "PM"
+			if hour > 12 {
+				displayHour = hour - 12
+			}
+		}
+		if displayHour == 0 {
+			displayHour = 12
+		}
+
+		return fmt.Sprintf("%d:%02d %s", displayHour, minute, period)
+	}
+
+	return fmt.Sprintf("%02d:%02d", hour, minute)
 }
 
 var pickupOverrides = map[string]map[orderDomain.OrderStatus]notificationText{

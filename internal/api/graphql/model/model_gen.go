@@ -252,6 +252,21 @@ type Payment struct {
 	SettlementAmount                *float64       `json:"settlementAmount,omitempty"`
 }
 
+type PosDevice struct {
+	ID           uuid.UUID  `json:"id"`
+	Label        string     `json:"label"`
+	SerialNumber string     `json:"serialNumber"`
+	RegisteredAt time.Time  `json:"registeredAt"`
+	LastSeenAt   *time.Time `json:"lastSeenAt,omitempty"`
+	RevokedAt    *time.Time `json:"revokedAt,omitempty"`
+}
+
+type PosStaff struct {
+	ID          uuid.UUID `json:"id"`
+	DisplayName string    `json:"displayName"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
 type Product struct {
 	Code           *string          `json:"code,omitempty"`
 	CreatedAt      time.Time        `json:"createdAt"`
@@ -365,12 +380,13 @@ type UpdateProductInput struct {
 }
 
 type UpdateUserInput struct {
-	FirstName       *string `json:"firstName,omitempty"`
-	LastName        *string `json:"lastName,omitempty"`
-	Email           *string `json:"email,omitempty"`
-	PhoneNumber     *string `json:"phoneNumber,omitempty"`
-	AddressID       *string `json:"addressId,omitempty"`
-	NotifyMarketing *bool   `json:"notifyMarketing,omitempty"`
+	FirstName          *string `json:"firstName,omitempty"`
+	LastName           *string `json:"lastName,omitempty"`
+	Email              *string `json:"email,omitempty"`
+	PhoneNumber        *string `json:"phoneNumber,omitempty"`
+	AddressID          *string `json:"addressId,omitempty"`
+	NotifyMarketing    *bool   `json:"notifyMarketing,omitempty"`
+	NotifyOrderUpdates *bool   `json:"notifyOrderUpdates,omitempty"`
 }
 
 type User struct {
@@ -381,9 +397,11 @@ type User struct {
 	PhoneNumber         *string    `json:"phoneNumber,omitempty"`
 	IsAdmin             bool       `json:"isAdmin"`
 	NotifyMarketing     bool       `json:"notifyMarketing"`
+	NotifyOrderUpdates  bool       `json:"notifyOrderUpdates"`
 	DeletionRequestedAt *time.Time `json:"deletionRequestedAt,omitempty"`
 	Address             *Address   `json:"address,omitempty"`
 	Orders              []*Order   `json:"orders,omitempty"`
+	Rrn                 *string    `json:"rrn,omitempty"`
 }
 
 type OrderTypeEnum string

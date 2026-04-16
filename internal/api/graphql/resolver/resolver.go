@@ -24,6 +24,7 @@ import (
 	notificationApplication "tsb-service/internal/modules/notification/application"
 	orderApplication "tsb-service/internal/modules/order/application"
 	paymentApplication "tsb-service/internal/modules/payment/application"
+	posApplication "tsb-service/internal/modules/pos/application"
 	productApplication "tsb-service/internal/modules/product/application"
 	restaurantApplication "tsb-service/internal/modules/restaurant/application"
 	userApplication "tsb-service/internal/modules/user/application"
@@ -46,6 +47,7 @@ type Resolver struct {
 	ProductService      productApplication.ProductService
 	RestaurantService   restaurantApplication.RestaurantService
 	UserService         userApplication.UserService
+	PosService          *posApplication.Service
 	// ChangeLogger triggers an async HubRise catalog push after any
 	// product/category mutation (debounced, 2s). Nil when HubRise is
 	// disabled — callers must nil-check.
@@ -65,6 +67,7 @@ func NewResolver(
 	productService productApplication.ProductService,
 	restaurantService restaurantApplication.RestaurantService,
 	userService userApplication.UserService,
+	posService *posApplication.Service,
 	changeLogger *productApplication.MenuChangeLogger,
 ) *Resolver {
 	return &Resolver{
@@ -79,6 +82,7 @@ func NewResolver(
 		ProductService:      productService,
 		RestaurantService:   restaurantService,
 		UserService:         userService,
+		PosService:          posService,
 		ChangeLogger:        changeLogger,
 	}
 }
@@ -102,6 +106,10 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 			WriteBufferSize: 1024,
 			CheckOrigin: func(r *http.Request) bool {
 				origin := strings.TrimRight(strings.ToLower(r.Header.Get("Origin")), "/")
+				// Native apps (Android/iOS) don't send an Origin header — allow empty
+				if origin == "" {
+					return true
+				}
 				for _, allowed := range allowedOrigins {
 					if origin == strings.TrimRight(strings.ToLower(allowed), "/") {
 						return true

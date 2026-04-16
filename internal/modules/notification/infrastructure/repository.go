@@ -19,51 +19,6 @@ func NewNotificationRepository(pool *db.DBPool) domain.NotificationRepository {
 	return &notificationRepository{pool: pool}
 }
 
-// ──────────────────── Live Activity Tokens ────────────────────
-
-func (r *notificationRepository) SaveLiveActivityToken(ctx context.Context, orderID uuid.UUID, pushToken string) error {
-	query := `
-		INSERT INTO live_activity_tokens (order_id, push_token)
-		VALUES ($1, $2)
-		ON CONFLICT (order_id, push_token) DO UPDATE SET created_at = now()
-	`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, orderID, pushToken)
-	if err != nil {
-		return fmt.Errorf("save live activity token: %w", err)
-	}
-	return nil
-}
-
-func (r *notificationRepository) FindLiveActivityTokensByOrderID(ctx context.Context, orderID uuid.UUID) ([]string, error) {
-	query := `
-		SELECT push_token FROM live_activity_tokens
-		WHERE order_id = $1 AND expires_at > now()
-	`
-	var tokens []string
-	if err := r.pool.ForContext(ctx).SelectContext(ctx, &tokens, query, orderID); err != nil {
-		return nil, fmt.Errorf("find live activity tokens: %w", err)
-	}
-	return tokens, nil
-}
-
-func (r *notificationRepository) DeleteLiveActivityTokensByOrderID(ctx context.Context, orderID uuid.UUID) error {
-	query := `DELETE FROM live_activity_tokens WHERE order_id = $1`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, orderID)
-	if err != nil {
-		return fmt.Errorf("delete live activity tokens: %w", err)
-	}
-	return nil
-}
-
-func (r *notificationRepository) DeleteExpiredLiveActivityTokens(ctx context.Context) error {
-	query := `DELETE FROM live_activity_tokens WHERE expires_at <= now()`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query)
-	if err != nil {
-		return fmt.Errorf("delete expired live activity tokens: %w", err)
-	}
-	return nil
-}
-
 // ──────────────────── Device Push Tokens ────────────────────
 
 func (r *notificationRepository) SaveDeviceToken(ctx context.Context, userID uuid.UUID, deviceToken, platform, role string) error {
