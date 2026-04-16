@@ -115,9 +115,9 @@ func (h *Handler) RrnLogin(c *gin.Context) {
 		return
 	}
 
-	// isAdmin is a property of the user, not the session; we let the service
-	// compute it from Zitadel roles in a later pass. For now, defer to false
-	// and rely on the admin flag being cached on the user row if needed.
+	// All POS staff with an RRN+PIN are treated as admin for order management.
+	// Fine-grained POS roles (cashier vs manager) can be added later via a
+	// role column on the users table.
 	tokens, err := h.svc.RrnLogin(c.Request.Context(), application.RrnLoginInput{
 		DeviceID:  deviceID,
 		RRN:       body.RRN,
@@ -125,7 +125,7 @@ func (h *Handler) RrnLogin(c *gin.Context) {
 		Timestamp: body.Timestamp,
 		Nonce:     body.Nonce,
 		HMAC:      body.HMAC,
-	}, false)
+	}, true)
 	if err != nil {
 		respondAuthError(c, err)
 		return
@@ -151,7 +151,7 @@ func (h *Handler) Refresh(c *gin.Context) {
 		Timestamp:    body.Timestamp,
 		Nonce:        body.Nonce,
 		HMAC:         body.HMAC,
-	}, false)
+	}, true)
 	if err != nil {
 		respondAuthError(c, err)
 		return
