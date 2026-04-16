@@ -131,8 +131,10 @@ func (v *OIDCVerifier) tryVerifyAppJWT(c *gin.Context, tokenStr string) bool {
 	}
 	userID, isAdmin, err := v.appJWT.VerifyAccessToken(tokenStr)
 	if err != nil || userID == uuid.Nil {
+		zap.L().Debug("app JWT verification failed", zap.Error(err))
 		return false
 	}
+	zap.L().Debug("app JWT verified", zap.String("userID", userID.String()), zap.Bool("isAdmin", isAdmin))
 	ctx := utils.SetUserID(c.Request.Context(), userID.String())
 	ctx = utils.SetIsAdmin(ctx, isAdmin)
 	c.Request = c.Request.WithContext(ctx)
