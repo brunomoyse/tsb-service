@@ -379,12 +379,13 @@ type UpdateProductInput struct {
 }
 
 type UpdateUserInput struct {
-	FirstName       *string `json:"firstName,omitempty"`
-	LastName        *string `json:"lastName,omitempty"`
-	Email           *string `json:"email,omitempty"`
-	PhoneNumber     *string `json:"phoneNumber,omitempty"`
-	AddressID       *string `json:"addressId,omitempty"`
-	NotifyMarketing *bool   `json:"notifyMarketing,omitempty"`
+	FirstName          *string `json:"firstName,omitempty"`
+	LastName           *string `json:"lastName,omitempty"`
+	Email              *string `json:"email,omitempty"`
+	PhoneNumber        *string `json:"phoneNumber,omitempty"`
+	AddressID          *string `json:"addressId,omitempty"`
+	NotifyMarketing    *bool   `json:"notifyMarketing,omitempty"`
+	NotifyOrderUpdates *bool   `json:"notifyOrderUpdates,omitempty"`
 }
 
 type User struct {
@@ -395,6 +396,7 @@ type User struct {
 	PhoneNumber         *string    `json:"phoneNumber,omitempty"`
 	IsAdmin             bool       `json:"isAdmin"`
 	NotifyMarketing     bool       `json:"notifyMarketing"`
+	NotifyOrderUpdates  bool       `json:"notifyOrderUpdates"`
 	DeletionRequestedAt *time.Time `json:"deletionRequestedAt,omitempty"`
 	Address             *Address   `json:"address,omitempty"`
 	Orders              []*Order   `json:"orders,omitempty"`

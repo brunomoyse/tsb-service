@@ -33,6 +33,7 @@ func (r *mutationResolver) UpdateMe(ctx context.Context, input model.UpdateUserI
 		input.PhoneNumber,
 		input.AddressID,
 		input.NotifyMarketing,
+		input.NotifyOrderUpdates,
 	)
 
 	if err != nil {
