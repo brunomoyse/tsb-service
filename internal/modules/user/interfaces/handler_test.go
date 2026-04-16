@@ -25,7 +25,7 @@ import (
 type mockUserService struct {
 	getUserByIDFn   func(ctx context.Context, id string) (*domain.User, error)
 	getUserByEmailFn func(ctx context.Context, email string) (*domain.User, error)
-	updateMeFn      func(ctx context.Context, userID string, firstName, lastName, email, phoneNumber, addressID *string, notifyMarketing *bool) (*domain.User, error)
+	updateMeFn      func(ctx context.Context, userID string, firstName, lastName, email, phoneNumber, addressID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error)
 }
 
 func (m *mockUserService) GetUserByID(ctx context.Context, id string) (*domain.User, error) {
@@ -42,9 +42,9 @@ func (m *mockUserService) GetUserByEmail(ctx context.Context, email string) (*do
 	return nil, sql.ErrNoRows
 }
 
-func (m *mockUserService) UpdateMe(ctx context.Context, userID string, firstName, lastName, email, phoneNumber, addressID *string, notifyMarketing *bool) (*domain.User, error) {
+func (m *mockUserService) UpdateMe(ctx context.Context, userID string, firstName, lastName, email, phoneNumber, addressID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error) {
 	if m.updateMeFn != nil {
-		return m.updateMeFn(ctx, userID, firstName, lastName, email, phoneNumber, addressID, notifyMarketing)
+		return m.updateMeFn(ctx, userID, firstName, lastName, email, phoneNumber, addressID, notifyMarketing, notifyOrderUpdates)
 	}
 	return nil, fmt.Errorf("not implemented")
 }
@@ -161,7 +161,7 @@ func TestUpdateMeHandler(t *testing.T) {
 	testUserID := uuid.New()
 
 	svc := &mockUserService{
-		updateMeFn: func(_ context.Context, userID string, firstName, lastName, email, phoneNumber, addressID *string, notifyMarketing *bool) (*domain.User, error) {
+		updateMeFn: func(_ context.Context, userID string, firstName, lastName, email, phoneNumber, addressID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error) {
 			return &domain.User{
 				ID:        testUserID,
 				FirstName: *firstName,

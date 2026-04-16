@@ -368,21 +368,27 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 	} else {
 		// If offline payment, send the notification e-mail already
-		go func() {
-			_, cancel := emailContext()
-			defer cancel()
-			err = es.SendOrderPendingEmail(*user, order.Language, *order, items)
-			if err != nil {
-				zap.L().Error("failed to send order pending email", zap.String("order_id", order.ID.String()), zap.Error(err))
-			}
-		}()
+		if user.NotifyOrderUpdates {
+			go func() {
+				_, cancel := emailContext()
+				defer cancel()
+				err = es.SendOrderPendingEmail(*user, order.Language, *order, items)
+				if err != nil {
+					zap.L().Error("failed to send order pending email", zap.String("order_id", order.ID.String()), zap.Error(err))
+				}
+			}()
+		}
 	}
 
 	// 10) Map to GraphQL model
 	gql := ToGQLOrder(order)
 
-	// 11) Publish subscription
-	r.Broker.Publish("orderCreated", gql)
+	// 11) Publish subscription. Online-payment orders are only published to
+	// the admin dashboard once the Mollie webhook confirms payment (see
+	// payment/interfaces/handler.go) — unpaid orders are not actionable.
+	if !input.IsOnlinePayment {
+		r.Broker.Publish("orderCreated", gql)
+	}
 
 	// 12) Send push notification to admin devices (non-blocking)
 	if r.FCMClient != nil || r.APNsClient != nil {
@@ -416,6 +422,21 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 							_ = r.NotificationService.UnregisterDeviceToken(context.Background(), dt.UserID, dt.DeviceToken)
 						} else {
 							zap.L().Error("failed to send admin APNs push",
+								zap.String("order_id", order.ID.String()),
+								zap.Error(pushErr),
+							)
+						}
+					}
+				}
+			}
+
+			// Also notify POS devices (Sunmi handhelds) via FCM.
+			if r.PosService != nil && r.FCMClient != nil {
+				posTokens, posErr := r.PosService.GetActiveFCMTokens(context.Background())
+				if posErr == nil {
+					for _, token := range posTokens {
+						if pushErr := r.FCMClient.SendAlert(token, msg.Title, msg.Body, data); pushErr != nil {
+							zap.L().Warn("failed to send POS FCM push",
 								zap.String("order_id", order.ID.String()),
 								zap.Error(pushErr),
 							)
@@ -514,6 +535,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				}
 			}
 
+			if !user.NotifyOrderUpdates {
+				return
+			}
 			err = es.SendOrderConfirmedEmail(*user, lang, *o, items, address)
 			if err != nil {
 				zap.L().Error("failed to send order confirmed email", zap.String("order_id", o.ID.String()), zap.Error(err))
@@ -534,6 +558,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
+			if !user.NotifyOrderUpdates {
+				return
+			}
 			err = es.SendOrderReadyEmail(*user, lang, *o)
 			if err != nil {
 				zap.L().Error("failed to send order ready email", zap.String("order_id", o.ID.String()), zap.Error(err))
@@ -544,7 +571,11 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	// If estimated ready time changed on an already-confirmed order (not the initial confirmation)
 	isInitialConfirmation := oldOrder.OrderStatus == orderDomain.OrderStatusPending &&
 		(o.OrderStatus == orderDomain.OrderStatusConfirmed || o.OrderStatus == orderDomain.OrderStatusPreparing)
-	if input.EstimatedReadyTime != nil && oldOrder.EstimatedReadyTime != nil && !isInitialConfirmation {
+	readyTimeWasUpdated := input.EstimatedReadyTime != nil &&
+		o.EstimatedReadyTime != nil &&
+		!isInitialConfirmation &&
+		(oldOrder.EstimatedReadyTime == nil || !oldOrder.EstimatedReadyTime.Equal(*o.EstimatedReadyTime))
+	if readyTimeWasUpdated {
 		go func() {
 			ctx, cancel := emailContext()
 			defer cancel()
@@ -554,6 +585,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
+			if !user.NotifyOrderUpdates {
+				return
+			}
 			err = es.SendReadyTimeUpdatedEmail(*user, lang, *o)
 			if err != nil {
 				zap.L().Error("failed to send ready time updated email", zap.String("order_id", o.ID.String()), zap.Error(err))
@@ -580,6 +614,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 					return
 				}
 
+				if !user.NotifyOrderUpdates {
+					return
+				}
 				refundAmount := utils.FormatDecimal(o.TotalPrice)
 				err = es.SendRefundIssuedEmail(*user, lang, refundAmount)
 				if err != nil {
@@ -597,6 +634,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
+			if !user.NotifyOrderUpdates {
+				return
+			}
 			err = es.SendOrderCanceledEmail(*user, lang)
 			if err != nil {
 				zap.L().Error("failed to send order canceled email", zap.String("order_id", o.ID.String()), zap.Error(err))
@@ -611,43 +651,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	r.Broker.Publish("orderUpdated", order)
 	r.Broker.Publish(fmt.Sprintf("orderUpdated:%s", id), order)
 
-	// Send APNs push to update iOS Live Activities (non-blocking)
-	if r.APNsClient != nil {
-		go func() {
-			tokens, tokenErr := r.NotificationService.GetLiveActivityTokens(context.Background(), id)
-			if tokenErr != nil || len(tokens) == 0 {
-				return
-			}
-
-			isTerminal := o.OrderStatus == orderDomain.OrderStatusDelivered ||
-				o.OrderStatus == orderDomain.OrderStatusPickedUp ||
-				o.OrderStatus == orderDomain.OrderStatusCanceled
-
-			event := "update"
-			if isTerminal {
-				event = "end"
-			}
-
-			contentState := apns.BuildOrderContentState(string(o.OrderStatus), o.EstimatedReadyTime)
-
-			for _, tk := range tokens {
-				if pushErr := r.APNsClient.UpdateLiveActivity(tk, contentState, event); pushErr != nil {
-					zap.L().Error("failed to send Live Activity push",
-						zap.String("order_id", id.String()),
-						zap.Error(pushErr),
-					)
-				}
-			}
-
-			// Cleanup tokens after terminal status
-			if isTerminal {
-				_ = r.NotificationService.CleanupLiveActivityTokens(context.Background(), id)
-			}
-		}()
-	}
-
-	// Send standard alert push notifications to user's devices (non-blocking)
-	if r.APNsClient != nil {
+	// Send standard alert push notifications to user's devices (non-blocking).
+	// Only fired when the status actually changed.
+	if r.APNsClient != nil && oldOrder.OrderStatus != o.OrderStatus {
 		go func() {
 			deviceTokens, tokenErr := r.NotificationService.GetDeviceTokens(context.Background(), o.UserID)
 			if tokenErr != nil || len(deviceTokens) == 0 {
@@ -692,35 +698,65 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		}()
 	}
 
+	// Send an extra alert when estimated ready time changes, so users receive
+	// a visible notification banner in addition to the silent Live Activity update.
+	if (r.APNsClient != nil || r.FCMClient != nil) && readyTimeWasUpdated {
+		go func() {
+			deviceTokens, tokenErr := r.NotificationService.GetDeviceTokens(context.Background(), o.UserID)
+			if tokenErr != nil || len(deviceTokens) == 0 {
+				return
+			}
+
+			msg := notificationApplication.GetReadyTimeUpdatedNotification(o.Language, o.EstimatedReadyTime)
+			if msg.Body == "" {
+				return
+			}
+
+			data := map[string]string{
+				"orderId": id.String(),
+				"status":  string(o.OrderStatus),
+			}
+			if o.EstimatedReadyTime != nil {
+				data["estimatedReadyTime"] = o.EstimatedReadyTime.Format(time.RFC3339)
+			}
+
+			for _, dt := range deviceTokens {
+				if dt.Platform == "ios" && r.APNsClient != nil {
+					if pushErr := r.APNsClient.SendAlert(dt.DeviceToken, msg.Title, msg.Body, data); pushErr != nil {
+						if errors.Is(pushErr, apns.ErrTokenInvalid) {
+							_ = r.NotificationService.UnregisterDeviceToken(context.Background(), o.UserID, dt.DeviceToken)
+						} else {
+							zap.L().Error("failed to send ready time APNs push",
+								zap.String("order_id", id.String()),
+								zap.Error(pushErr),
+							)
+						}
+					}
+				} else if dt.Platform == "android" && r.FCMClient != nil {
+					if pushErr := r.FCMClient.SendAlert(dt.DeviceToken, msg.Title, msg.Body, data); pushErr != nil {
+						if errors.Is(pushErr, fcm.ErrTokenInvalid) {
+							_ = r.NotificationService.UnregisterDeviceToken(context.Background(), o.UserID, dt.DeviceToken)
+						} else {
+							zap.L().Error("failed to send ready time FCM push",
+								zap.String("order_id", id.String()),
+								zap.Error(pushErr),
+							)
+						}
+					}
+				}
+			}
+		}()
+	}
+
 	return order, nil
 }
 
-// RegisterLiveActivityToken is the resolver for the registerLiveActivityToken field.
+// RegisterLiveActivityToken is currently not supported.
 func (r *mutationResolver) RegisterLiveActivityToken(ctx context.Context, orderID uuid.UUID, pushToken string) (bool, error) {
-	// Verify the authenticated user owns this order
-	userID := utils.GetUserID(ctx)
-	if userID == "" {
-		return false, fmt.Errorf("authentication required")
-	}
-
-	uid, err := uuid.Parse(userID)
-	if err != nil {
-		return false, fmt.Errorf("invalid user ID")
-	}
-
-	order, _, err := r.OrderService.GetOrderByID(ctx, orderID)
-	if err != nil {
-		return false, fmt.Errorf("order not found")
-	}
-	if order.UserID != uid {
-		return false, fmt.Errorf("unauthorized: order does not belong to user")
-	}
-
-	if err := r.NotificationService.RegisterLiveActivityToken(ctx, orderID, pushToken); err != nil {
-		return false, fmt.Errorf("failed to register token: %w", err)
-	}
-
-	return true, nil
+	_ = ctx
+	_ = orderID
+	_ = pushToken
+	return false, fmt.Errorf("live activity is not supported")
 }
 
 // RegisterDeviceToken is the resolver for the registerDeviceToken field.

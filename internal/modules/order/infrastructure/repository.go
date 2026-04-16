@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 	"tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/db"
@@ -216,22 +217,28 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 
 	offset := (page - 1) * limit
 
-	var whereClause string
+	// Hide online-payment orders that haven't been paid yet — those are not
+	// actionable from the admin dashboard. Cash orders are always returned.
+	conditions := []string{
+		`(o.is_online_payment = false OR EXISTS (
+			SELECT 1 FROM mollie_payments p
+			WHERE p.order_id = o.id AND p.status = 'paid'
+		))`,
+	}
 	var args []any
 	placeholderIndex := 1
 
-	// If userID is not nil, add a WHERE condition
 	if userID != nil {
-		whereClause = fmt.Sprintf("WHERE o.user_id = $%d", placeholderIndex)
+		conditions = append(conditions, fmt.Sprintf("o.user_id = $%d", placeholderIndex))
 		args = append(args, *userID)
 		placeholderIndex++
 	}
 
-	// Next placeholders for LIMIT and OFFSET
+	whereClause := "WHERE " + strings.Join(conditions, " AND ")
+
 	limitPlaceholder := placeholderIndex
 	offsetPlaceholder := placeholderIndex + 1
 
-	// Build the final query
 	query := fmt.Sprintf(`
         SELECT
             o.*

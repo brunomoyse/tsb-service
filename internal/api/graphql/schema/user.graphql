@@ -6,6 +6,7 @@ type User {
     phoneNumber: String
     isAdmin: Boolean!
     notifyMarketing: Boolean!
+    notifyOrderUpdates: Boolean!
     deletionRequestedAt: DateTime
     address: Address
     orders: [Order!]
@@ -18,6 +19,7 @@ input UpdateUserInput {
     phoneNumber: String
     addressId: String
     notifyMarketing: Boolean
+    notifyOrderUpdates: Boolean
 }
 
 type CustomerStats {

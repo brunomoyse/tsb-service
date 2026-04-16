@@ -85,6 +85,10 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 			log.Error("webhook: failed to handle paid payment", zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(handleErr))
 		} else if order != nil {
 			gqlOrder := resolver.ToGQLOrder(order)
+			// First time the dashboard sees this online-payment order — publish
+			// orderCreated so admin clients add it to their store. CreateOrder
+			// suppressed that event for online orders until payment confirmed.
+			h.broker.Publish("orderCreated", gqlOrder)
 			h.broker.Publish("orderUpdated", gqlOrder)
 			h.broker.Publish(fmt.Sprintf("orderUpdated:%s", orderID), gqlOrder)
 		}

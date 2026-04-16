@@ -382,6 +382,7 @@ func TestCreateProduct(t *testing.T) {
 			"isVegan":        false,
 			"isSpicy":        false,
 			"isDiscountable": true,
+			"vatCategory":    "food",
 			"translations": []map[string]any{
 				{
 					"language":    "en",
@@ -445,6 +446,7 @@ func TestCreateProduct(t *testing.T) {
 			"isVegan":        false,
 			"isSpicy":        false,
 			"isDiscountable": true,
+			"vatCategory":    "food",
 			"translations": []map[string]any{
 				{
 					"language":    "en",

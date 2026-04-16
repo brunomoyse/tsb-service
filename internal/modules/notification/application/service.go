@@ -10,11 +10,6 @@ import (
 
 // NotificationService defines the use cases for push notification token management.
 type NotificationService interface {
-	// Live Activity tokens
-	RegisterLiveActivityToken(ctx context.Context, orderID uuid.UUID, pushToken string) error
-	GetLiveActivityTokens(ctx context.Context, orderID uuid.UUID) ([]string, error)
-	CleanupLiveActivityTokens(ctx context.Context, orderID uuid.UUID) error
-
 	// Device push tokens
 	RegisterDeviceToken(ctx context.Context, userID uuid.UUID, deviceToken, platform, role string) error
 	GetDeviceTokens(ctx context.Context, userID uuid.UUID) ([]domain.DevicePushToken, error)
@@ -29,18 +24,6 @@ type notificationService struct {
 // NewNotificationService constructs a NotificationService with the given repository.
 func NewNotificationService(repo domain.NotificationRepository) NotificationService {
 	return &notificationService{repo: repo}
-}
-
-func (s *notificationService) RegisterLiveActivityToken(ctx context.Context, orderID uuid.UUID, pushToken string) error {
-	return s.repo.SaveLiveActivityToken(ctx, orderID, pushToken)
-}
-
-func (s *notificationService) GetLiveActivityTokens(ctx context.Context, orderID uuid.UUID) ([]string, error) {
-	return s.repo.FindLiveActivityTokensByOrderID(ctx, orderID)
-}
-
-func (s *notificationService) CleanupLiveActivityTokens(ctx context.Context, orderID uuid.UUID) error {
-	return s.repo.DeleteLiveActivityTokensByOrderID(ctx, orderID)
 }
 
 func (s *notificationService) RegisterDeviceToken(ctx context.Context, userID uuid.UUID, deviceToken, platform, role string) error {
