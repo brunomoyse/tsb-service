@@ -90,8 +90,41 @@ func ParseCode(code *string) (string, int) {
 	return alpha, num
 }
 
+// FormatDecimal formats a decimal amount using the Belgian French (fr-BE)
+// locale convention: comma as decimal separator and a non-breaking space
+// as thousands separator. Example: 1234.56 → "1 234,56".
 func FormatDecimal(d decimal.Decimal) string {
-	return strings.Replace(d.StringFixed(2), ".", ",", 1)
+	fixed := d.StringFixed(2)
+	neg := strings.HasPrefix(fixed, "-")
+	if neg {
+		fixed = fixed[1:]
+	}
+	parts := strings.SplitN(fixed, ".", 2)
+	intPart := parts[0]
+	decPart := ""
+	if len(parts) == 2 {
+		decPart = parts[1]
+	}
+
+	// Insert non-breaking space every 3 digits from the right.
+	const nbsp = "\u00a0"
+	var b strings.Builder
+	n := len(intPart)
+	for i, r := range intPart {
+		if i > 0 && (n-i)%3 == 0 {
+			b.WriteString(nbsp)
+		}
+		b.WriteRune(r)
+	}
+
+	out := b.String()
+	if decPart != "" {
+		out = out + "," + decPart
+	}
+	if neg {
+		out = "-" + out
+	}
+	return out
 }
 
 func UploadProductImage(ctx context.Context, src io.Reader, filename string, slug *string) error {
