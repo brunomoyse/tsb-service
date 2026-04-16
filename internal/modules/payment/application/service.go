@@ -334,9 +334,11 @@ func (s *paymentService) HandlePaymentPaid(ctx context.Context, orderID uuid.UUI
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
 	}
 
-	// Send confirmation email
-	if emailErr := es.SendOrderPendingEmail(*u, order.Language, *order, orderProductsResponse); emailErr != nil {
-		zap.L().Error("failed to send order pending email", zap.String("order_id", orderID.String()), zap.Error(emailErr))
+	// Send confirmation email (respect user's order-updates preference)
+	if u.NotifyOrderUpdates {
+		if emailErr := es.SendOrderPendingEmail(*u, order.Language, *order, orderProductsResponse); emailErr != nil {
+			zap.L().Error("failed to send order pending email", zap.String("order_id", orderID.String()), zap.Error(emailErr))
+		}
 	}
 
 	return order, nil
@@ -368,8 +370,10 @@ func (s *paymentService) HandlePaymentFailed(ctx context.Context, orderID uuid.U
 			return
 		}
 
-		if emailErr := es.SendPaymentFailedEmail(*u, order.Language); emailErr != nil {
-			zap.L().Error("failed to send payment failed email", zap.String("order_id", orderID.String()), zap.Error(emailErr))
+		if u.NotifyOrderUpdates {
+			if emailErr := es.SendPaymentFailedEmail(*u, order.Language); emailErr != nil {
+				zap.L().Error("failed to send payment failed email", zap.String("order_id", orderID.String()), zap.Error(emailErr))
+			}
 		}
 	}()
 

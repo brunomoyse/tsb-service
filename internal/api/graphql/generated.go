@@ -354,6 +354,7 @@ type ComplexityRoot struct {
 		IsAdmin             func(childComplexity int) int
 		LastName            func(childComplexity int) int
 		NotifyMarketing     func(childComplexity int) int
+		NotifyOrderUpdates  func(childComplexity int) int
 		Orders              func(childComplexity int) int
 		PhoneNumber         func(childComplexity int) int
 		Rrn                 func(childComplexity int) int
@@ -2068,6 +2069,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.User.NotifyMarketing(childComplexity), true
+	case "User.notifyOrderUpdates":
+		if e.ComplexityRoot.User.NotifyOrderUpdates == nil {
+			break
+		}
+
+		return e.ComplexityRoot.User.NotifyOrderUpdates(childComplexity), true
 	case "User.orders":
 		if e.ComplexityRoot.User.Orders == nil {
 			break
@@ -4942,6 +4949,8 @@ func (ec *executionContext) fieldContext_Mutation_setUserRrn(ctx context.Context
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			case "notifyMarketing":
 				return ec.fieldContext_User_notifyMarketing(ctx, field)
+			case "notifyOrderUpdates":
+				return ec.fieldContext_User_notifyOrderUpdates(ctx, field)
 			case "deletionRequestedAt":
 				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
@@ -5020,6 +5029,8 @@ func (ec *executionContext) fieldContext_Mutation_setUserPin(ctx context.Context
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			case "notifyMarketing":
 				return ec.fieldContext_User_notifyMarketing(ctx, field)
+			case "notifyOrderUpdates":
+				return ec.fieldContext_User_notifyOrderUpdates(ctx, field)
 			case "deletionRequestedAt":
 				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
@@ -5860,6 +5871,8 @@ func (ec *executionContext) fieldContext_Mutation_updateMe(ctx context.Context, 
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			case "notifyMarketing":
 				return ec.fieldContext_User_notifyMarketing(ctx, field)
+			case "notifyOrderUpdates":
+				return ec.fieldContext_User_notifyOrderUpdates(ctx, field)
 			case "deletionRequestedAt":
 				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
@@ -5937,6 +5950,8 @@ func (ec *executionContext) fieldContext_Mutation_requestDeletion(_ context.Cont
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			case "notifyMarketing":
 				return ec.fieldContext_User_notifyMarketing(ctx, field)
+			case "notifyOrderUpdates":
+				return ec.fieldContext_User_notifyOrderUpdates(ctx, field)
 			case "deletionRequestedAt":
 				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
@@ -6003,6 +6018,8 @@ func (ec *executionContext) fieldContext_Mutation_cancelDeletionRequest(_ contex
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			case "notifyMarketing":
 				return ec.fieldContext_User_notifyMarketing(ctx, field)
+			case "notifyOrderUpdates":
+				return ec.fieldContext_User_notifyOrderUpdates(ctx, field)
 			case "deletionRequestedAt":
 				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
@@ -6536,6 +6553,8 @@ func (ec *executionContext) fieldContext_Order_customer(_ context.Context, field
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			case "notifyMarketing":
 				return ec.fieldContext_User_notifyMarketing(ctx, field)
+			case "notifyOrderUpdates":
+				return ec.fieldContext_User_notifyOrderUpdates(ctx, field)
 			case "deletionRequestedAt":
 				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
@@ -10952,6 +10971,8 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			case "notifyMarketing":
 				return ec.fieldContext_User_notifyMarketing(ctx, field)
+			case "notifyOrderUpdates":
+				return ec.fieldContext_User_notifyOrderUpdates(ctx, field)
 			case "deletionRequestedAt":
 				return ec.fieldContext_User_deletionRequestedAt(ctx, field)
 			case "address":
@@ -12163,6 +12184,35 @@ func (ec *executionContext) _User_notifyMarketing(ctx context.Context, field gra
 }
 
 func (ec *executionContext) fieldContext_User_notifyMarketing(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_notifyOrderUpdates(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_notifyOrderUpdates,
+		func(ctx context.Context) (any, error) {
+			return obj.NotifyOrderUpdates, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_notifyOrderUpdates(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
@@ -14893,7 +14943,7 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"firstName", "lastName", "email", "phoneNumber", "addressId", "notifyMarketing"}
+	fieldsInOrder := [...]string{"firstName", "lastName", "email", "phoneNumber", "addressId", "notifyMarketing", "notifyOrderUpdates"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -14942,6 +14992,13 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 				return it, err
 			}
 			it.NotifyMarketing = data
+		case "notifyOrderUpdates":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("notifyOrderUpdates"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.NotifyOrderUpdates = data
 		}
 	}
 	return it, nil
@@ -17766,6 +17823,11 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			}
 		case "notifyMarketing":
 			out.Values[i] = ec._User_notifyMarketing(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "notifyOrderUpdates":
+			out.Values[i] = ec._User_notifyOrderUpdates(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}

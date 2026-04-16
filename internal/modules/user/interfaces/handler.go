@@ -66,7 +66,7 @@ func (h *UserHandler) UpdateMeHandler(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.UpdateMe(ctx, userID, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressID, nil)
+	user, err := h.service.UpdateMe(ctx, userID, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressID, nil, nil)
 	if err != nil {
 		logging.FromContext(ctx).Error("failed to update user profile", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user profile"})

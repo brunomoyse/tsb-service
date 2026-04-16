@@ -368,14 +368,16 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 	} else {
 		// If offline payment, send the notification e-mail already
-		go func() {
-			_, cancel := emailContext()
-			defer cancel()
-			err = es.SendOrderPendingEmail(*user, order.Language, *order, items)
-			if err != nil {
-				zap.L().Error("failed to send order pending email", zap.String("order_id", order.ID.String()), zap.Error(err))
-			}
-		}()
+		if user.NotifyOrderUpdates {
+			go func() {
+				_, cancel := emailContext()
+				defer cancel()
+				err = es.SendOrderPendingEmail(*user, order.Language, *order, items)
+				if err != nil {
+					zap.L().Error("failed to send order pending email", zap.String("order_id", order.ID.String()), zap.Error(err))
+				}
+			}()
+		}
 	}
 
 	// 10) Map to GraphQL model
@@ -533,6 +535,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				}
 			}
 
+			if !user.NotifyOrderUpdates {
+				return
+			}
 			err = es.SendOrderConfirmedEmail(*user, lang, *o, items, address)
 			if err != nil {
 				zap.L().Error("failed to send order confirmed email", zap.String("order_id", o.ID.String()), zap.Error(err))
@@ -553,6 +558,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
+			if !user.NotifyOrderUpdates {
+				return
+			}
 			err = es.SendOrderReadyEmail(*user, lang, *o)
 			if err != nil {
 				zap.L().Error("failed to send order ready email", zap.String("order_id", o.ID.String()), zap.Error(err))
@@ -577,6 +585,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
+			if !user.NotifyOrderUpdates {
+				return
+			}
 			err = es.SendReadyTimeUpdatedEmail(*user, lang, *o)
 			if err != nil {
 				zap.L().Error("failed to send ready time updated email", zap.String("order_id", o.ID.String()), zap.Error(err))
@@ -603,6 +614,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 					return
 				}
 
+				if !user.NotifyOrderUpdates {
+					return
+				}
 				refundAmount := utils.FormatDecimal(o.TotalPrice)
 				err = es.SendRefundIssuedEmail(*user, lang, refundAmount)
 				if err != nil {
@@ -620,6 +634,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
+			if !user.NotifyOrderUpdates {
+				return
+			}
 			err = es.SendOrderCanceledEmail(*user, lang)
 			if err != nil {
 				zap.L().Error("failed to send order canceled email", zap.String("order_id", o.ID.String()), zap.Error(err))

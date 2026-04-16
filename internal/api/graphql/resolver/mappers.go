@@ -68,6 +68,7 @@ func ToGQLUser(u *userDomain.User) *model.User {
 		LastName:            u.LastName,
 		PhoneNumber:         u.PhoneNumber,
 		NotifyMarketing:     u.NotifyMarketing,
+		NotifyOrderUpdates:  u.NotifyOrderUpdates,
 		DeletionRequestedAt: u.DeletionRequestedAt,
 		Rrn:                 u.RRN,
 	}
