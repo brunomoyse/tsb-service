@@ -204,7 +204,11 @@ func (h *Handler) isAdminViaUserinfo(authHeader string) bool {
 		zap.L().Warn("userinfo request failed", zap.Error(err))
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			zap.L().Warn("failed to close userinfo response body", zap.Error(err))
+		}
+	}()
 	if resp.StatusCode != 200 {
 		zap.L().Warn("userinfo non-200", zap.Int("status", resp.StatusCode))
 		return false
