@@ -457,7 +457,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
 
-	err = r.OrderService.UpdateOrder(ctx, id, input.Status, input.EstimatedReadyTime)
+	err = r.OrderService.UpdateOrder(ctx, id, input.Status, input.EstimatedReadyTime, input.CancellationReason)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update order status: %w", err)
 	}
@@ -637,7 +637,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			if !user.NotifyOrderUpdates {
 				return
 			}
-			err = es.SendOrderCanceledEmail(*user, lang)
+			err = es.SendOrderCanceledEmail(*user, lang, o.CancellationReason)
 			if err != nil {
 				zap.L().Error("failed to send order canceled email", zap.String("order_id", o.ID.String()), zap.Error(err))
 			}
@@ -660,7 +660,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
-			msg := notificationApplication.GetOrderStatusNotification(o.OrderStatus, o.Language, string(o.OrderType))
+			msg := notificationApplication.GetOrderStatusNotification(o.OrderStatus, o.Language, string(o.OrderType), o.CancellationReason)
 			if msg.Body == "" {
 				return
 			}

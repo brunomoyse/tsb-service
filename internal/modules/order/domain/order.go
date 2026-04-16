@@ -12,6 +12,7 @@ import (
 
 type OrderStatus string
 type OrderType string
+type OrderCancellationReason string
 
 const (
 	OrderStatusPending        OrderStatus = "PENDING"
@@ -28,6 +29,13 @@ const (
 const (
 	OrderTypeDelivery OrderType = "DELIVERY"
 	OrderTypePickUp   OrderType = "PICKUP"
+)
+
+const (
+	OrderCancellationReasonOutOfStock    OrderCancellationReason = "OUT_OF_STOCK"
+	OrderCancellationReasonKitchenClosed OrderCancellationReason = "KITCHEN_CLOSED"
+	OrderCancellationReasonDeliveryArea  OrderCancellationReason = "DELIVERY_AREA"
+	OrderCancellationReasonOther         OrderCancellationReason = "OTHER"
 )
 
 type Order struct {
@@ -60,6 +68,7 @@ type Order struct {
 	Postcode         *string  `db:"postcode" json:"postcode,omitempty"`
 	AddressDistance  *float64 `db:"address_distance" json:"addressDistance,omitempty"`
 	IsManualAddress  bool     `db:"is_manual_address" json:"isManualAddress"`
+	CancellationReason *OrderCancellationReason `db:"cancellation_reason" json:"cancellationReason,omitempty"`
 }
 
 type OrderStatusHistory struct {

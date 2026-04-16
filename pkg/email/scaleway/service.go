@@ -337,7 +337,45 @@ func SendPasswordResetEmail(user userDomain.User, lang string, resetURL string) 
 	return nil
 }
 
-func SendOrderCanceledEmail(user userDomain.User, lang string) error {
+// cancellationReasonLabels holds localized display labels for each enum value.
+// OTHER is intentionally omitted — we fall back to the generic copy.
+var cancellationReasonLabels = map[string]map[orderDomain.OrderCancellationReason]string{
+	"fr": {
+		orderDomain.OrderCancellationReasonOutOfStock:    "rupture de stock",
+		orderDomain.OrderCancellationReasonKitchenClosed: "cuisine fermée",
+		orderDomain.OrderCancellationReasonDeliveryArea:  "hors zone de livraison",
+	},
+	"en": {
+		orderDomain.OrderCancellationReasonOutOfStock:    "out of stock",
+		orderDomain.OrderCancellationReasonKitchenClosed: "kitchen closed",
+		orderDomain.OrderCancellationReasonDeliveryArea:  "outside delivery area",
+	},
+	"nl": {
+		orderDomain.OrderCancellationReasonOutOfStock:    "uitverkocht",
+		orderDomain.OrderCancellationReasonKitchenClosed: "keuken gesloten",
+		orderDomain.OrderCancellationReasonDeliveryArea:  "buiten bezorggebied",
+	},
+	"zh": {
+		orderDomain.OrderCancellationReasonOutOfStock:    "缺货",
+		orderDomain.OrderCancellationReasonKitchenClosed: "厨房已关闭",
+		orderDomain.OrderCancellationReasonDeliveryArea:  "超出配送范围",
+	},
+}
+
+// LocalizedCancellationReason returns the localized label for a reason, or an empty
+// string when the reason is nil, OTHER, or the language is unknown.
+func LocalizedCancellationReason(reason *orderDomain.OrderCancellationReason, lang string) string {
+	if reason == nil || *reason == orderDomain.OrderCancellationReasonOther {
+		return ""
+	}
+	labels, ok := cancellationReasonLabels[lang]
+	if !ok {
+		labels = cancellationReasonLabels["fr"]
+	}
+	return labels[*reason]
+}
+
+func SendOrderCanceledEmail(user userDomain.User, lang string, reason *orderDomain.OrderCancellationReason) error {
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -355,12 +393,14 @@ func SendOrderCanceledEmail(user userDomain.User, lang string) error {
 	// Determine the template path based on the user's language.
 	path := fmt.Sprintf("templates/%s/order-canceled", lang)
 
-	htmlContent, err := renderOrderCanceledEmailHTML(path, user)
+	reasonLabel := LocalizedCancellationReason(reason, lang)
+
+	htmlContent, err := renderOrderCanceledEmailHTML(path, user, reasonLabel)
 	if err != nil {
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
 
-	plainTextContent, err := renderOrderCanceledEmailText(path, user)
+	plainTextContent, err := renderOrderCanceledEmailText(path, user, reasonLabel)
 	if err != nil {
 		return fmt.Errorf("failed to render email template: %w", err)
 	}

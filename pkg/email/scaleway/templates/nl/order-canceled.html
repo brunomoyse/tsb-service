@@ -19,6 +19,7 @@
     <tr><td style="background-color:#ffffff;padding:36px;">
         <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">Hallo {{.UserName}},</p>
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Helaas moeten wij u meedelen dat uw bestelling is <strong>geannuleerd</strong>.</p>
+        {{if .Reason}}<p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;"><strong>Reden:</strong> {{.Reason}}.</p>{{end}}
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Als u de betaling reeds hebt uitgevoerd, is een terugbetaling gestart en ontvangt u uw geld binnenkort.</p>
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Onze oprechte excuses voor het ongemak.</p>
         <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">Voor hulp kunt u rechtstreeks contact opnemen met het restaurant op <strong>04 222 98 88</strong>.</p>

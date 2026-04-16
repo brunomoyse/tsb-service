@@ -132,6 +132,9 @@ models:
     model:
       - tsb-service/internal/modules/order/domain.OrderStatus
       - tsb-service/internal/modules/order/domain.OrderType
+  OrderCancellationReason:
+    model:
+      - tsb-service/internal/modules/order/domain.OrderCancellationReason
 
   # The GraphQL spec explicitly states that the Int type is a signed 32-bit
   # integer. Using Go int or int64 to represent it can lead to unexpected

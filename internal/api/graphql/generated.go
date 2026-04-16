@@ -150,6 +150,7 @@ type ComplexityRoot struct {
 	Order struct {
 		Address             func(childComplexity int) int
 		AddressExtra        func(childComplexity int) int
+		CancellationReason  func(childComplexity int) int
 		CouponCode          func(childComplexity int) int
 		CreatedAt           func(childComplexity int) int
 		Customer            func(childComplexity int) int
@@ -1031,6 +1032,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Order.AddressExtra(childComplexity), true
+	case "Order.cancellationReason":
+		if e.ComplexityRoot.Order.CancellationReason == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Order.CancellationReason(childComplexity), true
 	case "Order.couponCode":
 		if e.ComplexityRoot.Order.CouponCode == nil {
 			break
@@ -4481,6 +4488,8 @@ func (ec *executionContext) fieldContext_Mutation_createOrder(ctx context.Contex
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -4583,6 +4592,8 @@ func (ec *executionContext) fieldContext_Mutation_updateOrder(ctx context.Contex
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -6470,6 +6481,35 @@ func (ec *executionContext) fieldContext_Order_couponCode(_ context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _Order_cancellationReason(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Order_cancellationReason,
+		func(ctx context.Context) (any, error) {
+			return obj.CancellationReason, nil
+		},
+		nil,
+		ec.marshalOOrderCancellationReason2ᚖtsbᚑserviceᚋinternalᚋmodulesᚋorderᚋdomainᚐOrderCancellationReason,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Order_cancellationReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Order",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type OrderCancellationReason does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Order_address(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6899,6 +6939,8 @@ func (ec *executionContext) fieldContext_OrderHistoryResponse_orders(_ context.C
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10040,6 +10082,8 @@ func (ec *executionContext) fieldContext_Query_orders(_ context.Context, field g
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10131,6 +10175,8 @@ func (ec *executionContext) fieldContext_Query_order(ctx context.Context, field 
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10233,6 +10279,8 @@ func (ec *executionContext) fieldContext_Query_customerOrders(ctx context.Contex
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10395,6 +10443,8 @@ func (ec *executionContext) fieldContext_Query_myOrders(ctx context.Context, fie
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10497,6 +10547,8 @@ func (ec *executionContext) fieldContext_Query_myOrder(ctx context.Context, fiel
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -11581,6 +11633,8 @@ func (ec *executionContext) fieldContext_Subscription_orderCreated(_ context.Con
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -11671,6 +11725,8 @@ func (ec *executionContext) fieldContext_Subscription_orderUpdated(_ context.Con
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -11762,6 +11818,8 @@ func (ec *executionContext) fieldContext_Subscription_myOrderUpdated(ctx context
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -12353,6 +12411,8 @@ func (ec *executionContext) fieldContext_User_orders(_ context.Context, field gr
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -14748,7 +14808,7 @@ func (ec *executionContext) unmarshalInputUpdateOrderInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"status", "estimatedReadyTime"}
+	fieldsInOrder := [...]string{"status", "estimatedReadyTime", "cancellationReason"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -14769,6 +14829,13 @@ func (ec *executionContext) unmarshalInputUpdateOrderInput(ctx context.Context, 
 				return it, err
 			}
 			it.EstimatedReadyTime = data
+		case "cancellationReason":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cancellationReason"))
+			data, err := ec.unmarshalOOrderCancellationReason2ᚖtsbᚑserviceᚋinternalᚋmodulesᚋorderᚋdomainᚐOrderCancellationReason(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CancellationReason = data
 		}
 	}
 	return it, nil
@@ -15769,6 +15836,8 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 			out.Values[i] = ec._Order_orderExtra(ctx, field, obj)
 		case "couponCode":
 			out.Values[i] = ec._Order_couponCode(ctx, field, obj)
+		case "cancellationReason":
+			out.Values[i] = ec._Order_cancellationReason(ctx, field, obj)
 		case "address":
 			field := field
 
@@ -19359,6 +19428,25 @@ func (ec *executionContext) marshalOOrder2ᚕᚖtsbᚑserviceᚋinternalᚋapi�
 	}
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalOOrderCancellationReason2ᚖtsbᚑserviceᚋinternalᚋmodulesᚋorderᚋdomainᚐOrderCancellationReason(ctx context.Context, v any) (*domain.OrderCancellationReason, error) {
+	if v == nil {
+		return nil, nil
+	}
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.OrderCancellationReason(tmp)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOOrderCancellationReason2ᚖtsbᚑserviceᚋinternalᚋmodulesᚋorderᚋdomainᚐOrderCancellationReason(ctx context.Context, sel ast.SelectionSet, v *domain.OrderCancellationReason) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalString(string(*v))
+	return res
 }
 
 func (ec *executionContext) unmarshalOOrderExtraInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderExtraInputᚄ(ctx context.Context, v any) ([]*model.OrderExtraInput, error) {

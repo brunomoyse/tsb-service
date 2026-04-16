@@ -13,7 +13,9 @@ type notificationText struct {
 }
 
 // GetOrderStatusNotification returns localized push notification text for a given order status.
-func GetOrderStatusNotification(status orderDomain.OrderStatus, language string, orderType string) notificationText {
+// When the status is CANCELLED and the cancellation reason is set to something other than
+// OTHER, the reason is appended to the body so the customer knows why.
+func GetOrderStatusNotification(status orderDomain.OrderStatus, language string, orderType string, cancellationReason *orderDomain.OrderCancellationReason) notificationText {
 	texts := orderNotificationTexts[language]
 	if texts == nil {
 		texts = orderNotificationTexts["fr"]
@@ -27,11 +29,54 @@ func GetOrderStatusNotification(status orderDomain.OrderStatus, language string,
 	// Use pickup-specific text if available
 	if orderType == "PICKUP" {
 		if pickupMsg, exists := pickupOverrides[language][status]; exists {
-			return pickupMsg
+			msg = pickupMsg
+		}
+	}
+
+	// Append localized cancellation reason when meaningful.
+	if status == orderDomain.OrderStatusCanceled && cancellationReason != nil && *cancellationReason != orderDomain.OrderCancellationReasonOther {
+		labelLang := language
+		if _, ok := cancellationReasonPushLabels[labelLang]; !ok {
+			labelLang = "fr"
+		}
+		if reasonLabel, ok := cancellationReasonPushLabels[labelLang][*cancellationReason]; ok && reasonLabel != "" {
+			msg.Body = fmt.Sprintf(cancellationReasonBodyFormat[labelLang], reasonLabel)
 		}
 	}
 
 	return msg
+}
+
+// Localized labels + templates for the cancellation reason appended to push bodies.
+// OTHER is intentionally omitted — we keep the generic body.
+var cancellationReasonPushLabels = map[string]map[orderDomain.OrderCancellationReason]string{
+	"fr": {
+		orderDomain.OrderCancellationReasonOutOfStock:    "rupture de stock",
+		orderDomain.OrderCancellationReasonKitchenClosed: "cuisine fermée",
+		orderDomain.OrderCancellationReasonDeliveryArea:  "hors zone de livraison",
+	},
+	"en": {
+		orderDomain.OrderCancellationReasonOutOfStock:    "out of stock",
+		orderDomain.OrderCancellationReasonKitchenClosed: "kitchen closed",
+		orderDomain.OrderCancellationReasonDeliveryArea:  "outside delivery area",
+	},
+	"nl": {
+		orderDomain.OrderCancellationReasonOutOfStock:    "uitverkocht",
+		orderDomain.OrderCancellationReasonKitchenClosed: "keuken gesloten",
+		orderDomain.OrderCancellationReasonDeliveryArea:  "buiten bezorggebied",
+	},
+	"zh": {
+		orderDomain.OrderCancellationReasonOutOfStock:    "缺货",
+		orderDomain.OrderCancellationReasonKitchenClosed: "厨房已关闭",
+		orderDomain.OrderCancellationReasonDeliveryArea:  "超出配送范围",
+	},
+}
+
+var cancellationReasonBodyFormat = map[string]string{
+	"fr": "Votre commande a été annulée : %s.",
+	"en": "Your order has been cancelled: %s.",
+	"nl": "Uw bestelling is geannuleerd: %s.",
+	"zh": "您的订单已被取消：%s。",
 }
 
 // GetReadyTimeUpdatedNotification returns localized push notification text when

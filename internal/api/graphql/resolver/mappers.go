@@ -109,8 +109,9 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		BoxNumber:        o.BoxNumber,
 		MunicipalityName: o.MunicipalityName,
 		Postcode:         o.Postcode,
-		AddressDistance:   o.AddressDistance,
-		IsManualAddr:     &isManual,
+		AddressDistance:    o.AddressDistance,
+		IsManualAddr:       &isManual,
+		CancellationReason: o.CancellationReason,
 	}
 }
 
