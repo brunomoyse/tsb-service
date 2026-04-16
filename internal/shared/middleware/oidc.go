@@ -171,6 +171,18 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 	if !isAdmin && v.projectID != "" {
 		isAdmin = authCtx.IsGrantedRoleInProject(v.projectID, "admin", "")
 	}
+	// Temporary debug: log role detection result + claim keys
+	if !isAdmin {
+		claimKeys := make([]string, 0)
+		for k := range authCtx.Claims {
+			claimKeys = append(claimKeys, k)
+		}
+		zap.L().Warn("admin role not detected",
+			zap.String("sub", sub),
+			zap.String("projectID", v.projectID),
+			zap.Strings("claimKeys", claimKeys),
+		)
+	}
 
 	// Resolve Zitadel sub → app user UUID (with JIT provisioning)
 	userID := sub
