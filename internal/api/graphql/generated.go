@@ -388,6 +388,8 @@ type MutationResolver interface {
 	CancelDeletionRequest(ctx context.Context) (*model.User, error)
 }
 type OrderResolver interface {
+	OrderExtra(ctx context.Context, obj *model.Order) (any, error)
+
 	Address(ctx context.Context, obj *model.Order) (*model.Address, error)
 	Customer(ctx context.Context, obj *model.Order) (*model.User, error)
 	Payment(ctx context.Context, obj *model.Order) (*model.Payment, error)
@@ -6553,10 +6555,10 @@ func (ec *executionContext) _Order_orderExtra(ctx context.Context, field graphql
 		field,
 		ec.fieldContext_Order_orderExtra,
 		func(ctx context.Context) (any, error) {
-			return obj.OrderExtra, nil
+			return ec.Resolvers.Order().OrderExtra(ctx, obj)
 		},
 		nil,
-		ec.marshalOJSON2map,
+		ec.marshalOJSON2interface,
 		true,
 		false,
 	)
@@ -6566,8 +6568,8 @@ func (ec *executionContext) fieldContext_Order_orderExtra(_ context.Context, fie
 	fc = &graphql.FieldContext{
 		Object:     "Order",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type JSON does not have child fields")
 		},
@@ -8033,7 +8035,7 @@ func (ec *executionContext) _Payment_metadata(ctx context.Context, field graphql
 			return obj.Metadata, nil
 		},
 		nil,
-		ec.marshalOJSON2map,
+		ec.marshalOJSON2interface,
 		true,
 		false,
 	)
@@ -8062,7 +8064,7 @@ func (ec *executionContext) _Payment_links(ctx context.Context, field graphql.Co
 			return obj.Links, nil
 		},
 		nil,
-		ec.marshalOJSON2map,
+		ec.marshalOJSON2interface,
 		true,
 		false,
 	)
@@ -11202,7 +11204,7 @@ func (ec *executionContext) _RestaurantConfig_openingHours(ctx context.Context, 
 			return obj.OpeningHours, nil
 		},
 		nil,
-		ec.marshalNJSON2map,
+		ec.marshalNJSON2interface,
 		true,
 		true,
 	)
@@ -11231,7 +11233,7 @@ func (ec *executionContext) _RestaurantConfig_orderingHours(ctx context.Context,
 			return obj.OrderingHours, nil
 		},
 		nil,
-		ec.marshalOJSON2map,
+		ec.marshalOJSON2interface,
 		true,
 		false,
 	)
@@ -15710,7 +15712,38 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 		case "orderNote":
 			out.Values[i] = ec._Order_orderNote(ctx, field, obj)
 		case "orderExtra":
-			out.Values[i] = ec._Order_orderExtra(ctx, field, obj)
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Order_orderExtra(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "couponCode":
 			out.Values[i] = ec._Order_couponCode(ctx, field, obj)
 		case "cancellationReason":
@@ -18363,12 +18396,12 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 	return res
 }
 
-func (ec *executionContext) unmarshalNJSON2map(ctx context.Context, v any) (map[string]any, error) {
-	res, err := graphql.UnmarshalMap(v)
+func (ec *executionContext) unmarshalNJSON2interface(ctx context.Context, v any) (any, error) {
+	res, err := graphql.UnmarshalAny(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNJSON2map(ctx context.Context, sel ast.SelectionSet, v map[string]any) graphql.Marshaler {
+func (ec *executionContext) marshalNJSON2interface(ctx context.Context, sel ast.SelectionSet, v any) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -18376,7 +18409,7 @@ func (ec *executionContext) marshalNJSON2map(ctx context.Context, sel ast.Select
 		return graphql.Null
 	}
 	_ = sel
-	res := graphql.MarshalMap(v)
+	res := graphql.MarshalAny(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -19090,21 +19123,21 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 	return res
 }
 
-func (ec *executionContext) unmarshalOJSON2map(ctx context.Context, v any) (map[string]any, error) {
+func (ec *executionContext) unmarshalOJSON2interface(ctx context.Context, v any) (any, error) {
 	if v == nil {
 		return nil, nil
 	}
-	res, err := graphql.UnmarshalMap(v)
+	res, err := graphql.UnmarshalAny(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOJSON2map(ctx context.Context, sel ast.SelectionSet, v map[string]any) graphql.Marshaler {
+func (ec *executionContext) marshalOJSON2interface(ctx context.Context, sel ast.SelectionSet, v any) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	_ = sel
 	_ = ctx
-	res := graphql.MarshalMap(v)
+	res := graphql.MarshalAny(v)
 	return res
 }
 

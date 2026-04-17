@@ -225,37 +225,37 @@ type OrderStatusHistory struct {
 }
 
 type Payment struct {
-	ID                              uuid.UUID      `json:"id"`
-	Resource                        *string        `json:"resource,omitempty"`
-	MolliePaymentID                 string         `json:"molliePaymentId"`
-	Status                          string         `json:"status"`
-	Description                     *string        `json:"description,omitempty"`
-	CancelURL                       *string        `json:"cancelUrl,omitempty"`
-	WebhookURL                      *string        `json:"webhookUrl,omitempty"`
-	CountryCode                     *string        `json:"country_code,omitempty"`
-	RestrictPaymentMethodsToCountry *string        `json:"restrictPaymentMethodsToCountry,omitempty"`
-	ProfileID                       *string        `json:"profileId,omitempty"`
-	SettlementID                    *string        `json:"settlementId,omitempty"`
-	OrderID                         uuid.UUID      `json:"orderId"`
-	IsCancelable                    bool           `json:"isCancelable"`
-	Mode                            *string        `json:"mode,omitempty"`
-	Locale                          *string        `json:"locale,omitempty"`
-	Method                          *string        `json:"method,omitempty"`
-	Metadata                        map[string]any `json:"metadata,omitempty"`
-	Links                           map[string]any `json:"links,omitempty"`
-	CreatedAt                       time.Time      `json:"createdAt"`
-	AuthorizedAt                    *time.Time     `json:"authorizedAt,omitempty"`
-	PaidAt                          *time.Time     `json:"paidAt,omitempty"`
-	CanceledAt                      *time.Time     `json:"canceledAt,omitempty"`
-	ExpiresAt                       *time.Time     `json:"expiresAt,omitempty"`
-	ExpiredAt                       *time.Time     `json:"expiredAt,omitempty"`
-	FailedAt                        *time.Time     `json:"failedAt,omitempty"`
-	Amount                          *float64       `json:"amount,omitempty"`
-	AmountRefunded                  *float64       `json:"amountRefunded,omitempty"`
-	AmountRemaining                 *float64       `json:"amountRemaining,omitempty"`
-	AmountCaptured                  *float64       `json:"amountCaptured,omitempty"`
-	AmountChargedBack               *float64       `json:"amountChargedBack,omitempty"`
-	SettlementAmount                *float64       `json:"settlementAmount,omitempty"`
+	ID                              uuid.UUID  `json:"id"`
+	Resource                        *string    `json:"resource,omitempty"`
+	MolliePaymentID                 string     `json:"molliePaymentId"`
+	Status                          string     `json:"status"`
+	Description                     *string    `json:"description,omitempty"`
+	CancelURL                       *string    `json:"cancelUrl,omitempty"`
+	WebhookURL                      *string    `json:"webhookUrl,omitempty"`
+	CountryCode                     *string    `json:"country_code,omitempty"`
+	RestrictPaymentMethodsToCountry *string    `json:"restrictPaymentMethodsToCountry,omitempty"`
+	ProfileID                       *string    `json:"profileId,omitempty"`
+	SettlementID                    *string    `json:"settlementId,omitempty"`
+	OrderID                         uuid.UUID  `json:"orderId"`
+	IsCancelable                    bool       `json:"isCancelable"`
+	Mode                            *string    `json:"mode,omitempty"`
+	Locale                          *string    `json:"locale,omitempty"`
+	Method                          *string    `json:"method,omitempty"`
+	Metadata                        any        `json:"metadata,omitempty"`
+	Links                           any        `json:"links,omitempty"`
+	CreatedAt                       time.Time  `json:"createdAt"`
+	AuthorizedAt                    *time.Time `json:"authorizedAt,omitempty"`
+	PaidAt                          *time.Time `json:"paidAt,omitempty"`
+	CanceledAt                      *time.Time `json:"canceledAt,omitempty"`
+	ExpiresAt                       *time.Time `json:"expiresAt,omitempty"`
+	ExpiredAt                       *time.Time `json:"expiredAt,omitempty"`
+	FailedAt                        *time.Time `json:"failedAt,omitempty"`
+	Amount                          *float64   `json:"amount,omitempty"`
+	AmountRefunded                  *float64   `json:"amountRefunded,omitempty"`
+	AmountRemaining                 *float64   `json:"amountRemaining,omitempty"`
+	AmountCaptured                  *float64   `json:"amountCaptured,omitempty"`
+	AmountChargedBack               *float64   `json:"amountChargedBack,omitempty"`
+	SettlementAmount                *float64   `json:"settlementAmount,omitempty"`
 }
 
 type PosDevice struct {
@@ -315,12 +315,12 @@ type Query struct {
 }
 
 type RestaurantConfig struct {
-	OrderingEnabled         bool           `json:"orderingEnabled"`
-	OpeningHours            map[string]any `json:"openingHours"`
-	OrderingHours           map[string]any `json:"orderingHours,omitempty"`
-	IsCurrentlyOpen         bool           `json:"isCurrentlyOpen"`
-	IsOrderingCurrentlyOpen bool           `json:"isOrderingCurrentlyOpen"`
-	UpdatedAt               time.Time      `json:"updatedAt"`
+	OrderingEnabled         bool      `json:"orderingEnabled"`
+	OpeningHours            any       `json:"openingHours"`
+	OrderingHours           any       `json:"orderingHours,omitempty"`
+	IsCurrentlyOpen         bool      `json:"isCurrentlyOpen"`
+	IsOrderingCurrentlyOpen bool      `json:"isOrderingCurrentlyOpen"`
+	UpdatedAt               time.Time `json:"updatedAt"`
 }
 
 type Subscription struct {

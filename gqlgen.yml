@@ -150,7 +150,9 @@ models:
       - github.com/99designs/gqlgen/graphql.Int
   JSON:
     model:
-      - github.com/99designs/gqlgen/graphql.Map
+      # graphql.Any so the scalar can round-trip JSON arrays AND objects
+      # (orderExtra is an array; other JSON fields may be objects).
+      - github.com/99designs/gqlgen/graphql.Any
   DateTime:
     model:
       - github.com/99designs/gqlgen/graphql.Time
