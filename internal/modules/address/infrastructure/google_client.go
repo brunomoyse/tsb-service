@@ -43,7 +43,7 @@ func (c *GoogleClient) Autocomplete(ctx context.Context, input, sessionToken, la
 		"sessionToken":         sessionToken,
 		"languageCode":         language,
 		"includedRegionCodes":  []string{"BE"},
-		"includedPrimaryTypes": []string{"street_address", "premise", "subpremise", "route"},
+		"includedPrimaryTypes": []string{"street_address", "premise", "subpremise"},
 	}
 	if c.autocompleteRadius > 0 {
 		reqBody["locationRestriction"] = map[string]interface{}{
