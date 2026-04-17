@@ -31,6 +31,9 @@ type Order struct {
 
 	// Non-schema fields: denormalized address for Address() resolver
 	AddressID        *string  `json:"-"`
+	AddressPlaceID   *string  `json:"-"`
+	AddressLat       *float64 `json:"-"`
+	AddressLng       *float64 `json:"-"`
 	StreetName       *string  `json:"-"`
 	HouseNumber      *string  `json:"-"`
 	BoxNumber        *string  `json:"-"`

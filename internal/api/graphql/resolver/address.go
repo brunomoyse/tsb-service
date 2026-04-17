@@ -10,75 +10,36 @@ import (
 	"fmt"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
-	addressDomain "tsb-service/internal/modules/address/domain"
 )
 
-// Streets is the resolver for the streets field.
-func (r *queryResolver) Streets(ctx context.Context, query string) ([]*model.Street, error) {
-	s, err := r.AddressService.SearchStreetNames(ctx, query)
+// AutocompleteAddresses is the resolver for the autocompleteAddresses field.
+func (r *queryResolver) AutocompleteAddresses(ctx context.Context, input string, sessionToken string) ([]*model.AddressSuggestion, error) {
+	suggestions, err := r.AddressService.Autocomplete(ctx, input, sessionToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to search street names: %w", err)
+		return nil, fmt.Errorf("failed to autocomplete addresses: %w", err)
 	}
 
-	// Map the street names to the GraphQL model
-	streets := Map(s, func(street *addressDomain.Street) *model.Street {
-		return ToGQLStreet(street)
-	})
-
-	// Return empty array if no streets were found.
-	if len(streets) == 0 {
-		return []*model.Street{}, nil
+	gqlSuggestions := make([]*model.AddressSuggestion, len(suggestions))
+	for i, s := range suggestions {
+		gqlSuggestions[i] = &model.AddressSuggestion{
+			PlaceID:       s.PlaceID,
+			Description:   s.Description,
+			MainText:      s.MainText,
+			SecondaryText: s.SecondaryText,
+		}
 	}
 
-	// Return the list
-	return streets, nil
+	return gqlSuggestions, nil
 }
 
-// HouseNumbers is the resolver for the houseNumbers field.
-func (r *queryResolver) HouseNumbers(ctx context.Context, streetID string) ([]string, error) {
-	houseNumbers, err := r.AddressService.GetDistinctHouseNumbers(ctx, streetID)
+// ResolveAddress is the resolver for the resolveAddress field.
+func (r *queryResolver) ResolveAddress(ctx context.Context, placeID string, sessionToken string) (*model.Address, error) {
+	addr, err := r.AddressService.Resolve(ctx, placeID, sessionToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get house numbers: %w", err)
+		return nil, fmt.Errorf("failed to resolve address: %w", err)
 	}
 
-	// Return the list
-	return houseNumbers, nil
-}
-
-// BoxNumbers is the resolver for the boxNumbers field.
-func (r *queryResolver) BoxNumbers(ctx context.Context, streetID string, houseNumber string) ([]*string, error) {
-	boxNumbers, err := r.AddressService.GetBoxNumbers(ctx, streetID, houseNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get box numbers: %w", err)
-	}
-
-	// Return the list
-	return boxNumbers, nil
-}
-
-// Address is the resolver for the address field.
-func (r *queryResolver) Address(ctx context.Context, id string) (*model.Address, error) {
-	a, err := r.AddressService.GetAddressByID(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get address by id: %w", err)
-	}
-
-	return ToGQLAddress(a), nil
-}
-
-// AddressByLocation is the resolver for the addressByLocation field.
-func (r *queryResolver) AddressByLocation(ctx context.Context, streetID string, houseNumber string, boxNumber *string) (*model.Address, error) {
-	a, err := r.AddressService.GetFinalAddress(ctx, streetID, houseNumber, boxNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get final address: %w", err)
-	}
-
-	return ToGQLAddress(a), nil
-}
-
-// StreetAverageDistance is the resolver for the streetAverageDistance field.
-func (r *queryResolver) StreetAverageDistance(ctx context.Context, streetID string) (float64, error) {
-	return r.AddressService.GetStreetAverageDistance(ctx, streetID)
+	return ToGQLAddress(addr), nil
 }
 
 // Query returns graphql1.QueryResolver implementation.
