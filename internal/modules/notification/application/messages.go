@@ -5,6 +5,7 @@ import (
 	"time"
 
 	orderDomain "tsb-service/internal/modules/order/domain"
+	"tsb-service/pkg/timezone"
 )
 
 type notificationText struct {
@@ -196,8 +197,9 @@ var readyTimeUpdatedTexts = map[string]*notificationText{
 }
 
 func formatReadyTimeForNotification(t time.Time, language string) string {
-	hour := t.Hour()
-	minute := t.Minute()
+	local := timezone.In(t)
+	hour := local.Hour()
+	minute := local.Minute()
 
 	if language == "en" {
 		period := "AM"

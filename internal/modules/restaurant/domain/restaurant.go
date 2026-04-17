@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"tsb-service/pkg/timezone"
 )
 
 // DaySchedule represents opening hours for a single day.
@@ -70,14 +72,17 @@ func (c *RestaurantConfig) IsOrderingCurrentlyOpen(now time.Time) bool {
 }
 
 // isWithinSchedule checks if the given time falls within any period of the schedule for that day.
+// Schedules are wall-clock strings ("HH:MM") in the restaurant's timezone, so [now]
+// is converted to that zone before comparing.
 func isWithinSchedule(hours OpeningHours, now time.Time) bool {
-	dayName := strings.ToLower(now.Weekday().String())
+	local := timezone.In(now)
+	dayName := strings.ToLower(local.Weekday().String())
 	schedule, exists := hours[dayName]
 	if !exists || schedule == nil {
 		return false
 	}
 
-	currentTime := now.Format("15:04")
+	currentTime := local.Format("15:04")
 
 	if currentTime >= schedule.Open && currentTime < schedule.Close {
 		return true

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/go-pdf/fpdf"
+
+	"tsb-service/pkg/timezone"
 )
 
 //go:embed fonts/DejaVuSans.ttf
@@ -149,7 +151,7 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 	pdf.SetFont("DejaVu", "B", 10)
 	pdf.CellFormat(usableW/2, 6, fmt.Sprintf("%s: %s", l.OrderRef, orderRef), "", 0, "L", false, 0, "")
 	pdf.SetFont("DejaVu", "", 10)
-	pdf.CellFormat(usableW/2, 6, fmt.Sprintf("%s: %s", l.Date, data.OrderDate.Format(dateFormat)), "", 1, "R", false, 0, "")
+	pdf.CellFormat(usableW/2, 6, fmt.Sprintf("%s: %s", l.Date, timezone.In(data.OrderDate).Format(dateFormat)), "", 1, "R", false, 0, "")
 
 	orderTypeLabel := l.TypePickup
 	switch data.OrderType {
