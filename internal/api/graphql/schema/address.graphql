@@ -1,29 +1,24 @@
 type Address {
-    id: String! # BeST
+    id: String!                    # Google place_id for new addresses, legacy UUID for old orders
     postcode: String!
     municipalityName: String!
     streetName: String!
     houseNumber: String!
     boxNumber: String
-    distance: Float!
+    distance: Float!               # meters (driving distance from Routes API)
+    lat: Float
+    lng: Float
+    duration: Int                  # seconds (driving duration from Routes API), nullable for legacy
 }
 
-type Street {
-    id: String!
-    streetName: String!
-    municipalityName: String!
-    postcode: String!
+type AddressSuggestion {
+    placeId: String!
+    description: String!
+    mainText: String!
+    secondaryText: String!
 }
 
 extend type Query {
-    streets(query: String!): [Street]!
-    houseNumbers(streetId: String!): [String!]!
-    boxNumbers(streetId: String!, houseNumber: String!): [String]!
-    address(id: String!): Address!
-    addressByLocation(
-        streetID: String!
-        houseNumber: String!
-        boxNumber: String
-    ): Address!
-    streetAverageDistance(streetId: String!): Float!
+    autocompleteAddresses(input: String!, sessionToken: String!): [AddressSuggestion!]!
+    resolveAddress(placeId: String!, sessionToken: String!): Address!
 }

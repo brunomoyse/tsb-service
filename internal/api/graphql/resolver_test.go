@@ -1,6 +1,7 @@
 package graphql_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
@@ -8,6 +9,7 @@ import (
 	"tsb-service/internal/api/graphql/resolver"
 	"tsb-service/internal/api/graphql/testhelpers"
 	addressApplication "tsb-service/internal/modules/address/application"
+	addressDomain "tsb-service/internal/modules/address/domain"
 	addressInfrastructure "tsb-service/internal/modules/address/infrastructure"
 	couponApplication "tsb-service/internal/modules/coupon/application"
 	couponInfrastructure "tsb-service/internal/modules/coupon/infrastructure"
@@ -69,7 +71,7 @@ func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
 	broker := pubsub.NewBroker()
 
 	// Create repositories
-	addressRepo := addressInfrastructure.NewAddressRepository(pool)
+	addressCacheRepo := addressInfrastructure.NewAddressCacheRepository(pool)
 	couponRepo := couponInfrastructure.NewCouponRepository(pool)
 	orderRepo := orderInfrastructure.NewOrderRepository(pool)
 	paymentRepo := paymentInfrastructure.NewPaymentRepository(pool)
@@ -81,8 +83,10 @@ func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
 	mollieCfg := mollie.NewAPITestingConfig(true)
 	mollieClient, _ := mollie.NewClient(nil, mollieCfg)
 
-	// Create services
-	addressService := addressApplication.NewAddressService(addressRepo)
+	// Create services (use a mock Google client for tests; real API calls require actual API key)
+	// For now, we'll use nil for googleClient since this test doesn't call Autocomplete/Resolve
+	googleClient := (*mockGoogleClient)(nil)
+	addressService := addressApplication.NewAddressService(addressCacheRepo, googleClient, "fr")
 	couponService := couponApplication.NewCouponService(couponRepo)
 	orderService := orderApplication.NewOrderService(orderRepo)
 	productService := productApplication.NewProductService(productRepo)
@@ -101,4 +105,19 @@ func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
 		RestaurantService: restaurantService,
 		UserService:       userService,
 	}
+}
+
+// mockGoogleClient is a stub for testing (no actual Google API calls)
+type mockGoogleClient struct{}
+
+func (m *mockGoogleClient) Autocomplete(ctx context.Context, input, sessionToken, language string) ([]addressDomain.Suggestion, error) {
+	return nil, nil
+}
+
+func (m *mockGoogleClient) PlaceDetails(ctx context.Context, placeID, sessionToken, language string) (*addressDomain.AddressCache, error) {
+	return nil, nil
+}
+
+func (m *mockGoogleClient) ComputeRoute(ctx context.Context, destLat, destLng float64) (int, int, error) {
+	return 0, 0, nil
 }

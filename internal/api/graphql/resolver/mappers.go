@@ -109,8 +109,9 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		BoxNumber:        o.BoxNumber,
 		MunicipalityName: o.MunicipalityName,
 		Postcode:         o.Postcode,
-		AddressDistance:   o.AddressDistance,
-		IsManualAddr:     &isManual,
+		AddressDistance:    o.AddressDistance,
+		IsManualAddr:       &isManual,
+		CancellationReason: o.CancellationReason,
 	}
 }
 
@@ -146,15 +147,9 @@ func ToGQLAddress(a *addressDomain.Address) *model.Address {
 		Postcode:         a.Postcode,
 		MunicipalityName: a.MunicipalityName,
 		Distance:         a.Distance,
-	}
-}
-
-func ToGQLStreet(s *addressDomain.Street) *model.Street {
-	return &model.Street{
-		ID:               s.ID,
-		StreetName:       s.StreetName,
-		MunicipalityName: s.MunicipalityName,
-		Postcode:         s.Postcode,
+		Lat:              a.Lat,
+		Lng:              a.Lng,
+		Duration:         a.Duration,
 	}
 }
 
@@ -289,13 +284,16 @@ func addressFromOrder(o *orderDomain.Order) *addressDomain.Address {
 		Postcode:         *o.Postcode,
 		HouseNumber:      *o.HouseNumber,
 		BoxNumber:        o.BoxNumber,
+		Lat:              o.AddressLat,
+		Lng:              o.AddressLng,
 	}
-	if o.AddressID != nil {
-		addr.ID = *o.AddressID
+	if o.AddressPlaceID != nil {
+		addr.ID = *o.AddressPlaceID
 	}
 	if o.AddressDistance != nil {
 		addr.Distance = *o.AddressDistance
 	}
+	// Duration is not available from order denormalization, leave as nil
 	return addr
 }
 

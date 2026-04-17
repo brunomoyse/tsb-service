@@ -51,11 +51,21 @@ type ComplexityRoot struct {
 	Address struct {
 		BoxNumber        func(childComplexity int) int
 		Distance         func(childComplexity int) int
+		Duration         func(childComplexity int) int
 		HouseNumber      func(childComplexity int) int
 		ID               func(childComplexity int) int
+		Lat              func(childComplexity int) int
+		Lng              func(childComplexity int) int
 		MunicipalityName func(childComplexity int) int
 		Postcode         func(childComplexity int) int
 		StreetName       func(childComplexity int) int
+	}
+
+	AddressSuggestion struct {
+		Description   func(childComplexity int) int
+		MainText      func(childComplexity int) int
+		PlaceID       func(childComplexity int) int
+		SecondaryText func(childComplexity int) int
 	}
 
 	ChoiceTranslation struct {
@@ -150,6 +160,7 @@ type ComplexityRoot struct {
 	Order struct {
 		Address             func(childComplexity int) int
 		AddressExtra        func(childComplexity int) int
+		CancellationReason  func(childComplexity int) int
 		CouponCode          func(childComplexity int) int
 		CreatedAt           func(childComplexity int) int
 		Customer            func(childComplexity int) int
@@ -288,14 +299,11 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Address               func(childComplexity int, id string) int
-		AddressByLocation     func(childComplexity int, streetID string, houseNumber string, boxNumber *string) int
-		BoxNumbers            func(childComplexity int, streetID string, houseNumber string) int
+		AutocompleteAddresses func(childComplexity int, input string, sessionToken string) int
 		Coupon                func(childComplexity int, id uuid.UUID) int
 		Coupons               func(childComplexity int) int
 		CustomerOrders        func(childComplexity int, userID uuid.UUID, first *int, page *int) int
 		CustomerStats         func(childComplexity int, input *model.CustomerStatsInput) int
-		HouseNumbers          func(childComplexity int, streetID string) int
 		Me                    func(childComplexity int) int
 		MyOrder               func(childComplexity int, id uuid.UUID) int
 		MyOrders              func(childComplexity int, first *int, page *int) int
@@ -308,9 +316,8 @@ type ComplexityRoot struct {
 		ProductCategories     func(childComplexity int) int
 		ProductCategory       func(childComplexity int, id uuid.UUID) int
 		Products              func(childComplexity int) int
+		ResolveAddress        func(childComplexity int, placeID string, sessionToken string) int
 		RestaurantConfig      func(childComplexity int) int
-		StreetAverageDistance func(childComplexity int, streetID string) int
-		Streets               func(childComplexity int, query string) int
 		ValidateCoupon        func(childComplexity int, code string, orderAmount string) int
 	}
 
@@ -322,13 +329,6 @@ type ComplexityRoot struct {
 		OrderingHours           func(childComplexity int) int
 		SystemDisableReason     func(childComplexity int) int
 		UpdatedAt               func(childComplexity int) int
-	}
-
-	Street struct {
-		ID               func(childComplexity int) int
-		MunicipalityName func(childComplexity int) int
-		Postcode         func(childComplexity int) int
-		StreetName       func(childComplexity int) int
 	}
 
 	Subscription struct {
@@ -413,12 +413,8 @@ type ProductCategoryResolver interface {
 	Translations(ctx context.Context, obj *model.ProductCategory) ([]*model.Translation, error)
 }
 type QueryResolver interface {
-	Streets(ctx context.Context, query string) ([]*model.Street, error)
-	HouseNumbers(ctx context.Context, streetID string) ([]string, error)
-	BoxNumbers(ctx context.Context, streetID string, houseNumber string) ([]*string, error)
-	Address(ctx context.Context, id string) (*model.Address, error)
-	AddressByLocation(ctx context.Context, streetID string, houseNumber string, boxNumber *string) (*model.Address, error)
-	StreetAverageDistance(ctx context.Context, streetID string) (float64, error)
+	AutocompleteAddresses(ctx context.Context, input string, sessionToken string) ([]*model.AddressSuggestion, error)
+	ResolveAddress(ctx context.Context, placeID string, sessionToken string) (*model.Address, error)
 	ValidateCoupon(ctx context.Context, code string, orderAmount string) (*model.CouponValidation, error)
 	Coupons(ctx context.Context) ([]*model.Coupon, error)
 	Coupon(ctx context.Context, id uuid.UUID) (*model.Coupon, error)
@@ -481,6 +477,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Address.Distance(childComplexity), true
+	case "Address.duration":
+		if e.ComplexityRoot.Address.Duration == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Address.Duration(childComplexity), true
 	case "Address.houseNumber":
 		if e.ComplexityRoot.Address.HouseNumber == nil {
 			break
@@ -493,6 +495,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Address.ID(childComplexity), true
+	case "Address.lat":
+		if e.ComplexityRoot.Address.Lat == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Address.Lat(childComplexity), true
+	case "Address.lng":
+		if e.ComplexityRoot.Address.Lng == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Address.Lng(childComplexity), true
 	case "Address.municipalityName":
 		if e.ComplexityRoot.Address.MunicipalityName == nil {
 			break
@@ -511,6 +525,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Address.StreetName(childComplexity), true
+
+	case "AddressSuggestion.description":
+		if e.ComplexityRoot.AddressSuggestion.Description == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AddressSuggestion.Description(childComplexity), true
+	case "AddressSuggestion.mainText":
+		if e.ComplexityRoot.AddressSuggestion.MainText == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AddressSuggestion.MainText(childComplexity), true
+	case "AddressSuggestion.placeId":
+		if e.ComplexityRoot.AddressSuggestion.PlaceID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AddressSuggestion.PlaceID(childComplexity), true
+	case "AddressSuggestion.secondaryText":
+		if e.ComplexityRoot.AddressSuggestion.SecondaryText == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AddressSuggestion.SecondaryText(childComplexity), true
 
 	case "ChoiceTranslation.locale":
 		if e.ComplexityRoot.ChoiceTranslation.Locale == nil {
@@ -1032,6 +1071,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Order.AddressExtra(childComplexity), true
+	case "Order.cancellationReason":
+		if e.ComplexityRoot.Order.CancellationReason == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Order.CancellationReason(childComplexity), true
 	case "Order.couponCode":
 		if e.ComplexityRoot.Order.CouponCode == nil {
 			break
@@ -1673,39 +1718,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ProductChoice.Translations(childComplexity), true
 
-	case "Query.address":
-		if e.ComplexityRoot.Query.Address == nil {
+	case "Query.autocompleteAddresses":
+		if e.ComplexityRoot.Query.AutocompleteAddresses == nil {
 			break
 		}
 
-		args, err := ec.field_Query_address_args(ctx, rawArgs)
+		args, err := ec.field_Query_autocompleteAddresses_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.Address(childComplexity, args["id"].(string)), true
-	case "Query.addressByLocation":
-		if e.ComplexityRoot.Query.AddressByLocation == nil {
-			break
-		}
-
-		args, err := ec.field_Query_addressByLocation_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Query.AddressByLocation(childComplexity, args["streetID"].(string), args["houseNumber"].(string), args["boxNumber"].(*string)), true
-	case "Query.boxNumbers":
-		if e.ComplexityRoot.Query.BoxNumbers == nil {
-			break
-		}
-
-		args, err := ec.field_Query_boxNumbers_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Query.BoxNumbers(childComplexity, args["streetId"].(string), args["houseNumber"].(string)), true
+		return e.ComplexityRoot.Query.AutocompleteAddresses(childComplexity, args["input"].(string), args["sessionToken"].(string)), true
 	case "Query.coupon":
 		if e.ComplexityRoot.Query.Coupon == nil {
 			break
@@ -1745,17 +1768,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.CustomerStats(childComplexity, args["input"].(*model.CustomerStatsInput)), true
-	case "Query.houseNumbers":
-		if e.ComplexityRoot.Query.HouseNumbers == nil {
-			break
-		}
-
-		args, err := ec.field_Query_houseNumbers_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Query.HouseNumbers(childComplexity, args["streetId"].(string)), true
 
 	case "Query.me":
 		if e.ComplexityRoot.Query.Me == nil {
@@ -1859,34 +1871,23 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Products(childComplexity), true
+	case "Query.resolveAddress":
+		if e.ComplexityRoot.Query.ResolveAddress == nil {
+			break
+		}
+
+		args, err := ec.field_Query_resolveAddress_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ResolveAddress(childComplexity, args["placeId"].(string), args["sessionToken"].(string)), true
 	case "Query.restaurantConfig":
 		if e.ComplexityRoot.Query.RestaurantConfig == nil {
 			break
 		}
 
 		return e.ComplexityRoot.Query.RestaurantConfig(childComplexity), true
-	case "Query.streetAverageDistance":
-		if e.ComplexityRoot.Query.StreetAverageDistance == nil {
-			break
-		}
-
-		args, err := ec.field_Query_streetAverageDistance_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Query.StreetAverageDistance(childComplexity, args["streetId"].(string)), true
-	case "Query.streets":
-		if e.ComplexityRoot.Query.Streets == nil {
-			break
-		}
-
-		args, err := ec.field_Query_streets_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.ComplexityRoot.Query.Streets(childComplexity, args["query"].(string)), true
 	case "Query.validateCoupon":
 		if e.ComplexityRoot.Query.ValidateCoupon == nil {
 			break
@@ -1941,31 +1942,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.RestaurantConfig.UpdatedAt(childComplexity), true
-
-	case "Street.id":
-		if e.ComplexityRoot.Street.ID == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Street.ID(childComplexity), true
-	case "Street.municipalityName":
-		if e.ComplexityRoot.Street.MunicipalityName == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Street.MunicipalityName(childComplexity), true
-	case "Street.postcode":
-		if e.ComplexityRoot.Street.Postcode == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Street.Postcode(childComplexity), true
-	case "Street.streetName":
-		if e.ComplexityRoot.Street.StreetName == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Street.StreetName(childComplexity), true
 
 	case "Subscription.couponUpdated":
 		if e.ComplexityRoot.Subscription.CouponUpdated == nil {
@@ -2554,51 +2530,19 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_addressByLocation_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Query_autocompleteAddresses_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "streetID", ec.unmarshalNString2string)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNString2string)
 	if err != nil {
 		return nil, err
 	}
-	args["streetID"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "houseNumber", ec.unmarshalNString2string)
+	args["input"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "sessionToken", ec.unmarshalNString2string)
 	if err != nil {
 		return nil, err
 	}
-	args["houseNumber"] = arg1
-	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "boxNumber", ec.unmarshalOString2ᚖstring)
-	if err != nil {
-		return nil, err
-	}
-	args["boxNumber"] = arg2
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_address_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNString2string)
-	if err != nil {
-		return nil, err
-	}
-	args["id"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_boxNumbers_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "streetId", ec.unmarshalNString2string)
-	if err != nil {
-		return nil, err
-	}
-	args["streetId"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "houseNumber", ec.unmarshalNString2string)
-	if err != nil {
-		return nil, err
-	}
-	args["houseNumber"] = arg1
+	args["sessionToken"] = arg1
 	return args, nil
 }
 
@@ -2642,17 +2586,6 @@ func (ec *executionContext) field_Query_customerStats_args(ctx context.Context, 
 		return nil, err
 	}
 	args["input"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_houseNumbers_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "streetId", ec.unmarshalNString2string)
-	if err != nil {
-		return nil, err
-	}
-	args["streetId"] = arg0
 	return args, nil
 }
 
@@ -2727,25 +2660,19 @@ func (ec *executionContext) field_Query_product_args(ctx context.Context, rawArg
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_streetAverageDistance_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Query_resolveAddress_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "streetId", ec.unmarshalNString2string)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "placeId", ec.unmarshalNString2string)
 	if err != nil {
 		return nil, err
 	}
-	args["streetId"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_streets_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "query", ec.unmarshalNString2string)
+	args["placeId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "sessionToken", ec.unmarshalNString2string)
 	if err != nil {
 		return nil, err
 	}
-	args["query"] = arg0
+	args["sessionToken"] = arg1
 	return args, nil
 }
 
@@ -3026,6 +2953,209 @@ func (ec *executionContext) fieldContext_Address_distance(_ context.Context, fie
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Address_lat(ctx context.Context, field graphql.CollectedField, obj *model.Address) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Address_lat,
+		func(ctx context.Context) (any, error) {
+			return obj.Lat, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Address_lat(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Address",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Address_lng(ctx context.Context, field graphql.CollectedField, obj *model.Address) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Address_lng,
+		func(ctx context.Context) (any, error) {
+			return obj.Lng, nil
+		},
+		nil,
+		ec.marshalOFloat2ᚖfloat64,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Address_lng(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Address",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Address_duration(ctx context.Context, field graphql.CollectedField, obj *model.Address) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Address_duration,
+		func(ctx context.Context) (any, error) {
+			return obj.Duration, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Address_duration(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Address",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AddressSuggestion_placeId(ctx context.Context, field graphql.CollectedField, obj *model.AddressSuggestion) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AddressSuggestion_placeId,
+		func(ctx context.Context) (any, error) {
+			return obj.PlaceID, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AddressSuggestion_placeId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AddressSuggestion",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AddressSuggestion_description(ctx context.Context, field graphql.CollectedField, obj *model.AddressSuggestion) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AddressSuggestion_description,
+		func(ctx context.Context) (any, error) {
+			return obj.Description, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AddressSuggestion_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AddressSuggestion",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AddressSuggestion_mainText(ctx context.Context, field graphql.CollectedField, obj *model.AddressSuggestion) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AddressSuggestion_mainText,
+		func(ctx context.Context) (any, error) {
+			return obj.MainText, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AddressSuggestion_mainText(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AddressSuggestion",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AddressSuggestion_secondaryText(ctx context.Context, field graphql.CollectedField, obj *model.AddressSuggestion) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_AddressSuggestion_secondaryText,
+		func(ctx context.Context) (any, error) {
+			return obj.SecondaryText, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_AddressSuggestion_secondaryText(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AddressSuggestion",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -4488,6 +4618,8 @@ func (ec *executionContext) fieldContext_Mutation_createOrder(ctx context.Contex
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -4590,6 +4722,8 @@ func (ec *executionContext) fieldContext_Mutation_updateOrder(ctx context.Contex
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -6483,6 +6617,35 @@ func (ec *executionContext) fieldContext_Order_couponCode(_ context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _Order_cancellationReason(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Order_cancellationReason,
+		func(ctx context.Context) (any, error) {
+			return obj.CancellationReason, nil
+		},
+		nil,
+		ec.marshalOOrderCancellationReason2ᚖtsbᚑserviceᚋinternalᚋmodulesᚋorderᚋdomainᚐOrderCancellationReason,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Order_cancellationReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Order",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type OrderCancellationReason does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Order_address(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6521,6 +6684,12 @@ func (ec *executionContext) fieldContext_Order_address(_ context.Context, field 
 				return ec.fieldContext_Address_boxNumber(ctx, field)
 			case "distance":
 				return ec.fieldContext_Address_distance(ctx, field)
+			case "lat":
+				return ec.fieldContext_Address_lat(ctx, field)
+			case "lng":
+				return ec.fieldContext_Address_lng(ctx, field)
+			case "duration":
+				return ec.fieldContext_Address_duration(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Address", field.Name)
 		},
@@ -6912,6 +7081,8 @@ func (ec *executionContext) fieldContext_OrderHistoryResponse_orders(_ context.C
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -9488,24 +9659,24 @@ func (ec *executionContext) fieldContext_ProductChoice_translations(_ context.Co
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_streets(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_autocompleteAddresses(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_Query_streets,
+		ec.fieldContext_Query_autocompleteAddresses,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().Streets(ctx, fc.Args["query"].(string))
+			return ec.Resolvers.Query().AutocompleteAddresses(ctx, fc.Args["input"].(string), fc.Args["sessionToken"].(string))
 		},
 		nil,
-		ec.marshalNStreet2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐStreet,
+		ec.marshalNAddressSuggestion2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAddressSuggestionᚄ,
 		true,
 		true,
 	)
 }
 
-func (ec *executionContext) fieldContext_Query_streets(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_autocompleteAddresses(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -9513,16 +9684,16 @@ func (ec *executionContext) fieldContext_Query_streets(ctx context.Context, fiel
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_Street_id(ctx, field)
-			case "streetName":
-				return ec.fieldContext_Street_streetName(ctx, field)
-			case "municipalityName":
-				return ec.fieldContext_Street_municipalityName(ctx, field)
-			case "postcode":
-				return ec.fieldContext_Street_postcode(ctx, field)
+			case "placeId":
+				return ec.fieldContext_AddressSuggestion_placeId(ctx, field)
+			case "description":
+				return ec.fieldContext_AddressSuggestion_description(ctx, field)
+			case "mainText":
+				return ec.fieldContext_AddressSuggestion_mainText(ctx, field)
+			case "secondaryText":
+				return ec.fieldContext_AddressSuggestion_secondaryText(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Street", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type AddressSuggestion", field.Name)
 		},
 	}
 	defer func() {
@@ -9532,104 +9703,22 @@ func (ec *executionContext) fieldContext_Query_streets(ctx context.Context, fiel
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_streets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Query_autocompleteAddresses_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_houseNumbers(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_resolveAddress(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_Query_houseNumbers,
+		ec.fieldContext_Query_resolveAddress,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().HouseNumbers(ctx, fc.Args["streetId"].(string))
-		},
-		nil,
-		ec.marshalNString2ᚕstringᚄ,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Query_houseNumbers(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_houseNumbers_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_boxNumbers(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Query_boxNumbers,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().BoxNumbers(ctx, fc.Args["streetId"].(string), fc.Args["houseNumber"].(string))
-		},
-		nil,
-		ec.marshalNString2ᚕᚖstring,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Query_boxNumbers(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_boxNumbers_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_address(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Query_address,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().Address(ctx, fc.Args["id"].(string))
+			return ec.Resolvers.Query().ResolveAddress(ctx, fc.Args["placeId"].(string), fc.Args["sessionToken"].(string))
 		},
 		nil,
 		ec.marshalNAddress2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAddress,
@@ -9638,7 +9727,7 @@ func (ec *executionContext) _Query_address(ctx context.Context, field graphql.Co
 	)
 }
 
-func (ec *executionContext) fieldContext_Query_address(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_resolveAddress(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -9660,6 +9749,12 @@ func (ec *executionContext) fieldContext_Query_address(ctx context.Context, fiel
 				return ec.fieldContext_Address_boxNumber(ctx, field)
 			case "distance":
 				return ec.fieldContext_Address_distance(ctx, field)
+			case "lat":
+				return ec.fieldContext_Address_lat(ctx, field)
+			case "lng":
+				return ec.fieldContext_Address_lng(ctx, field)
+			case "duration":
+				return ec.fieldContext_Address_duration(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Address", field.Name)
 		},
@@ -9671,105 +9766,7 @@ func (ec *executionContext) fieldContext_Query_address(ctx context.Context, fiel
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_address_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_addressByLocation(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Query_addressByLocation,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().AddressByLocation(ctx, fc.Args["streetID"].(string), fc.Args["houseNumber"].(string), fc.Args["boxNumber"].(*string))
-		},
-		nil,
-		ec.marshalNAddress2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAddress,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Query_addressByLocation(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Address_id(ctx, field)
-			case "postcode":
-				return ec.fieldContext_Address_postcode(ctx, field)
-			case "municipalityName":
-				return ec.fieldContext_Address_municipalityName(ctx, field)
-			case "streetName":
-				return ec.fieldContext_Address_streetName(ctx, field)
-			case "houseNumber":
-				return ec.fieldContext_Address_houseNumber(ctx, field)
-			case "boxNumber":
-				return ec.fieldContext_Address_boxNumber(ctx, field)
-			case "distance":
-				return ec.fieldContext_Address_distance(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Address", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_addressByLocation_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_streetAverageDistance(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Query_streetAverageDistance,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().StreetAverageDistance(ctx, fc.Args["streetId"].(string))
-		},
-		nil,
-		ec.marshalNFloat2float64,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Query_streetAverageDistance(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Float does not have child fields")
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_streetAverageDistance_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Query_resolveAddress_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -10053,6 +10050,8 @@ func (ec *executionContext) fieldContext_Query_orders(_ context.Context, field g
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10144,6 +10143,8 @@ func (ec *executionContext) fieldContext_Query_order(ctx context.Context, field 
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10246,6 +10247,8 @@ func (ec *executionContext) fieldContext_Query_customerOrders(ctx context.Contex
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10408,6 +10411,8 @@ func (ec *executionContext) fieldContext_Query_myOrders(ctx context.Context, fie
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10510,6 +10515,8 @@ func (ec *executionContext) fieldContext_Query_myOrder(ctx context.Context, fiel
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -11374,122 +11381,6 @@ func (ec *executionContext) fieldContext_RestaurantConfig_updatedAt(_ context.Co
 	return fc, nil
 }
 
-func (ec *executionContext) _Street_id(ctx context.Context, field graphql.CollectedField, obj *model.Street) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Street_id,
-		func(ctx context.Context) (any, error) {
-			return obj.ID, nil
-		},
-		nil,
-		ec.marshalNString2string,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Street_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Street",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Street_streetName(ctx context.Context, field graphql.CollectedField, obj *model.Street) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Street_streetName,
-		func(ctx context.Context) (any, error) {
-			return obj.StreetName, nil
-		},
-		nil,
-		ec.marshalNString2string,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Street_streetName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Street",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Street_municipalityName(ctx context.Context, field graphql.CollectedField, obj *model.Street) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Street_municipalityName,
-		func(ctx context.Context) (any, error) {
-			return obj.MunicipalityName, nil
-		},
-		nil,
-		ec.marshalNString2string,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Street_municipalityName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Street",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Street_postcode(ctx context.Context, field graphql.CollectedField, obj *model.Street) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Street_postcode,
-		func(ctx context.Context) (any, error) {
-			return obj.Postcode, nil
-		},
-		nil,
-		ec.marshalNString2string,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Street_postcode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Street",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Subscription_couponUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
 	return graphql.ResolveFieldStream(
 		ctx,
@@ -11625,6 +11516,8 @@ func (ec *executionContext) fieldContext_Subscription_orderCreated(_ context.Con
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -11715,6 +11608,8 @@ func (ec *executionContext) fieldContext_Subscription_orderUpdated(_ context.Con
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -11806,6 +11701,8 @@ func (ec *executionContext) fieldContext_Subscription_myOrderUpdated(ctx context
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -12338,6 +12235,12 @@ func (ec *executionContext) fieldContext_User_address(_ context.Context, field g
 				return ec.fieldContext_Address_boxNumber(ctx, field)
 			case "distance":
 				return ec.fieldContext_Address_distance(ctx, field)
+			case "lat":
+				return ec.fieldContext_Address_lat(ctx, field)
+			case "lng":
+				return ec.fieldContext_Address_lng(ctx, field)
+			case "duration":
+				return ec.fieldContext_Address_duration(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Address", field.Name)
 		},
@@ -12399,6 +12302,8 @@ func (ec *executionContext) fieldContext_User_orders(_ context.Context, field gr
 				return ec.fieldContext_Order_orderExtra(ctx, field)
 			case "couponCode":
 				return ec.fieldContext_Order_couponCode(ctx, field)
+			case "cancellationReason":
+				return ec.fieldContext_Order_cancellationReason(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -14044,7 +13949,7 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"orderType", "isOnlinePayment", "addressId", "addressExtra", "orderNote", "orderExtra", "preferredReadyTime", "items", "couponCode", "streetId", "houseNumber", "boxNumber", "isManualAddress", "paymentRedirectUrl"}
+	fieldsInOrder := [...]string{"orderType", "isOnlinePayment", "addressPlaceId", "addressExtra", "orderNote", "orderExtra", "preferredReadyTime", "items", "couponCode", "paymentRedirectUrl"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -14065,13 +13970,13 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 				return it, err
 			}
 			it.IsOnlinePayment = data
-		case "addressId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addressId"))
+		case "addressPlaceId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addressPlaceId"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.AddressID = data
+			it.AddressPlaceID = data
 		case "addressExtra":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addressExtra"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -14114,34 +14019,6 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 				return it, err
 			}
 			it.CouponCode = data
-		case "streetId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("streetId"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.StreetID = data
-		case "houseNumber":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("houseNumber"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.HouseNumber = data
-		case "boxNumber":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("boxNumber"))
-			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.BoxNumber = data
-		case "isManualAddress":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isManualAddress"))
-			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.IsManualAddress = data
 		case "paymentRedirectUrl":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("paymentRedirectUrl"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -14794,7 +14671,7 @@ func (ec *executionContext) unmarshalInputUpdateOrderInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"status", "estimatedReadyTime"}
+	fieldsInOrder := [...]string{"status", "estimatedReadyTime", "cancellationReason"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -14815,6 +14692,13 @@ func (ec *executionContext) unmarshalInputUpdateOrderInput(ctx context.Context, 
 				return it, err
 			}
 			it.EstimatedReadyTime = data
+		case "cancellationReason":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cancellationReason"))
+			data, err := ec.unmarshalOOrderCancellationReason2ᚖtsbᚑserviceᚋinternalᚋmodulesᚋorderᚋdomainᚐOrderCancellationReason(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CancellationReason = data
 		}
 	}
 	return it, nil
@@ -15098,6 +14982,66 @@ func (ec *executionContext) _Address(ctx context.Context, sel ast.SelectionSet, 
 			out.Values[i] = ec._Address_boxNumber(ctx, field, obj)
 		case "distance":
 			out.Values[i] = ec._Address_distance(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lat":
+			out.Values[i] = ec._Address_lat(ctx, field, obj)
+		case "lng":
+			out.Values[i] = ec._Address_lng(ctx, field, obj)
+		case "duration":
+			out.Values[i] = ec._Address_duration(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var addressSuggestionImplementors = []string{"AddressSuggestion"}
+
+func (ec *executionContext) _AddressSuggestion(ctx context.Context, sel ast.SelectionSet, obj *model.AddressSuggestion) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, addressSuggestionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AddressSuggestion")
+		case "placeId":
+			out.Values[i] = ec._AddressSuggestion_placeId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "description":
+			out.Values[i] = ec._AddressSuggestion_description(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "mainText":
+			out.Values[i] = ec._AddressSuggestion_mainText(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "secondaryText":
+			out.Values[i] = ec._AddressSuggestion_secondaryText(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -15815,6 +15759,8 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 			out.Values[i] = ec._Order_orderExtra(ctx, field, obj)
 		case "couponCode":
 			out.Values[i] = ec._Order_couponCode(ctx, field, obj)
+		case "cancellationReason":
+			out.Values[i] = ec._Order_cancellationReason(ctx, field, obj)
 		case "address":
 			field := field
 
@@ -17017,7 +16963,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
-		case "streets":
+		case "autocompleteAddresses":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -17026,7 +16972,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_streets(ctx, field)
+				res = ec._Query_autocompleteAddresses(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -17039,7 +16985,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "houseNumbers":
+		case "resolveAddress":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -17048,95 +16994,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_houseNumbers(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "boxNumbers":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_boxNumbers(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "address":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_address(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "addressByLocation":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_addressByLocation(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "streetAverageDistance":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_streetAverageDistance(ctx, field)
+				res = ec._Query_resolveAddress(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -17677,60 +17535,6 @@ func (ec *executionContext) _RestaurantConfig(ctx context.Context, sel ast.Selec
 			out.Values[i] = ec._RestaurantConfig_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.ProcessDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
-var streetImplementors = []string{"Street"}
-
-func (ec *executionContext) _Street(ctx context.Context, sel ast.SelectionSet, obj *model.Street) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, streetImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("Street")
-		case "id":
-			out.Values[i] = ec._Street_id(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "streetName":
-			out.Values[i] = ec._Street_streetName(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "municipalityName":
-			out.Values[i] = ec._Street_municipalityName(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "postcode":
-			out.Values[i] = ec._Street_postcode(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -18319,6 +18123,32 @@ func (ec *executionContext) marshalNAddress2ᚖtsbᚑserviceᚋinternalᚋapiᚋ
 		return graphql.Null
 	}
 	return ec._Address(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAddressSuggestion2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAddressSuggestionᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.AddressSuggestion) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNAddressSuggestion2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAddressSuggestion(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNAddressSuggestion2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAddressSuggestion(ctx context.Context, sel ast.SelectionSet, v *model.AddressSuggestion) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AddressSuggestion(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {
@@ -18924,16 +18754,6 @@ func (ec *executionContext) marshalNRestaurantConfig2ᚖtsbᚑserviceᚋinternal
 	return ec._RestaurantConfig(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNStreet2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐStreet(ctx context.Context, sel ast.SelectionSet, v []*model.Street) graphql.Marshaler {
-	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
-		fc := graphql.GetFieldContext(ctx)
-		fc.Result = &v[i]
-		return ec.marshalOStreet2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐStreet(ctx, sel, v[i])
-	})
-
-	return ret
-}
-
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -18948,60 +18768,6 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
-}
-
-func (ec *executionContext) unmarshalNString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
-	var err error
-	res := make([]string, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	for i := range v {
-		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
-	}
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
-func (ec *executionContext) unmarshalNString2ᚕᚖstring(ctx context.Context, v any) ([]*string, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
-	var err error
-	res := make([]*string, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalOString2ᚖstring(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalNString2ᚕᚖstring(ctx context.Context, sel ast.SelectionSet, v []*string) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	for i := range v {
-		ret[i] = ec.marshalOString2ᚖstring(ctx, sel, v[i])
-	}
-
-	return ret
 }
 
 func (ec *executionContext) marshalNTranslation2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTranslationᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Translation) graphql.Marshaler {
@@ -19409,6 +19175,25 @@ func (ec *executionContext) marshalOOrder2ᚕᚖtsbᚑserviceᚋinternalᚋapi�
 	return ret
 }
 
+func (ec *executionContext) unmarshalOOrderCancellationReason2ᚖtsbᚑserviceᚋinternalᚋmodulesᚋorderᚋdomainᚐOrderCancellationReason(ctx context.Context, v any) (*domain.OrderCancellationReason, error) {
+	if v == nil {
+		return nil, nil
+	}
+	tmp, err := graphql.UnmarshalString(v)
+	res := domain.OrderCancellationReason(tmp)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOOrderCancellationReason2ᚖtsbᚑserviceᚋinternalᚋmodulesᚋorderᚋdomainᚐOrderCancellationReason(ctx context.Context, sel ast.SelectionSet, v *domain.OrderCancellationReason) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalString(string(*v))
+	return res
+}
+
 func (ec *executionContext) unmarshalOOrderExtraInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderExtraInputᚄ(ctx context.Context, v any) ([]*model.OrderExtraInput, error) {
 	if v == nil {
 		return nil, nil
@@ -19482,13 +19267,6 @@ func (ec *executionContext) marshalOProductChoice2ᚖtsbᚑserviceᚋinternalᚋ
 		return graphql.Null
 	}
 	return ec._ProductChoice(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOStreet2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐStreet(ctx context.Context, sel ast.SelectionSet, v *model.Street) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._Street(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {

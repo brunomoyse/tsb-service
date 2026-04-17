@@ -15,7 +15,7 @@ import (
 type OrderService interface {
 	CreateOrder(ctx context.Context, order *domain.Order, orderProducts *[]domain.OrderProductRaw) (*domain.Order, *[]domain.OrderProductRaw, error)
 	GetPaginatedOrders(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*domain.Order, error)
-	UpdateOrder(ctx context.Context, orderID uuid.UUID, newStatus *domain.OrderStatus, estimatedReadyTime *time.Time) error
+	UpdateOrder(ctx context.Context, orderID uuid.UUID, newStatus *domain.OrderStatus, estimatedReadyTime *time.Time, cancellationReason *domain.OrderCancellationReason) error
 	GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error)
 	GetStatusHistory(ctx context.Context, orderID uuid.UUID) ([]*domain.OrderStatusHistory, error)
 
@@ -58,7 +58,7 @@ func (s *orderService) GetPaginatedOrders(ctx context.Context, page int, limit i
 	return s.repo.FindPaginated(ctx, page, limit, userID)
 }
 
-func (s *orderService) UpdateOrder(ctx context.Context, orderID uuid.UUID, newStatus *domain.OrderStatus, estimatedReadyTime *time.Time) error {
+func (s *orderService) UpdateOrder(ctx context.Context, orderID uuid.UUID, newStatus *domain.OrderStatus, estimatedReadyTime *time.Time, cancellationReason *domain.OrderCancellationReason) error {
 	// Retrieve the order
 	order, _, err := s.repo.FindByID(ctx, orderID)
 	if err != nil {
@@ -75,6 +75,11 @@ func (s *orderService) UpdateOrder(ctx context.Context, orderID uuid.UUID, newSt
 	// Check if there is a new estimated ready time
 	if estimatedReadyTime != nil {
 		order.EstimatedReadyTime = estimatedReadyTime
+	}
+
+	// Persist cancellation reason only when transitioning to CANCELLED.
+	if cancellationReason != nil && order.OrderStatus == domain.OrderStatusCanceled {
+		order.CancellationReason = cancellationReason
 	}
 
 	if err := s.repo.Update(ctx, order); err != nil {

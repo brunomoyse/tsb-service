@@ -1,18 +1,45 @@
 package domain
 
-type Address struct {
-	ID               string  `db:"address_id" json:"id"`
-	StreetName       string  `db:"streetname_fr" json:"streetName"`
-	HouseNumber      string  `db:"house_number" json:"houseNumber"`
-	BoxNumber        *string `db:"box_number" json:"boxNumber"`
-	MunicipalityName string  `db:"municipality_name_fr" json:"municipalityName"`
-	Postcode         string  `db:"postcode" json:"postcode"`
-	Distance         float64 `db:"distance" json:"distance"`
+import "time"
+
+type AddressCache struct {
+	PlaceID          string    `db:"place_id"`
+	FormattedAddress string    `db:"formatted_address"`
+	Lat              float64   `db:"lat"`
+	Lng              float64   `db:"lng"`
+	StreetName       *string   `db:"street_name"`
+	HouseNumber      *string   `db:"house_number"`
+	BoxNumber        *string   `db:"box_number"`
+	Postcode         *string   `db:"postcode"`
+	MunicipalityName *string   `db:"municipality_name"`
+	CountryCode      string    `db:"country_code"`
+	DistanceMeters   int       `db:"distance_meters"`
+	DurationSeconds  int       `db:"duration_seconds"`
+	RawPlaceDetails  []byte    `db:"raw_place_details"`
+	CreatedAt        time.Time `db:"created_at"`
+	RefreshedAt      time.Time `db:"refreshed_at"`
 }
 
-type Street struct {
-	ID               string `db:"street_id" json:"id"`
-	StreetName       string `db:"streetname_fr" json:"streetName"`
-	MunicipalityName string `db:"municipality_name_fr" json:"municipalityName"`
-	Postcode         string `db:"postcode" json:"postcode"`
+// Address is the unified domain type returned to resolvers.
+// For new Google-backed addresses, ID is the place_id.
+// For legacy orders with denormalized-only data, ID is empty.
+type Address struct {
+	ID               string
+	PlaceID          string
+	StreetName       string
+	HouseNumber      string
+	BoxNumber        *string
+	Postcode         string
+	MunicipalityName string
+	Distance         float64 // meters
+	Lat              *float64
+	Lng              *float64
+	Duration         *int // seconds
+}
+
+type Suggestion struct {
+	PlaceID       string
+	Description   string
+	MainText      string
+	SecondaryText string
 }
