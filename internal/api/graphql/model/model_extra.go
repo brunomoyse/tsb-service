@@ -42,3 +42,21 @@ type Order struct {
 	AddressDistance   *float64 `json:"-"`
 	IsManualAddr     *bool    `json:"-"`
 }
+
+// User is the custom GraphQL User model. It mirrors the schema fields and
+// carries DefaultPlaceID as a non-schema field, used by the Address()
+// resolver to look up the user's saved default address in address_cache.
+type User struct {
+	ID                  uuid.UUID  `json:"id"`
+	Email               string     `json:"email"`
+	FirstName           string     `json:"firstName"`
+	LastName            string     `json:"lastName"`
+	PhoneNumber         *string    `json:"phoneNumber,omitempty"`
+	IsAdmin             bool       `json:"isAdmin"`
+	NotifyMarketing     bool       `json:"notifyMarketing"`
+	NotifyOrderUpdates  bool       `json:"notifyOrderUpdates"`
+	DeletionRequestedAt *time.Time `json:"deletionRequestedAt,omitempty"`
+	Rrn                 *string    `json:"rrn,omitempty"`
+
+	DefaultPlaceID *string `json:"-"`
+}

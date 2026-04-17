@@ -14827,7 +14827,7 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"firstName", "lastName", "email", "phoneNumber", "addressId", "notifyMarketing", "notifyOrderUpdates"}
+	fieldsInOrder := [...]string{"firstName", "lastName", "email", "phoneNumber", "addressPlaceId", "notifyMarketing", "notifyOrderUpdates"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -14862,13 +14862,13 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 				return it, err
 			}
 			it.PhoneNumber = data
-		case "addressId":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addressId"))
+		case "addressPlaceId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("addressPlaceId"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.AddressID = data
+			it.AddressPlaceID = data
 		case "notifyMarketing":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("notifyMarketing"))
 			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)

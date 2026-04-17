@@ -155,9 +155,14 @@ func main() {
 		os.Exit(1)
 	}
 	googleLang := cmp.Or(os.Getenv("GOOGLE_MAPS_LANGUAGE"), "fr")
+	autocompleteRadius, err := strconv.ParseFloat(cmp.Or(os.Getenv("AUTOCOMPLETE_RADIUS_METERS"), "15000"), 64)
+	if err != nil {
+		zap.L().Error("AUTOCOMPLETE_RADIUS_METERS must be a float", zap.Error(err))
+		os.Exit(1)
+	}
 
 	addressCacheRepo := addressInfrastructure.NewAddressCacheRepository(dbPool)
-	googleClient := addressInfrastructure.NewGoogleClient(googleAPIKey, originLat, originLng, nil)
+	googleClient := addressInfrastructure.NewGoogleClient(googleAPIKey, originLat, originLng, autocompleteRadius, nil)
 	addressService := addressApplication.NewAddressService(addressCacheRepo, googleClient, googleLang)
 	couponService := couponApplication.NewCouponService(couponRepo)
 	notificationService := notificationApplication.NewNotificationService(notificationRepo)

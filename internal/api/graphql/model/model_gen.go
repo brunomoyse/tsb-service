@@ -383,25 +383,9 @@ type UpdateUserInput struct {
 	LastName           *string `json:"lastName,omitempty"`
 	Email              *string `json:"email,omitempty"`
 	PhoneNumber        *string `json:"phoneNumber,omitempty"`
-	AddressID          *string `json:"addressId,omitempty"`
+	AddressPlaceID     *string `json:"addressPlaceId,omitempty"`
 	NotifyMarketing    *bool   `json:"notifyMarketing,omitempty"`
 	NotifyOrderUpdates *bool   `json:"notifyOrderUpdates,omitempty"`
-}
-
-type User struct {
-	ID                  uuid.UUID  `json:"id"`
-	Email               string     `json:"email"`
-	FirstName           string     `json:"firstName"`
-	LastName            string     `json:"lastName"`
-	PhoneNumber         *string    `json:"phoneNumber,omitempty"`
-	IsAdmin             bool       `json:"isAdmin"`
-	NotifyMarketing     bool       `json:"notifyMarketing"`
-	NotifyOrderUpdates  bool       `json:"notifyOrderUpdates"`
-	DeletionRequestedAt *time.Time `json:"deletionRequestedAt,omitempty"`
-	Address             *Address   `json:"address,omitempty"`
-	Orders              []*Order   `json:"orders,omitempty"`
-	Rrn                 *string    `json:"rrn,omitempty"`
-	DefaultPlaceID      *string    `json:"-"`
 }
 
 type OrderTypeEnum string

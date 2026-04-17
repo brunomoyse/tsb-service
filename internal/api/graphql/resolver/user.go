@@ -29,7 +29,7 @@ func (r *mutationResolver) UpdateMe(ctx context.Context, input model.UpdateUserI
 		input.LastName,
 		input.Email,
 		input.PhoneNumber,
-		input.AddressID,
+		input.AddressPlaceID,
 		input.NotifyMarketing,
 		input.NotifyOrderUpdates,
 	)

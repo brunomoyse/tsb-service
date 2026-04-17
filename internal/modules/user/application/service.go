@@ -13,7 +13,7 @@ import (
 type UserService interface {
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
-	UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error)
+	UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressPlaceID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error)
 	RequestDeletion(ctx context.Context, userID string) (*domain.User, error)
 	CancelDeletionRequest(ctx context.Context, userID string) (*domain.User, error)
 	BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error)
@@ -40,7 +40,7 @@ func (s *userService) GetUserByEmail(ctx context.Context, email string) (*domain
 	return s.repo.FindByEmail(ctx, email)
 }
 
-func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error) {
+func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressPlaceID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error) {
 	user, err := s.repo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -58,8 +58,13 @@ func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *st
 	if phoneNumber != nil {
 		user.PhoneNumber = phoneNumber
 	}
-	if addressID != nil {
-		user.AddressID = addressID
+	if addressPlaceID != nil {
+		// Empty string clears the saved default address; non-empty sets it.
+		if *addressPlaceID == "" {
+			user.DefaultPlaceID = nil
+		} else {
+			user.DefaultPlaceID = addressPlaceID
+		}
 	}
 	if notifyMarketing != nil {
 		user.NotifyMarketing = *notifyMarketing

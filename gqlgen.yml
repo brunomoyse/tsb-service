@@ -211,6 +211,8 @@ models:
         resolver: true
 
   User:
+    model:
+      - tsb-service/internal/api/graphql/model.User
     fields:
       orders:
         resolver: true
