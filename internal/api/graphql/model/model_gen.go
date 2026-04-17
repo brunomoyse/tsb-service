@@ -15,13 +15,23 @@ import (
 )
 
 type Address struct {
-	ID               string  `json:"id"`
-	Postcode         string  `json:"postcode"`
-	MunicipalityName string  `json:"municipalityName"`
-	StreetName       string  `json:"streetName"`
-	HouseNumber      string  `json:"houseNumber"`
-	BoxNumber        *string `json:"boxNumber,omitempty"`
-	Distance         float64 `json:"distance"`
+	ID               string   `json:"id"`
+	Postcode         string   `json:"postcode"`
+	MunicipalityName string   `json:"municipalityName"`
+	StreetName       string   `json:"streetName"`
+	HouseNumber      string   `json:"houseNumber"`
+	BoxNumber        *string  `json:"boxNumber,omitempty"`
+	Distance         float64  `json:"distance"`
+	Lat              *float64 `json:"lat,omitempty"`
+	Lng              *float64 `json:"lng,omitempty"`
+	Duration         *int     `json:"duration,omitempty"`
+}
+
+type AddressSuggestion struct {
+	PlaceID       string `json:"placeId"`
+	Description   string `json:"description"`
+	MainText      string `json:"mainText"`
+	SecondaryText string `json:"secondaryText"`
 }
 
 type ChoiceTranslation struct {
@@ -70,17 +80,13 @@ type CreateCouponInput struct {
 type CreateOrderInput struct {
 	OrderType          OrderTypeEnum           `json:"orderType"`
 	IsOnlinePayment    bool                    `json:"isOnlinePayment"`
-	AddressID          *string                 `json:"addressId,omitempty"`
+	AddressPlaceID     *string                 `json:"addressPlaceId,omitempty"`
 	AddressExtra       *string                 `json:"addressExtra,omitempty"`
 	OrderNote          *string                 `json:"orderNote,omitempty"`
 	OrderExtra         []*OrderExtraInput      `json:"orderExtra,omitempty"`
 	PreferredReadyTime *time.Time              `json:"preferredReadyTime,omitempty"`
 	Items              []*CreateOrderItemInput `json:"items"`
 	CouponCode         *string                 `json:"couponCode,omitempty"`
-	StreetID           *string                 `json:"streetId,omitempty"`
-	HouseNumber        *string                 `json:"houseNumber,omitempty"`
-	BoxNumber          *string                 `json:"boxNumber,omitempty"`
-	IsManualAddress    *bool                   `json:"isManualAddress,omitempty"`
 	PaymentRedirectURL *string                 `json:"paymentRedirectUrl,omitempty"`
 }
 
@@ -317,13 +323,6 @@ type RestaurantConfig struct {
 	UpdatedAt               time.Time      `json:"updatedAt"`
 }
 
-type Street struct {
-	ID               string `json:"id"`
-	StreetName       string `json:"streetName"`
-	MunicipalityName string `json:"municipalityName"`
-	Postcode         string `json:"postcode"`
-}
-
 type Subscription struct {
 }
 
@@ -402,6 +401,7 @@ type User struct {
 	Address             *Address   `json:"address,omitempty"`
 	Orders              []*Order   `json:"orders,omitempty"`
 	Rrn                 *string    `json:"rrn,omitempty"`
+	DefaultPlaceID      *string    `json:"-"`
 }
 
 type OrderTypeEnum string

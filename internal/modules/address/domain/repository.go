@@ -1,20 +1,14 @@
 package domain
 
-import (
-	"context"
-)
+import "context"
 
-// AddressRepository defines the contract for persisting Address aggregates.
-type AddressRepository interface {
-	SearchStreetNames(ctx context.Context, query string) ([]*Street, error)
-	GetDistinctHouseNumbers(ctx context.Context, streetName string) ([]string, error)
-	GetBoxNumbers(ctx context.Context, streetName, houseNumber string) ([]*string, error)
-	GetFinalAddress(ctx context.Context, streetID string, houseNumber string, boxNumber *string) (*Address, error)
-	GetAddressByID(ctx context.Context, ID string) (*Address, error)
+type AddressCacheRepository interface {
+	GetByPlaceID(ctx context.Context, placeID string) (*AddressCache, error) // returns (nil, nil) on miss
+	Upsert(ctx context.Context, entry *AddressCache) error
+}
 
-	BatchGetAddressesByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*Address, error)
-	BatchGetAddressesByUserIDs(ctx context.Context, userIDs []string) (map[string][]*Address, error)
-
-	GetStreetByID(ctx context.Context, streetID string) (*Street, error)
-	GetStreetAverageDistance(ctx context.Context, streetID string) (float64, error)
+type GoogleClient interface {
+	Autocomplete(ctx context.Context, input, sessionToken, language string) ([]Suggestion, error)
+	PlaceDetails(ctx context.Context, placeID, sessionToken, language string) (*AddressCache, error) // returns cache-ready entry WITHOUT distance_meters/duration_seconds
+	ComputeRoute(ctx context.Context, destLat, destLng float64) (distanceMeters int, durationSeconds int, err error)
 }

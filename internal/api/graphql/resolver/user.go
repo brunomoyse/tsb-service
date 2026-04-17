@@ -11,8 +11,6 @@ import (
 	"time"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
-	addressApplication "tsb-service/internal/modules/address/application"
-	addressDomain "tsb-service/internal/modules/address/domain"
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/utils"
@@ -157,27 +155,19 @@ func (r *queryResolver) CustomerStats(ctx context.Context, input *model.Customer
 
 // Address is the resolver for the address field.
 func (r *userResolver) Address(ctx context.Context, obj *model.User) (*model.Address, error) {
-	loader := addressApplication.GetUserAddressLoader(ctx)
-	if loader == nil {
-		return nil, fmt.Errorf("no user address loader found")
-	}
-
-	// Load domain addresses
-	domainAddresses, err := loader.Loader.Load(ctx, obj.ID.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to load user address: %w", err)
-	}
-
-	// If there are no addresses, return nil (and no error)
-	if len(domainAddresses) == 0 {
+	// Return nil if user has no default address
+	if obj.DefaultPlaceID == nil {
 		return nil, nil
 	}
 
-	// Map to GraphQL model and return the first one
-	gqlAddresses := Map(domainAddresses, func(a *addressDomain.Address) *model.Address {
-		return ToGQLAddress(a)
-	})
-	return gqlAddresses[0], nil
+	// Fetch address from cache using place ID
+	addr, err := r.AddressService.GetByPlaceID(ctx, *obj.DefaultPlaceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch user's default address: %w", err)
+	}
+
+	// Return the converted address
+	return ToGQLAddress(addr), nil
 }
 
 // Orders is the resolver for the orders field.

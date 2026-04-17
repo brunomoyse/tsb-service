@@ -78,18 +78,13 @@ input OrderExtraInput {
 input CreateOrderInput {
     orderType: OrderTypeEnum!
     isOnlinePayment: Boolean!
-    addressId: String
+    addressPlaceId: String
     addressExtra: String
     orderNote: String
     orderExtra: [OrderExtraInput!]
     preferredReadyTime: DateTime
     items: [CreateOrderItemInput!]!
     couponCode: String
-    # Manual address fields (used when isManualAddress=true)
-    streetId: String
-    houseNumber: String
-    boxNumber: String
-    isManualAddress: Boolean
     # Custom redirect URL for Mollie payment (native apps use custom URL scheme)
     paymentRedirectUrl: String
 }

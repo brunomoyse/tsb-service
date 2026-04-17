@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	addressApplication "tsb-service/internal/modules/address/application"
 	orderApplication "tsb-service/internal/modules/order/application"
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	productApplication "tsb-service/internal/modules/product/application"
@@ -10,7 +9,6 @@ import (
 )
 
 func DataLoaderMiddleware(
-	ads addressApplication.AddressService,
 	ors orderApplication.OrderService,
 	pas paymentApplication.PaymentService,
 	prs productApplication.ProductService,
@@ -19,8 +17,7 @@ func DataLoaderMiddleware(
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
 
-		// Attach DataLoaders into the context, passing in the actual ProductService
-		ctx = addressApplication.AttachDataLoaders(ctx, ads)
+		// Attach DataLoaders into the context, passing in the actual services
 		ctx = productApplication.AttachDataLoaders(ctx, prs)
 		ctx = paymentApplication.AttachDataLoaders(ctx, pas)
 		ctx = orderApplication.AttachDataLoaders(ctx, ors)

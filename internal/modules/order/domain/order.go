@@ -68,6 +68,9 @@ type Order struct {
 	Postcode         *string  `db:"postcode" json:"postcode,omitempty"`
 	AddressDistance  *float64 `db:"address_distance" json:"addressDistance,omitempty"`
 	IsManualAddress  bool     `db:"is_manual_address" json:"isManualAddress"`
+	AddressPlaceID   *string  `db:"address_place_id" json:"addressPlaceId,omitempty"`
+	AddressLat       *float64 `db:"address_lat" json:"addressLat,omitempty"`
+	AddressLng       *float64 `db:"address_lng" json:"addressLng,omitempty"`
 	CancellationReason *OrderCancellationReason `db:"cancellation_reason" json:"cancellationReason,omitempty"`
 }
 
@@ -140,6 +143,9 @@ type AddressSnapshot struct {
 	MunicipalityName *string
 	Postcode         *string
 	Distance         *float64
+	PlaceID          *string
+	Lat              *float64
+	Lng              *float64
 	IsManual         bool
 }
 
@@ -191,6 +197,9 @@ func NewOrder(
 		o.MunicipalityName = addrSnapshot.MunicipalityName
 		o.Postcode = addrSnapshot.Postcode
 		o.AddressDistance = addrSnapshot.Distance
+		o.AddressPlaceID = addrSnapshot.PlaceID
+		o.AddressLat = addrSnapshot.Lat
+		o.AddressLng = addrSnapshot.Lng
 		o.IsManualAddress = addrSnapshot.IsManual
 	}
 

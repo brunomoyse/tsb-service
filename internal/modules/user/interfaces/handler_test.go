@@ -76,35 +76,16 @@ var _ application.UserService = (*mockUserService)(nil)
 
 type mockAddressService struct{}
 
-func (m *mockAddressService) SearchStreetNames(_ context.Context, _ string) ([]*addressDomain.Street, error) {
+func (m *mockAddressService) Autocomplete(_ context.Context, _ string, _ string) ([]addressDomain.Suggestion, error) {
 	return nil, nil
 }
-func (m *mockAddressService) GetDistinctHouseNumbers(_ context.Context, _ string) ([]string, error) {
+
+func (m *mockAddressService) Resolve(_ context.Context, _ string, _ string) (*addressDomain.Address, error) {
 	return nil, nil
 }
-func (m *mockAddressService) GetAddressByID(_ context.Context, _ string) (*addressDomain.Address, error) {
+
+func (m *mockAddressService) GetByPlaceID(_ context.Context, _ string) (*addressDomain.Address, error) {
 	return nil, nil
-}
-func (m *mockAddressService) GetAddressByStreetAndNumber(_ context.Context, _, _ string) (*addressDomain.Address, error) {
-	return nil, nil
-}
-func (m *mockAddressService) BatchGetAddressesByUserIDs(_ context.Context, _ []string) (map[string][]*addressDomain.Address, error) {
-	return nil, nil
-}
-func (m *mockAddressService) BatchGetAddressesByOrderIDs(_ context.Context, _ []string) (map[string][]*addressDomain.Address, error) {
-	return nil, nil
-}
-func (m *mockAddressService) GetBoxNumbers(_ context.Context, _, _ string) ([]*string, error) {
-	return nil, nil
-}
-func (m *mockAddressService) GetFinalAddress(_ context.Context, _, _ string, _ *string) (*addressDomain.Address, error) {
-	return nil, nil
-}
-func (m *mockAddressService) GetStreetByID(_ context.Context, _ string) (*addressDomain.Street, error) {
-	return nil, nil
-}
-func (m *mockAddressService) GetStreetAverageDistance(_ context.Context, _ string) (float64, error) {
-	return 0, nil
 }
 
 // --- Tests ---

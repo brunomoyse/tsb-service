@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -129,7 +130,6 @@ func main() {
 	}
 
 	// Repos / services / handlers
-	addressRepo := addressInfrastructure.NewAddressRepository(dbPool)
 	couponRepo := couponInfrastructure.NewCouponRepository(dbPool)
 	notificationRepo := notificationInfrastructure.NewNotificationRepository(dbPool)
 	orderRepo := orderInfrastructure.NewOrderRepository(dbPool)
@@ -138,7 +138,27 @@ func main() {
 	restaurantRepo := restaurantInfrastructure.NewRestaurantRepository(dbPool)
 	userRepo := userInfrastructure.NewUserRepository(dbPool)
 
-	addressService := addressApplication.NewAddressService(addressRepo)
+	// Google Maps address caching setup
+	googleAPIKey := os.Getenv("GOOGLE_MAPS_API_KEY")
+	if googleAPIKey == "" {
+		zap.L().Error("GOOGLE_MAPS_API_KEY is required")
+		os.Exit(1)
+	}
+	originLat, err := strconv.ParseFloat(cmp.Or(os.Getenv("RESTAURANT_ORIGIN_LAT"), "50.6423"), 64)
+	if err != nil {
+		zap.L().Error("RESTAURANT_ORIGIN_LAT must be a float", zap.Error(err))
+		os.Exit(1)
+	}
+	originLng, err := strconv.ParseFloat(cmp.Or(os.Getenv("RESTAURANT_ORIGIN_LNG"), "5.5745"), 64)
+	if err != nil {
+		zap.L().Error("RESTAURANT_ORIGIN_LNG must be a float", zap.Error(err))
+		os.Exit(1)
+	}
+	googleLang := cmp.Or(os.Getenv("GOOGLE_MAPS_LANGUAGE"), "fr")
+
+	addressCacheRepo := addressInfrastructure.NewAddressCacheRepository(dbPool)
+	googleClient := addressInfrastructure.NewGoogleClient(googleAPIKey, originLat, originLng, nil)
+	addressService := addressApplication.NewAddressService(addressCacheRepo, googleClient, googleLang)
 	couponService := couponApplication.NewCouponService(couponRepo)
 	notificationService := notificationApplication.NewNotificationService(notificationRepo)
 	orderService := orderApplication.NewOrderService(orderRepo)
@@ -290,7 +310,7 @@ func main() {
 	api.GET("/up", healthCheck)
 	api.Use(middleware.LanguageExtractor())
 	api.Use(middleware.DataLoaderMiddleware(
-		addressService, orderService, paymentService, productService, userService,
+		orderService, paymentService, productService, userService,
 	))
 
 	// GraphQL
