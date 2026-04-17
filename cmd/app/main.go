@@ -260,7 +260,6 @@ func main() {
 	}
 
 	orderHandler := orderInterfaces.NewOrderHandler(orderService, userService, productService)
-	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, broker)
 
 	// Gin HTTP setup
 	router := gin.New()
@@ -323,6 +322,9 @@ func main() {
 		broker, apnsClient, fcmClient,
 		addressService, couponService, notificationService, orderService, paymentService, productService, restaurantService, userService, posService,
 	)
+	// Payment webhook depends on the resolver to fan out the new-order push
+	// notification once the Mollie payment transitions to paid.
+	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, broker, rootResolver)
 	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL, "capacitor://localhost", "https://localhost"}, oidcVerifier)
 	optionalAuth := oidcVerifier.OptionalAuthMiddleware()
 

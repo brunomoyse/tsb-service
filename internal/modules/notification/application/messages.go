@@ -190,7 +190,7 @@ var newOrderTexts = map[string]*notificationText{
 }
 
 var readyTimeUpdatedTexts = map[string]*notificationText{
-	"fr": {Title: "Heure de retrait mise a jour", Body: "Nouvelle heure estimee: %s."},
+	"fr": {Title: "Heure de retrait mise à jour", Body: "Nouvelle heure estimée : %s."},
 	"en": {Title: "Ready time updated", Body: "New estimated ready time: %s."},
 	"zh": {Title: "预计完成时间已更新", Body: "新的预计完成时间：%s。"},
 	"nl": {Title: "Afhaaltijd bijgewerkt", Body: "Nieuwe geschatte afhaaltijd: %s."},
