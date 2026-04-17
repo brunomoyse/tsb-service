@@ -847,3 +847,37 @@ func SendFeedbackEmail(name, email, serviceType, feedbackType, message, lang str
 	logger.Debugf("Feedback email sent to admin from %s", email)
 	return nil
 }
+
+// SendAlertEmail sends a plain-text operational alert to the given
+// recipients. Used by the pkg/alerter EmailAlerter for HubRise
+// health notifications — not for customer-facing correspondence.
+//
+// Reuses the global temClient + baseReq (From, Region, ProjectID)
+// initialised by InitService(). Returns an error if the client is
+// not initialised so callers can degrade to logging.
+func SendAlertEmail(recipients []string, subject, body string) error {
+	if !IsInitialized() {
+		return fmt.Errorf("scaleway email service not initialized")
+	}
+	if len(recipients) == 0 {
+		return fmt.Errorf("no recipients provided")
+	}
+
+	// Copy baseReq to avoid mutating the shared template.
+	newReq := *baseReq
+
+	to := make([]*temv1alpha1.CreateEmailRequestAddress, 0, len(recipients))
+	for _, r := range recipients {
+		to = append(to, &temv1alpha1.CreateEmailRequestAddress{Email: r})
+	}
+	newReq.To = to
+	newReq.Subject = subject
+	newReq.Text = body
+
+	if _, err := temClient.CreateEmail(&newReq); err != nil {
+		return fmt.Errorf("failed to send alert email: %w", err)
+	}
+
+	logger.Debugf("Alert email sent to %d recipient(s): %s", len(recipients), subject)
+	return nil
+}

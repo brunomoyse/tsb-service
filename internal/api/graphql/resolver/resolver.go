@@ -48,6 +48,10 @@ type Resolver struct {
 	RestaurantService   restaurantApplication.RestaurantService
 	UserService         userApplication.UserService
 	PosService          *posApplication.Service
+	// ChangeLogger triggers an async HubRise catalog push after any
+	// product/category mutation (debounced, 2s). Nil when HubRise is
+	// disabled — callers must nil-check.
+	ChangeLogger        *productApplication.MenuChangeLogger
 }
 
 // NewResolver constructs the Resolver with required services.
@@ -64,6 +68,7 @@ func NewResolver(
 	restaurantService restaurantApplication.RestaurantService,
 	userService userApplication.UserService,
 	posService *posApplication.Service,
+	changeLogger *productApplication.MenuChangeLogger,
 ) *Resolver {
 	return &Resolver{
 		Broker:              broker,
@@ -78,6 +83,7 @@ func NewResolver(
 		RestaurantService:   restaurantService,
 		UserService:         userService,
 		PosService:          posService,
+		ChangeLogger:        changeLogger,
 	}
 }
 
