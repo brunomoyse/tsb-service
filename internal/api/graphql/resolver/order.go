@@ -541,7 +541,14 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 
 	// Send standard alert push notifications to user's devices (non-blocking).
 	// Only fired when the status actually changed.
-	if r.APNsClient != nil && oldOrder.OrderStatus != o.OrderStatus {
+	//
+	// Exception: OUT_FOR_DELIVERY → DELIVERED is suppressed. The driver hands the
+	// food directly to the customer, so a "Your order has been delivered" push
+	// would be noise arriving at exactly the moment the customer already knows.
+	statusChanged := oldOrder.OrderStatus != o.OrderStatus
+	suppressDelivered := oldOrder.OrderStatus == orderDomain.OrderStatusOutForDelivery &&
+		o.OrderStatus == orderDomain.OrderStatusDelivered
+	if r.APNsClient != nil && statusChanged && !suppressDelivered {
 		go func() {
 			deviceTokens, tokenErr := r.NotificationService.GetDeviceTokens(context.Background(), o.UserID)
 			if tokenErr != nil || len(deviceTokens) == 0 {
@@ -692,6 +699,11 @@ func (r *mutationResolver) UnregisterDeviceToken(ctx context.Context, deviceToke
 	}
 
 	return true, nil
+}
+
+// OrderExtra is the resolver for the orderExtra field.
+func (r *orderResolver) OrderExtra(_ context.Context, obj *model.Order) (any, error) {
+	return obj.OrderExtra, nil
 }
 
 // Address is the resolver for the address field.

@@ -25,7 +25,7 @@ type Order struct {
 	EstimatedReadyTime *time.Time         `json:"estimatedReadyTime,omitempty"`
 	AddressExtra       *string            `json:"addressExtra,omitempty"`
 	OrderNote          *string            `json:"orderNote,omitempty"`
-	OrderExtra         map[string]any     `json:"orderExtra,omitempty"`
+	OrderExtra         []any              `json:"orderExtra,omitempty"`
 	CouponCode         *string            `json:"couponCode,omitempty"`
 	CancellationReason *domain.OrderCancellationReason `json:"cancellationReason,omitempty"`
 

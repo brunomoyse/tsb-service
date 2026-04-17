@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"tsb-service/internal/api/graphql/model"
 	addressDomain "tsb-service/internal/modules/address/domain"
 	couponDomain "tsb-service/internal/modules/coupon/domain"
@@ -76,8 +78,18 @@ func ToGQLUser(u *userDomain.User) *model.User {
 }
 
 func ToGQLOrder(o *orderDomain.Order) *model.Order {
-	var orderExtra map[string]any
-	_ = json.Unmarshal(o.OrderExtra, &orderExtra)
+	// orderExtra is persisted as a JSON array (e.g. [{"name":"chopsticks"},
+	// {"name":"sauces","options":["sweet"]}]). Unmarshalling into a map would
+	// silently fail, leaving the field null on the wire.
+	var orderExtra []any
+	if len(o.OrderExtra) > 0 {
+		if err := json.Unmarshal(o.OrderExtra, &orderExtra); err != nil {
+			zap.L().Warn("failed to unmarshal order_extra JSON",
+				zap.String("order_id", o.ID.String()),
+				zap.Error(err),
+			)
+		}
+	}
 
 	var deliveryFeeStr *string
 	if o.DeliveryFee != nil {
