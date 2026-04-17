@@ -8,11 +8,11 @@ import (
 )
 
 type UpdateUserRequest struct {
-	FirstName   *string `json:"firstName"`
-	LastName    *string `json:"lastName"`
-	Email       *string `json:"email"`
-	PhoneNumber *string `json:"phoneNumber"`
-	AddressID   *string `json:"addressId"`
+	FirstName      *string `json:"firstName"`
+	LastName       *string `json:"lastName"`
+	Email          *string `json:"email"`
+	PhoneNumber    *string `json:"phoneNumber"`
+	AddressPlaceID *string `json:"addressPlaceId"`
 }
 
 type UserResponse struct {

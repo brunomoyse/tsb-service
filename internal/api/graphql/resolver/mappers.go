@@ -71,6 +71,7 @@ func ToGQLUser(u *userDomain.User) *model.User {
 		NotifyOrderUpdates:  u.NotifyOrderUpdates,
 		DeletionRequestedAt: u.DeletionRequestedAt,
 		Rrn:                 u.RRN,
+		DefaultPlaceID:      u.DefaultPlaceID,
 	}
 }
 

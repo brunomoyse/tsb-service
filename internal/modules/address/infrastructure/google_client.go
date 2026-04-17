@@ -17,31 +17,44 @@ import (
 )
 
 type GoogleClient struct {
-	apiKey      string
-	originLat   float64
-	originLng   float64
-	httpClient  *http.Client
+	apiKey             string
+	originLat          float64
+	originLng          float64
+	autocompleteRadius float64 // meters; 0 disables the locationRestriction
+	httpClient         *http.Client
 }
 
-func NewGoogleClient(apiKey string, originLat, originLng float64, httpClient *http.Client) domain.GoogleClient {
+func NewGoogleClient(apiKey string, originLat, originLng, autocompleteRadiusMeters float64, httpClient *http.Client) domain.GoogleClient {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 10 * time.Second}
 	}
 	return &GoogleClient{
-		apiKey:     apiKey,
-		originLat:  originLat,
-		originLng:  originLng,
-		httpClient: httpClient,
+		apiKey:             apiKey,
+		originLat:          originLat,
+		originLng:          originLng,
+		autocompleteRadius: autocompleteRadiusMeters,
+		httpClient:         httpClient,
 	}
 }
 
 func (c *GoogleClient) Autocomplete(ctx context.Context, input, sessionToken, language string) ([]domain.Suggestion, error) {
 	reqBody := map[string]interface{}{
-		"input":                  input,
-		"sessionToken":           sessionToken,
-		"languageCode":           language,
-		"includedRegionCodes":    []string{"BE"},
-		"includedPrimaryTypes":   []string{"street_address", "premise", "subpremise", "route"},
+		"input":                input,
+		"sessionToken":         sessionToken,
+		"languageCode":         language,
+		"includedRegionCodes":  []string{"BE"},
+		"includedPrimaryTypes": []string{"street_address", "premise", "subpremise", "route"},
+	}
+	if c.autocompleteRadius > 0 {
+		reqBody["locationRestriction"] = map[string]interface{}{
+			"circle": map[string]interface{}{
+				"center": map[string]float64{
+					"latitude":  c.originLat,
+					"longitude": c.originLng,
+				},
+				"radius": c.autocompleteRadius,
+			},
+		}
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)

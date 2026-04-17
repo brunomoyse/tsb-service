@@ -17,7 +17,7 @@ input UpdateUserInput {
     lastName: String
     email: String
     phoneNumber: String
-    addressId: String
+    addressPlaceId: String
     notifyMarketing: Boolean
     notifyOrderUpdates: Boolean
 }

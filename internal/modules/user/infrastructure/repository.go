@@ -74,10 +74,10 @@ func (r *UserRepository) FindByZitadelID(ctx context.Context, zitadelID string) 
 func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) (*domain.User, error) {
 	query := `
 		UPDATE users
-		SET first_name = $1, last_name = $2, email = $3, phone_number = $4, address_id = $5, notify_marketing = $6, notify_order_updates = $7, zitadel_user_id = $8
-		WHERE id = $9
+		SET first_name = $1, last_name = $2, email = $3, phone_number = $4, address_id = $5, default_place_id = $6, notify_marketing = $7, notify_order_updates = $8, zitadel_user_id = $9
+		WHERE id = $10
 	`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.NotifyMarketing, user.NotifyOrderUpdates, user.ZitadelUserID, user.ID)
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.DefaultPlaceID, user.NotifyMarketing, user.NotifyOrderUpdates, user.ZitadelUserID, user.ID)
 	if err != nil {
 		return nil, err
 	}
