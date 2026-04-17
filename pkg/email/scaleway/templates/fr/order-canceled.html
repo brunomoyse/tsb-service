@@ -19,6 +19,7 @@
     <tr><td style="background-color:#ffffff;padding:36px;">
         <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">Bonjour {{.UserName}},</p>
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Nous avons le regret de vous informer que votre commande a été <strong>annulée</strong>.</p>
+        {{if .Reason}}<p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;"><strong>Motif :</strong> {{.Reason}}.</p>{{end}}
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Si vous avez déjà effectué le paiement, un remboursement a été initié et vous recevrez votre argent sous peu.</p>
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Veuillez accepter nos sincères excuses pour la gêne occasionnée.</p>
         <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">Pour toute assistance, n'hésitez pas à contacter directement le restaurant au <strong>04 222 98 88</strong>.</p>

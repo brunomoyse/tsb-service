@@ -15,6 +15,7 @@ type User struct {
 	Email           string     `db:"email" json:"email"`
 	PhoneNumber     *string    `db:"phone_number" json:"phoneNumber"`
 	AddressID       *string    `db:"address_id" json:"addressId"`
+	DefaultPlaceID  *string    `db:"default_place_id" json:"defaultPlaceId,omitempty"`
 	NotifyMarketing bool       `db:"notify_marketing" json:"notifyMarketing"`
 	NotifyOrderUpdates  bool       `db:"notify_order_updates" json:"notifyOrderUpdates"`
 	DeletionRequestedAt *time.Time `db:"deletion_requested_at" json:"deletionRequestedAt"`

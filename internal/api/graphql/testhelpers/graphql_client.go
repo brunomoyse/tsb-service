@@ -9,7 +9,6 @@ import (
 	"tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/directives"
 	"tsb-service/internal/api/graphql/resolver"
-	addressApplication "tsb-service/internal/modules/address/application"
 	orderApplication "tsb-service/internal/modules/order/application"
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	productApplication "tsb-service/internal/modules/product/application"
@@ -38,7 +37,6 @@ func NewGraphQLTestClient(r *resolver.Resolver, jwtSecret string) *GraphQLTestCl
 		ctx := req.Context()
 
 		// Attach DataLoaders to context (required for resolvers)
-		ctx = addressApplication.AttachDataLoaders(ctx, r.AddressService)
 		ctx = productApplication.AttachDataLoaders(ctx, r.ProductService)
 		ctx = paymentApplication.AttachDataLoaders(ctx, r.PaymentService)
 		ctx = orderApplication.AttachDataLoaders(ctx, r.OrderService)

@@ -42,8 +42,8 @@ func (h *UserHandler) GetUserProfileHandler(c *gin.Context) {
 	}
 
 	var address *addressDomain.Address
-	if user.AddressID != nil {
-		address, _ = h.addressService.GetAddressByID(c.Request.Context(), *user.AddressID)
+	if user.DefaultPlaceID != nil {
+		address, _ = h.addressService.GetByPlaceID(c.Request.Context(), *user.DefaultPlaceID)
 	}
 
 	res := NewUserResponse(user, address)
@@ -74,8 +74,8 @@ func (h *UserHandler) UpdateMeHandler(c *gin.Context) {
 	}
 
 	var address *addressDomain.Address
-	if user.AddressID != nil {
-		address, _ = h.addressService.GetAddressByID(c.Request.Context(), *user.AddressID)
+	if user.DefaultPlaceID != nil {
+		address, _ = h.addressService.GetByPlaceID(c.Request.Context(), *user.DefaultPlaceID)
 	}
 
 	res := NewUserResponse(user, address)

@@ -13,7 +13,6 @@ import (
 	"time"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
-	addressApplication "tsb-service/internal/modules/address/application"
 	addressDomain "tsb-service/internal/modules/address/domain"
 	notificationApplication "tsb-service/internal/modules/notification/application"
 	orderApplication "tsb-service/internal/modules/order/application"
@@ -147,74 +146,35 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 	// 6) Compute delivery fee and build address snapshot
 	fee := decimal.NewFromInt(0)
-	isManual := input.IsManualAddress != nil && *input.IsManualAddress
 	var addrSnapshot *orderDomain.AddressSnapshot
 
 	if odType == orderDomain.OrderTypeDelivery {
-		if isManual {
-			// Manual address path: street from DB + free-text house number
-			if input.StreetID == nil || *input.StreetID == "" {
-				return nil, fmt.Errorf("streetId required for manual delivery address")
-			}
-			if input.HouseNumber == nil || *input.HouseNumber == "" {
-				return nil, fmt.Errorf("houseNumber required for manual delivery address")
-			}
+		if input.AddressPlaceID == nil || *input.AddressPlaceID == "" {
+			return nil, fmt.Errorf("addressPlaceId required for delivery")
+		}
 
-			street, err := r.AddressService.GetStreetByID(ctx, *input.StreetID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to retrieve street: %w", err)
-			}
+		addr, err := r.AddressService.Resolve(ctx, *input.AddressPlaceID, "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve address: %w", err)
+		}
+		if addr.Distance >= 9000 {
+			return nil, fmt.Errorf("address too far for delivery")
+		}
 
-			avgDistance, err := r.AddressService.GetStreetAverageDistance(ctx, *input.StreetID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to compute street distance: %w", err)
-			}
-			if avgDistance >= 9000 {
-				return nil, fmt.Errorf("address too far for delivery")
-			}
+		fee = deliveryFeeFromDistance(addr.Distance)
+		total = total.Add(fee)
 
-			fee = deliveryFeeFromDistance(avgDistance)
-			total = total.Add(fee)
-
-			addrSnapshot = &orderDomain.AddressSnapshot{
-				StreetID:         input.StreetID,
-				StreetName:       &street.StreetName,
-				HouseNumber:      input.HouseNumber,
-				BoxNumber:        input.BoxNumber,
-				MunicipalityName: &street.MunicipalityName,
-				Postcode:         &street.Postcode,
-				Distance:         &avgDistance,
-				IsManual:         true,
-			}
-		} else {
-			// DB-matched address path
-			if input.AddressID == nil {
-				return nil, fmt.Errorf("addressID required for delivery")
-			}
-
-			addr, err := r.AddressService.GetAddressByID(ctx, *input.AddressID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to retrieve address: %w", err)
-			}
-			if addr == nil {
-				return nil, fmt.Errorf("address not found")
-			}
-			if addr.Distance >= 9000 {
-				return nil, fmt.Errorf("address too far for delivery")
-			}
-
-			fee = deliveryFeeFromDistance(addr.Distance)
-			total = total.Add(fee)
-
-			addrSnapshot = &orderDomain.AddressSnapshot{
-				StreetName:       &addr.StreetName,
-				HouseNumber:      &addr.HouseNumber,
-				BoxNumber:        addr.BoxNumber,
-				MunicipalityName: &addr.MunicipalityName,
-				Postcode:         &addr.Postcode,
-				Distance:         &addr.Distance,
-				IsManual:         false,
-			}
+		addrSnapshot = &orderDomain.AddressSnapshot{
+			StreetName:       &addr.StreetName,
+			HouseNumber:      &addr.HouseNumber,
+			BoxNumber:        addr.BoxNumber,
+			MunicipalityName: &addr.MunicipalityName,
+			Postcode:         &addr.Postcode,
+			Distance:         &addr.Distance,
+			PlaceID:          &addr.PlaceID,
+			Lat:              addr.Lat,
+			Lng:              addr.Lng,
+			IsManual:         false,
 		}
 	}
 
@@ -269,17 +229,11 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	// Capture the customer's language at order creation time
 	orderLang := utils.GetLang(ctx)
 
-	// For manual addresses, don't store address_id (there isn't one)
-	var addressID *string
-	if !isManual {
-		addressID = input.AddressID
-	}
-
 	tempOrder := orderDomain.NewOrder(
 		userUUID,
 		odType,
 		input.IsOnlinePayment,
-		addressID,
+		nil, // addressID is legacy; no longer used
 		input.AddressExtra,
 		input.OrderNote,
 		input.PreferredReadyTime,
@@ -344,20 +298,8 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 	// Handle payment creation if needed.
 	if input.IsOnlinePayment {
-		address := &addressDomain.Address{}
-		if odType == orderDomain.OrderTypeDelivery {
-			if isManual {
-				address = addressFromOrder(order)
-			} else {
-				if input.AddressID == nil {
-					return nil, fmt.Errorf("addressID required for delivery")
-				}
-				address, err = r.AddressService.GetAddressByID(ctx, *input.AddressID)
-				if err != nil {
-					return nil, fmt.Errorf("failed to retrieve address: %w", err)
-				}
-			}
-		}
+		// Build address from denormalized order fields for payment service
+		address := addressFromOrder(order)
 		molliePayment, err := r.PaymentService.CreatePayment(ctx, *order, items, *user, address, input.PaymentRedirectURL)
 		if err != nil || molliePayment == nil {
 			// Clean up the orphaned order since payment creation failed
@@ -457,7 +399,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
 
-	err = r.OrderService.UpdateOrder(ctx, id, input.Status, input.EstimatedReadyTime)
+	err = r.OrderService.UpdateOrder(ctx, id, input.Status, input.EstimatedReadyTime, input.CancellationReason)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update order status: %w", err)
 	}
@@ -524,20 +466,15 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			}
 
 			var address *addressDomain.Address
+			// Use denormalized address fields from the order (all new orders have these)
 			if o.StreetName != nil {
-				// Use denormalized address fields from the order
 				address = addressFromOrder(o)
-			} else if o.AddressID != nil {
-				address, err = r.AddressService.GetAddressByID(ctx, *o.AddressID)
-				if err != nil {
-					zap.L().Error("failed to retrieve address", zap.String("order_id", o.ID.String()), zap.Error(err))
-					return
-				}
 			}
 
 			if !user.NotifyOrderUpdates {
 				return
 			}
+			// address may be nil for very old orders; email service should handle gracefully
 			err = es.SendOrderConfirmedEmail(*user, lang, *o, items, address)
 			if err != nil {
 				zap.L().Error("failed to send order confirmed email", zap.String("order_id", o.ID.String()), zap.Error(err))
@@ -637,7 +574,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			if !user.NotifyOrderUpdates {
 				return
 			}
-			err = es.SendOrderCanceledEmail(*user, lang)
+			err = es.SendOrderCanceledEmail(*user, lang, o.CancellationReason)
 			if err != nil {
 				zap.L().Error("failed to send order canceled email", zap.String("order_id", o.ID.String()), zap.Error(err))
 			}
@@ -660,7 +597,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				return
 			}
 
-			msg := notificationApplication.GetOrderStatusNotification(o.OrderStatus, o.Language, string(o.OrderType))
+			msg := notificationApplication.GetOrderStatusNotification(o.OrderStatus, o.Language, string(o.OrderType), o.CancellationReason)
 			if msg.Body == "" {
 				return
 			}
@@ -808,40 +745,23 @@ func (r *mutationResolver) UnregisterDeviceToken(ctx context.Context, deviceToke
 
 // Address is the resolver for the address field.
 func (r *orderResolver) Address(ctx context.Context, obj *model.Order) (*model.Address, error) {
-	// Use denormalized address fields if available (new orders)
+	// Use denormalized address fields if available (all delivery orders have them)
 	if obj.StreetName != nil {
 		return &model.Address{
-			ID:               derefOrEmpty(obj.AddressID),
+			ID:               derefOrEmpty(obj.AddressPlaceID),
 			StreetName:       *obj.StreetName,
 			HouseNumber:      derefOrEmpty(obj.HouseNumber),
 			BoxNumber:        obj.BoxNumber,
 			MunicipalityName: derefOrEmpty(obj.MunicipalityName),
 			Postcode:         derefOrEmpty(obj.Postcode),
 			Distance:         derefFloatOrZero(obj.AddressDistance),
+			Lat:              obj.AddressLat,
+			Lng:              obj.AddressLng,
 		}, nil
 	}
 
-	// Legacy fallback: use DataLoader for old orders without denormalized fields
-	loader := addressApplication.GetOrderAddressLoader(ctx)
-
-	if loader == nil {
-		return nil, fmt.Errorf("no order address loader found")
-	}
-
-	a, err := loader.Loader.Load(ctx, obj.ID.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to load order address: %w", err)
-	}
-
-	addresses := Map(a, func(address *addressDomain.Address) *model.Address {
-		return ToGQLAddress(address)
-	})
-
-	if len(addresses) == 0 {
-		return nil, nil
-	}
-
-	return addresses[0], nil
+	// Pickup orders have no address
+	return nil, nil
 }
 
 // Customer is the resolver for the customer field.
