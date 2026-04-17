@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"tsb-service/internal/api/graphql/resolver"
+	orderDomain "tsb-service/internal/modules/order/domain"
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	paymentDomain "tsb-service/internal/modules/payment/domain"
 	"tsb-service/pkg/logging"
@@ -16,13 +17,20 @@ import (
 	"tsb-service/pkg/utils"
 )
 
-type PaymentHandler struct {
-	service paymentApplication.PaymentService
-	broker  *pubsub.Broker
+// NewOrderNotifier fans out push notifications when an online-payment order
+// transitions to paid. Satisfied by *resolver.Resolver.
+type NewOrderNotifier interface {
+	SendNewOrderPush(order *orderDomain.Order)
 }
 
-func NewPaymentHandler(service paymentApplication.PaymentService, broker *pubsub.Broker) *PaymentHandler {
-	return &PaymentHandler{service: service, broker: broker}
+type PaymentHandler struct {
+	service  paymentApplication.PaymentService
+	broker   *pubsub.Broker
+	notifier NewOrderNotifier
+}
+
+func NewPaymentHandler(service paymentApplication.PaymentService, broker *pubsub.Broker, notifier NewOrderNotifier) *PaymentHandler {
+	return &PaymentHandler{service: service, broker: broker, notifier: notifier}
 }
 
 // UpdatePaymentStatusHandler handles Mollie webhook callbacks.
@@ -91,6 +99,11 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 			h.broker.Publish("orderCreated", gqlOrder)
 			h.broker.Publish("orderUpdated", gqlOrder)
 			h.broker.Publish(fmt.Sprintf("orderUpdated:%s", orderID), gqlOrder)
+			// Same rationale applies to push notifications — we only wake up
+			// admin phones and POS handhelds once the payment is confirmed.
+			if h.notifier != nil {
+				h.notifier.SendNewOrderPush(order)
+			}
 		}
 	case paymentDomain.PaymentStatusCanceled, paymentDomain.PaymentStatusFailed, paymentDomain.PaymentStatusExpired:
 		order, handleErr := h.service.HandlePaymentFailed(ctx, *orderID)

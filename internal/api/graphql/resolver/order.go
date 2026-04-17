@@ -332,61 +332,12 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		r.Broker.Publish("orderCreated", gql)
 	}
 
-	// 12) Send push notification to admin devices (non-blocking)
-	if r.FCMClient != nil || r.APNsClient != nil {
-		go func() {
-			adminTokens, tokenErr := r.NotificationService.GetAdminDeviceTokens(context.Background())
-			if tokenErr != nil || len(adminTokens) == 0 {
-				return
-			}
-
-			msg := notificationApplication.GetNewOrderNotification(orderLang, string(odType), order.TotalPrice.StringFixed(2))
-			data := map[string]string{
-				"orderId": order.ID.String(),
-				"type":    "new_order",
-			}
-
-			for _, dt := range adminTokens {
-				if dt.Platform == "android" && r.FCMClient != nil {
-					if pushErr := r.FCMClient.SendAlert(dt.DeviceToken, msg.Title, msg.Body, data); pushErr != nil {
-						if errors.Is(pushErr, fcm.ErrTokenInvalid) {
-							_ = r.NotificationService.UnregisterDeviceToken(context.Background(), dt.UserID, dt.DeviceToken)
-						} else {
-							zap.L().Error("failed to send admin FCM push",
-								zap.String("order_id", order.ID.String()),
-								zap.Error(pushErr),
-							)
-						}
-					}
-				} else if dt.Platform == "ios" && r.APNsClient != nil {
-					if pushErr := r.APNsClient.SendAlert(dt.DeviceToken, msg.Title, msg.Body, data); pushErr != nil {
-						if errors.Is(pushErr, apns.ErrTokenInvalid) {
-							_ = r.NotificationService.UnregisterDeviceToken(context.Background(), dt.UserID, dt.DeviceToken)
-						} else {
-							zap.L().Error("failed to send admin APNs push",
-								zap.String("order_id", order.ID.String()),
-								zap.Error(pushErr),
-							)
-						}
-					}
-				}
-			}
-
-			// Also notify POS devices (Sunmi handhelds) via FCM.
-			if r.PosService != nil && r.FCMClient != nil {
-				posTokens, posErr := r.PosService.GetActiveFCMTokens(context.Background())
-				if posErr == nil {
-					for _, token := range posTokens {
-						if pushErr := r.FCMClient.SendAlert(token, msg.Title, msg.Body, data); pushErr != nil {
-							zap.L().Warn("failed to send POS FCM push",
-								zap.String("order_id", order.ID.String()),
-								zap.Error(pushErr),
-							)
-						}
-					}
-				}
-			}
-		}()
+	// 12) Send push notification to admin devices + POS handhelds (non-blocking).
+	// Online-payment orders defer this until the Mollie webhook confirms payment
+	// (see payment/interfaces/handler.go) — we must not wake up POS/staff for an
+	// order that may never be paid.
+	if !input.IsOnlinePayment {
+		r.SendNewOrderPush(order)
 	}
 
 	return gql, nil
