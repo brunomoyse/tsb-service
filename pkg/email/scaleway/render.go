@@ -15,6 +15,7 @@ import (
 	"github.com/shopspring/decimal"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	userDomain "tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/timezone"
 	"tsb-service/pkg/utils"
 )
 
@@ -100,6 +101,8 @@ func formatEstimatedReadyTime(t *time.Time, lang string) string {
 		return ""
 	}
 
+	local := timezone.In(*t)
+
 	// Map for day names
 	frenchDays := []string{"dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"}
 	englishDays := []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
@@ -111,12 +114,12 @@ func formatEstimatedReadyTime(t *time.Time, lang string) string {
 	englishMonths := []string{"", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"}
 	dutchMonths := []string{"", "januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"}
 
-	weekday := int(t.Weekday())
-	day := t.Day()
-	month := int(t.Month())
-	year := t.Year()
-	hour := t.Hour()
-	minute := t.Minute()
+	weekday := int(local.Weekday())
+	day := local.Day()
+	month := int(local.Month())
+	year := local.Year()
+	hour := local.Hour()
+	minute := local.Minute()
 
 	switch lang {
 	case "fr":

@@ -33,7 +33,9 @@ func main() {
 
 	// Parse flags
 	var command string
+	var allowMissing bool
 	flag.StringVar(&command, "cmd", "", "Migration command: up, down, status, create, version, up-to, down-to, redo")
+	flag.BoolVar(&allowMissing, "allow-missing", false, "Allow applying out-of-order migrations (useful when branches merge with stale timestamps)")
 	flag.Parse()
 
 	if command == "" {
@@ -86,9 +88,13 @@ func main() {
 
 	// Execute migration command
 	var execErr error
+	var upOpts []goose.OptionsFunc
+	if allowMissing {
+		upOpts = append(upOpts, goose.WithAllowMissing())
+	}
 	switch command {
 	case "up":
-		execErr = goose.Up(db, migrationsDir)
+		execErr = goose.Up(db, migrationsDir, upOpts...)
 	case "down":
 		execErr = goose.Down(db, migrationsDir)
 	case "status":
@@ -109,7 +115,7 @@ func main() {
 		if _, err := fmt.Sscanf(args[0], "%d", &version); err != nil {
 			zap.L().Fatal("invalid version", zap.Error(err))
 		}
-		execErr = goose.UpTo(db, migrationsDir, version)
+		execErr = goose.UpTo(db, migrationsDir, version, upOpts...)
 	case "down-to":
 		args := flag.Args()
 		if len(args) < 1 {

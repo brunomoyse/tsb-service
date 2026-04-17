@@ -16,6 +16,7 @@ import (
 	userApplication "tsb-service/internal/modules/user/application"
 	"tsb-service/pkg/invoice"
 	"tsb-service/pkg/logging"
+	"tsb-service/pkg/timezone"
 	"tsb-service/pkg/utils"
 )
 
@@ -236,7 +237,7 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 
 	// 13. Build localized filename: e.g. "facture-02-12-2025-bruno-moyse.pdf"
 	prefix := invoice.FilePrefix(order.Language)
-	datePart := order.CreatedAt.Format("02-01-2006")
+	datePart := timezone.In(order.CreatedAt).Format("02-01-2006")
 	namePart := strings.ToLower(strings.ReplaceAll(user.FirstName+"-"+user.LastName, " ", "-"))
 	filename := fmt.Sprintf("%s-%s-%s.pdf", prefix, datePart, namePart)
 
