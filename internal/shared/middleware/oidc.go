@@ -45,9 +45,10 @@ type UserLookup interface {
 
 // AppJWTVerifier is a secondary verifier for tsb-service-signed JWTs issued by
 // the POS /auth/rrn-login endpoint. It lets shop-floor devices hit GraphQL with
-// an app token instead of a Zitadel JWT — see internal/modules/pos.
+// an app token instead of a Zitadel JWT — see internal/modules/pos. POS tokens
+// only ever grant the staff role; admin is reserved for Zitadel JWTs.
 type AppJWTVerifier interface {
-	VerifyAccessToken(token string) (userID uuid.UUID, isAdmin bool, err error)
+	VerifyAccessToken(token string) (userID uuid.UUID, isStaff bool, err error)
 }
 
 // OIDCVerifier validates Zitadel JWTs via JWKS (no network call per request).
@@ -123,20 +124,21 @@ func (v *OIDCVerifier) SetAppJWTVerifier(appJWT AppJWTVerifier) {
 }
 
 // tryVerifyAppJWT attempts to validate a POS-issued HS256 token. Returns true
-// on success and populates userID/isAdmin in the Gin context exactly like the
-// Zitadel path would.
+// on success and populates userID/isStaff in the Gin context. POS tokens are
+// never granted admin — only the staff role.
 func (v *OIDCVerifier) tryVerifyAppJWT(c *gin.Context, tokenStr string) bool {
 	if v.appJWT == nil {
 		return false
 	}
-	userID, isAdmin, err := v.appJWT.VerifyAccessToken(tokenStr)
+	userID, isStaff, err := v.appJWT.VerifyAccessToken(tokenStr)
 	if err != nil || userID == uuid.Nil {
 		zap.L().Debug("app JWT verification failed", zap.Error(err))
 		return false
 	}
-	zap.L().Debug("app JWT verified", zap.String("userID", userID.String()), zap.Bool("isAdmin", isAdmin))
+	zap.L().Debug("app JWT verified", zap.String("userID", userID.String()), zap.Bool("isStaff", isStaff))
 	ctx := utils.SetUserID(c.Request.Context(), userID.String())
-	ctx = utils.SetIsAdmin(ctx, isAdmin)
+	ctx = utils.SetIsAdmin(ctx, false)
+	ctx = utils.SetIsStaff(ctx, isStaff)
 	c.Request = c.Request.WithContext(ctx)
 	c.Set(string(utils.UserIDKey), userID.String())
 	return true
@@ -261,19 +263,24 @@ func (v *OIDCVerifier) OptionalAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// VerifyToken verifies a raw JWT string and returns the subject and admin status.
+// VerifyToken verifies a raw JWT string and returns the subject plus role flags.
 // Used by the GraphQL WebSocket InitFunc. Tries Zitadel first, then falls back
 // to the POS app JWT verifier. Returns the raw Zitadel sub (no DB lookup) for
-// Zitadel tokens, or the app user UUID for POS tokens.
-func (v *OIDCVerifier) VerifyToken(ctx context.Context, tokenStr string) (subject string, isAdmin bool, err error) {
+// Zitadel tokens, or the app user UUID for POS tokens. Admin implies staff —
+// callers may rely on isStaff to gate @staff-protected subscriptions.
+func (v *OIDCVerifier) VerifyToken(ctx context.Context, tokenStr string) (subject string, isAdmin, isStaff bool, err error) {
 	authCtx, zitadelErr := v.authorizer.CheckAuthorization(ctx, "Bearer "+tokenStr)
 	if zitadelErr == nil {
-		return authCtx.UserID(), authCtx.IsGrantedRole("admin"), nil
+		admin := authCtx.IsGrantedRole("admin")
+		if !admin && v.projectID != "" {
+			admin = authCtx.IsGrantedRoleInProject(v.projectID, "admin", "")
+		}
+		return authCtx.UserID(), admin, admin, nil
 	}
 	if v.appJWT != nil {
-		if uid, admin, appErr := v.appJWT.VerifyAccessToken(tokenStr); appErr == nil {
-			return uid.String(), admin, nil
+		if uid, staff, appErr := v.appJWT.VerifyAccessToken(tokenStr); appErr == nil {
+			return uid.String(), false, staff, nil
 		}
 	}
-	return "", false, zitadelErr
+	return "", false, false, zitadelErr
 }

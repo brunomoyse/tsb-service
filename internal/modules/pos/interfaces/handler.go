@@ -34,8 +34,10 @@ func NewHandler(svc *application.Service, userinfoURL, internalURL, externalHost
 // ---- DTOs
 
 type enrollDTO struct {
-	Serial string `json:"serial" binding:"required"`
-	Label  string `json:"label"  binding:"required"`
+	Serial    string `json:"serial"    binding:"required"`
+	Label     string `json:"label"     binding:"required"`
+	Timestamp int64  `json:"timestamp" binding:"required"`
+	Nonce     string `json:"nonce"     binding:"required,min=16,max=128"`
 }
 
 type enrollResponse struct {
@@ -73,7 +75,7 @@ type tokenResponse struct {
 	RefreshToken string `json:"refreshToken"`
 	ExpiresIn    int64  `json:"expiresIn"`
 	UserID       string `json:"userId"`
-	IsAdmin      bool   `json:"isAdmin"`
+	IsStaff      bool   `json:"isStaff"`
 }
 
 // ---- endpoints
@@ -98,10 +100,25 @@ func (h *Handler) Enroll(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.EnrollDevice(c.Request.Context(), body.Serial, body.Label, adminID)
+	result, err := h.svc.EnrollDeviceWithReplayProtection(c.Request.Context(), application.EnrollmentRequest{
+		Serial:      body.Serial,
+		Label:       body.Label,
+		AdminUserID: adminID,
+		Timestamp:   body.Timestamp,
+		Nonce:       body.Nonce,
+	})
 	if err != nil {
-		zap.L().Warn("enrollDevice failed", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "enroll failed"})
+		switch {
+		case errors.Is(err, application.ErrReplayedEnrollment):
+			c.JSON(http.StatusConflict, gin.H{"error": "replayed enrollment request"})
+		case errors.Is(err, application.ErrStaleRequest):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "stale enrollment request"})
+		case errors.Is(err, application.ErrInvalidNonce):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid enrollment nonce"})
+		default:
+			zap.L().Warn("enrollDevice failed", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "enroll failed"})
+		}
 		return
 	}
 	c.JSON(http.StatusOK, enrollResponse{
@@ -123,9 +140,6 @@ func (h *Handler) RrnLogin(c *gin.Context) {
 		return
 	}
 
-	// All POS staff with an RRN+PIN are treated as admin for order management.
-	// Fine-grained POS roles (cashier vs manager) can be added later via a
-	// role column on the users table.
 	tokens, err := h.svc.RrnLogin(c.Request.Context(), application.RrnLoginInput{
 		DeviceID:  deviceID,
 		RRN:       body.RRN,
@@ -133,7 +147,7 @@ func (h *Handler) RrnLogin(c *gin.Context) {
 		Timestamp: body.Timestamp,
 		Nonce:     body.Nonce,
 		HMAC:      body.HMAC,
-	}, true)
+	})
 	if err != nil {
 		respondAuthError(c, err)
 		return
@@ -159,7 +173,7 @@ func (h *Handler) Refresh(c *gin.Context) {
 		Timestamp:    body.Timestamp,
 		Nonce:        body.Nonce,
 		HMAC:         body.HMAC,
-	}, true)
+	})
 	if err != nil {
 		respondAuthError(c, err)
 		return
@@ -289,6 +303,6 @@ func toTokenResponse(t *application.TokenPair) tokenResponse {
 		RefreshToken: t.RefreshToken,
 		ExpiresIn:    t.ExpiresIn,
 		UserID:       t.UserID.String(),
-		IsAdmin:      t.IsAdmin,
+		IsStaff:      t.IsStaff,
 	}
 }

@@ -2,10 +2,15 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// ErrNonceAlreadySeen is returned by NonceRepository.Remember when the given
+// nonce has already been recorded within its TTL window.
+var ErrNonceAlreadySeen = errors.New("nonce already seen")
 
 // Device is an enrolled POS handheld. Its shared HMAC secret is only kept as a
 // SHA-256 hash; the plaintext is returned once at enrollment and stored on the
@@ -98,4 +103,12 @@ type StaffRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	IncrementFailedAttempts(ctx context.Context, id uuid.UUID, lockedUntil *time.Time) error
 	ResetFailedAttempts(ctx context.Context, id uuid.UUID) error
+}
+
+// NonceRepository tracks nonces seen on replay-sensitive endpoints (currently
+// enrollment). Remember returns ErrReplayedNonce if the nonce was already
+// recorded, giving the caller an atomic "first time seen" guarantee.
+type NonceRepository interface {
+	Remember(ctx context.Context, nonce string, ttl time.Duration) error
+	Prune(ctx context.Context) error
 }
