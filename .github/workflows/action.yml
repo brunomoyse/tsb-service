@@ -111,7 +111,7 @@ jobs:
             cd /opt/tokyosushi/tsb-infra
             git pull --ff-only
             sops -d "secrets/${APP}.secret.enc.yaml" | sudo kubectl apply -n tokyosushi -f -
-            sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
+            sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
               --namespace tokyosushi \
               --reuse-values \
               --set "apps.${APP}.image.tag=${TAG}" \
@@ -145,7 +145,7 @@ jobs:
             for i in $(seq 1 "${MIGRATIONS_DOWN:-0}"); do
               sudo kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=down
             done
-            sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
+            sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
               --namespace tokyosushi \
               --reuse-values \
               --set "apps.${APP}.image.tag=${TAG}" \
