@@ -1,0 +1,53 @@
+name: Release (tag + deploy)
+
+# Manual UI button: tags the current HEAD of main with the provided version
+# and pushes the tag, which triggers the existing "Build and Deploy" workflow
+# (build_production + deploy_production) automatically.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version to release (e.g. v1.0.3). Must not already exist.'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  tag_and_release:
+    name: Tag main and push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          # PAT (not GITHUB_TOKEN) so the tag push triggers the downstream
+          # "Build and Deploy" workflow — GITHUB_TOKEN-pushed events do not
+          # cascade by design.
+          token: ${{ secrets.PAT }}
+          fetch-depth: 0
+
+      - name: Validate version
+        run: |
+          set -euo pipefail
+          if [[ ! "${{ inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+            echo "::error::Version must look like vMAJOR.MINOR.PATCH (got '${{ inputs.version }}')"
+            exit 1
+          fi
+          if git rev-parse --verify --quiet "refs/tags/${{ inputs.version }}" >/dev/null; then
+            echo "::error::Tag ${{ inputs.version }} already exists. Bump it or delete it first."
+            exit 1
+          fi
+
+      - name: Create and push tag
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ inputs.version }}" -m "Release ${{ inputs.version }} from main ($(git rev-parse --short HEAD))"
+          git push origin "${{ inputs.version }}"
+          echo ""
+          echo "::notice::Tag ${{ inputs.version }} pushed. Watch the 'Build and Deploy' workflow that just started for build + prod deploy progress."
