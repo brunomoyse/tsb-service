@@ -142,6 +142,15 @@ func (v *OIDCVerifier) tryVerifyAppJWT(c *gin.Context, tokenStr string) bool {
 	return true
 }
 
+// claimString safely extracts a string claim from the JWT raw claims map.
+func claimString(m map[string]any, key string) string {
+	if m == nil {
+		return ""
+	}
+	s, _ := m[key].(string)
+	return s
+}
+
 // extractToken gets the token from Authorization header (or cookie as fallback).
 func extractToken(c *gin.Context) string {
 	if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
@@ -173,25 +182,29 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 	if !isAdmin && v.projectID != "" {
 		isAdmin = authCtx.IsGrantedRoleInProject(v.projectID, "admin", "")
 	}
-	// Temporary debug: log role detection result + claim keys
-	if !isAdmin {
-		claimKeys := make([]string, 0)
-		for k := range authCtx.Claims {
-			claimKeys = append(claimKeys, k)
-		}
-		zap.L().Warn("admin role not detected",
-			zap.String("sub", sub),
-			zap.String("projectID", v.projectID),
-			zap.Strings("claimKeys", claimKeys),
-		)
-	}
+
+	// Profile claims — the zitadel-go SDK's local JWT path only populates
+	// sub/aud/iss on IntrospectionContext; everything else (including email/
+	// given_name/family_name) must be read from the raw Claims map. If the
+	// JWT doesn't carry them at all (common for social-IdP logins), the user
+	// service falls back to fetching from Zitadel's user API.
+	email := claimString(authCtx.Claims, "email")
+	givenName := claimString(authCtx.Claims, "given_name")
+	familyName := claimString(authCtx.Claims, "family_name")
+
+	zap.L().Debug("oidc claims extracted",
+		zap.String("sub", sub),
+		zap.Bool("has_email", email != ""),
+		zap.Bool("has_given", givenName != ""),
+		zap.Bool("has_family", familyName != ""),
+		zap.Bool("is_admin", isAdmin),
+	)
 
 	// Resolve Zitadel sub → app user UUID (with JIT provisioning)
 	userID := sub
 	if v.userLookup != nil {
 		appID, lookupErr := v.userLookup.ResolveZitadelID(
-			c.Request.Context(), sub,
-			authCtx.Email, authCtx.GivenName, authCtx.FamilyName,
+			c.Request.Context(), sub, email, givenName, familyName,
 		)
 		if lookupErr != nil {
 			zap.L().Warn("failed to resolve Zitadel user", zap.String("sub", sub), zap.Error(lookupErr))

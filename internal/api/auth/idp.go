@@ -197,7 +197,11 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 
 	// 3. No existing user — create one using the template from the intent
 	// Uses admin PAT since user creation requires management permissions
-	log.Info("creating new zitadel user from IdP intent", zap.String("email", email))
+	log.Info("creating new zitadel user from IdP intent",
+		zap.String("email", email),
+		zap.String("idp_user_id", intentInfo.IdpInfo.UserID),
+		zap.ByteString("add_human_user", intentInfo.AddHumanUser),
+	)
 	userBody, userStatus, err := zitadelAdminRequest("POST", "/v2/users/human", intentInfo.AddHumanUser)
 	if err != nil {
 		return "", fmt.Errorf("create zitadel user: %w", err)
