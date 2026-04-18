@@ -9,12 +9,15 @@ import (
 	"strings"
 	"time"
 
+	gqlgraphql "github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
+	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 	"go.uber.org/zap"
 
 	"tsb-service/internal/api/graphql"
@@ -86,6 +89,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 	cfg := graphql.Config{Resolvers: resolver}
 	cfg.Directives.Auth = directives.Auth
 	cfg.Directives.Admin = directives.Admin
+	cfg.Directives.Staff = directives.Staff
 
 	h := handler.New(graphql.NewExecutableSchema(cfg))
 
@@ -127,16 +131,24 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 				return ctx, &initPayload, nil
 			}
 			tokenStr := strings.TrimPrefix(auth, "Bearer ")
-			sub, isAdmin, err := oidcVerifier.VerifyToken(ctx, tokenStr)
+			sub, isAdmin, isStaff, err := oidcVerifier.VerifyToken(ctx, tokenStr)
 			if err == nil && sub != "" {
-				// Resolve Zitadel sub → app UUID
-				appID, lookupErr := resolver.UserService.ResolveZitadelID(ctx, sub, "", "", "")
-				if lookupErr == nil {
-					ctx = utils.SetUserID(ctx, appID)
-				} else {
+				isPOS := isStaff && !isAdmin
+				if isPOS {
+					// POS staff tokens already carry the app UUID in `sub`; don't
+					// hit Zitadel's user API for them.
 					ctx = utils.SetUserID(ctx, sub)
+				} else {
+					// Zitadel tokens: resolve sub → app UUID via JIT provisioning.
+					appID, lookupErr := resolver.UserService.ResolveZitadelID(ctx, sub, "", "", "")
+					if lookupErr == nil {
+						ctx = utils.SetUserID(ctx, appID)
+					} else {
+						ctx = utils.SetUserID(ctx, sub)
+					}
 				}
 				ctx = utils.SetIsAdmin(ctx, isAdmin)
+				ctx = utils.SetIsStaff(ctx, isStaff)
 			}
 			return ctx, &initPayload, nil
 		},
@@ -155,6 +167,29 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 		Cache: lru.New[string](50),
 	})
 	h.Use(extension.FixedComplexityLimit(100))
+
+	// Forward non-user-facing GraphQL errors to Sentry. User-input / not-found
+	// errors carry the "USER_ERROR" extension flag and are skipped to keep the
+	// signal/noise ratio useful.
+	h.SetErrorPresenter(func(ctx context.Context, e error) *gqlerror.Error {
+		err := gqlgraphql.DefaultErrorPresenter(ctx, e)
+		if ext, ok := err.Extensions["code"].(string); !ok || (ext != "USER_ERROR" && ext != "UNAUTHENTICATED" && ext != "FORBIDDEN") {
+			if hub := sentry.GetHubFromContext(ctx); hub != nil {
+				hub.CaptureException(e)
+			} else {
+				sentry.CaptureException(e)
+			}
+		}
+		return err
+	})
+	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
+		if hub := sentry.GetHubFromContext(ctx); hub != nil {
+			hub.RecoverWithContext(ctx, err)
+		} else {
+			sentry.CurrentHub().Recover(err)
+		}
+		return gqlgraphql.DefaultRecover(ctx, err)
+	})
 
 	return func(c *gin.Context) {
 		h.ServeHTTP(c.Writer, c.Request)

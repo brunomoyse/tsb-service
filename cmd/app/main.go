@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
+	"github.com/getsentry/sentry-go"
+	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -71,6 +73,22 @@ func main() {
 	}
 	logging.Setup(logLevel, logFormat)
 	defer logging.Sync()
+
+	// Sentry error tracking (skipped when SENTRY_DSN is empty, e.g. local dev)
+	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
+		if err := sentry.Init(sentry.ClientOptions{
+			Dsn:              dsn,
+			Environment:      cmp.Or(os.Getenv("APP_ENV"), "production"),
+			Release:          os.Getenv("APP_VERSION"),
+			TracesSampleRate: 0.1,
+			AttachStacktrace: true,
+		}); err != nil {
+			zap.L().Error("sentry init failed", zap.Error(err))
+		} else {
+			zap.L().Info("sentry initialized", zap.String("environment", cmp.Or(os.Getenv("APP_ENV"), "production")))
+			defer sentry.Flush(2 * time.Second)
+		}
+	}
 
 	// DB connection with retry (dual pool: customer + admin)
 	var dbPool *db.DBPool
@@ -263,9 +281,13 @@ func main() {
 
 	// Gin HTTP setup
 	router := gin.New()
+	// Order matters: Sentry first (catches panics in every subsequent handler),
+	// then RequestID + Logger + SentryContext (propagates request_id/user_id as Sentry scope tags).
+	router.Use(sentrygin.New(sentrygin.Options{Repanic: true}))
 	router.Use(gin.Recovery())
 	router.Use(middleware.RequestIDMiddleware())
 	router.Use(middleware.ZapRequestLogger())
+	router.Use(middleware.SentryContext())
 	router.RedirectTrailingSlash = true
 	router.RedirectFixedPath = true
 
