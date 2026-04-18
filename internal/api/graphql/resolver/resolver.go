@@ -34,6 +34,7 @@ import (
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/apns"
 	"tsb-service/pkg/fcm"
+	"tsb-service/pkg/logging"
 	"tsb-service/pkg/pubsub"
 	"tsb-service/pkg/utils"
 )
@@ -168,14 +169,42 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 	})
 	h.Use(extension.FixedComplexityLimit(100))
 
-	// Forward non-user-facing GraphQL errors to Sentry. User-input / not-found
-	// errors carry the "USER_ERROR" extension flag and are skipped to keep the
-	// signal/noise ratio useful.
+	// Log every GraphQL error to zap (HTTP 200 with `errors` in the body leaves
+	// no trace in the access log middleware otherwise) and forward unexpected
+	// ones to Sentry. User-input / auth errors carry a known code in
+	// `extensions.code` and are demoted to a warn-level log, not Sentry events.
 	h.SetErrorPresenter(func(ctx context.Context, e error) *gqlerror.Error {
 		err := gqlgraphql.DefaultErrorPresenter(ctx, e)
-		if ext, ok := err.Extensions["code"].(string); !ok || (ext != "USER_ERROR" && ext != "UNAUTHENTICATED" && ext != "FORBIDDEN") {
+
+		code, _ := err.Extensions["code"].(string)
+		expected := code == "USER_ERROR" || code == "UNAUTHENTICATED" || code == "FORBIDDEN" || code == "NOT_FOUND"
+
+		opCtx := gqlgraphql.GetOperationContext(ctx)
+		var opName, query string
+		if opCtx != nil {
+			opName = opCtx.OperationName
+			query = opCtx.RawQuery
+		}
+		path := err.Path.String()
+
+		fields := []zap.Field{
+			zap.String("operation", opName),
+			zap.String("code", code),
+			zap.String("path", path),
+			zap.String("message", err.Message),
+		}
+		logger := logging.FromContext(ctx)
+		if expected {
+			logger.Warn("graphql user error", fields...)
+		} else {
+			logger.Error("graphql resolver error", append(fields, zap.String("query", query), zap.Error(e))...)
 			if hub := sentry.GetHubFromContext(ctx); hub != nil {
-				hub.CaptureException(e)
+				hub.WithScope(func(scope *sentry.Scope) {
+					scope.SetTag("graphql.operation", opName)
+					scope.SetTag("graphql.path", path)
+					scope.SetExtra("graphql.query", query)
+					hub.CaptureException(e)
+				})
 			} else {
 				sentry.CaptureException(e)
 			}
@@ -183,6 +212,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 		return err
 	})
 	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
+		logging.FromContext(ctx).Error("graphql resolver panic", zap.Any("panic", err))
 		if hub := sentry.GetHubFromContext(ctx); hub != nil {
 			hub.RecoverWithContext(ctx, err)
 		} else {
