@@ -22,13 +22,24 @@ type UserService interface {
 	ResolveZitadelID(ctx context.Context, zitadelID, email, firstName, lastName string) (string, error)
 }
 
-type userService struct {
-	repo domain.UserRepository
+// ZitadelUserFetcher retrieves a user's profile from Zitadel by sub.
+// Used to enrich JIT provisioning because local JWT validation (zitadel-go
+// SDK oauth.WithJWT) does not populate profile claims on the auth context —
+// only `sub` is guaranteed. Without this fallback, social-IdP users (Apple,
+// Google) are created with empty firstName/lastName/email.
+type ZitadelUserFetcher interface {
+	FetchUserInfo(ctx context.Context, userID string) (email, givenName, familyName string, err error)
 }
 
-func NewUserService(repo domain.UserRepository) UserService {
+type userService struct {
+	repo           domain.UserRepository
+	zitadelFetcher ZitadelUserFetcher
+}
+
+func NewUserService(repo domain.UserRepository, zitadelFetcher ZitadelUserFetcher) UserService {
 	return &userService{
-		repo: repo,
+		repo:           repo,
+		zitadelFetcher: zitadelFetcher,
 	}
 }
 
@@ -101,21 +112,64 @@ func (s *userService) CancelDeletionRequest(ctx context.Context, userID string) 
 }
 
 func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, email, firstName, lastName string) (*domain.User, error) {
+	log := zap.L().With(zap.String("zitadel_sub", zitadelID))
+
 	// Try to find existing user by Zitadel ID
 	user, err := s.repo.FindByZitadelID(ctx, zitadelID)
 	if err == nil {
+		// Backfill empty profile fields — e.g. Apple/Google users who were
+		// JIT-created before the Zitadel fallback existed have blank name/email.
+		if user.Email == "" || user.FirstName == "" || user.LastName == "" {
+			email, firstName, lastName = s.enrichFromZitadel(ctx, zitadelID, email, firstName, lastName)
+			changed := false
+			if user.Email == "" && email != "" {
+				user.Email = email
+				changed = true
+			}
+			if user.FirstName == "" && firstName != "" {
+				user.FirstName = firstName
+				changed = true
+			}
+			if user.LastName == "" && lastName != "" {
+				user.LastName = lastName
+				changed = true
+			}
+			if changed {
+				log.Info("backfilling app user profile from Zitadel",
+					zap.String("email", user.Email),
+					zap.String("first_name", user.FirstName),
+					zap.String("last_name", user.LastName),
+				)
+				return s.repo.UpdateUser(ctx, user)
+			}
+		}
 		return user, nil
 	}
 
-	// Not found by Zitadel ID — try by email (for migrated users not yet backfilled)
-	user, err = s.repo.FindByEmail(ctx, email)
-	if err == nil {
-		// Link the Zitadel ID to this existing user
-		user.ZitadelUserID = &zitadelID
-		return s.repo.UpdateUser(ctx, user)
+	// New user path — ensure we have profile data from Zitadel before creating.
+	email, firstName, lastName = s.enrichFromZitadel(ctx, zitadelID, email, firstName, lastName)
+
+	// Try by email first (for migrated users not yet backfilled)
+	if email != "" {
+		user, err = s.repo.FindByEmail(ctx, email)
+		if err == nil {
+			user.ZitadelUserID = &zitadelID
+			if user.FirstName == "" && firstName != "" {
+				user.FirstName = firstName
+			}
+			if user.LastName == "" && lastName != "" {
+				user.LastName = lastName
+			}
+			log.Info("linking existing app user to Zitadel", zap.String("email", email))
+			return s.repo.UpdateUser(ctx, user)
+		}
 	}
 
-	// Brand new user — create from OIDC claims
+	log.Info("creating app user from Zitadel JIT",
+		zap.String("email", email),
+		zap.String("first_name", firstName),
+		zap.String("last_name", lastName),
+	)
 	newUser := domain.User{
 		FirstName:     firstName,
 		LastName:      lastName,
@@ -128,6 +182,32 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 	}
 	newUser.ID = id
 	return &newUser, nil
+}
+
+// enrichFromZitadel fills in any missing profile fields by fetching the Zitadel
+// user record. JWT access tokens validated locally (oauth.WithJWT) don't
+// populate these fields on the auth context, so the OIDC middleware forwards
+// empty strings for social-IdP logins where ID-token claims aren't available.
+func (s *userService) enrichFromZitadel(ctx context.Context, zitadelID, email, firstName, lastName string) (string, string, string) {
+	if s.zitadelFetcher == nil || (email != "" && firstName != "" && lastName != "") {
+		return email, firstName, lastName
+	}
+	zEmail, zFirst, zLast, err := s.zitadelFetcher.FetchUserInfo(ctx, zitadelID)
+	if err != nil {
+		zap.L().Warn("zitadel user fetch failed during JIT",
+			zap.String("zitadel_sub", zitadelID), zap.Error(err))
+		return email, firstName, lastName
+	}
+	if email == "" {
+		email = zEmail
+	}
+	if firstName == "" {
+		firstName = zFirst
+	}
+	if lastName == "" {
+		lastName = zLast
+	}
+	return email, firstName, lastName
 }
 
 func (s *userService) ResolveZitadelID(ctx context.Context, zitadelID, email, firstName, lastName string) (string, error) {

@@ -169,7 +169,7 @@ func main() {
 	orderService := orderApplication.NewOrderService(orderRepo)
 	productService := productApplication.NewProductService(productRepo)
 	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, os.Getenv("APP_ENV") != "production")
-	userService := userApplication.NewUserService(userRepo)
+	userService := userApplication.NewUserService(userRepo, zitadelUserFetcher{})
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService)
 
 	// OIDC verifier — validates JWTs via JWKS + resolves Zitadel sub → app user UUID
@@ -400,4 +400,13 @@ func main() {
 		os.Exit(1)
 	}
 	zap.L().Info("server exited gracefully")
+}
+
+// zitadelUserFetcher adapts auth.GetZitadelUserInfo to userApplication.ZitadelUserFetcher
+// so the user service can enrich JIT-created users with profile data that isn't
+// present on locally-validated JWT access tokens.
+type zitadelUserFetcher struct{}
+
+func (zitadelUserFetcher) FetchUserInfo(ctx context.Context, userID string) (string, string, string, error) {
+	return auth.GetZitadelUserInfo(ctx, userID)
 }

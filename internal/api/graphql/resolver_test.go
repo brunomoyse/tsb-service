@@ -91,7 +91,7 @@ func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
 	orderService := orderApplication.NewOrderService(orderRepo)
 	productService := productApplication.NewProductService(productRepo)
 	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, true)
-	userService := userApplication.NewUserService(userRepo)
+	userService := userApplication.NewUserService(userRepo, nil)
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService)
 
 	// Create resolver
