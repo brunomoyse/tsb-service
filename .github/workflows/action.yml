@@ -95,15 +95,27 @@ jobs:
     environment: production
 
     steps:
-      - name: Deploy and migrate via SSH
+      - name: Deploy and migrate via SSH (Helm)
         uses: appleboy/ssh-action@v1
+        env:
+          APP: tsb-service
+          TAG: ${{ github.ref_name }}
         with:
           host: ${{ vars.OVH_HOST }}
           username: ${{ vars.OVH_USER }}
           key: ${{ secrets.OVH_SSH_PRIVATE_KEY }}
+          envs: APP,TAG
           script: |
-            sudo kubectl rollout restart deployment/tsb-service -n tokyosushi
-            sudo kubectl rollout status deployment/tsb-service -n tokyosushi --timeout=5m
+            set -euo pipefail
+            export SOPS_AGE_KEY_FILE=/opt/tokyosushi/.config/sops/age/keys.txt
+            cd /opt/tokyosushi/tsb-infra
+            git pull --ff-only
+            sops -d "secrets/${APP}.secret.enc.yaml" | sudo kubectl apply -n tokyosushi -f -
+            sudo helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
+              --namespace tokyosushi \
+              --reuse-values \
+              --set "apps.${APP}.image.tag=${TAG}" \
+              --atomic --timeout 5m
             sudo kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=up
 
 # ── Rollback (manual trigger) ────────────────────────────────────────────────
@@ -115,15 +127,26 @@ jobs:
     environment: production
 
     steps:
-      - name: Rollback via SSH
+      - name: Rollback via SSH (Helm)
         uses: appleboy/ssh-action@v1
+        env:
+          APP: tsb-service
+          TAG: ${{ inputs.version }}
+          MIGRATIONS_DOWN: ${{ inputs.migrations_down }}
         with:
           host: ${{ vars.OVH_HOST }}
           username: ${{ vars.OVH_USER }}
           key: ${{ secrets.OVH_SSH_PRIVATE_KEY }}
+          envs: APP,TAG,MIGRATIONS_DOWN
           script: |
-            sudo kubectl set image deployment/tsb-service tsb-service=ghcr.io/brunomoyse/tsb-service:${{ inputs.version }} -n tokyosushi
-            sudo kubectl rollout status deployment/tsb-service -n tokyosushi --timeout=5m
-            for i in $(seq 1 ${{ inputs.migrations_down }}); do
+            set -euo pipefail
+            cd /opt/tokyosushi/tsb-infra
+            # Roll back DB migrations first (using current container), before swapping image
+            for i in $(seq 1 "${MIGRATIONS_DOWN:-0}"); do
               sudo kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=down
             done
+            sudo helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
+              --namespace tokyosushi \
+              --reuse-values \
+              --set "apps.${APP}.image.tag=${TAG}" \
+              --atomic --timeout 5m
