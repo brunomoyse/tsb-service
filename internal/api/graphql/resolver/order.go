@@ -702,7 +702,7 @@ func (r *mutationResolver) UnregisterDeviceToken(ctx context.Context, deviceToke
 }
 
 // OrderExtra is the resolver for the orderExtra field.
-func (r *orderResolver) OrderExtra(_ context.Context, obj *model.Order) (any, error) {
+func (r *orderResolver) OrderExtra(ctx context.Context, obj *model.Order) (any, error) {
 	return obj.OrderExtra, nil
 }
 

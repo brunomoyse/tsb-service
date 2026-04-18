@@ -217,9 +217,10 @@ func main() {
 	posRefreshRepo := posInfrastructure.NewRefreshTokenRepository(dbPool)
 	posUserRepo := posInfrastructure.NewPosUserRepository(dbPool)
 	posStaffRepo := posInfrastructure.NewStaffRepository(dbPool)
+	posNonceRepo := posInfrastructure.NewNonceRepository(dbPool)
 	posService := posApplication.NewService(
 		posApplication.DefaultConfig(posJWTSecret),
-		posDeviceRepo, posRefreshRepo, posUserRepo, posStaffRepo,
+		posDeviceRepo, posRefreshRepo, posUserRepo, posStaffRepo, posNonceRepo,
 	)
 	oidcVerifier.SetAppJWTVerifier(posService)
 	posHandler := posInterfaces.NewHandler(
@@ -407,10 +408,29 @@ func main() {
 		}
 	}()
 
+	// Periodic prune of expired POS enrollment nonces.
+	noncePruneCtx, noncePruneCancel := context.WithCancel(context.Background())
+	defer noncePruneCancel()
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-noncePruneCtx.Done():
+				return
+			case <-ticker.C:
+				if err := posService.PruneExpiredNonces(noncePruneCtx); err != nil {
+					zap.L().Warn("pos nonce prune failed", zap.Error(err))
+				}
+			}
+		}
+	}()
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	zap.L().Info("shutting down server")
+	noncePruneCancel()
 	authLimiter.Stop()
 	feedbackLimiter.Stop()
 	broker.Shutdown()

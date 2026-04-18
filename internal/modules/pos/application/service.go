@@ -23,15 +23,22 @@ import (
 // ---- errors surfaced to the handler
 
 var (
-	ErrDeviceNotEnrolled = errors.New("device not enrolled")
-	ErrDeviceRevoked     = errors.New("device revoked")
-	ErrStaleRequest      = errors.New("request timestamp out of bounds")
-	ErrInvalidHMAC       = errors.New("hmac signature mismatch")
-	ErrNoSuchUser        = errors.New("no user with that RRN")
-	ErrInvalidPin        = errors.New("invalid PIN")
-	ErrPinLocked         = errors.New("PIN temporarily locked due to too many failed attempts")
-	ErrRefreshExpired    = errors.New("refresh token expired or revoked")
+	ErrDeviceNotEnrolled  = errors.New("device not enrolled")
+	ErrDeviceRevoked      = errors.New("device revoked")
+	ErrStaleRequest       = errors.New("request timestamp out of bounds")
+	ErrInvalidHMAC        = errors.New("hmac signature mismatch")
+	ErrNoSuchUser         = errors.New("no user with that RRN")
+	ErrInvalidPin         = errors.New("invalid PIN")
+	ErrPinLocked          = errors.New("PIN temporarily locked due to too many failed attempts")
+	ErrRefreshExpired     = errors.New("refresh token expired or revoked")
+	ErrReplayedEnrollment = errors.New("enrollment request already processed")
+	ErrInvalidNonce       = errors.New("enrollment nonce is invalid")
 )
+
+// Window during which enrollment nonces are remembered to detect replays. The
+// client must also send a timestamp within HMACSkew, so in practice replays are
+// blocked long before the TTL expires.
+const enrollmentNonceTTL = 10 * time.Minute
 
 // Config holds runtime configuration for the POS auth service.
 type Config struct {
@@ -60,10 +67,20 @@ type Service struct {
 	refresh  domain.RefreshTokenRepository
 	posUsers domain.PosUserRepository
 	staff    domain.StaffRepository
+	nonces   domain.NonceRepository
 }
 
-func NewService(cfg Config, d domain.DeviceRepository, r domain.RefreshTokenRepository, u domain.PosUserRepository, s domain.StaffRepository) *Service {
-	return &Service{cfg: cfg, devices: d, refresh: r, posUsers: u, staff: s}
+func NewService(cfg Config, d domain.DeviceRepository, r domain.RefreshTokenRepository, u domain.PosUserRepository, s domain.StaffRepository, n domain.NonceRepository) *Service {
+	return &Service{cfg: cfg, devices: d, refresh: r, posUsers: u, staff: s, nonces: n}
+}
+
+// PruneExpiredNonces removes stale enrollment nonces. Call periodically from a
+// background goroutine.
+func (s *Service) PruneExpiredNonces(ctx context.Context) error {
+	if s.nonces == nil {
+		return nil
+	}
+	return s.nonces.Prune(ctx)
 }
 
 // ---- enrollment
@@ -71,6 +88,40 @@ func NewService(cfg Config, d domain.DeviceRepository, r domain.RefreshTokenRepo
 type EnrollmentResult struct {
 	DeviceID     uuid.UUID
 	DeviceSecret string // base64, returned once, never persisted
+}
+
+// EnrollmentRequest captures the replay-protection fields (timestamp + nonce)
+// alongside the enrollment payload. The Zitadel admin bearer token carries the
+// authorization; the nonce+timestamp prevent a leaked admin token from being
+// replayed to rotate a legitimate device's secret.
+type EnrollmentRequest struct {
+	Serial      string
+	Label       string
+	AdminUserID uuid.UUID
+	Timestamp   int64 // epoch ms
+	Nonce       string
+}
+
+// EnrollDeviceWithReplayProtection validates the timestamp skew + nonce
+// uniqueness before enrolling. Call this from request handlers that receive
+// client-provided replay metadata.
+func (s *Service) EnrollDeviceWithReplayProtection(ctx context.Context, in EnrollmentRequest) (*EnrollmentResult, error) {
+	if in.Nonce == "" || len(in.Nonce) < 16 || len(in.Nonce) > 128 {
+		return nil, ErrInvalidNonce
+	}
+	now := time.Now().UnixMilli()
+	if absInt64(now-in.Timestamp) > s.cfg.HMACSkew.Milliseconds() {
+		return nil, ErrStaleRequest
+	}
+	if s.nonces != nil {
+		if err := s.nonces.Remember(ctx, in.Nonce, enrollmentNonceTTL); err != nil {
+			if errors.Is(err, domain.ErrNonceAlreadySeen) {
+				return nil, ErrReplayedEnrollment
+			}
+			return nil, err
+		}
+	}
+	return s.EnrollDevice(ctx, in.Serial, in.Label, in.AdminUserID)
 }
 
 // EnrollDevice registers a new device or replaces the secret on an existing one
@@ -142,10 +193,13 @@ type TokenPair struct {
 	RefreshToken string
 	ExpiresIn    int64 // seconds
 	UserID       uuid.UUID
-	IsAdmin      bool
+	IsStaff      bool
 }
 
-func (s *Service) RrnLogin(ctx context.Context, in RrnLoginInput, isAdmin bool) (*TokenPair, error) {
+// RrnLogin issues a POS-scoped token pair. All POS tokens carry the staff role
+// (isStaff=true, isAdmin=false) — fine-grained POS roles (e.g. manager vs
+// cashier) can be layered on later without changing this contract.
+func (s *Service) RrnLogin(ctx context.Context, in RrnLoginInput) (*TokenPair, error) {
 	device, err := s.verifyDeviceRequest(ctx, in.DeviceID, in.Timestamp, in.Nonce, in.HMAC, buildLoginHmacPayload(in))
 	if err != nil {
 		return nil, err
@@ -167,7 +221,7 @@ func (s *Service) RrnLogin(ctx context.Context, in RrnLoginInput, isAdmin bool) 
 		}
 		_ = s.staff.ResetFailedAttempts(ctx, staffMember.ID)
 		_ = s.devices.TouchLastSeen(ctx, device.ID)
-		return s.issueTokens(ctx, staffMember.ID, device.ID, isAdmin)
+		return s.issueTokens(ctx, staffMember.ID, device.ID)
 	}
 
 	// Fall back to Zitadel-linked users (legacy path).
@@ -197,7 +251,7 @@ func (s *Service) RrnLogin(ctx context.Context, in RrnLoginInput, isAdmin bool) 
 	_ = s.posUsers.ResetFailedAttempts(ctx, user.ID)
 	_ = s.devices.TouchLastSeen(ctx, device.ID)
 
-	return s.issueTokens(ctx, user.ID, device.ID, isAdmin)
+	return s.issueTokens(ctx, user.ID, device.ID)
 }
 
 // ---- staff management
@@ -250,7 +304,7 @@ type RefreshInput struct {
 	HMAC         string
 }
 
-func (s *Service) Refresh(ctx context.Context, in RefreshInput, isAdmin bool) (*TokenPair, error) {
+func (s *Service) Refresh(ctx context.Context, in RefreshInput) (*TokenPair, error) {
 	if _, err := s.verifyDeviceRequest(ctx, in.DeviceID, in.Timestamp, in.Nonce, in.HMAC, buildRefreshHmacPayload(in)); err != nil {
 		return nil, err
 	}
@@ -267,7 +321,7 @@ func (s *Service) Refresh(ctx context.Context, in RefreshInput, isAdmin bool) (*
 	}
 	// Rotate: old token is revoked, a fresh pair is issued.
 	_ = s.refresh.Revoke(ctx, hash)
-	return s.issueTokens(ctx, rec.UserID, rec.DeviceID, isAdmin)
+	return s.issueTokens(ctx, rec.UserID, rec.DeviceID)
 }
 
 // ---- shared helpers
@@ -294,7 +348,7 @@ func (s *Service) verifyDeviceRequest(
 	return device, nil
 }
 
-func (s *Service) issueTokens(ctx context.Context, userID, deviceID uuid.UUID, isAdmin bool) (*TokenPair, error) {
+func (s *Service) issueTokens(ctx context.Context, userID, deviceID uuid.UUID) (*TokenPair, error) {
 	now := time.Now()
 	accessExp := now.Add(s.cfg.AccessTokenTTL)
 	refreshExp := now.Add(s.cfg.RefreshTokenTTL)
@@ -305,7 +359,7 @@ func (s *Service) issueTokens(ctx context.Context, userID, deviceID uuid.UUID, i
 		"exp":      accessExp.Unix(),
 		"iss":      "tsb-pos",
 		"deviceId": deviceID.String(),
-		"isAdmin":  isAdmin,
+		"isStaff":  true,
 		"typ":      "access",
 	}
 	access, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.cfg.JWTSecret)
@@ -333,7 +387,7 @@ func (s *Service) issueTokens(ctx context.Context, userID, deviceID uuid.UUID, i
 		RefreshToken: refreshStr,
 		ExpiresIn:    int64(s.cfg.AccessTokenTTL.Seconds()),
 		UserID:       userID,
-		IsAdmin:      isAdmin,
+		IsStaff:      true,
 	}, nil
 }
 
@@ -391,7 +445,8 @@ func (s *Service) SetUserPin(ctx context.Context, userID uuid.UUID, pin string) 
 }
 
 // ---- VerifyAccessToken is used by the HTTP middleware to accept app-signed JWTs
-// alongside Zitadel ones. Returns (userID, isAdmin, err).
+// alongside Zitadel ones. Returns (userID, isStaff, err). Any valid POS token
+// grants the staff role; admin rights are only conferred by Zitadel JWTs.
 func (s *Service) VerifyAccessToken(tokenStr string) (uuid.UUID, bool, error) {
 	parsed, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -411,11 +466,12 @@ func (s *Service) VerifyAccessToken(tokenStr string) (uuid.UUID, bool, error) {
 	if err != nil {
 		return uuid.Nil, false, err
 	}
-	isAdmin, _ := claims["isAdmin"].(bool)
 	if iss, _ := claims["iss"].(string); iss != "tsb-pos" {
 		return uuid.Nil, false, errors.New("bad issuer")
 	}
-	return id, isAdmin, nil
+	// Legacy tokens issued before the staff/admin split carried isAdmin=true;
+	// ignore that claim and always grant the staff role (not admin).
+	return id, true, nil
 }
 
 // ---- utilities

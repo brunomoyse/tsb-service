@@ -45,6 +45,7 @@ type ResolverRoot interface {
 type DirectiveRoot struct {
 	Admin func(ctx context.Context, obj any, next graphql.Resolver) (res any, err error)
 	Auth  func(ctx context.Context, obj any, next graphql.Resolver) (res any, err error)
+	Staff func(ctx context.Context, obj any, next graphql.Resolver) (res any, err error)
 }
 
 type ComplexityRoot struct {
@@ -4663,11 +4664,11 @@ func (ec *executionContext) _Mutation_updateOrder(ctx context.Context, field gra
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.Directives.Admin == nil {
+				if ec.Directives.Staff == nil {
 					var zeroVal *model.Order
-					return zeroVal, errors.New("directive admin is not implemented")
+					return zeroVal, errors.New("directive staff is not implemented")
 				}
-				return ec.Directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Staff(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -9985,11 +9986,11 @@ func (ec *executionContext) _Query_orders(ctx context.Context, field graphql.Col
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.Directives.Admin == nil {
+				if ec.Directives.Staff == nil {
 					var zeroVal []*model.Order
-					return zeroVal, errors.New("directive admin is not implemented")
+					return zeroVal, errors.New("directive staff is not implemented")
 				}
-				return ec.Directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Staff(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -10078,11 +10079,11 @@ func (ec *executionContext) _Query_order(ctx context.Context, field graphql.Coll
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.Directives.Admin == nil {
+				if ec.Directives.Staff == nil {
 					var zeroVal *model.Order
-					return zeroVal, errors.New("directive admin is not implemented")
+					return zeroVal, errors.New("directive staff is not implemented")
 				}
-				return ec.Directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Staff(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -11420,11 +11421,11 @@ func (ec *executionContext) _Subscription_orderCreated(ctx context.Context, fiel
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.Directives.Admin == nil {
+				if ec.Directives.Staff == nil {
 					var zeroVal *model.Order
-					return zeroVal, errors.New("directive admin is not implemented")
+					return zeroVal, errors.New("directive staff is not implemented")
 				}
-				return ec.Directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Staff(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -11512,11 +11513,11 @@ func (ec *executionContext) _Subscription_orderUpdated(ctx context.Context, fiel
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.Directives.Admin == nil {
+				if ec.Directives.Staff == nil {
 					var zeroVal *model.Order
-					return zeroVal, errors.New("directive admin is not implemented")
+					return zeroVal, errors.New("directive staff is not implemented")
 				}
-				return ec.Directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Staff(ctx, nil, directive0)
 			}
 
 			next = directive1

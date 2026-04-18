@@ -123,8 +123,8 @@ type OrderHistoryResponse {
 }
 
 extend type Query {
-    orders: [Order!]! @admin
-    order(id: ID!): Order! @admin
+    orders: [Order!]! @staff
+    order(id: ID!): Order! @staff
     customerOrders(userId: ID!, first: Int = 20, page: Int = 1): [Order!]! @admin
     orderHistory(input: OrderHistoryInput): OrderHistoryResponse! @admin
     myOrders (first: Int = 5, page: Int = 1): [Order!]! @auth
@@ -133,7 +133,7 @@ extend type Query {
 
 extend type Mutation {
     createOrder(input: CreateOrderInput!): Order! @auth
-    updateOrder(id: ID!, input: UpdateOrderInput!): Order! @admin
+    updateOrder(id: ID!, input: UpdateOrderInput!): Order! @staff
 
     # Push notification token management
     registerLiveActivityToken(orderId: ID!, pushToken: String!): Boolean! @auth
@@ -142,10 +142,10 @@ extend type Mutation {
 }
 
 extend type Subscription {
-    orderCreated: Order! @admin
+    orderCreated: Order! @staff
 
     # for the restaurant—fires on *every* order update
-    orderUpdated: Order! @admin
+    orderUpdated: Order! @staff
 
     # for a customer—fires only when *their* order (by ID) changes
     myOrderUpdated(orderId: ID!): Order! @auth
