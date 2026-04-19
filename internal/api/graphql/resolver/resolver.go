@@ -202,7 +202,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 				hub.WithScope(func(scope *sentry.Scope) {
 					scope.SetTag("graphql.operation", opName)
 					scope.SetTag("graphql.path", path)
-					scope.SetExtra("graphql.query", query)
+					scope.SetContext("graphql", map[string]any{"query": query})
 					hub.CaptureException(e)
 				})
 			} else {
