@@ -229,6 +229,23 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	// Capture the customer's language at order creation time
 	orderLang := utils.GetLang(ctx)
 
+	// Parse optional cash payment amount. Only meaningful for cash orders;
+	// silently ignored for online payments to avoid misleading ticket display.
+	var cashPaymentAmount *decimal.Decimal
+	if !input.IsOnlinePayment && input.CashPaymentAmount != nil {
+		trimmed := strings.TrimSpace(*input.CashPaymentAmount)
+		if trimmed != "" {
+			parsed, err := decimal.NewFromString(trimmed)
+			if err != nil {
+				return nil, fmt.Errorf("invalid cashPaymentAmount: %w", err)
+			}
+			if parsed.LessThan(decimal.Zero) {
+				return nil, fmt.Errorf("cashPaymentAmount must be non-negative")
+			}
+			cashPaymentAmount = &parsed
+		}
+	}
+
 	tempOrder := orderDomain.NewOrder(
 		userUUID,
 		odType,
@@ -243,6 +260,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		couponDiscount,
 		orderLang,
 		addrSnapshot,
+		cashPaymentAmount,
 	)
 	tempOrder.CouponCode = couponCode
 

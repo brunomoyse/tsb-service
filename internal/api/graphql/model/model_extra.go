@@ -20,6 +20,7 @@ type Order struct {
 	IsOnlinePayment    bool               `json:"isOnlinePayment"`
 	DiscountAmount     string             `json:"discountAmount"`
 	DeliveryFee        *string            `json:"deliveryFee,omitempty"`
+	TransactionFee     *string            `json:"transactionFee,omitempty"`
 	TotalPrice         string             `json:"totalPrice"`
 	PreferredReadyTime *time.Time         `json:"preferredReadyTime,omitempty"`
 	EstimatedReadyTime *time.Time         `json:"estimatedReadyTime,omitempty"`
@@ -28,6 +29,7 @@ type Order struct {
 	OrderExtra         []any              `json:"orderExtra,omitempty"`
 	CouponCode         *string            `json:"couponCode,omitempty"`
 	CancellationReason *domain.OrderCancellationReason `json:"cancellationReason,omitempty"`
+	CashPaymentAmount  *string            `json:"cashPaymentAmount,omitempty"`
 
 	// Non-schema fields: denormalized address for Address() resolver
 	AddressID        *string  `json:"-"`

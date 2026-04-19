@@ -114,6 +114,16 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 		})
 	}
 
+	if o.TransactionFee.GreaterThan(decimal.Zero) {
+		lines = append(lines, mollie.PaymentLines{
+			Type:        mollie.SurchargeLine,
+			Description: "Frais de transaction",
+			Quantity:    1,
+			UnitPrice:   amt(o.TransactionFee),
+			TotalAmount: amt(o.TransactionFee),
+		})
+	}
+
 	appBaseURL := os.Getenv("APP_BASE_URL")
 	if appBaseURL == "" {
 		return nil, fmt.Errorf("APP_BASE_URL is required")
