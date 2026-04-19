@@ -82,9 +82,9 @@ type OrderStatusHistory struct {
 }
 
 type OrderExtra struct {
-	// Name of the extra, e.g., "chopsticks" or "sauces".
+	// Name of the extra, e.g., "chopsticks" or "sauce".
 	Name string `json:"name"`
-	// Options for this extra, e.g., for sauces: ["salt", "sweet"].
+	// Options for this extra, e.g., for sauce: ["sweet"], ["salty"] or ["both"].
 	Options []string `json:"options,omitempty"`
 }
 
