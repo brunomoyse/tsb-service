@@ -162,6 +162,7 @@ type ComplexityRoot struct {
 		Address             func(childComplexity int) int
 		AddressExtra        func(childComplexity int) int
 		CancellationReason  func(childComplexity int) int
+		CashPaymentAmount   func(childComplexity int) int
 		CouponCode          func(childComplexity int) int
 		CreatedAt           func(childComplexity int) int
 		Customer            func(childComplexity int) int
@@ -181,6 +182,7 @@ type ComplexityRoot struct {
 		Status              func(childComplexity int) int
 		StatusHistory       func(childComplexity int) int
 		TotalPrice          func(childComplexity int) int
+		TransactionFee      func(childComplexity int) int
 		Type                func(childComplexity int) int
 		UpdatedAt           func(childComplexity int) int
 	}
@@ -1079,6 +1081,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Order.CancellationReason(childComplexity), true
+	case "Order.cashPaymentAmount":
+		if e.ComplexityRoot.Order.CashPaymentAmount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Order.CashPaymentAmount(childComplexity), true
 	case "Order.couponCode":
 		if e.ComplexityRoot.Order.CouponCode == nil {
 			break
@@ -1193,6 +1201,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Order.TotalPrice(childComplexity), true
+	case "Order.transactionFee":
+		if e.ComplexityRoot.Order.TransactionFee == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Order.TransactionFee(childComplexity), true
 	case "Order.type":
 		if e.ComplexityRoot.Order.Type == nil {
 			break
@@ -4600,6 +4614,8 @@ func (ec *executionContext) fieldContext_Mutation_createOrder(ctx context.Contex
 				return ec.fieldContext_Order_discountAmount(ctx, field)
 			case "deliveryFee":
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "transactionFee":
+				return ec.fieldContext_Order_transactionFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
 			case "preferredReadyTime":
@@ -4616,6 +4632,8 @@ func (ec *executionContext) fieldContext_Mutation_createOrder(ctx context.Contex
 				return ec.fieldContext_Order_couponCode(ctx, field)
 			case "cancellationReason":
 				return ec.fieldContext_Order_cancellationReason(ctx, field)
+			case "cashPaymentAmount":
+				return ec.fieldContext_Order_cashPaymentAmount(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -4704,6 +4722,8 @@ func (ec *executionContext) fieldContext_Mutation_updateOrder(ctx context.Contex
 				return ec.fieldContext_Order_discountAmount(ctx, field)
 			case "deliveryFee":
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "transactionFee":
+				return ec.fieldContext_Order_transactionFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
 			case "preferredReadyTime":
@@ -4720,6 +4740,8 @@ func (ec *executionContext) fieldContext_Mutation_updateOrder(ctx context.Contex
 				return ec.fieldContext_Order_couponCode(ctx, field)
 			case "cancellationReason":
 				return ec.fieldContext_Order_cancellationReason(ctx, field)
+			case "cashPaymentAmount":
+				return ec.fieldContext_Order_cashPaymentAmount(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -6404,6 +6426,35 @@ func (ec *executionContext) fieldContext_Order_deliveryFee(_ context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _Order_transactionFee(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Order_transactionFee,
+		func(ctx context.Context) (any, error) {
+			return obj.TransactionFee, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Order_transactionFee(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Order",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Order_totalPrice(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6631,6 +6682,35 @@ func (ec *executionContext) fieldContext_Order_cancellationReason(_ context.Cont
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type OrderCancellationReason does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Order_cashPaymentAmount(ctx context.Context, field graphql.CollectedField, obj *model.Order) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Order_cashPaymentAmount,
+		func(ctx context.Context) (any, error) {
+			return obj.CashPaymentAmount, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Order_cashPaymentAmount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Order",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7057,6 +7137,8 @@ func (ec *executionContext) fieldContext_OrderHistoryResponse_orders(_ context.C
 				return ec.fieldContext_Order_discountAmount(ctx, field)
 			case "deliveryFee":
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "transactionFee":
+				return ec.fieldContext_Order_transactionFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
 			case "preferredReadyTime":
@@ -7073,6 +7155,8 @@ func (ec *executionContext) fieldContext_OrderHistoryResponse_orders(_ context.C
 				return ec.fieldContext_Order_couponCode(ctx, field)
 			case "cancellationReason":
 				return ec.fieldContext_Order_cancellationReason(ctx, field)
+			case "cashPaymentAmount":
+				return ec.fieldContext_Order_cashPaymentAmount(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10026,6 +10110,8 @@ func (ec *executionContext) fieldContext_Query_orders(_ context.Context, field g
 				return ec.fieldContext_Order_discountAmount(ctx, field)
 			case "deliveryFee":
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "transactionFee":
+				return ec.fieldContext_Order_transactionFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
 			case "preferredReadyTime":
@@ -10042,6 +10128,8 @@ func (ec *executionContext) fieldContext_Query_orders(_ context.Context, field g
 				return ec.fieldContext_Order_couponCode(ctx, field)
 			case "cancellationReason":
 				return ec.fieldContext_Order_cancellationReason(ctx, field)
+			case "cashPaymentAmount":
+				return ec.fieldContext_Order_cashPaymentAmount(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10119,6 +10207,8 @@ func (ec *executionContext) fieldContext_Query_order(ctx context.Context, field 
 				return ec.fieldContext_Order_discountAmount(ctx, field)
 			case "deliveryFee":
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "transactionFee":
+				return ec.fieldContext_Order_transactionFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
 			case "preferredReadyTime":
@@ -10135,6 +10225,8 @@ func (ec *executionContext) fieldContext_Query_order(ctx context.Context, field 
 				return ec.fieldContext_Order_couponCode(ctx, field)
 			case "cancellationReason":
 				return ec.fieldContext_Order_cancellationReason(ctx, field)
+			case "cashPaymentAmount":
+				return ec.fieldContext_Order_cashPaymentAmount(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10223,6 +10315,8 @@ func (ec *executionContext) fieldContext_Query_customerOrders(ctx context.Contex
 				return ec.fieldContext_Order_discountAmount(ctx, field)
 			case "deliveryFee":
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "transactionFee":
+				return ec.fieldContext_Order_transactionFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
 			case "preferredReadyTime":
@@ -10239,6 +10333,8 @@ func (ec *executionContext) fieldContext_Query_customerOrders(ctx context.Contex
 				return ec.fieldContext_Order_couponCode(ctx, field)
 			case "cancellationReason":
 				return ec.fieldContext_Order_cancellationReason(ctx, field)
+			case "cashPaymentAmount":
+				return ec.fieldContext_Order_cashPaymentAmount(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10387,6 +10483,8 @@ func (ec *executionContext) fieldContext_Query_myOrders(ctx context.Context, fie
 				return ec.fieldContext_Order_discountAmount(ctx, field)
 			case "deliveryFee":
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "transactionFee":
+				return ec.fieldContext_Order_transactionFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
 			case "preferredReadyTime":
@@ -10403,6 +10501,8 @@ func (ec *executionContext) fieldContext_Query_myOrders(ctx context.Context, fie
 				return ec.fieldContext_Order_couponCode(ctx, field)
 			case "cancellationReason":
 				return ec.fieldContext_Order_cancellationReason(ctx, field)
+			case "cashPaymentAmount":
+				return ec.fieldContext_Order_cashPaymentAmount(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -10491,6 +10591,8 @@ func (ec *executionContext) fieldContext_Query_myOrder(ctx context.Context, fiel
 				return ec.fieldContext_Order_discountAmount(ctx, field)
 			case "deliveryFee":
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "transactionFee":
+				return ec.fieldContext_Order_transactionFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
 			case "preferredReadyTime":
@@ -10507,6 +10609,8 @@ func (ec *executionContext) fieldContext_Query_myOrder(ctx context.Context, fiel
 				return ec.fieldContext_Order_couponCode(ctx, field)
 			case "cancellationReason":
 				return ec.fieldContext_Order_cancellationReason(ctx, field)
+			case "cashPaymentAmount":
+				return ec.fieldContext_Order_cashPaymentAmount(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -11461,6 +11565,8 @@ func (ec *executionContext) fieldContext_Subscription_orderCreated(_ context.Con
 				return ec.fieldContext_Order_discountAmount(ctx, field)
 			case "deliveryFee":
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "transactionFee":
+				return ec.fieldContext_Order_transactionFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
 			case "preferredReadyTime":
@@ -11477,6 +11583,8 @@ func (ec *executionContext) fieldContext_Subscription_orderCreated(_ context.Con
 				return ec.fieldContext_Order_couponCode(ctx, field)
 			case "cancellationReason":
 				return ec.fieldContext_Order_cancellationReason(ctx, field)
+			case "cashPaymentAmount":
+				return ec.fieldContext_Order_cashPaymentAmount(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -11553,6 +11661,8 @@ func (ec *executionContext) fieldContext_Subscription_orderUpdated(_ context.Con
 				return ec.fieldContext_Order_discountAmount(ctx, field)
 			case "deliveryFee":
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "transactionFee":
+				return ec.fieldContext_Order_transactionFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
 			case "preferredReadyTime":
@@ -11569,6 +11679,8 @@ func (ec *executionContext) fieldContext_Subscription_orderUpdated(_ context.Con
 				return ec.fieldContext_Order_couponCode(ctx, field)
 			case "cancellationReason":
 				return ec.fieldContext_Order_cancellationReason(ctx, field)
+			case "cashPaymentAmount":
+				return ec.fieldContext_Order_cashPaymentAmount(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -11646,6 +11758,8 @@ func (ec *executionContext) fieldContext_Subscription_myOrderUpdated(ctx context
 				return ec.fieldContext_Order_discountAmount(ctx, field)
 			case "deliveryFee":
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "transactionFee":
+				return ec.fieldContext_Order_transactionFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
 			case "preferredReadyTime":
@@ -11662,6 +11776,8 @@ func (ec *executionContext) fieldContext_Subscription_myOrderUpdated(ctx context
 				return ec.fieldContext_Order_couponCode(ctx, field)
 			case "cancellationReason":
 				return ec.fieldContext_Order_cancellationReason(ctx, field)
+			case "cashPaymentAmount":
+				return ec.fieldContext_Order_cashPaymentAmount(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -12245,6 +12361,8 @@ func (ec *executionContext) fieldContext_User_orders(_ context.Context, field gr
 				return ec.fieldContext_Order_discountAmount(ctx, field)
 			case "deliveryFee":
 				return ec.fieldContext_Order_deliveryFee(ctx, field)
+			case "transactionFee":
+				return ec.fieldContext_Order_transactionFee(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_Order_totalPrice(ctx, field)
 			case "preferredReadyTime":
@@ -12261,6 +12379,8 @@ func (ec *executionContext) fieldContext_User_orders(_ context.Context, field gr
 				return ec.fieldContext_Order_couponCode(ctx, field)
 			case "cancellationReason":
 				return ec.fieldContext_Order_cancellationReason(ctx, field)
+			case "cashPaymentAmount":
+				return ec.fieldContext_Order_cashPaymentAmount(ctx, field)
 			case "address":
 				return ec.fieldContext_Order_address(ctx, field)
 			case "customer":
@@ -13906,7 +14026,7 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"orderType", "isOnlinePayment", "addressPlaceId", "addressExtra", "orderNote", "orderExtra", "preferredReadyTime", "items", "couponCode", "paymentRedirectUrl"}
+	fieldsInOrder := [...]string{"orderType", "isOnlinePayment", "addressPlaceId", "addressExtra", "orderNote", "orderExtra", "preferredReadyTime", "items", "couponCode", "cashPaymentAmount", "paymentRedirectUrl"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -13976,6 +14096,13 @@ func (ec *executionContext) unmarshalInputCreateOrderInput(ctx context.Context, 
 				return it, err
 			}
 			it.CouponCode = data
+		case "cashPaymentAmount":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cashPaymentAmount"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CashPaymentAmount = data
 		case "paymentRedirectUrl":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("paymentRedirectUrl"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -15699,6 +15826,8 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 			}
 		case "deliveryFee":
 			out.Values[i] = ec._Order_deliveryFee(ctx, field, obj)
+		case "transactionFee":
+			out.Values[i] = ec._Order_transactionFee(ctx, field, obj)
 		case "totalPrice":
 			out.Values[i] = ec._Order_totalPrice(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -15749,6 +15878,8 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 			out.Values[i] = ec._Order_couponCode(ctx, field, obj)
 		case "cancellationReason":
 			out.Values[i] = ec._Order_cancellationReason(ctx, field, obj)
+		case "cashPaymentAmount":
+			out.Values[i] = ec._Order_cashPaymentAmount(ctx, field, obj)
 		case "address":
 			field := field
 

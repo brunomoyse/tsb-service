@@ -97,6 +97,18 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		deliveryFeeStr = &tmp
 	}
 
+	var transactionFeeStr *string
+	if o.TransactionFee.GreaterThan(decimal.Zero) {
+		tmp := o.TransactionFee.String()
+		transactionFeeStr = &tmp
+	}
+
+	var cashPaymentAmountStr *string
+	if o.CashPaymentAmount != nil {
+		tmp := o.CashPaymentAmount.String()
+		cashPaymentAmountStr = &tmp
+	}
+
 	isManual := o.IsManualAddress
 
 	return &model.Order{
@@ -108,6 +120,7 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		IsOnlinePayment:    o.IsOnlinePayment,
 		DiscountAmount:     o.DiscountAmount().String(),
 		DeliveryFee:        deliveryFeeStr,
+		TransactionFee:     transactionFeeStr,
 		TotalPrice:         o.TotalPrice.String(),
 		PreferredReadyTime: o.PreferredReadyTime,
 		EstimatedReadyTime: o.EstimatedReadyTime,
@@ -125,6 +138,7 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		AddressDistance:    o.AddressDistance,
 		IsManualAddr:       &isManual,
 		CancellationReason: o.CancellationReason,
+		CashPaymentAmount:  cashPaymentAmountStr,
 	}
 }
 

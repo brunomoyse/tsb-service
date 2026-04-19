@@ -57,6 +57,11 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 			computedTotal = computedTotal.Sub(totalDiscount)
 		}
 
+		// Add transaction fee for online payments.
+		if o.TransactionFee.GreaterThan(decimal.Zero) {
+			computedTotal = computedTotal.Add(o.TransactionFee)
+		}
+
 		o.TotalPrice = computedTotal
 	}
 
@@ -64,20 +69,22 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 	const orderQuery = `
 		INSERT INTO orders (
 			user_id, order_status, order_type, is_online_payment,
-			takeaway_discount, coupon_discount, delivery_fee, total_price,
+			takeaway_discount, coupon_discount, delivery_fee, transaction_fee, total_price,
 			preferred_ready_time, estimated_ready_time,
 			address_id, address_extra, order_note, order_extra, language, coupon_code,
 			street_id, street_name, house_number, box_number,
 			municipality_name, postcode, address_distance, is_manual_address,
-			address_place_id, address_lat, address_lng
+			address_place_id, address_lat, address_lng,
+			cash_payment_amount
 		) VALUES (
 			$1, $2, $3, $4,
-			$5, $6, $7, $8,
-			$9, $10,
-			$11, $12, $13, $14, $15, $16,
-			$17, $18, $19, $20,
-			$21, $22, $23, $24,
-			$25, $26, $27
+			$5, $6, $7, $8, $9,
+			$10, $11,
+			$12, $13, $14, $15, $16, $17,
+			$18, $19, $20, $21,
+			$22, $23, $24, $25,
+			$26, $27, $28,
+			$29
 		)
 		RETURNING id, created_at, updated_at;
 	`
@@ -96,6 +103,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		o.TakeawayDiscount,
 		o.CouponDiscount,
 		o.DeliveryFee,
+		o.TransactionFee,
 		o.TotalPrice,
 		o.PreferredReadyTime,
 		o.EstimatedReadyTime,
@@ -116,6 +124,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		o.AddressPlaceID,
 		o.AddressLat,
 		o.AddressLng,
+		o.CashPaymentAmount,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to insert order: %w", err)

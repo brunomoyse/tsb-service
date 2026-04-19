@@ -38,6 +38,9 @@ const (
 	OrderCancellationReasonOther         OrderCancellationReason = "OTHER"
 )
 
+// TransactionFee is charged on online (Mollie) payments to cover PSP costs.
+var TransactionFee = decimal.NewFromFloatWithExponent(0.30, -2)
+
 type Order struct {
 	ID                 uuid.UUID        `db:"id" json:"id"`
 	CreatedAt          time.Time        `db:"created_at" json:"createdAt"`
@@ -50,6 +53,7 @@ type Order struct {
 	TakeawayDiscount   decimal.Decimal  `db:"takeaway_discount" json:"takeawayDiscount"`
 	CouponDiscount     decimal.Decimal  `db:"coupon_discount" json:"couponDiscount"`
 	DeliveryFee        *decimal.Decimal `db:"delivery_fee" json:"deliveryFee,omitempty"`
+	TransactionFee     decimal.Decimal  `db:"transaction_fee" json:"transactionFee"`
 	TotalPrice         decimal.Decimal  `db:"total_price" json:"totalPrice"`
 	PreferredReadyTime *time.Time       `db:"preferred_ready_time" json:"preferredReadyTime,omitempty"`
 	EstimatedReadyTime *time.Time       `db:"estimated_ready_time" json:"estimatedReadyTime,omitempty"`
@@ -72,6 +76,7 @@ type Order struct {
 	AddressLat       *float64 `db:"address_lat" json:"addressLat,omitempty"`
 	AddressLng       *float64 `db:"address_lng" json:"addressLng,omitempty"`
 	CancellationReason *OrderCancellationReason `db:"cancellation_reason" json:"cancellationReason,omitempty"`
+	CashPaymentAmount  *decimal.Decimal         `db:"cash_payment_amount" json:"cashPaymentAmount,omitempty"`
 }
 
 type OrderStatusHistory struct {
@@ -163,6 +168,7 @@ func NewOrder(
 	couponDiscount decimal.Decimal,
 	language string,
 	addrSnapshot *AddressSnapshot,
+	cashPaymentAmount *decimal.Decimal,
 ) *Order {
 	var orderExtraJSON types.NullableJSON
 	if len(orderExtra) > 0 {
@@ -171,6 +177,11 @@ func NewOrder(
 	}
 
 	language = cmp.Or(language, "fr")
+
+	transactionFee := decimal.Zero
+	if isOnlinePayment {
+		transactionFee = TransactionFee
+	}
 
 	o := &Order{
 		ID:                 uuid.Nil,
@@ -186,7 +197,9 @@ func NewOrder(
 		DeliveryFee:        deliveryFee,
 		TakeawayDiscount:   takeawayDiscount,
 		CouponDiscount:     couponDiscount,
+		TransactionFee:     transactionFee,
 		Language:           language,
+		CashPaymentAmount:  cashPaymentAmount,
 	}
 
 	if addrSnapshot != nil {

@@ -7,6 +7,7 @@ type Order {
     isOnlinePayment: Boolean!
     discountAmount: String!
     deliveryFee: String
+    transactionFee: String
     totalPrice: String!
     preferredReadyTime: DateTime
     estimatedReadyTime: DateTime
@@ -15,6 +16,7 @@ type Order {
     orderExtra: JSON
     couponCode: String
     cancellationReason: OrderCancellationReason
+    cashPaymentAmount: String
 
     address: Address
     customer: User
@@ -85,6 +87,8 @@ input CreateOrderInput {
     preferredReadyTime: DateTime
     items: [CreateOrderItemInput!]!
     couponCode: String
+    # Cash payment amount the customer wants to pay with (for change calculation)
+    cashPaymentAmount: String
     # Custom redirect URL for Mollie payment (native apps use custom URL scheme)
     paymentRedirectUrl: String
 }

@@ -87,6 +87,7 @@ type CreateOrderInput struct {
 	PreferredReadyTime *time.Time              `json:"preferredReadyTime,omitempty"`
 	Items              []*CreateOrderItemInput `json:"items"`
 	CouponCode         *string                 `json:"couponCode,omitempty"`
+	CashPaymentAmount  *string                 `json:"cashPaymentAmount,omitempty"`
 	PaymentRedirectURL *string                 `json:"paymentRedirectUrl,omitempty"`
 }
 
