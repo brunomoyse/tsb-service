@@ -79,7 +79,7 @@ func ToGQLUser(u *userDomain.User) *model.User {
 
 func ToGQLOrder(o *orderDomain.Order) *model.Order {
 	// orderExtra is persisted as a JSON array (e.g. [{"name":"chopsticks"},
-	// {"name":"sauces","options":["sweet"]}]). Unmarshalling into a map would
+	// {"name":"sauce","options":["both"]}]). Unmarshalling into a map would
 	// silently fail, leaving the field null on the wire.
 	var orderExtra []any
 	if len(o.OrderExtra) > 0 {
