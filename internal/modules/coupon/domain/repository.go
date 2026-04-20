@@ -21,4 +21,10 @@ type CouponRepository interface {
 	// IncrementUserUsageAtomic atomically increments the per-user usage count.
 	// Returns true if the increment succeeded, false if the per-user limit was reached.
 	IncrementUserUsageAtomic(ctx context.Context, couponID, userID uuid.UUID, maxUsesPerUser *int) (bool, error)
+	// DecrementUsedCountAtomic rolls back a previous global increment.
+	// Guards against used_count going negative.
+	DecrementUsedCountAtomic(ctx context.Context, id uuid.UUID) (bool, error)
+	// DecrementUserUsageAtomic rolls back a previous per-user increment.
+	// Guards against used_count going negative.
+	DecrementUserUsageAtomic(ctx context.Context, couponID, userID uuid.UUID) (bool, error)
 }

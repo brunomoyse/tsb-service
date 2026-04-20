@@ -189,7 +189,7 @@ func main() {
 	productService := productApplication.NewProductService(productRepo)
 	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, scheduleOverrideRepo, os.Getenv("APP_ENV") != "production")
 	userService := userApplication.NewUserService(userRepo, zitadelUserFetcher{})
-	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService)
+	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService, couponService)
 
 	// OIDC verifier — validates JWTs via JWKS + resolves Zitadel sub → app user UUID
 	zitadelInternalURL := os.Getenv("ZITADEL_INTERNAL_URL") // Optional: internal Docker URL for OIDC discovery
@@ -341,10 +341,15 @@ func main() {
 		orderService, paymentService, productService, userService,
 	))
 
+	// Per-user rate limit on validateCoupon GraphQL query to block brute-force
+	// enumeration of coupon codes: ~5 req/min, burst 3.
+	couponValidateLimiter := middleware.NewRateLimiter(5.0/60, 3)
+
 	// GraphQL
 	rootResolver := resolver.NewResolver(
 		broker, apnsClient, fcmClient,
 		addressService, couponService, notificationService, orderService, paymentService, productService, restaurantService, userService, posService,
+		couponValidateLimiter,
 	)
 	// Payment webhook depends on the resolver to fan out the new-order push
 	// notification once the Mollie payment transitions to paid.

@@ -103,6 +103,17 @@ func (r *CouponRepository) IncrementUsedCountAtomic(ctx context.Context, id uuid
 	return rows > 0, nil
 }
 
+func (r *CouponRepository) DecrementUsedCountAtomic(ctx context.Context, id uuid.UUID) (bool, error) {
+	result, err := r.pool.ForContext(ctx).ExecContext(ctx,
+		`UPDATE coupons SET used_count = used_count - 1
+		 WHERE id = $1 AND used_count > 0`, id)
+	if err != nil {
+		return false, fmt.Errorf("failed to decrement coupon usage: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	return rows > 0, nil
+}
+
 func (r *CouponRepository) GetUserUsageCount(ctx context.Context, couponID, userID uuid.UUID) (int, error) {
 	var count int
 	err := r.pool.ForContext(ctx).GetContext(ctx, &count,
@@ -139,6 +150,18 @@ func (r *CouponRepository) IncrementUserUsageAtomic(ctx context.Context, couponI
 		couponID, userID, *maxUsesPerUser)
 	if err != nil {
 		return false, fmt.Errorf("failed to increment user usage: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	return rows > 0, nil
+}
+
+func (r *CouponRepository) DecrementUserUsageAtomic(ctx context.Context, couponID, userID uuid.UUID) (bool, error) {
+	result, err := r.pool.ForContext(ctx).ExecContext(ctx,
+		`UPDATE coupon_users SET used_count = used_count - 1
+		 WHERE coupon_id = $1 AND user_id = $2 AND used_count > 0`,
+		couponID, userID)
+	if err != nil {
+		return false, fmt.Errorf("failed to decrement user usage: %w", err)
 	}
 	rows, _ := result.RowsAffected()
 	return rows > 0, nil

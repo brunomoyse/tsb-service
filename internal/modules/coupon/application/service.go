@@ -6,8 +6,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 
 	"tsb-service/internal/modules/coupon/domain"
+	"tsb-service/pkg/logging"
 )
 
 type CouponService interface {
@@ -15,8 +17,14 @@ type CouponService interface {
 	IncrementUsage(ctx context.Context, id uuid.UUID) error
 	// IncrementUsageAtomic atomically increments and returns false if the coupon is no longer valid.
 	IncrementUsageAtomic(ctx context.Context, id uuid.UUID, userID uuid.UUID) (bool, error)
+	// DecrementUsageAtomic rolls back a previous IncrementUsageAtomic (best-effort).
+	// Used when order creation or payment initiation fails after reservation, and on
+	// payment-failed webhooks. Returns an error only for hard DB failures; missing rows
+	// (e.g. counter already at zero) are treated as no-ops.
+	DecrementUsageAtomic(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
 	GetAllCoupons(ctx context.Context) ([]*domain.Coupon, error)
 	GetCoupon(ctx context.Context, id uuid.UUID) (*domain.Coupon, error)
+	GetCouponByCode(ctx context.Context, code string) (*domain.Coupon, error)
 	CreateCoupon(ctx context.Context, coupon *domain.Coupon) error
 	UpdateCoupon(ctx context.Context, coupon *domain.Coupon) error
 }
@@ -70,6 +78,31 @@ func (s *couponService) IncrementUsageAtomic(ctx context.Context, id uuid.UUID, 
 
 	// Then increment global usage
 	return s.repo.IncrementUsedCountAtomic(ctx, id)
+}
+
+func (s *couponService) DecrementUsageAtomic(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+	log := logging.FromContext(ctx)
+
+	if _, err := s.repo.DecrementUserUsageAtomic(ctx, id, userID); err != nil {
+		log.Error("failed to decrement per-user coupon usage",
+			zap.String("coupon_id", id.String()),
+			zap.String("user_id", userID.String()),
+			zap.Error(err))
+		return fmt.Errorf("failed to decrement per-user coupon usage: %w", err)
+	}
+
+	if _, err := s.repo.DecrementUsedCountAtomic(ctx, id); err != nil {
+		log.Error("failed to decrement global coupon usage",
+			zap.String("coupon_id", id.String()),
+			zap.Error(err))
+		return fmt.Errorf("failed to decrement global coupon usage: %w", err)
+	}
+
+	return nil
+}
+
+func (s *couponService) GetCouponByCode(ctx context.Context, code string) (*domain.Coupon, error) {
+	return s.repo.FindByCode(ctx, code)
 }
 
 func (s *couponService) GetAllCoupons(ctx context.Context) ([]*domain.Coupon, error) {

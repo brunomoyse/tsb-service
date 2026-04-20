@@ -40,18 +40,19 @@ import (
 )
 
 type Resolver struct {
-	Broker              *pubsub.Broker
-	APNsClient          *apns.Client // nil if APNs not configured
-	FCMClient           *fcm.Client  // nil if FCM not configured
-	AddressService      addressApplication.AddressService
-	CouponService       couponApplication.CouponService
-	NotificationService notificationApplication.NotificationService
-	OrderService        orderApplication.OrderService
-	PaymentService      paymentApplication.PaymentService
-	ProductService      productApplication.ProductService
-	RestaurantService   restaurantApplication.RestaurantService
-	UserService         userApplication.UserService
-	PosService          *posApplication.Service
+	Broker                *pubsub.Broker
+	APNsClient            *apns.Client // nil if APNs not configured
+	FCMClient             *fcm.Client  // nil if FCM not configured
+	AddressService        addressApplication.AddressService
+	CouponService         couponApplication.CouponService
+	NotificationService   notificationApplication.NotificationService
+	OrderService          orderApplication.OrderService
+	PaymentService        paymentApplication.PaymentService
+	ProductService        productApplication.ProductService
+	RestaurantService     restaurantApplication.RestaurantService
+	UserService           userApplication.UserService
+	PosService            *posApplication.Service
+	CouponValidateLimiter *middleware.RateLimiter
 }
 
 // NewResolver constructs the Resolver with required services.
@@ -68,20 +69,22 @@ func NewResolver(
 	restaurantService restaurantApplication.RestaurantService,
 	userService userApplication.UserService,
 	posService *posApplication.Service,
+	couponValidateLimiter *middleware.RateLimiter,
 ) *Resolver {
 	return &Resolver{
-		Broker:              broker,
-		APNsClient:          apnsClient,
-		FCMClient:           fcmClient,
-		AddressService:      addressService,
-		CouponService:       couponService,
-		NotificationService: notificationService,
-		OrderService:        orderService,
-		PaymentService:      paymentService,
-		ProductService:      productService,
-		RestaurantService:   restaurantService,
-		UserService:         userService,
-		PosService:          posService,
+		Broker:                broker,
+		APNsClient:            apnsClient,
+		FCMClient:             fcmClient,
+		AddressService:        addressService,
+		CouponService:         couponService,
+		NotificationService:   notificationService,
+		OrderService:          orderService,
+		PaymentService:        paymentService,
+		ProductService:        productService,
+		RestaurantService:     restaurantService,
+		UserService:           userService,
+		PosService:            posService,
+		CouponValidateLimiter: couponValidateLimiter,
 	}
 }
 
