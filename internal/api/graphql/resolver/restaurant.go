@@ -20,59 +20,94 @@ func (r *mutationResolver) UpdateOrderingEnabled(ctx context.Context, enabled bo
 	if err != nil {
 		return nil, fmt.Errorf("update ordering enabled: %w", err)
 	}
-	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.UpdatedAt)
+	gqlConfig := toGQLRestaurantConfig(config)
 	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
 	return gqlConfig, nil
 }
 
 // UpdateOpeningHours is the resolver for the updateOpeningHours field.
 func (r *mutationResolver) UpdateOpeningHours(ctx context.Context, hours model.OpeningHoursInput) (*model.RestaurantConfig, error) {
-	hoursMap := map[string]any{
-		"monday":    toScheduleMap(hours.Monday),
-		"tuesday":   toScheduleMap(hours.Tuesday),
-		"wednesday": toScheduleMap(hours.Wednesday),
-		"thursday":  toScheduleMap(hours.Thursday),
-		"friday":    toScheduleMap(hours.Friday),
-		"saturday":  toScheduleMap(hours.Saturday),
-		"sunday":    toScheduleMap(hours.Sunday),
-	}
-	hoursJSON, err := json.Marshal(hoursMap)
+	hoursJSON, err := marshalOpeningHoursInput(hours)
 	if err != nil {
-		return nil, fmt.Errorf("marshal opening hours: %w", err)
+		return nil, err
 	}
-
 	config, err := r.RestaurantService.UpdateOpeningHours(ctx, hoursJSON)
 	if err != nil {
 		return nil, fmt.Errorf("update opening hours: %w", err)
 	}
-	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.UpdatedAt)
+	gqlConfig := toGQLRestaurantConfig(config)
 	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
 	return gqlConfig, nil
 }
 
 // UpdateOrderingHours is the resolver for the updateOrderingHours field.
 func (r *mutationResolver) UpdateOrderingHours(ctx context.Context, hours model.OpeningHoursInput) (*model.RestaurantConfig, error) {
-	hoursMap := map[string]any{
-		"monday":    toScheduleMap(hours.Monday),
-		"tuesday":   toScheduleMap(hours.Tuesday),
-		"wednesday": toScheduleMap(hours.Wednesday),
-		"thursday":  toScheduleMap(hours.Thursday),
-		"friday":    toScheduleMap(hours.Friday),
-		"saturday":  toScheduleMap(hours.Saturday),
-		"sunday":    toScheduleMap(hours.Sunday),
-	}
-	hoursJSON, err := json.Marshal(hoursMap)
+	hoursJSON, err := marshalOpeningHoursInput(hours)
 	if err != nil {
-		return nil, fmt.Errorf("marshal ordering hours: %w", err)
+		return nil, err
 	}
-
 	config, err := r.RestaurantService.UpdateOrderingHours(ctx, hoursJSON)
 	if err != nil {
 		return nil, fmt.Errorf("update ordering hours: %w", err)
 	}
-	gqlConfig := toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.UpdatedAt)
+	gqlConfig := toGQLRestaurantConfig(config)
 	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
 	return gqlConfig, nil
+}
+
+// UpdatePreparationMinutes is the resolver for the updatePreparationMinutes field.
+func (r *mutationResolver) UpdatePreparationMinutes(ctx context.Context, minutes int) (*model.RestaurantConfig, error) {
+	if minutes < 1 || minutes > 240 {
+		return nil, fmt.Errorf("preparation minutes must be between 1 and 240")
+	}
+	config, err := r.RestaurantService.UpdatePreparationMinutes(ctx, minutes)
+	if err != nil {
+		return nil, fmt.Errorf("update preparation minutes: %w", err)
+	}
+	gqlConfig := toGQLRestaurantConfig(config)
+	r.Broker.Publish("restaurantConfigUpdated", gqlConfig)
+	return gqlConfig, nil
+}
+
+// UpsertScheduleOverride is the resolver for the upsertScheduleOverride field.
+func (r *mutationResolver) UpsertScheduleOverride(ctx context.Context, input model.ScheduleOverrideInput) (*model.ScheduleOverride, error) {
+	if !input.Closed && input.Schedule == nil {
+		return nil, fmt.Errorf("schedule is required when override is not closed")
+	}
+
+	var scheduleJSON json.RawMessage
+	if input.Schedule != nil && !input.Closed {
+		m := toScheduleMap(input.Schedule)
+		b, err := json.Marshal(m)
+		if err != nil {
+			return nil, fmt.Errorf("marshal override schedule: %w", err)
+		}
+		scheduleJSON = b
+	}
+
+	// Normalize to start-of-day in the restaurant timezone. The DB column is
+	// DATE, so the time component is discarded on write anyway.
+	date := input.Date.UTC()
+
+	ov, err := r.RestaurantService.UpsertOverride(ctx, date, input.Closed, scheduleJSON, input.Note)
+	if err != nil {
+		return nil, fmt.Errorf("upsert override: %w", err)
+	}
+
+	r.publishScheduleOverridesUpdated(ctx)
+	r.publishRestaurantConfigUpdated(ctx)
+
+	return toGQLScheduleOverride(ov), nil
+}
+
+// DeleteScheduleOverride is the resolver for the deleteScheduleOverride field.
+func (r *mutationResolver) DeleteScheduleOverride(ctx context.Context, date time.Time) (bool, error) {
+	if err := r.RestaurantService.DeleteOverride(ctx, date); err != nil {
+		return false, fmt.Errorf("delete override: %w", err)
+	}
+	r.publishScheduleOverridesUpdated(ctx)
+	r.publishRestaurantConfigUpdated(ctx)
+	return true, nil
 }
 
 // RestaurantConfig is the resolver for the restaurantConfig field.
@@ -81,28 +116,56 @@ func (r *queryResolver) RestaurantConfig(ctx context.Context) (*model.Restaurant
 	if err != nil {
 		return nil, fmt.Errorf("get restaurant config: %w", err)
 	}
-	return toGQLRestaurantConfig(config.OrderingEnabled, config.OpeningHours, config.OrderingHours, config.UpdatedAt), nil
+	return toGQLRestaurantConfig(config), nil
+}
+
+// ScheduleOverrides is the resolver for the scheduleOverrides field.
+func (r *queryResolver) ScheduleOverrides(ctx context.Context, from time.Time, to time.Time) ([]*model.ScheduleOverride, error) {
+	overrides, err := r.RestaurantService.ListOverrides(ctx, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("list schedule overrides: %w", err)
+	}
+	out := make([]*model.ScheduleOverride, len(overrides))
+	for i, ov := range overrides {
+		out[i] = toGQLScheduleOverride(ov)
+	}
+	return out, nil
 }
 
 // IsCurrentlyOpen is the resolver for the isCurrentlyOpen field.
-// Returns whether the restaurant is open right now based on the opening hours schedule.
 func (r *restaurantConfigResolver) IsCurrentlyOpen(ctx context.Context, obj *model.RestaurantConfig) (bool, error) {
-	config, err := r.RestaurantService.GetConfig(ctx)
+	config, overrides, err := r.RestaurantService.GetConfigWithOverrides(ctx)
 	if err != nil {
 		return false, fmt.Errorf("get restaurant config: %w", err)
 	}
-	return config.IsCurrentlyOpen(time.Now()), nil
+	return config.IsCurrentlyOpen(time.Now(), overrides), nil
 }
 
 // IsOrderingCurrentlyOpen is the resolver for the isOrderingCurrentlyOpen field.
-// Returns whether ordering is within the configured ordering hours schedule.
-// Falls back to opening hours if ordering hours are not set.
 func (r *restaurantConfigResolver) IsOrderingCurrentlyOpen(ctx context.Context, obj *model.RestaurantConfig) (bool, error) {
-	config, err := r.RestaurantService.GetConfig(ctx)
+	config, overrides, err := r.RestaurantService.GetConfigWithOverrides(ctx)
 	if err != nil {
 		return false, fmt.Errorf("get restaurant config: %w", err)
 	}
-	return config.IsOrderingCurrentlyOpen(time.Now()), nil
+	return config.IsOrderingCurrentlyOpen(time.Now(), overrides), nil
+}
+
+// AvailableSlotsToday is the resolver for the availableSlotsToday field.
+func (r *restaurantConfigResolver) AvailableSlotsToday(ctx context.Context, obj *model.RestaurantConfig) ([]*model.TimeSlot, error) {
+	config, overrides, err := r.RestaurantService.GetConfigWithOverrides(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get restaurant config: %w", err)
+	}
+	return toGQLTimeSlots(config.AvailableSlotsToday(time.Now(), overrides)), nil
+}
+
+// NextOpeningAt is the resolver for the nextOpeningAt field.
+func (r *restaurantConfigResolver) NextOpeningAt(ctx context.Context, obj *model.RestaurantConfig) (*time.Time, error) {
+	config, overrides, err := r.RestaurantService.GetConfigWithOverrides(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get restaurant config: %w", err)
+	}
+	return config.NextOpeningAt(time.Now(), overrides), nil
 }
 
 // RestaurantConfigUpdated is the resolver for the restaurantConfigUpdated field.
@@ -124,6 +187,36 @@ func (r *subscriptionResolver) RestaurantConfigUpdated(ctx context.Context) (<-c
 				if c, ok := msg.(*model.RestaurantConfig); ok {
 					select {
 					case ch <- c:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}
+		}
+	}()
+
+	return ch, nil
+}
+
+// ScheduleOverridesUpdated is the resolver for the scheduleOverridesUpdated field.
+func (r *subscriptionResolver) ScheduleOverridesUpdated(ctx context.Context) (<-chan []*model.ScheduleOverride, error) {
+	ch := make(chan []*model.ScheduleOverride, 1)
+	sub := r.Broker.Subscribe("scheduleOverridesUpdated")
+
+	go func() {
+		defer close(ch)
+		defer r.Broker.Unsubscribe("scheduleOverridesUpdated", sub)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-sub:
+				if !ok {
+					return
+				}
+				if list, ok := msg.([]*model.ScheduleOverride); ok {
+					select {
+					case ch <- list:
 					case <-ctx.Done():
 						return
 					}

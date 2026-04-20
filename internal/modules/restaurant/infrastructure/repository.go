@@ -7,6 +7,8 @@ import (
 	"tsb-service/pkg/db"
 )
 
+const configColumns = `ordering_enabled, opening_hours, ordering_hours, preparation_minutes, updated_at`
+
 type RestaurantRepository struct {
 	pool *db.DBPool
 }
@@ -18,7 +20,7 @@ func NewRestaurantRepository(pool *db.DBPool) domain.RestaurantRepository {
 func (r *RestaurantRepository) GetConfig(ctx context.Context) (*domain.RestaurantConfig, error) {
 	var config domain.RestaurantConfig
 	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
-		`SELECT ordering_enabled, opening_hours, ordering_hours, updated_at FROM restaurant_config WHERE id = TRUE`)
+		`SELECT `+configColumns+` FROM restaurant_config WHERE id = TRUE`)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +31,7 @@ func (r *RestaurantRepository) UpdateOrderingEnabled(ctx context.Context, enable
 	var config domain.RestaurantConfig
 	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
 		`UPDATE restaurant_config SET ordering_enabled = $1, updated_at = NOW() WHERE id = TRUE
-		 RETURNING ordering_enabled, opening_hours, ordering_hours, updated_at`, enabled)
+		 RETURNING `+configColumns, enabled)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +42,7 @@ func (r *RestaurantRepository) UpdateOpeningHours(ctx context.Context, hours jso
 	var config domain.RestaurantConfig
 	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
 		`UPDATE restaurant_config SET opening_hours = $1, updated_at = NOW() WHERE id = TRUE
-		 RETURNING ordering_enabled, opening_hours, ordering_hours, updated_at`, hours)
+		 RETURNING `+configColumns, hours)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +53,18 @@ func (r *RestaurantRepository) UpdateOrderingHours(ctx context.Context, hours js
 	var config domain.RestaurantConfig
 	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
 		`UPDATE restaurant_config SET ordering_hours = $1, updated_at = NOW() WHERE id = TRUE
-		 RETURNING ordering_enabled, opening_hours, ordering_hours, updated_at`, hours)
+		 RETURNING `+configColumns, hours)
+	if err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+func (r *RestaurantRepository) UpdatePreparationMinutes(ctx context.Context, minutes int) (*domain.RestaurantConfig, error) {
+	var config domain.RestaurantConfig
+	err := r.pool.ForContext(ctx).GetContext(ctx, &config,
+		`UPDATE restaurant_config SET preparation_minutes = $1, updated_at = NOW() WHERE id = TRUE
+		 RETURNING `+configColumns, minutes)
 	if err != nil {
 		return nil, err
 	}

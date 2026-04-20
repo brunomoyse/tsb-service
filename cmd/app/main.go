@@ -154,6 +154,7 @@ func main() {
 	paymentRepo := paymentInfrastructure.NewPaymentRepository(dbPool)
 	productRepo := productInfrastructure.NewProductRepository(dbPool)
 	restaurantRepo := restaurantInfrastructure.NewRestaurantRepository(dbPool)
+	scheduleOverrideRepo := restaurantInfrastructure.NewScheduleOverrideRepository(dbPool)
 	userRepo := userInfrastructure.NewUserRepository(dbPool)
 
 	// Google Maps address caching setup
@@ -162,12 +163,12 @@ func main() {
 		zap.L().Error("GOOGLE_MAPS_API_KEY is required")
 		os.Exit(1)
 	}
-	originLat, err := strconv.ParseFloat(cmp.Or(os.Getenv("RESTAURANT_ORIGIN_LAT"), "50.6423"), 64)
+	originLat, err := strconv.ParseFloat(cmp.Or(os.Getenv("RESTAURANT_ORIGIN_LAT"), "50.64245770697728"), 64)
 	if err != nil {
 		zap.L().Error("RESTAURANT_ORIGIN_LAT must be a float", zap.Error(err))
 		os.Exit(1)
 	}
-	originLng, err := strconv.ParseFloat(cmp.Or(os.Getenv("RESTAURANT_ORIGIN_LNG"), "5.5745"), 64)
+	originLng, err := strconv.ParseFloat(cmp.Or(os.Getenv("RESTAURANT_ORIGIN_LNG"), "5.574703166758179"), 64)
 	if err != nil {
 		zap.L().Error("RESTAURANT_ORIGIN_LNG must be a float", zap.Error(err))
 		os.Exit(1)
@@ -186,7 +187,7 @@ func main() {
 	notificationService := notificationApplication.NewNotificationService(notificationRepo)
 	orderService := orderApplication.NewOrderService(orderRepo)
 	productService := productApplication.NewProductService(productRepo)
-	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, os.Getenv("APP_ENV") != "production")
+	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, scheduleOverrideRepo, os.Getenv("APP_ENV") != "production")
 	userService := userApplication.NewUserService(userRepo, zitadelUserFetcher{})
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService)
 

@@ -77,6 +77,7 @@ func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
 	paymentRepo := paymentInfrastructure.NewPaymentRepository(pool)
 	productRepo := productInfrastructure.NewProductRepository(pool)
 	restaurantRepo := restaurantInfrastructure.NewRestaurantRepository(pool)
+	scheduleOverrideRepo := restaurantInfrastructure.NewScheduleOverrideRepository(pool)
 	userRepo := userInfrastructure.NewUserRepository(pool)
 
 	// Create Mollie client (test mode)
@@ -90,7 +91,7 @@ func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
 	couponService := couponApplication.NewCouponService(couponRepo)
 	orderService := orderApplication.NewOrderService(orderRepo)
 	productService := productApplication.NewProductService(productRepo)
-	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, true)
+	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, scheduleOverrideRepo, true)
 	userService := userApplication.NewUserService(userRepo, nil)
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService)
 

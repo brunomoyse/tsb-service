@@ -5,12 +5,28 @@ type DaySchedule {
     dinnerClose: String
 }
 
+type TimeSlot {
+    label: String!
+    value: DateTime!
+}
+
+type ScheduleOverride {
+    date: DateTime!
+    closed: Boolean!
+    schedule: DaySchedule
+    note: String
+    updatedAt: DateTime!
+}
+
 type RestaurantConfig {
     orderingEnabled: Boolean!
     openingHours: JSON!
     orderingHours: JSON
+    preparationMinutes: Int!
     isCurrentlyOpen: Boolean!
     isOrderingCurrentlyOpen: Boolean!
+    availableSlotsToday: [TimeSlot!]!
+    nextOpeningAt: DateTime
     updatedAt: DateTime!
 }
 
@@ -31,16 +47,28 @@ input OpeningHoursInput {
     sunday: DayScheduleInput
 }
 
+input ScheduleOverrideInput {
+    date: DateTime!
+    closed: Boolean!
+    schedule: DayScheduleInput
+    note: String
+}
+
 extend type Query {
     restaurantConfig: RestaurantConfig!
+    scheduleOverrides(from: DateTime!, to: DateTime!): [ScheduleOverride!]! @admin
 }
 
 extend type Mutation {
     updateOrderingEnabled(enabled: Boolean!): RestaurantConfig! @admin
     updateOpeningHours(hours: OpeningHoursInput!): RestaurantConfig! @admin
     updateOrderingHours(hours: OpeningHoursInput!): RestaurantConfig! @admin
+    updatePreparationMinutes(minutes: Int!): RestaurantConfig! @admin
+    upsertScheduleOverride(input: ScheduleOverrideInput!): ScheduleOverride! @admin
+    deleteScheduleOverride(date: DateTime!): Boolean! @admin
 }
 
 extend type Subscription {
     restaurantConfigUpdated: RestaurantConfig!
+    scheduleOverridesUpdated: [ScheduleOverride!]!
 }

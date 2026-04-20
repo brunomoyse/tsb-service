@@ -211,6 +211,10 @@ models:
         resolver: true
       isOrderingCurrentlyOpen:
         resolver: true
+      availableSlotsToday:
+        resolver: true
+      nextOpeningAt:
+        resolver: true
 
   User:
     model:

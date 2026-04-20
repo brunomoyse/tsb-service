@@ -215,21 +215,105 @@ func toDomainTranslationsPtr(in []*model.TranslationInput) []productDomain.Trans
 	return out
 }
 
-func toGQLRestaurantConfig(orderingEnabled bool, openingHoursRaw json.RawMessage, orderingHoursRaw json.RawMessage, updatedAt time.Time) *model.RestaurantConfig {
+func toGQLRestaurantConfig(c *restaurantDomain.RestaurantConfig) *model.RestaurantConfig {
 	var openingHours map[string]any
-	_ = json.Unmarshal(openingHoursRaw, &openingHours)
+	_ = json.Unmarshal(c.OpeningHours, &openingHours)
 
 	var orderingHours map[string]any
-	if len(orderingHoursRaw) > 0 && string(orderingHoursRaw) != "null" {
-		_ = json.Unmarshal(orderingHoursRaw, &orderingHours)
+	if len(c.OrderingHours) > 0 && string(c.OrderingHours) != "null" {
+		_ = json.Unmarshal(c.OrderingHours, &orderingHours)
 	}
 
 	return &model.RestaurantConfig{
-		OrderingEnabled: orderingEnabled,
-		OpeningHours:    openingHours,
-		OrderingHours:   orderingHours,
-		UpdatedAt:       updatedAt,
+		OrderingEnabled:    c.OrderingEnabled,
+		OpeningHours:       openingHours,
+		OrderingHours:      orderingHours,
+		PreparationMinutes: c.PreparationMinutes,
+		UpdatedAt:          c.UpdatedAt,
 	}
+}
+
+func toGQLScheduleOverride(ov *restaurantDomain.ScheduleOverride) *model.ScheduleOverride {
+	out := &model.ScheduleOverride{
+		Date:      ov.Date,
+		Closed:    ov.Closed,
+		Note:      ov.Note,
+		UpdatedAt: ov.UpdatedAt,
+	}
+	if s, err := ov.ParsedSchedule(); err == nil && s != nil {
+		out.Schedule = toGQLDaySchedule(s)
+	}
+	return out
+}
+
+func toGQLDaySchedule(s *restaurantDomain.DaySchedule) *model.DaySchedule {
+	if s == nil {
+		return nil
+	}
+	out := &model.DaySchedule{
+		Open:  s.Open,
+		Close: s.Close,
+	}
+	if s.DinnerOpen != "" {
+		v := s.DinnerOpen
+		out.DinnerOpen = &v
+	}
+	if s.DinnerClose != "" {
+		v := s.DinnerClose
+		out.DinnerClose = &v
+	}
+	return out
+}
+
+func toGQLTimeSlots(slots []restaurantDomain.TimeSlot) []*model.TimeSlot {
+	out := make([]*model.TimeSlot, len(slots))
+	for i, s := range slots {
+		out[i] = &model.TimeSlot{Label: s.Label, Value: s.Value}
+	}
+	return out
+}
+
+// marshalOpeningHoursInput converts the GraphQL input into the JSONB shape
+// stored in restaurant_config.opening_hours / ordering_hours.
+func marshalOpeningHoursInput(hours model.OpeningHoursInput) (json.RawMessage, error) {
+	hoursMap := map[string]any{
+		"monday":    toScheduleMap(hours.Monday),
+		"tuesday":   toScheduleMap(hours.Tuesday),
+		"wednesday": toScheduleMap(hours.Wednesday),
+		"thursday":  toScheduleMap(hours.Thursday),
+		"friday":    toScheduleMap(hours.Friday),
+		"saturday":  toScheduleMap(hours.Saturday),
+		"sunday":    toScheduleMap(hours.Sunday),
+	}
+	b, err := json.Marshal(hoursMap)
+	if err != nil {
+		return nil, fmt.Errorf("marshal hours: %w", err)
+	}
+	return b, nil
+}
+
+// publishScheduleOverridesUpdated republishes the next batch of overrides
+// (today + 1 year lookahead) so dashboard subscribers refresh after a change.
+func (r *Resolver) publishScheduleOverridesUpdated(ctx context.Context) {
+	overrides, err := r.RestaurantService.ListOverrides(ctx, time.Now(), time.Now().AddDate(1, 0, 0))
+	if err != nil {
+		return
+	}
+	out := make([]*model.ScheduleOverride, len(overrides))
+	for i, ov := range overrides {
+		out[i] = toGQLScheduleOverride(ov)
+	}
+	r.Broker.Publish("scheduleOverridesUpdated", out)
+}
+
+// publishRestaurantConfigUpdated republishes the config so `isCurrentlyOpen`,
+// `availableSlotsToday`, etc. subscribers refresh after an override change.
+func (r *Resolver) publishRestaurantConfigUpdated(ctx context.Context) {
+	config, err := r.RestaurantService.GetConfig(ctx)
+	if err != nil {
+		return
+	}
+	r.Broker.Publish("restaurantConfigUpdated", toGQLRestaurantConfig(config))
 }
 
 func toScheduleMap(s *model.DayScheduleInput) any {
@@ -337,7 +421,7 @@ func derefFloatOrZero(f *float64) float64 {
 	return 0
 }
 
-func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.RestaurantConfig, now time.Time, isOpenNow bool) error {
+func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.RestaurantConfig, overrides map[string]*restaurantDomain.ScheduleOverride, now time.Time, isOpenNow bool) error {
 	if preferred == nil {
 		if !isOpenNow {
 			return fmt.Errorf("fixed time is required while the restaurant is closed")
@@ -360,18 +444,12 @@ func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.R
 		return fmt.Errorf("preferred ready time must be aligned to 15-minute slots")
 	}
 
-	// Use ordering hours if set, otherwise fall back to opening hours
-	hours, err := config.GetOrderingHours()
-	if err != nil || hours == nil {
-		hours, err = config.GetOpeningHours()
-		if err != nil {
-			return fmt.Errorf("failed to parse opening hours")
-		}
-	}
-
-	dayName := strings.ToLower(nowLocal.Weekday().String())
-	schedule, exists := hours[dayName]
-	if !exists || schedule == nil {
+	// Use ordering hours if set, otherwise fall back to opening hours.
+	// resolveDaySchedule is not exported; replicate its priority here:
+	// override > weekly. We use IsOrderingCurrentlyOpen already checks this,
+	// so here we just need the resolved schedule for slot containment.
+	schedule := resolveSchedule(config, overrides, now)
+	if schedule == nil {
 		return fmt.Errorf("ordering is closed today")
 	}
 
@@ -381,6 +459,37 @@ func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.R
 	}
 
 	return nil
+}
+
+// resolveSchedule returns the effective schedule for `now`, using the
+// same override > ordering hours > opening hours priority as domain resolution.
+func resolveSchedule(config *restaurantDomain.RestaurantConfig, overrides map[string]*restaurantDomain.ScheduleOverride, now time.Time) *restaurantDomain.DaySchedule {
+	// Override for today wins regardless of weekly config.
+	local := now.In(now.Location())
+	dateKey := local.Format("2006-01-02")
+	if ov, ok := overrides[dateKey]; ok && ov != nil {
+		if ov.Closed {
+			return nil
+		}
+		if s, err := ov.ParsedSchedule(); err == nil && s != nil {
+			return s
+		}
+		return nil
+	}
+
+	hours, err := config.GetOrderingHours()
+	if err != nil || hours == nil {
+		hours, err = config.GetOpeningHours()
+		if err != nil {
+			return nil
+		}
+	}
+	dayName := strings.ToLower(local.Weekday().String())
+	schedule, exists := hours[dayName]
+	if !exists || schedule == nil {
+		return nil
+	}
+	return schedule
 }
 
 func isSlotInAllowedInterval(slotMins int, schedule *restaurantDomain.DaySchedule) bool {
