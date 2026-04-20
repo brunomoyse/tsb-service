@@ -37,7 +37,7 @@ import (
 func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error) {
 	// 0) Validate ordering availability and preferred ready time constraints
 	if !r.RestaurantService.IsDevMode() {
-		config, err := r.RestaurantService.GetConfig(ctx)
+		config, overrides, err := r.RestaurantService.GetConfigWithOverrides(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load restaurant config: %w", err)
 		}
@@ -46,8 +46,8 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 
 		now := time.Now()
-		isOpenNow := config.IsOrderingCurrentlyOpen(now)
-		if err := validatePreferredReadyTime(input.PreferredReadyTime, config, now, isOpenNow); err != nil {
+		isOpenNow := config.IsOrderingCurrentlyOpen(now, overrides)
+		if err := validatePreferredReadyTime(input.PreferredReadyTime, config, overrides, now, isOpenNow); err != nil {
 			return nil, err
 		}
 	}
@@ -278,6 +278,14 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	// 8) Persist via service
 	order, itemsRaw, err := r.OrderService.CreateOrder(ctx, tempOrder, &rawItems)
 	if err != nil {
+		if validatedCouponID != nil {
+			if rbErr := r.CouponService.DecrementUsageAtomic(ctx, *validatedCouponID, userUUID); rbErr != nil {
+				zap.L().Error("failed to rollback coupon after order creation failure",
+					zap.String("coupon_id", validatedCouponID.String()),
+					zap.String("user_id", userUUID.String()),
+					zap.Error(rbErr))
+			}
+		}
 		return nil, fmt.Errorf("failed to create order: %w", err)
 	}
 
@@ -323,6 +331,15 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			// Clean up the orphaned order since payment creation failed
 			if delErr := r.OrderService.DeleteOrder(ctx, order.ID); delErr != nil {
 				zap.L().Error("failed to delete orphaned order", zap.String("order_id", order.ID.String()), zap.Error(delErr))
+			}
+			if validatedCouponID != nil {
+				if rbErr := r.CouponService.DecrementUsageAtomic(ctx, *validatedCouponID, userUUID); rbErr != nil {
+					zap.L().Error("failed to rollback coupon after payment creation failure",
+						zap.String("coupon_id", validatedCouponID.String()),
+						zap.String("user_id", userUUID.String()),
+						zap.String("order_id", order.ID.String()),
+						zap.Error(rbErr))
+				}
 			}
 			return nil, fmt.Errorf("failed to create payment: %w", err)
 		}

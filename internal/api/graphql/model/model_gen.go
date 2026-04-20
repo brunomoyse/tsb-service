@@ -316,15 +316,38 @@ type Query struct {
 }
 
 type RestaurantConfig struct {
-	OrderingEnabled         bool      `json:"orderingEnabled"`
-	OpeningHours            any       `json:"openingHours"`
-	OrderingHours           any       `json:"orderingHours,omitempty"`
-	IsCurrentlyOpen         bool      `json:"isCurrentlyOpen"`
-	IsOrderingCurrentlyOpen bool      `json:"isOrderingCurrentlyOpen"`
-	UpdatedAt               time.Time `json:"updatedAt"`
+	OrderingEnabled         bool        `json:"orderingEnabled"`
+	OpeningHours            any         `json:"openingHours"`
+	OrderingHours           any         `json:"orderingHours,omitempty"`
+	PreparationMinutes      int         `json:"preparationMinutes"`
+	IsCurrentlyOpen         bool        `json:"isCurrentlyOpen"`
+	IsOrderingCurrentlyOpen bool        `json:"isOrderingCurrentlyOpen"`
+	AvailableSlotsToday     []*TimeSlot `json:"availableSlotsToday"`
+	NextOpeningAt           *time.Time  `json:"nextOpeningAt,omitempty"`
+	UpdatedAt               time.Time   `json:"updatedAt"`
+}
+
+type ScheduleOverride struct {
+	Date      time.Time    `json:"date"`
+	Closed    bool         `json:"closed"`
+	Schedule  *DaySchedule `json:"schedule,omitempty"`
+	Note      *string      `json:"note,omitempty"`
+	UpdatedAt time.Time    `json:"updatedAt"`
+}
+
+type ScheduleOverrideInput struct {
+	Date     time.Time         `json:"date"`
+	Closed   bool              `json:"closed"`
+	Schedule *DayScheduleInput `json:"schedule,omitempty"`
+	Note     *string           `json:"note,omitempty"`
 }
 
 type Subscription struct {
+}
+
+type TimeSlot struct {
+	Label string    `json:"label"`
+	Value time.Time `json:"value"`
 }
 
 type Translation struct {

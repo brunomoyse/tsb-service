@@ -140,6 +140,7 @@ type ComplexityRoot struct {
 		CreateProductChoice       func(childComplexity int, input model.CreateProductChoiceInput) int
 		DeletePosStaff            func(childComplexity int, id uuid.UUID) int
 		DeleteProductChoice       func(childComplexity int, id uuid.UUID) int
+		DeleteScheduleOverride    func(childComplexity int, date time.Time) int
 		RegisterDeviceToken       func(childComplexity int, deviceToken string, platform string) int
 		RegisterLiveActivityToken func(childComplexity int, orderID uuid.UUID, pushToken string) int
 		RequestDeletion           func(childComplexity int) int
@@ -154,8 +155,10 @@ type ComplexityRoot struct {
 		UpdateOrderingEnabled     func(childComplexity int, enabled bool) int
 		UpdateOrderingHours       func(childComplexity int, hours model.OpeningHoursInput) int
 		UpdatePaymentStatus       func(childComplexity int, orderID uuid.UUID, status string) int
+		UpdatePreparationMinutes  func(childComplexity int, minutes int) int
 		UpdateProduct             func(childComplexity int, id uuid.UUID, input model.UpdateProductInput) int
 		UpdateProductChoice       func(childComplexity int, id uuid.UUID, input model.UpdateProductChoiceInput) int
+		UpsertScheduleOverride    func(childComplexity int, input model.ScheduleOverrideInput) int
 	}
 
 	Order struct {
@@ -321,25 +324,43 @@ type ComplexityRoot struct {
 		Products              func(childComplexity int) int
 		ResolveAddress        func(childComplexity int, placeID string, sessionToken string) int
 		RestaurantConfig      func(childComplexity int) int
+		ScheduleOverrides     func(childComplexity int, from time.Time, to time.Time) int
 		ValidateCoupon        func(childComplexity int, code string, orderAmount string) int
 	}
 
 	RestaurantConfig struct {
+		AvailableSlotsToday     func(childComplexity int) int
 		IsCurrentlyOpen         func(childComplexity int) int
 		IsOrderingCurrentlyOpen func(childComplexity int) int
+		NextOpeningAt           func(childComplexity int) int
 		OpeningHours            func(childComplexity int) int
 		OrderingEnabled         func(childComplexity int) int
 		OrderingHours           func(childComplexity int) int
+		PreparationMinutes      func(childComplexity int) int
 		UpdatedAt               func(childComplexity int) int
 	}
 
+	ScheduleOverride struct {
+		Closed    func(childComplexity int) int
+		Date      func(childComplexity int) int
+		Note      func(childComplexity int) int
+		Schedule  func(childComplexity int) int
+		UpdatedAt func(childComplexity int) int
+	}
+
 	Subscription struct {
-		CouponUpdated           func(childComplexity int) int
-		MyOrderUpdated          func(childComplexity int, orderID uuid.UUID) int
-		OrderCreated            func(childComplexity int) int
-		OrderUpdated            func(childComplexity int) int
-		ProductUpdated          func(childComplexity int) int
-		RestaurantConfigUpdated func(childComplexity int) int
+		CouponUpdated            func(childComplexity int) int
+		MyOrderUpdated           func(childComplexity int, orderID uuid.UUID) int
+		OrderCreated             func(childComplexity int) int
+		OrderUpdated             func(childComplexity int) int
+		ProductUpdated           func(childComplexity int) int
+		RestaurantConfigUpdated  func(childComplexity int) int
+		ScheduleOverridesUpdated func(childComplexity int) int
+	}
+
+	TimeSlot struct {
+		Label func(childComplexity int) int
+		Value func(childComplexity int) int
 	}
 
 	Translation struct {
@@ -386,6 +407,9 @@ type MutationResolver interface {
 	UpdateOrderingEnabled(ctx context.Context, enabled bool) (*model.RestaurantConfig, error)
 	UpdateOpeningHours(ctx context.Context, hours model.OpeningHoursInput) (*model.RestaurantConfig, error)
 	UpdateOrderingHours(ctx context.Context, hours model.OpeningHoursInput) (*model.RestaurantConfig, error)
+	UpdatePreparationMinutes(ctx context.Context, minutes int) (*model.RestaurantConfig, error)
+	UpsertScheduleOverride(ctx context.Context, input model.ScheduleOverrideInput) (*model.ScheduleOverride, error)
+	DeleteScheduleOverride(ctx context.Context, date time.Time) (bool, error)
 	UpdateMe(ctx context.Context, input model.UpdateUserInput) (*model.User, error)
 	RequestDeletion(ctx context.Context) (*model.User, error)
 	CancelDeletionRequest(ctx context.Context) (*model.User, error)
@@ -435,12 +459,15 @@ type QueryResolver interface {
 	ProductCategory(ctx context.Context, id uuid.UUID) (*model.ProductCategory, error)
 	ProductCategories(ctx context.Context) ([]*model.ProductCategory, error)
 	RestaurantConfig(ctx context.Context) (*model.RestaurantConfig, error)
+	ScheduleOverrides(ctx context.Context, from time.Time, to time.Time) ([]*model.ScheduleOverride, error)
 	Me(ctx context.Context) (*model.User, error)
 	CustomerStats(ctx context.Context, input *model.CustomerStatsInput) (*model.CustomerStatsResponse, error)
 }
 type RestaurantConfigResolver interface {
 	IsCurrentlyOpen(ctx context.Context, obj *model.RestaurantConfig) (bool, error)
 	IsOrderingCurrentlyOpen(ctx context.Context, obj *model.RestaurantConfig) (bool, error)
+	AvailableSlotsToday(ctx context.Context, obj *model.RestaurantConfig) ([]*model.TimeSlot, error)
+	NextOpeningAt(ctx context.Context, obj *model.RestaurantConfig) (*time.Time, error)
 }
 type SubscriptionResolver interface {
 	CouponUpdated(ctx context.Context) (<-chan *model.Coupon, error)
@@ -449,6 +476,7 @@ type SubscriptionResolver interface {
 	MyOrderUpdated(ctx context.Context, orderID uuid.UUID) (<-chan *model.Order, error)
 	ProductUpdated(ctx context.Context) (<-chan *model.Product, error)
 	RestaurantConfigUpdated(ctx context.Context) (<-chan *model.RestaurantConfig, error)
+	ScheduleOverridesUpdated(ctx context.Context) (<-chan []*model.ScheduleOverride, error)
 }
 type UserResolver interface {
 	Address(ctx context.Context, obj *model.User) (*model.Address, error)
@@ -891,6 +919,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteProductChoice(childComplexity, args["id"].(uuid.UUID)), true
+	case "Mutation.deleteScheduleOverride":
+		if e.ComplexityRoot.Mutation.DeleteScheduleOverride == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteScheduleOverride_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteScheduleOverride(childComplexity, args["date"].(time.Time)), true
 	case "Mutation.registerDeviceToken":
 		if e.ComplexityRoot.Mutation.RegisterDeviceToken == nil {
 			break
@@ -1040,6 +1079,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.UpdatePaymentStatus(childComplexity, args["orderId"].(uuid.UUID), args["status"].(string)), true
+	case "Mutation.updatePreparationMinutes":
+		if e.ComplexityRoot.Mutation.UpdatePreparationMinutes == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updatePreparationMinutes_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdatePreparationMinutes(childComplexity, args["minutes"].(int)), true
 	case "Mutation.updateProduct":
 		if e.ComplexityRoot.Mutation.UpdateProduct == nil {
 			break
@@ -1062,6 +1112,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.UpdateProductChoice(childComplexity, args["id"].(uuid.UUID), args["input"].(model.UpdateProductChoiceInput)), true
+	case "Mutation.upsertScheduleOverride":
+		if e.ComplexityRoot.Mutation.UpsertScheduleOverride == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_upsertScheduleOverride_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpsertScheduleOverride(childComplexity, args["input"].(model.ScheduleOverrideInput)), true
 
 	case "Order.address":
 		if e.ComplexityRoot.Order.Address == nil {
@@ -1904,6 +1965,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.RestaurantConfig(childComplexity), true
+	case "Query.scheduleOverrides":
+		if e.ComplexityRoot.Query.ScheduleOverrides == nil {
+			break
+		}
+
+		args, err := ec.field_Query_scheduleOverrides_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ScheduleOverrides(childComplexity, args["from"].(time.Time), args["to"].(time.Time)), true
 	case "Query.validateCoupon":
 		if e.ComplexityRoot.Query.ValidateCoupon == nil {
 			break
@@ -1916,6 +1988,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Query.ValidateCoupon(childComplexity, args["code"].(string), args["orderAmount"].(string)), true
 
+	case "RestaurantConfig.availableSlotsToday":
+		if e.ComplexityRoot.RestaurantConfig.AvailableSlotsToday == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RestaurantConfig.AvailableSlotsToday(childComplexity), true
 	case "RestaurantConfig.isCurrentlyOpen":
 		if e.ComplexityRoot.RestaurantConfig.IsCurrentlyOpen == nil {
 			break
@@ -1928,6 +2006,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.RestaurantConfig.IsOrderingCurrentlyOpen(childComplexity), true
+	case "RestaurantConfig.nextOpeningAt":
+		if e.ComplexityRoot.RestaurantConfig.NextOpeningAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RestaurantConfig.NextOpeningAt(childComplexity), true
 	case "RestaurantConfig.openingHours":
 		if e.ComplexityRoot.RestaurantConfig.OpeningHours == nil {
 			break
@@ -1946,12 +2030,49 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.RestaurantConfig.OrderingHours(childComplexity), true
+	case "RestaurantConfig.preparationMinutes":
+		if e.ComplexityRoot.RestaurantConfig.PreparationMinutes == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RestaurantConfig.PreparationMinutes(childComplexity), true
 	case "RestaurantConfig.updatedAt":
 		if e.ComplexityRoot.RestaurantConfig.UpdatedAt == nil {
 			break
 		}
 
 		return e.ComplexityRoot.RestaurantConfig.UpdatedAt(childComplexity), true
+
+	case "ScheduleOverride.closed":
+		if e.ComplexityRoot.ScheduleOverride.Closed == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ScheduleOverride.Closed(childComplexity), true
+	case "ScheduleOverride.date":
+		if e.ComplexityRoot.ScheduleOverride.Date == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ScheduleOverride.Date(childComplexity), true
+	case "ScheduleOverride.note":
+		if e.ComplexityRoot.ScheduleOverride.Note == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ScheduleOverride.Note(childComplexity), true
+	case "ScheduleOverride.schedule":
+		if e.ComplexityRoot.ScheduleOverride.Schedule == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ScheduleOverride.Schedule(childComplexity), true
+	case "ScheduleOverride.updatedAt":
+		if e.ComplexityRoot.ScheduleOverride.UpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ScheduleOverride.UpdatedAt(childComplexity), true
 
 	case "Subscription.couponUpdated":
 		if e.ComplexityRoot.Subscription.CouponUpdated == nil {
@@ -1994,6 +2115,25 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Subscription.RestaurantConfigUpdated(childComplexity), true
+	case "Subscription.scheduleOverridesUpdated":
+		if e.ComplexityRoot.Subscription.ScheduleOverridesUpdated == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Subscription.ScheduleOverridesUpdated(childComplexity), true
+
+	case "TimeSlot.label":
+		if e.ComplexityRoot.TimeSlot.Label == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeSlot.Label(childComplexity), true
+	case "TimeSlot.value":
+		if e.ComplexityRoot.TimeSlot.Value == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeSlot.Value(childComplexity), true
 
 	case "Translation.description":
 		if e.ComplexityRoot.Translation.Description == nil {
@@ -2106,6 +2246,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputOpeningHoursInput,
 		ec.unmarshalInputOrderExtraInput,
 		ec.unmarshalInputOrderHistoryInput,
+		ec.unmarshalInputScheduleOverrideInput,
 		ec.unmarshalInputTranslationInput,
 		ec.unmarshalInputUpdateCouponInput,
 		ec.unmarshalInputUpdateOrderInput,
@@ -2319,6 +2460,17 @@ func (ec *executionContext) field_Mutation_deleteProductChoice_args(ctx context.
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_deleteScheduleOverride_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "date", ec.unmarshalNDateTime2timeᚐTime)
+	if err != nil {
+		return nil, err
+	}
+	args["date"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_registerDeviceToken_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2497,6 +2649,17 @@ func (ec *executionContext) field_Mutation_updatePaymentStatus_args(ctx context.
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_updatePreparationMinutes_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "minutes", ec.unmarshalNInt2int)
+	if err != nil {
+		return nil, err
+	}
+	args["minutes"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_updateProductChoice_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2526,6 +2689,17 @@ func (ec *executionContext) field_Mutation_updateProduct_args(ctx context.Contex
 		return nil, err
 	}
 	args["input"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_upsertScheduleOverride_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNScheduleOverrideInput2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐScheduleOverrideInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -2683,6 +2857,22 @@ func (ec *executionContext) field_Query_resolveAddress_args(ctx context.Context,
 		return nil, err
 	}
 	args["sessionToken"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_scheduleOverrides_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "from", ec.unmarshalNDateTime2timeᚐTime)
+	if err != nil {
+		return nil, err
+	}
+	args["from"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "to", ec.unmarshalNDateTime2timeᚐTime)
+	if err != nil {
+		return nil, err
+	}
+	args["to"] = arg1
 	return args, nil
 }
 
@@ -5818,10 +6008,16 @@ func (ec *executionContext) fieldContext_Mutation_updateOrderingEnabled(ctx cont
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
 			case "orderingHours":
 				return ec.fieldContext_RestaurantConfig_orderingHours(ctx, field)
+			case "preparationMinutes":
+				return ec.fieldContext_RestaurantConfig_preparationMinutes(ctx, field)
 			case "isCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isCurrentlyOpen(ctx, field)
 			case "isOrderingCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isOrderingCurrentlyOpen(ctx, field)
+			case "availableSlotsToday":
+				return ec.fieldContext_RestaurantConfig_availableSlotsToday(ctx, field)
+			case "nextOpeningAt":
+				return ec.fieldContext_RestaurantConfig_nextOpeningAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_RestaurantConfig_updatedAt(ctx, field)
 			}
@@ -5886,10 +6082,16 @@ func (ec *executionContext) fieldContext_Mutation_updateOpeningHours(ctx context
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
 			case "orderingHours":
 				return ec.fieldContext_RestaurantConfig_orderingHours(ctx, field)
+			case "preparationMinutes":
+				return ec.fieldContext_RestaurantConfig_preparationMinutes(ctx, field)
 			case "isCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isCurrentlyOpen(ctx, field)
 			case "isOrderingCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isOrderingCurrentlyOpen(ctx, field)
+			case "availableSlotsToday":
+				return ec.fieldContext_RestaurantConfig_availableSlotsToday(ctx, field)
+			case "nextOpeningAt":
+				return ec.fieldContext_RestaurantConfig_nextOpeningAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_RestaurantConfig_updatedAt(ctx, field)
 			}
@@ -5954,10 +6156,16 @@ func (ec *executionContext) fieldContext_Mutation_updateOrderingHours(ctx contex
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
 			case "orderingHours":
 				return ec.fieldContext_RestaurantConfig_orderingHours(ctx, field)
+			case "preparationMinutes":
+				return ec.fieldContext_RestaurantConfig_preparationMinutes(ctx, field)
 			case "isCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isCurrentlyOpen(ctx, field)
 			case "isOrderingCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isOrderingCurrentlyOpen(ctx, field)
+			case "availableSlotsToday":
+				return ec.fieldContext_RestaurantConfig_availableSlotsToday(ctx, field)
+			case "nextOpeningAt":
+				return ec.fieldContext_RestaurantConfig_nextOpeningAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_RestaurantConfig_updatedAt(ctx, field)
 			}
@@ -5972,6 +6180,200 @@ func (ec *executionContext) fieldContext_Mutation_updateOrderingHours(ctx contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateOrderingHours_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updatePreparationMinutes(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_updatePreparationMinutes,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdatePreparationMinutes(ctx, fc.Args["minutes"].(int))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.RestaurantConfig
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNRestaurantConfig2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐRestaurantConfig,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updatePreparationMinutes(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "orderingEnabled":
+				return ec.fieldContext_RestaurantConfig_orderingEnabled(ctx, field)
+			case "openingHours":
+				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
+			case "orderingHours":
+				return ec.fieldContext_RestaurantConfig_orderingHours(ctx, field)
+			case "preparationMinutes":
+				return ec.fieldContext_RestaurantConfig_preparationMinutes(ctx, field)
+			case "isCurrentlyOpen":
+				return ec.fieldContext_RestaurantConfig_isCurrentlyOpen(ctx, field)
+			case "isOrderingCurrentlyOpen":
+				return ec.fieldContext_RestaurantConfig_isOrderingCurrentlyOpen(ctx, field)
+			case "availableSlotsToday":
+				return ec.fieldContext_RestaurantConfig_availableSlotsToday(ctx, field)
+			case "nextOpeningAt":
+				return ec.fieldContext_RestaurantConfig_nextOpeningAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_RestaurantConfig_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RestaurantConfig", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updatePreparationMinutes_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_upsertScheduleOverride(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_upsertScheduleOverride,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpsertScheduleOverride(ctx, fc.Args["input"].(model.ScheduleOverrideInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.ScheduleOverride
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNScheduleOverride2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐScheduleOverride,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_upsertScheduleOverride(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "date":
+				return ec.fieldContext_ScheduleOverride_date(ctx, field)
+			case "closed":
+				return ec.fieldContext_ScheduleOverride_closed(ctx, field)
+			case "schedule":
+				return ec.fieldContext_ScheduleOverride_schedule(ctx, field)
+			case "note":
+				return ec.fieldContext_ScheduleOverride_note(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ScheduleOverride_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ScheduleOverride", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_upsertScheduleOverride_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteScheduleOverride(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_deleteScheduleOverride,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteScheduleOverride(ctx, fc.Args["date"].(time.Time))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteScheduleOverride(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteScheduleOverride_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -11021,15 +11423,87 @@ func (ec *executionContext) fieldContext_Query_restaurantConfig(_ context.Contex
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
 			case "orderingHours":
 				return ec.fieldContext_RestaurantConfig_orderingHours(ctx, field)
+			case "preparationMinutes":
+				return ec.fieldContext_RestaurantConfig_preparationMinutes(ctx, field)
 			case "isCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isCurrentlyOpen(ctx, field)
 			case "isOrderingCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isOrderingCurrentlyOpen(ctx, field)
+			case "availableSlotsToday":
+				return ec.fieldContext_RestaurantConfig_availableSlotsToday(ctx, field)
+			case "nextOpeningAt":
+				return ec.fieldContext_RestaurantConfig_nextOpeningAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_RestaurantConfig_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RestaurantConfig", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_scheduleOverrides(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_scheduleOverrides,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ScheduleOverrides(ctx, fc.Args["from"].(time.Time), fc.Args["to"].(time.Time))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal []*model.ScheduleOverride
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNScheduleOverride2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐScheduleOverrideᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_scheduleOverrides(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "date":
+				return ec.fieldContext_ScheduleOverride_date(ctx, field)
+			case "closed":
+				return ec.fieldContext_ScheduleOverride_closed(ctx, field)
+			case "schedule":
+				return ec.fieldContext_ScheduleOverride_schedule(ctx, field)
+			case "note":
+				return ec.fieldContext_ScheduleOverride_note(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ScheduleOverride_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ScheduleOverride", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_scheduleOverrides_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -11357,6 +11831,35 @@ func (ec *executionContext) fieldContext_RestaurantConfig_orderingHours(_ contex
 	return fc, nil
 }
 
+func (ec *executionContext) _RestaurantConfig_preparationMinutes(ctx context.Context, field graphql.CollectedField, obj *model.RestaurantConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RestaurantConfig_preparationMinutes,
+		func(ctx context.Context) (any, error) {
+			return obj.PreparationMinutes, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RestaurantConfig_preparationMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RestaurantConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RestaurantConfig_isCurrentlyOpen(ctx context.Context, field graphql.CollectedField, obj *model.RestaurantConfig) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -11415,6 +11918,70 @@ func (ec *executionContext) fieldContext_RestaurantConfig_isOrderingCurrentlyOpe
 	return fc, nil
 }
 
+func (ec *executionContext) _RestaurantConfig_availableSlotsToday(ctx context.Context, field graphql.CollectedField, obj *model.RestaurantConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RestaurantConfig_availableSlotsToday,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.RestaurantConfig().AvailableSlotsToday(ctx, obj)
+		},
+		nil,
+		ec.marshalNTimeSlot2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTimeSlotᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RestaurantConfig_availableSlotsToday(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RestaurantConfig",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "label":
+				return ec.fieldContext_TimeSlot_label(ctx, field)
+			case "value":
+				return ec.fieldContext_TimeSlot_value(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSlot", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RestaurantConfig_nextOpeningAt(ctx context.Context, field graphql.CollectedField, obj *model.RestaurantConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RestaurantConfig_nextOpeningAt,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.RestaurantConfig().NextOpeningAt(ctx, obj)
+		},
+		nil,
+		ec.marshalODateTime2ᚖtimeᚐTime,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_RestaurantConfig_nextOpeningAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RestaurantConfig",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RestaurantConfig_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.RestaurantConfig) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -11434,6 +12001,161 @@ func (ec *executionContext) _RestaurantConfig_updatedAt(ctx context.Context, fie
 func (ec *executionContext) fieldContext_RestaurantConfig_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "RestaurantConfig",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ScheduleOverride_date(ctx context.Context, field graphql.CollectedField, obj *model.ScheduleOverride) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ScheduleOverride_date,
+		func(ctx context.Context) (any, error) {
+			return obj.Date, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ScheduleOverride_date(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ScheduleOverride",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ScheduleOverride_closed(ctx context.Context, field graphql.CollectedField, obj *model.ScheduleOverride) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ScheduleOverride_closed,
+		func(ctx context.Context) (any, error) {
+			return obj.Closed, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ScheduleOverride_closed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ScheduleOverride",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ScheduleOverride_schedule(ctx context.Context, field graphql.CollectedField, obj *model.ScheduleOverride) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ScheduleOverride_schedule,
+		func(ctx context.Context) (any, error) {
+			return obj.Schedule, nil
+		},
+		nil,
+		ec.marshalODaySchedule2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐDaySchedule,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ScheduleOverride_schedule(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ScheduleOverride",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "open":
+				return ec.fieldContext_DaySchedule_open(ctx, field)
+			case "close":
+				return ec.fieldContext_DaySchedule_close(ctx, field)
+			case "dinnerOpen":
+				return ec.fieldContext_DaySchedule_dinnerOpen(ctx, field)
+			case "dinnerClose":
+				return ec.fieldContext_DaySchedule_dinnerClose(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DaySchedule", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ScheduleOverride_note(ctx context.Context, field graphql.CollectedField, obj *model.ScheduleOverride) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ScheduleOverride_note,
+		func(ctx context.Context) (any, error) {
+			return obj.Note, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_ScheduleOverride_note(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ScheduleOverride",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ScheduleOverride_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.ScheduleOverride) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ScheduleOverride_updatedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ScheduleOverride_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ScheduleOverride",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -11909,14 +12631,119 @@ func (ec *executionContext) fieldContext_Subscription_restaurantConfigUpdated(_ 
 				return ec.fieldContext_RestaurantConfig_openingHours(ctx, field)
 			case "orderingHours":
 				return ec.fieldContext_RestaurantConfig_orderingHours(ctx, field)
+			case "preparationMinutes":
+				return ec.fieldContext_RestaurantConfig_preparationMinutes(ctx, field)
 			case "isCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isCurrentlyOpen(ctx, field)
 			case "isOrderingCurrentlyOpen":
 				return ec.fieldContext_RestaurantConfig_isOrderingCurrentlyOpen(ctx, field)
+			case "availableSlotsToday":
+				return ec.fieldContext_RestaurantConfig_availableSlotsToday(ctx, field)
+			case "nextOpeningAt":
+				return ec.fieldContext_RestaurantConfig_nextOpeningAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_RestaurantConfig_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RestaurantConfig", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_scheduleOverridesUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	return graphql.ResolveFieldStream(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Subscription_scheduleOverridesUpdated,
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Subscription().ScheduleOverridesUpdated(ctx)
+		},
+		nil,
+		ec.marshalNScheduleOverride2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐScheduleOverrideᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Subscription_scheduleOverridesUpdated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "date":
+				return ec.fieldContext_ScheduleOverride_date(ctx, field)
+			case "closed":
+				return ec.fieldContext_ScheduleOverride_closed(ctx, field)
+			case "schedule":
+				return ec.fieldContext_ScheduleOverride_schedule(ctx, field)
+			case "note":
+				return ec.fieldContext_ScheduleOverride_note(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_ScheduleOverride_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ScheduleOverride", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSlot_label(ctx context.Context, field graphql.CollectedField, obj *model.TimeSlot) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeSlot_label,
+		func(ctx context.Context) (any, error) {
+			return obj.Label, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeSlot_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSlot",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSlot_value(ctx context.Context, field graphql.CollectedField, obj *model.TimeSlot) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeSlot_value,
+		func(ctx context.Context) (any, error) {
+			return obj.Value, nil
+		},
+		nil,
+		ec.marshalNDateTime2timeᚐTime,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeSlot_value(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSlot",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
 		},
 	}
 	return fc, nil
@@ -14614,6 +15441,57 @@ func (ec *executionContext) unmarshalInputOrderHistoryInput(ctx context.Context,
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputScheduleOverrideInput(ctx context.Context, obj any) (model.ScheduleOverrideInput, error) {
+	var it model.ScheduleOverrideInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"date", "closed", "schedule", "note"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "date":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("date"))
+			data, err := ec.unmarshalNDateTime2timeᚐTime(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Date = data
+		case "closed":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("closed"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Closed = data
+		case "schedule":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("schedule"))
+			data, err := ec.unmarshalODayScheduleInput2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐDayScheduleInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Schedule = data
+		case "note":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("note"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Note = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputTranslationInput(ctx context.Context, obj any) (model.TranslationInput, error) {
 	var it model.TranslationInput
 	if obj == nil {
@@ -15730,6 +16608,27 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateOrderingHours":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateOrderingHours(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatePreparationMinutes":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updatePreparationMinutes(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "upsertScheduleOverride":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_upsertScheduleOverride(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteScheduleOverride":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteScheduleOverride(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -17478,6 +18377,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "scheduleOverrides":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_scheduleOverrides(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "me":
 			field := field
 
@@ -17576,6 +18497,11 @@ func (ec *executionContext) _RestaurantConfig(ctx context.Context, sel ast.Selec
 			}
 		case "orderingHours":
 			out.Values[i] = ec._RestaurantConfig_orderingHours(ctx, field, obj)
+		case "preparationMinutes":
+			out.Values[i] = ec._RestaurantConfig_preparationMinutes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "isCurrentlyOpen":
 			field := field
 
@@ -17648,10 +18574,132 @@ func (ec *executionContext) _RestaurantConfig(ctx context.Context, sel ast.Selec
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "availableSlotsToday":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._RestaurantConfig_availableSlotsToday(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "nextOpeningAt":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._RestaurantConfig_nextOpeningAt(ctx, field, obj)
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "updatedAt":
 			out.Values[i] = ec._RestaurantConfig_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var scheduleOverrideImplementors = []string{"ScheduleOverride"}
+
+func (ec *executionContext) _ScheduleOverride(ctx context.Context, sel ast.SelectionSet, obj *model.ScheduleOverride) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, scheduleOverrideImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ScheduleOverride")
+		case "date":
+			out.Values[i] = ec._ScheduleOverride_date(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "closed":
+			out.Values[i] = ec._ScheduleOverride_closed(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "schedule":
+			out.Values[i] = ec._ScheduleOverride_schedule(ctx, field, obj)
+		case "note":
+			out.Values[i] = ec._ScheduleOverride_note(ctx, field, obj)
+		case "updatedAt":
+			out.Values[i] = ec._ScheduleOverride_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -17701,9 +18749,55 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_productUpdated(ctx, fields[0])
 	case "restaurantConfigUpdated":
 		return ec._Subscription_restaurantConfigUpdated(ctx, fields[0])
+	case "scheduleOverridesUpdated":
+		return ec._Subscription_scheduleOverridesUpdated(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
+}
+
+var timeSlotImplementors = []string{"TimeSlot"}
+
+func (ec *executionContext) _TimeSlot(ctx context.Context, sel ast.SelectionSet, obj *model.TimeSlot) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, timeSlotImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TimeSlot")
+		case "label":
+			out.Values[i] = ec._TimeSlot_label(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "value":
+			out.Values[i] = ec._TimeSlot_value(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
 }
 
 var translationImplementors = []string{"Translation"}
@@ -18871,6 +19965,41 @@ func (ec *executionContext) marshalNRestaurantConfig2ᚖtsbᚑserviceᚋinternal
 	return ec._RestaurantConfig(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNScheduleOverride2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐScheduleOverride(ctx context.Context, sel ast.SelectionSet, v model.ScheduleOverride) graphql.Marshaler {
+	return ec._ScheduleOverride(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNScheduleOverride2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐScheduleOverrideᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ScheduleOverride) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNScheduleOverride2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐScheduleOverride(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNScheduleOverride2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐScheduleOverride(ctx context.Context, sel ast.SelectionSet, v *model.ScheduleOverride) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ScheduleOverride(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNScheduleOverrideInput2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐScheduleOverrideInput(ctx context.Context, v any) (model.ScheduleOverrideInput, error) {
+	res, err := ec.unmarshalInputScheduleOverrideInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -18885,6 +20014,32 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNTimeSlot2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTimeSlotᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.TimeSlot) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNTimeSlot2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTimeSlot(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNTimeSlot2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTimeSlot(ctx context.Context, sel ast.SelectionSet, v *model.TimeSlot) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TimeSlot(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNTranslation2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTranslationᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Translation) graphql.Marshaler {
@@ -19192,6 +20347,13 @@ func (ec *executionContext) marshalODateTime2ᚖtimeᚐTime(ctx context.Context,
 	_ = ctx
 	res := graphql.MarshalTime(*v)
 	return res
+}
+
+func (ec *executionContext) marshalODaySchedule2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐDaySchedule(ctx context.Context, sel ast.SelectionSet, v *model.DaySchedule) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._DaySchedule(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalODayScheduleInput2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐDayScheduleInput(ctx context.Context, v any) (*model.DayScheduleInput, error) {
