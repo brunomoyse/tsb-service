@@ -141,6 +141,16 @@ func (r *queryResolver) ValidateCoupon(ctx context.Context, code string, orderAm
 		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 
+	// Throttle per-user to block brute-force code enumeration.
+	if r.CouponValidateLimiter != nil && !r.CouponValidateLimiter.AllowKey(userID) {
+		errMsg := "too many attempts, please try again in a minute"
+		return &model.CouponValidation{
+			Valid:          false,
+			DiscountAmount: "0",
+			ErrorMessage:   &errMsg,
+		}, nil
+	}
+
 	_, discount, err := r.CouponService.ValidateCoupon(ctx, code, amount, userUUID)
 	if err != nil {
 		errMsg := err.Error()

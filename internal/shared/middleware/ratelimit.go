@@ -87,3 +87,10 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// AllowKey returns true if the action under the given key is permitted by the
+// rate limit, and false if the limit has been exceeded. Enables resolver-level
+// throttling keyed on arbitrary identifiers (e.g. user ID).
+func (rl *RateLimiter) AllowKey(key string) bool {
+	return rl.getVisitor(key).Allow()
+}

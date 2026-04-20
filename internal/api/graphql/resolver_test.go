@@ -93,7 +93,7 @@ func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
 	productService := productApplication.NewProductService(productRepo)
 	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, scheduleOverrideRepo, true)
 	userService := userApplication.NewUserService(userRepo, nil)
-	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService)
+	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService, couponService)
 
 	// Create resolver
 	return &resolver.Resolver{
