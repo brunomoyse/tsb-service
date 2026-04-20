@@ -27,9 +27,11 @@ func NewCategory(order int, translations []Translation) (*Category, error) {
 
 // GetTranslationFor returns the translation for the given language, or falls back to the first available.
 func (c *Category) GetTranslationFor(language string) *Translation {
-	for _, t := range c.Translations {
-		if t.Language == language {
-			return &t
+	for _, candidate := range translationFallbackOrder(language) {
+		for i := range c.Translations {
+			if c.Translations[i].Language == candidate {
+				return &c.Translations[i]
+			}
 		}
 	}
 	if len(c.Translations) > 0 {
