@@ -45,9 +45,11 @@ type ChoiceTranslation struct {
 
 // GetTranslationFor returns the translation matching the given locale.
 func (c *ProductChoice) GetTranslationFor(locale string) string {
-	for _, t := range c.Translations {
-		if t.Locale == locale {
-			return t.Name
+	for _, candidate := range translationFallbackOrder(locale) {
+		for i := range c.Translations {
+			if c.Translations[i].Locale == candidate {
+				return c.Translations[i].Name
+			}
 		}
 	}
 	if len(c.Translations) > 0 {
@@ -97,9 +99,11 @@ func NewProduct(price decimal.Decimal, categoryID uuid.UUID, isVisible bool, isA
 // GetTranslationFor returns the translation matching the given language,
 // or falls back to the first available translation if no exact match is found.
 func (p *Product) GetTranslationFor(language string) *Translation {
-	for _, t := range p.Translations {
-		if t.Language == language {
-			return &t
+	for _, candidate := range translationFallbackOrder(language) {
+		for i := range p.Translations {
+			if p.Translations[i].Language == candidate {
+				return &p.Translations[i]
+			}
 		}
 	}
 	if len(p.Translations) > 0 {
