@@ -21,6 +21,9 @@ func Admin(ctx context.Context, obj any, next graphql.Resolver) (any, error) {
 		}
 		return nil, err
 	}
+	if err := tokenExpired(ctx); err != nil {
+		return nil, err
+	}
 
 	// 2) Must be admin
 	if !utils.GetIsAdmin(ctx) {

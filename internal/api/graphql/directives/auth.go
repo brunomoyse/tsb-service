@@ -22,5 +22,8 @@ func Auth(ctx context.Context, obj any, next graphql.Resolver) (any, error) {
 		}
 		return nil, err
 	}
+	if err := tokenExpired(ctx); err != nil {
+		return nil, err
+	}
 	return next(ctx)
 }

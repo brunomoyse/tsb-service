@@ -15,10 +15,41 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 
 	"tsb-service/internal/modules/pos/domain"
+	"tsb-service/pkg/logging"
 )
+
+// maxPinLockDuration caps the exponential backoff so an RRN is never locked
+// out for longer than a full business day. Operators can clear the lock
+// manually via the staff management endpoints if a legitimate user locked
+// themselves out before the cap is hit.
+const maxPinLockDuration = 24 * time.Hour
+
+// computePinLockDuration returns the lockout to apply after the given number
+// of cumulative failed PIN attempts, implementing exponential backoff on top
+// of the base PinLockDuration.
+//
+// With defaults (base=5min, threshold=5): attempts 5→5min, 6→10min,
+// 7→20min, 8→40min, 9→1h20, 10→2h40, 11→5h20, 12→10h40, 13→21h20, 14+→24h.
+// So an attacker iterating the full 10k 4-digit PIN space cannot complete
+// in less than a year even if they stay patient between lockouts.
+func computePinLockDuration(base time.Duration, threshold, attempts int) time.Duration {
+	if attempts < threshold {
+		return 0
+	}
+	shift := attempts - threshold
+	if shift > 16 {
+		shift = 16 // guard against absurdly large shifts
+	}
+	d := base << shift
+	if d <= 0 || d > maxPinLockDuration { // overflow or cap
+		return maxPinLockDuration
+	}
+	return d
+}
 
 // ---- errors surfaced to the handler
 
@@ -205,16 +236,26 @@ func (s *Service) RrnLogin(ctx context.Context, in RrnLoginInput) (*TokenPair, e
 		return nil, err
 	}
 
+	log := logging.FromContext(ctx)
+
 	// Check pos_staff table first (no Zitadel account required).
 	if staffMember, err := s.staff.FindByRRNHash(ctx, rrnHash(s.cfg.JWTSecret, in.RRN)); err == nil {
 		if staffMember.PinLockedUntil != nil && time.Now().Before(*staffMember.PinLockedUntil) {
 			return nil, ErrPinLocked
 		}
 		if err := bcrypt.CompareHashAndPassword([]byte(staffMember.PinHash), []byte(in.PIN)); err != nil {
+			nextAttempts := staffMember.FailedPinAttempts + 1
 			var lockedUntil *time.Time
-			if staffMember.FailedPinAttempts+1 >= s.cfg.MaxFailedAttempts {
-				t := time.Now().Add(s.cfg.PinLockDuration)
+			if d := computePinLockDuration(s.cfg.PinLockDuration, s.cfg.MaxFailedAttempts, nextAttempts); d > 0 {
+				t := time.Now().Add(d)
 				lockedUntil = &t
+				log.Warn("pos pin lockout",
+					zap.String("subject", "staff"),
+					zap.String("staff_id", staffMember.ID.String()),
+					zap.String("device_id", device.ID.String()),
+					zap.Int("attempts", nextAttempts),
+					zap.Duration("lock_duration", d),
+				)
 			}
 			_ = s.staff.IncrementFailedAttempts(ctx, staffMember.ID, lockedUntil)
 			return nil, ErrInvalidPin
@@ -240,10 +281,18 @@ func (s *Service) RrnLogin(ctx context.Context, in RrnLoginInput) (*TokenPair, e
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(*user.PinHash), []byte(in.PIN)); err != nil {
+		nextAttempts := user.FailedPinAttempts + 1
 		var lockedUntil *time.Time
-		if user.FailedPinAttempts+1 >= s.cfg.MaxFailedAttempts {
-			t := time.Now().Add(s.cfg.PinLockDuration)
+		if d := computePinLockDuration(s.cfg.PinLockDuration, s.cfg.MaxFailedAttempts, nextAttempts); d > 0 {
+			t := time.Now().Add(d)
 			lockedUntil = &t
+			log.Warn("pos pin lockout",
+				zap.String("subject", "user"),
+				zap.String("user_id", user.ID.String()),
+				zap.String("device_id", device.ID.String()),
+				zap.Int("attempts", nextAttempts),
+				zap.Duration("lock_duration", d),
+			)
 		}
 		_ = s.posUsers.IncrementFailedAttempts(ctx, user.ID, lockedUntil)
 		return nil, ErrInvalidPin
@@ -472,6 +521,23 @@ func (s *Service) VerifyAccessToken(tokenStr string) (uuid.UUID, bool, error) {
 	// Legacy tokens issued before the staff/admin split carried isAdmin=true;
 	// ignore that claim and always grant the staff role (not admin).
 	return id, true, nil
+}
+
+// AccessTokenExpiry reads the exp claim from a POS token without re-verifying
+// the signature. Returns the zero time if the claim is missing or the token
+// can't be parsed. Callers must verify the signature via VerifyAccessToken
+// before trusting the returned value.
+func (s *Service) AccessTokenExpiry(tokenStr string) time.Time {
+	parser := jwt.NewParser(jwt.WithValidMethods([]string{"HS256"}))
+	claims := jwt.MapClaims{}
+	if _, _, err := parser.ParseUnverified(tokenStr, claims); err != nil {
+		return time.Time{}
+	}
+	exp, err := claims.GetExpirationTime()
+	if err != nil || exp == nil {
+		return time.Time{}
+	}
+	return exp.UTC()
 }
 
 // ---- utilities

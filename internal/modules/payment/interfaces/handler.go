@@ -40,8 +40,13 @@ func NewPaymentHandler(service paymentApplication.PaymentService, broker *pubsub
 // the payment from the Mollie API to get the authoritative status. This means a
 // spoofed webhook cannot change payment state — the Mollie API is the source of truth.
 func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
-	// Webhook is a server-to-server call that needs write access to orders/payments.
-	ctx := utils.SetIsAdmin(c.Request.Context(), true)
+	// The webhook itself runs under the plain request context — only the
+	// service calls that need write access to orders/payments run under an
+	// admin-flagged context. This keeps the elevation narrow: pubsub events
+	// and any future downstream code added here don't silently inherit admin
+	// privileges from a request whose only authenticated party is Mollie.
+	ctx := c.Request.Context()
+	adminCtx := utils.SetIsAdmin(ctx, true)
 	log := logging.FromContext(ctx)
 
 	var req struct {
@@ -61,7 +66,7 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 	}
 
 	// Verify payment exists in our DB before calling Mollie API
-	payment, err := h.service.GetPaymentByExternalID(ctx, req.ExternalMolliePaymentID)
+	payment, err := h.service.GetPaymentByExternalID(adminCtx, req.ExternalMolliePaymentID)
 	if err != nil {
 		log.Warn("webhook: unknown payment ID", zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
 		c.JSON(http.StatusOK, gin.H{"message": "unknown payment"})
@@ -72,7 +77,7 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 
 	// Fetch latest status from Mollie and update local DB (status + timestamps).
 	// Returns 500 on transient failures so Mollie retries naturally.
-	statusUpdate, orderID, err := h.service.UpdatePaymentStatus(ctx, req.ExternalMolliePaymentID)
+	statusUpdate, orderID, err := h.service.UpdatePaymentStatus(adminCtx, req.ExternalMolliePaymentID)
 	if err != nil {
 		log.Error("webhook: failed to update payment status", zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "temporary failure"})
@@ -88,7 +93,7 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 	// Delegate business logic to the service layer
 	switch statusUpdate.Status {
 	case paymentDomain.PaymentStatusPaid:
-		order, handleErr := h.service.HandlePaymentPaid(ctx, *orderID)
+		order, handleErr := h.service.HandlePaymentPaid(adminCtx, *orderID)
 		if handleErr != nil {
 			log.Error("webhook: failed to handle paid payment", zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(handleErr))
 		} else if order != nil {
@@ -106,7 +111,7 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 			}
 		}
 	case paymentDomain.PaymentStatusCanceled, paymentDomain.PaymentStatusFailed, paymentDomain.PaymentStatusExpired:
-		order, handleErr := h.service.HandlePaymentFailed(ctx, *orderID)
+		order, handleErr := h.service.HandlePaymentFailed(adminCtx, *orderID)
 		if handleErr != nil {
 			log.Error("webhook: failed to handle failed payment", zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(handleErr))
 		} else if order != nil {

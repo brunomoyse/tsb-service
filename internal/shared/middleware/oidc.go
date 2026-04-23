@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -49,6 +50,10 @@ type UserLookup interface {
 // only ever grant the staff role; admin is reserved for Zitadel JWTs.
 type AppJWTVerifier interface {
 	VerifyAccessToken(token string) (userID uuid.UUID, isStaff bool, err error)
+	// AccessTokenExpiry parses the token's exp claim without re-verifying
+	// the signature. Callers SHOULD only use the returned time after a
+	// successful VerifyAccessToken. Zero means the token carries no exp.
+	AccessTokenExpiry(token string) time.Time
 }
 
 // OIDCVerifier validates Zitadel JWTs via JWKS (no network call per request).
@@ -139,6 +144,7 @@ func (v *OIDCVerifier) tryVerifyAppJWT(c *gin.Context, tokenStr string) bool {
 	ctx := utils.SetUserID(c.Request.Context(), userID.String())
 	ctx = utils.SetIsAdmin(ctx, false)
 	ctx = utils.SetIsStaff(ctx, isStaff)
+	ctx = utils.SetTokenExpiry(ctx, v.appJWT.AccessTokenExpiry(tokenStr))
 	c.Request = c.Request.WithContext(ctx)
 	c.Set(string(utils.UserIDKey), userID.String())
 	return true
@@ -219,6 +225,9 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 	ctx := utils.SetUserID(c.Request.Context(), userID)
 	ctx = utils.SetZitadelSub(ctx, sub)
 	ctx = utils.SetIsAdmin(ctx, isAdmin)
+	if expRaw, ok := authCtx.Claims["exp"].(float64); ok {
+		ctx = utils.SetTokenExpiry(ctx, time.Unix(int64(expRaw), 0).UTC())
+	}
 	c.Request = c.Request.WithContext(ctx)
 	c.Set(string(utils.UserIDKey), userID)
 
@@ -268,19 +277,30 @@ func (v *OIDCVerifier) OptionalAuthMiddleware() gin.HandlerFunc {
 // to the POS app JWT verifier. Returns the raw Zitadel sub (no DB lookup) for
 // Zitadel tokens, or the app user UUID for POS tokens. Admin implies staff —
 // callers may rely on isStaff to gate @staff-protected subscriptions.
-func (v *OIDCVerifier) VerifyToken(ctx context.Context, tokenStr string) (subject string, isAdmin, isStaff bool, err error) {
+//
+// exp is the access token's expiry (UTC). The caller should bind the WS/HTTP
+// context to this deadline so long-lived subscriptions die when the token
+// expires instead of outliving the credential that authorized them. A zero
+// value means the token had no readable exp claim; callers should treat that
+// as "do not enforce a deadline" rather than "token is already expired".
+func (v *OIDCVerifier) VerifyToken(ctx context.Context, tokenStr string) (subject string, isAdmin, isStaff bool, exp time.Time, err error) {
 	authCtx, zitadelErr := v.authorizer.CheckAuthorization(ctx, "Bearer "+tokenStr)
 	if zitadelErr == nil {
 		admin := authCtx.IsGrantedRole("admin")
 		if !admin && v.projectID != "" {
 			admin = authCtx.IsGrantedRoleInProject(v.projectID, "admin", "")
 		}
-		return authCtx.UserID(), admin, admin, nil
+		// The SDK's introspection context exposes exp via the raw claims map.
+		var tokenExp time.Time
+		if expRaw, ok := authCtx.Claims["exp"].(float64); ok {
+			tokenExp = time.Unix(int64(expRaw), 0).UTC()
+		}
+		return authCtx.UserID(), admin, admin, tokenExp, nil
 	}
 	if v.appJWT != nil {
 		if uid, staff, appErr := v.appJWT.VerifyAccessToken(tokenStr); appErr == nil {
-			return uid.String(), false, staff, nil
+			return uid.String(), false, staff, v.appJWT.AccessTokenExpiry(tokenStr), nil
 		}
 	}
-	return "", false, false, zitadelErr
+	return "", false, false, time.Time{}, zitadelErr
 }

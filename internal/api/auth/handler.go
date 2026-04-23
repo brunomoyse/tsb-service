@@ -76,28 +76,42 @@ func CreateSessionHandler(c *gin.Context) {
 
 	if status != http.StatusCreated && status != http.StatusOK {
 		msg := parseZitadelError(respBody)
+		// Keep the social-login hint: users who signed up with Google/Apple need
+		// to know to click the social button, and the email is already disclosed
+		// to the client by the act of typing it.
 		if code, message := mapSessionError(msg); code != "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": code, "message": message})
 			return
 		}
 
-		// Forward other errors as-is (401 for bad credentials, etc.)
-		c.Data(status, "application/json", respBody)
+		// Collapse every other failure (wrong password, unknown account,
+		// account locked, etc.) into one canonical 401 so response bodies and
+		// status codes don't let an attacker distinguish the cases.
+		c.JSON(http.StatusUnauthorized, gin.H{"error": ErrWrongPassword})
 		return
-	}
-
-	// Block login if email is not verified
-	if userID, err := findZitadelUserByEmail(req.LoginName); err == nil {
-		if !isZitadelEmailVerified(userID) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "email_not_verified"})
-			return
-		}
 	}
 
 	var zResp zitadelSessionResponse
 	if err := json.Unmarshal(respBody, &zResp); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid response from auth service"})
 		return
+	}
+
+	// Post-success email-verified gate. The credentials were already accepted
+	// here, so disclosing the verification state doesn't enable enumeration
+	// beyond what the caller already knows. Delete the session we just
+	// created so the unverified user can't replay the sessionToken.
+	if userID, err := findZitadelUserByEmail(req.LoginName); err == nil {
+		if !isZitadelEmailVerified(userID) {
+			if _, _, delErr := zitadelRequest("DELETE", "/v2/sessions/"+zResp.SessionID, map[string]any{
+				"sessionToken": zResp.SessionToken,
+			}); delErr != nil {
+				logging.FromContext(c.Request.Context()).Warn("failed to revoke session for unverified email",
+					zap.String("session_id", zResp.SessionID), zap.Error(delErr))
+			}
+			c.JSON(http.StatusForbidden, gin.H{"error": "email_not_verified"})
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, sessionResponse(zResp))
