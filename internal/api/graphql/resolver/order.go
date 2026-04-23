@@ -109,7 +109,16 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			if choice.ProductID != pid {
 				return nil, fmt.Errorf("choice %s does not belong to product %s", op.ChoiceID, pid)
 			}
-			unitPrice = unitPrice.Add(choice.PriceModifier)
+			// Negative modifiers would let a choice discount the order unit
+			// price. The DB has a CHECK constraint enforcing modifier >= 0 and
+			// the admin mutation rejects negative input, but the order path
+			// clamps to zero here as well so a bad value written by some
+			// future code path can't silently reduce the order total.
+			modifier := choice.PriceModifier
+			if modifier.Sign() < 0 {
+				modifier = decimal.Zero
+			}
+			unitPrice = unitPrice.Add(modifier)
 			if unitPrice.LessThan(decimal.Zero) {
 				return nil, fmt.Errorf("invalid price for product %s with choice %s: price cannot be negative", pid, op.ChoiceID)
 			}

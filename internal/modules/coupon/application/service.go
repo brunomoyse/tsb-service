@@ -61,23 +61,7 @@ func (s *couponService) IncrementUsage(ctx context.Context, id uuid.UUID) error 
 }
 
 func (s *couponService) IncrementUsageAtomic(ctx context.Context, id uuid.UUID, userID uuid.UUID) (bool, error) {
-	// First, get the coupon to check if there's a per-user limit
-	coupon, err := s.repo.FindByID(ctx, id)
-	if err != nil {
-		return false, fmt.Errorf("failed to find coupon: %w", err)
-	}
-
-	// Atomically increment per-user usage
-	ok, err := s.repo.IncrementUserUsageAtomic(ctx, id, userID, coupon.MaxUsesPerUser)
-	if err != nil {
-		return false, err
-	}
-	if !ok {
-		return false, nil
-	}
-
-	// Then increment global usage
-	return s.repo.IncrementUsedCountAtomic(ctx, id)
+	return s.repo.RedeemAtomic(ctx, id, userID)
 }
 
 func (s *couponService) DecrementUsageAtomic(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {

@@ -525,6 +525,30 @@ func TestCreateSessionHandler_BadCredentials(t *testing.T) {
 	CreateSessionHandler(c)
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, ErrWrongPassword, resp["error"])
+	assert.Nil(t, resp["message"], "must not leak Zitadel error details")
+	assert.Nil(t, resp["code"], "must not leak Zitadel error code")
+}
+
+// TestCreateSessionHandler_UnknownAccount asserts the response for an account
+// that doesn't exist is byte-identical to a wrong-password response. This
+// prevents the /auth/session endpoint from becoming an account-enumeration
+// oracle.
+func TestCreateSessionHandler_UnknownAccount(t *testing.T) {
+	setupMockZitadel(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"code":16,"message":"user not found"}`))
+	})
+
+	w, c := ginContext("POST", "/auth/session", `{"loginName":"ghost@example.com","password":"P@ssw0rd!"}`)
+	CreateSessionHandler(c)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, ErrWrongPassword, resp["error"])
 }
 
 func TestCreateSessionHandler_SocialOnlyAccount(t *testing.T) {
@@ -543,6 +567,7 @@ func TestCreateSessionHandler_SocialOnlyAccount(t *testing.T) {
 }
 
 func TestCreateSessionHandler_EmailNotVerified(t *testing.T) {
+	var sessionDeleted bool
 	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/v2/sessions" && r.Method == "POST":
@@ -554,6 +579,10 @@ func TestCreateSessionHandler_EmailNotVerified(t *testing.T) {
 		case r.URL.Path == "/v2/users/user-789" && r.Method == "GET":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"email":{"isVerified":false}}}}`))
+		case r.URL.Path == "/v2/sessions/sess-123" && r.Method == "DELETE":
+			sessionDeleted = true
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -566,6 +595,7 @@ func TestCreateSessionHandler_EmailNotVerified(t *testing.T) {
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "email_not_verified", resp["error"])
+	assert.True(t, sessionDeleted, "unverified session must be revoked")
 }
 
 func TestCreateSessionHandler_MissingFields(t *testing.T) {

@@ -89,18 +89,81 @@ func (r *CouponRepository) IncrementUsedCount(ctx context.Context, id uuid.UUID)
 	return nil
 }
 
-func (r *CouponRepository) IncrementUsedCountAtomic(ctx context.Context, id uuid.UUID) (bool, error) {
-	result, err := r.pool.ForContext(ctx).ExecContext(ctx,
-		`UPDATE coupons SET used_count = used_count + 1
-		 WHERE id = $1 AND is_active = true
-		 AND (max_uses IS NULL OR used_count < max_uses)
-		 AND (valid_from IS NULL OR valid_from <= NOW())
-		 AND (valid_until IS NULL OR valid_until >= NOW())`, id)
+// RedeemAtomic serializes concurrent redemptions on the same coupon via a
+// SELECT ... FOR UPDATE row lock, then atomically validates and increments
+// both the per-user and global counters. All three steps (lock + per-user
+// bump + global bump) commit together or not at all, so a failed global
+// increment cannot leave a dangling per-user increment behind — the race
+// the previous two-step implementation allowed.
+func (r *CouponRepository) RedeemAtomic(ctx context.Context, couponID, userID uuid.UUID) (bool, error) {
+	tx, err := r.pool.ForContext(ctx).BeginTxx(ctx, nil)
 	if err != nil {
-		return false, fmt.Errorf("failed to increment coupon usage: %w", err)
+		return false, fmt.Errorf("begin redeem tx: %w", err)
 	}
-	rows, _ := result.RowsAffected()
-	return rows > 0, nil
+	defer func() { _ = tx.Rollback() }()
+
+	var maxUsesPerUser sql.NullInt32
+	// Lock the coupon row and re-check the global validity window in one shot.
+	// Concurrent redemptions for the same coupon serialize here; Postgres
+	// returns zero rows (and we treat it as "no longer available") once the
+	// cap is exhausted.
+	err = tx.QueryRowxContext(ctx,
+		`SELECT max_uses_per_user
+		 FROM coupons
+		 WHERE id = $1
+		   AND is_active = true
+		   AND (max_uses IS NULL OR used_count < max_uses)
+		   AND (valid_from IS NULL OR valid_from <= NOW())
+		   AND (valid_until IS NULL OR valid_until >= NOW())
+		 FOR UPDATE`, couponID).Scan(&maxUsesPerUser)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, fmt.Errorf("lock coupon: %w", err)
+	}
+
+	// Per-user bump. The WHERE on the DO UPDATE ensures we never exceed
+	// max_uses_per_user; a zero-row result means this user has hit their cap.
+	var perUserResult sql.Result
+	if maxUsesPerUser.Valid {
+		perUserResult, err = tx.ExecContext(ctx,
+			`INSERT INTO coupon_users (coupon_id, user_id, used_count)
+			 VALUES ($1, $2, 1)
+			 ON CONFLICT (coupon_id, user_id) DO UPDATE SET used_count = coupon_users.used_count + 1
+			 WHERE coupon_users.used_count < $3`,
+			couponID, userID, maxUsesPerUser.Int32)
+	} else {
+		perUserResult, err = tx.ExecContext(ctx,
+			`INSERT INTO coupon_users (coupon_id, user_id, used_count)
+			 VALUES ($1, $2, 1)
+			 ON CONFLICT (coupon_id, user_id) DO UPDATE SET used_count = coupon_users.used_count + 1`,
+			couponID, userID)
+	}
+	if err != nil {
+		return false, fmt.Errorf("per-user redeem: %w", err)
+	}
+	if rows, _ := perUserResult.RowsAffected(); rows == 0 {
+		return false, nil
+	}
+
+	// Global bump. We already re-checked the cap under the row lock, but
+	// double-gate here so the counter update itself cannot overshoot if a
+	// future writer slips in under a different code path.
+	globalResult, err := tx.ExecContext(ctx,
+		`UPDATE coupons SET used_count = used_count + 1
+		 WHERE id = $1 AND (max_uses IS NULL OR used_count < max_uses)`, couponID)
+	if err != nil {
+		return false, fmt.Errorf("global redeem: %w", err)
+	}
+	if rows, _ := globalResult.RowsAffected(); rows == 0 {
+		return false, nil
+	}
+
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("commit redeem: %w", err)
+	}
+	return true, nil
 }
 
 func (r *CouponRepository) DecrementUsedCountAtomic(ctx context.Context, id uuid.UUID) (bool, error) {
@@ -125,34 +188,6 @@ func (r *CouponRepository) GetUserUsageCount(ctx context.Context, couponID, user
 		return 0, fmt.Errorf("failed to get user usage count: %w", err)
 	}
 	return count, nil
-}
-
-func (r *CouponRepository) IncrementUserUsageAtomic(ctx context.Context, couponID, userID uuid.UUID, maxUsesPerUser *int) (bool, error) {
-	if maxUsesPerUser == nil {
-		// No per-user limit, just upsert and increment
-		_, err := r.pool.ForContext(ctx).ExecContext(ctx,
-			`INSERT INTO coupon_users (coupon_id, user_id, used_count)
-			 VALUES ($1, $2, 1)
-			 ON CONFLICT (coupon_id, user_id) DO UPDATE SET used_count = coupon_users.used_count + 1`,
-			couponID, userID)
-		if err != nil {
-			return false, fmt.Errorf("failed to increment user usage: %w", err)
-		}
-		return true, nil
-	}
-
-	// Atomic upsert with limit check
-	result, err := r.pool.ForContext(ctx).ExecContext(ctx,
-		`INSERT INTO coupon_users (coupon_id, user_id, used_count)
-		 VALUES ($1, $2, 1)
-		 ON CONFLICT (coupon_id, user_id) DO UPDATE SET used_count = coupon_users.used_count + 1
-		 WHERE coupon_users.used_count < $3`,
-		couponID, userID, *maxUsesPerUser)
-	if err != nil {
-		return false, fmt.Errorf("failed to increment user usage: %w", err)
-	}
-	rows, _ := result.RowsAffected()
-	return rows > 0, nil
 }
 
 func (r *CouponRepository) DecrementUserUsageAtomic(ctx context.Context, couponID, userID uuid.UUID) (bool, error) {

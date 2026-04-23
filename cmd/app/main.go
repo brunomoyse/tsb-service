@@ -378,13 +378,22 @@ func main() {
 	posLimiter := middleware.NewRateLimiter(30.0/60, 10) // 30 req/min per IP
 	api.POST("/pos/auth/rrn-login", posLimiter.Middleware(), posHandler.RrnLogin)
 	api.POST("/pos/auth/refresh", posLimiter.Middleware(), posHandler.Refresh)
-	// Enrollment requires a valid Zitadel admin JWT.
-	api.POST("/pos/devices/enroll", oidcVerifier.StrictAuthMiddleware(), posHandler.Enroll)
+	// Enrollment requires a valid Zitadel admin JWT and is throttled to a
+	// slow bucket — every successful enrollment hits the Zitadel userinfo
+	// endpoint, so the limiter also protects the upstream IdP from being
+	// flooded by a compromised admin session.
+	enrollLimiter := middleware.NewRateLimiter(5.0/60, 3) // 5 req/min per IP, burst 3
+	api.POST("/pos/devices/enroll", enrollLimiter.Middleware(), oidcVerifier.StrictAuthMiddleware(), posHandler.Enroll)
 	// FCM token registration — HMAC-signed, no Zitadel session required.
 	api.PATCH("/pos/devices/fcm-token", posLimiter.Middleware(), posHandler.UpdateFCMToken)
 
 	// Other endpoints
-	api.POST("/payments/webhook", paymentHandler.UpdatePaymentStatusHandler)
+	// Mollie's webhook retries are retried ~25 times over 2 days on failure,
+	// and normal traffic is 1-3 hits per payment. 60 req/min (burst 10) per
+	// source IP is well above that baseline and blocks forced-re-fetch spam
+	// from an attacker who has guessed a valid tr_* payment ID.
+	mollieLimiter := middleware.NewRateLimiter(1.0, 10) // 60 req/min per IP, burst 10
+	api.POST("/payments/webhook", mollieLimiter.Middleware(), paymentHandler.UpdatePaymentStatusHandler)
 
 	strictAuth := oidcVerifier.StrictAuthMiddleware()
 	api.POST("/auth/change-password", strictAuth, auth.ChangePasswordHandler)

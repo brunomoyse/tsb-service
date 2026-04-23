@@ -135,7 +135,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 				return ctx, &initPayload, nil
 			}
 			tokenStr := strings.TrimPrefix(auth, "Bearer ")
-			sub, isAdmin, isStaff, err := oidcVerifier.VerifyToken(ctx, tokenStr)
+			sub, isAdmin, isStaff, exp, err := oidcVerifier.VerifyToken(ctx, tokenStr)
 			if err == nil && sub != "" {
 				isPOS := isStaff && !isAdmin
 				if isPOS {
@@ -153,6 +153,24 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 				}
 				ctx = utils.SetIsAdmin(ctx, isAdmin)
 				ctx = utils.SetIsStaff(ctx, isStaff)
+				ctx = utils.SetTokenExpiry(ctx, exp)
+				// Bind the WebSocket context lifetime to the access token.
+				// When exp hits, ctx.Done() fires, every in-flight subscription
+				// unblocks on its <-ctx.Done() select arm, and gqlgen tears
+				// down the connection. Clients must reconnect with a fresh
+				// token (both tsb-core and tsb-dashboard already do this via
+				// silentRenew + graphql-ws retry).
+				//
+				// The WS transport cancels the parent ctx on socket close, so
+				// the cancel func here is redundant — the deadline fires via
+				// the runtime clock and its Timer is GC'd by context.cancelCtx
+				// once the parent terminates. Kept in a named var so govet's
+				// lostcancel check is satisfied.
+				if !exp.IsZero() {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithDeadline(ctx, exp)
+					_ = cancel
+				}
 			}
 			return ctx, &initPayload, nil
 		},

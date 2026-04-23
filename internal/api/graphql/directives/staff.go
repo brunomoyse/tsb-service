@@ -19,6 +19,9 @@ func Staff(ctx context.Context, obj any, next graphql.Resolver) (any, error) {
 			Extensions: map[string]any{"code": "UNAUTHENTICATED"},
 		}
 	}
+	if err := tokenExpired(ctx); err != nil {
+		return nil, err
+	}
 
 	if !utils.GetIsStaff(ctx) {
 		return nil, &gqlerror.Error{

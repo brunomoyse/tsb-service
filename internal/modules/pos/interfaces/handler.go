@@ -1,11 +1,13 @@
 package interfaces
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -90,7 +92,7 @@ func (h *Handler) Enroll(c *gin.Context) {
 	// Zitadel native-app JWT access tokens don't include project role claims.
 	// Check admin status via the Zitadel userinfo endpoint instead.
 	token := c.GetHeader("Authorization")
-	if !h.isAdminViaUserinfo(token) {
+	if !h.isAdminViaUserinfo(c.Request.Context(), token) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin required"})
 		return
 	}
@@ -230,7 +232,11 @@ func respondAuthError(c *gin.Context, err error) {
 // isAdminViaUserinfo calls the Zitadel /oidc/v1/userinfo endpoint with the
 // bearer token and checks if any of the project role claims contain "admin".
 // This is a network call but only happens during device enrollment (once per device).
-func (h *Handler) isAdminViaUserinfo(authHeader string) bool {
+//
+// The call is bounded to 5s so a Zitadel outage can't hang enrollment requests
+// (and, combined with the per-IP rate limit on the route, keeps a compromised
+// admin session from amplifying traffic against the IdP).
+func (h *Handler) isAdminViaUserinfo(ctx context.Context, authHeader string) bool {
 	if authHeader == "" {
 		return false
 	}
@@ -238,7 +244,9 @@ func (h *Handler) isAdminViaUserinfo(authHeader string) bool {
 	if h.internalURL != "" {
 		url = h.internalURL + "/oidc/v1/userinfo"
 	}
-	req, err := http.NewRequest("GET", url, nil)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		zap.L().Warn("failed to build userinfo request", zap.Error(err))
 		return false
@@ -247,7 +255,8 @@ func (h *Handler) isAdminViaUserinfo(authHeader string) bool {
 	if h.externalHost != "" {
 		req.Host = h.externalHost
 	}
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		zap.L().Warn("userinfo request failed", zap.Error(err))
 		return false

@@ -191,6 +191,9 @@ func (r *mutationResolver) CreateProductChoice(ctx context.Context, input model.
 	if err != nil {
 		return nil, fmt.Errorf("invalid price modifier format: %w", err)
 	}
+	if priceMod.Sign() < 0 {
+		return nil, fmt.Errorf("price modifier must be zero or positive")
+	}
 
 	translations := make([]domain.ChoiceTranslation, len(input.Translations))
 	for i, t := range input.Translations {
@@ -229,6 +232,9 @@ func (r *mutationResolver) UpdateProductChoice(ctx context.Context, id uuid.UUID
 		priceMod, err := decimal.NewFromString(clean)
 		if err != nil {
 			return nil, fmt.Errorf("invalid price modifier format: %w", err)
+		}
+		if priceMod.Sign() < 0 {
+			return nil, fmt.Errorf("price modifier must be zero or positive")
 		}
 		choice.PriceModifier = priceMod
 	}

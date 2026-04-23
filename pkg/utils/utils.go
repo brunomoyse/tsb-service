@@ -23,6 +23,7 @@ const UserIDKey contextKey = "userID"
 const IsAdminKey contextKey = "isAdmin"
 const IsStaffKey contextKey = "isStaff"
 const ZitadelSubKey contextKey = "zitadelSub"
+const TokenExpiryKey contextKey = "tokenExpiry"
 
 // SetLang stores the language in the context.
 func SetLang(ctx context.Context, lang string) context.Context {
@@ -70,6 +71,20 @@ func GetIsAdmin(ctx context.Context) bool {
 
 func SetIsStaff(ctx context.Context, isStaff bool) context.Context {
 	return context.WithValue(ctx, IsStaffKey, isStaff)
+}
+
+// SetTokenExpiry stores the JWT exp claim (UTC) in the context. Zero means
+// "no expiry information available" and callers should not enforce a deadline
+// on that path.
+func SetTokenExpiry(ctx context.Context, exp time.Time) context.Context {
+	return context.WithValue(ctx, TokenExpiryKey, exp)
+}
+
+// GetTokenExpiry returns the JWT exp stored by the auth middleware, or the
+// zero time when none was recorded.
+func GetTokenExpiry(ctx context.Context) time.Time {
+	exp, _ := ctx.Value(TokenExpiryKey).(time.Time)
+	return exp
 }
 
 // GetIsStaff returns true when the caller holds the POS staff role OR is an
