@@ -63,7 +63,7 @@ type TestProduct struct {
 	Code          string
 	Slug          string
 	IsHalal       bool
-	IsVegan       bool
+	IsVegetarian       bool
 	IsSpicy       bool
 	PieceCount    *int
 	IsDiscountable bool
@@ -106,7 +106,7 @@ func SeedTestData(t *testing.T, db *sqlx.DB) *TestFixtures {
 		Code:           "SUSHI-SALMON",
 		Slug:           "salmon-sushi",
 		IsHalal:        false,
-		IsVegan:        false,
+		IsVegetarian:        false,
 		PieceCount:     &pieces8,
 		IsDiscountable: true,
 		NameEN:         "Salmon Sushi",
@@ -126,7 +126,7 @@ func SeedTestData(t *testing.T, db *sqlx.DB) *TestFixtures {
 		Code:           "SUSHI-TUNA",
 		Slug:           "tuna-sushi",
 		IsHalal:        false,
-		IsVegan:        false,
+		IsVegetarian:        false,
 		PieceCount:     &pieces6,
 		IsDiscountable: true,
 		NameEN:         "Tuna Sushi",
@@ -145,7 +145,7 @@ func SeedTestData(t *testing.T, db *sqlx.DB) *TestFixtures {
 		Code:           "DRINK-TEA",
 		Slug:           "green-tea",
 		IsHalal:        true,
-		IsVegan:        true,
+		IsVegetarian:        true,
 		PieceCount:     nil,
 		IsDiscountable: false,
 		NameEN:         "Green Tea",
@@ -164,7 +164,7 @@ func SeedTestData(t *testing.T, db *sqlx.DB) *TestFixtures {
 		Code:           "DESSERT-MOCHI",
 		Slug:           "mochi-ice-cream",
 		IsHalal:        false,
-		IsVegan:        false,
+		IsVegetarian:        false,
 		PieceCount:     nil,
 		IsDiscountable: false,
 		NameEN:         "Mochi Ice Cream",
@@ -257,13 +257,13 @@ func createTestProduct(t *testing.T, ctx context.Context, db *sqlx.DB, product T
 
 	// Insert product
 	productQuery := `
-		INSERT INTO products (id, created_at, updated_at, category_id, price, is_visible, is_available, code, slug, is_halal, is_vegan, is_spicy, piece_count, is_discountable, vat_category)
+		INSERT INTO products (id, created_at, updated_at, category_id, price, is_visible, is_available, code, slug, is_halal, is_vegetarian, is_spicy, piece_count, is_discountable, vat_category)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	`
 	now := time.Now()
 	_, err := db.ExecContext(ctx, productQuery,
 		product.ID, now, now, product.CategoryID, product.Price, product.IsVisible, product.IsAvailable,
-		product.Code, product.Slug, product.IsHalal, product.IsVegan, product.IsSpicy, product.PieceCount, product.IsDiscountable, "food")
+		product.Code, product.Slug, product.IsHalal, product.IsVegetarian, product.IsSpicy, product.PieceCount, product.IsDiscountable, "food")
 	require.NoError(t, err, "Failed to create product")
 
 	// Insert translations (migration only supports en/fr/zh)

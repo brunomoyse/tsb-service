@@ -112,7 +112,7 @@ type CreateProductInput struct {
 	IsDiscountable bool                `json:"isDiscountable"`
 	IsHalal        bool                `json:"isHalal"`
 	IsSpicy        bool                `json:"isSpicy"`
-	IsVegan        bool                `json:"isVegan"`
+	IsVegetarian   bool                `json:"isVegetarian"`
 	IsVisible      bool                `json:"isVisible"`
 	PieceCount     *int                `json:"pieceCount,omitempty"`
 	Price          string              `json:"price"`
@@ -282,7 +282,7 @@ type Product struct {
 	IsDiscountable bool             `json:"isDiscountable"`
 	IsHalal        bool             `json:"isHalal"`
 	IsSpicy        bool             `json:"isSpicy"`
-	IsVegan        bool             `json:"isVegan"`
+	IsVegetarian   bool             `json:"isVegetarian"`
 	IsVisible      bool             `json:"isVisible"`
 	PieceCount     *int             `json:"pieceCount,omitempty"`
 	Price          string           `json:"price"`
@@ -394,7 +394,7 @@ type UpdateProductInput struct {
 	IsDiscountable *bool               `json:"isDiscountable,omitempty"`
 	IsHalal        *bool               `json:"isHalal,omitempty"`
 	IsSpicy        *bool               `json:"isSpicy,omitempty"`
-	IsVegan        *bool               `json:"isVegan,omitempty"`
+	IsVegetarian   *bool               `json:"isVegetarian,omitempty"`
 	IsVisible      *bool               `json:"isVisible,omitempty"`
 	PieceCount     *int                `json:"pieceCount,omitempty"`
 	Price          *string             `json:"price,omitempty"`

@@ -277,7 +277,7 @@ type ComplexityRoot struct {
 		IsDiscountable func(childComplexity int) int
 		IsHalal        func(childComplexity int) int
 		IsSpicy        func(childComplexity int) int
-		IsVegan        func(childComplexity int) int
+		IsVegetarian   func(childComplexity int) int
 		IsVisible      func(childComplexity int) int
 		Name           func(childComplexity int) int
 		PieceCount     func(childComplexity int) int
@@ -1678,12 +1678,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Product.IsSpicy(childComplexity), true
-	case "Product.isVegan":
-		if e.ComplexityRoot.Product.IsVegan == nil {
+	case "Product.isVegetarian":
+		if e.ComplexityRoot.Product.IsVegetarian == nil {
 			break
 		}
 
-		return e.ComplexityRoot.Product.IsVegan(childComplexity), true
+		return e.ComplexityRoot.Product.IsVegetarian(childComplexity), true
 	case "Product.isVisible":
 		if e.ComplexityRoot.Product.IsVisible == nil {
 			break
@@ -5642,8 +5642,8 @@ func (ec *executionContext) fieldContext_Mutation_createProduct(ctx context.Cont
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
-			case "isVegan":
-				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVegetarian":
+				return ec.fieldContext_Product_isVegetarian(ctx, field)
 			case "isVisible":
 				return ec.fieldContext_Product_isVisible(ctx, field)
 			case "pieceCount":
@@ -5734,8 +5734,8 @@ func (ec *executionContext) fieldContext_Mutation_updateProduct(ctx context.Cont
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
-			case "isVegan":
-				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVegetarian":
+				return ec.fieldContext_Product_isVegetarian(ctx, field)
 			case "isVisible":
 				return ec.fieldContext_Product_isVisible(ctx, field)
 			case "pieceCount":
@@ -7744,8 +7744,8 @@ func (ec *executionContext) fieldContext_OrderItem_product(_ context.Context, fi
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
-			case "isVegan":
-				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVegetarian":
+				return ec.fieldContext_Product_isVegetarian(ctx, field)
 			case "isVisible":
 				return ec.fieldContext_Product_isVisible(ctx, field)
 			case "pieceCount":
@@ -9411,14 +9411,14 @@ func (ec *executionContext) fieldContext_Product_isSpicy(_ context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _Product_isVegan(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+func (ec *executionContext) _Product_isVegetarian(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_Product_isVegan,
+		ec.fieldContext_Product_isVegetarian,
 		func(ctx context.Context) (any, error) {
-			return obj.IsVegan, nil
+			return obj.IsVegetarian, nil
 		},
 		nil,
 		ec.marshalNBoolean2bool,
@@ -9427,7 +9427,7 @@ func (ec *executionContext) _Product_isVegan(ctx context.Context, field graphql.
 	)
 }
 
-func (ec *executionContext) fieldContext_Product_isVegan(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Product_isVegetarian(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Product",
 		Field:      field,
@@ -9889,8 +9889,8 @@ func (ec *executionContext) fieldContext_ProductCategory_products(_ context.Cont
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
-			case "isVegan":
-				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVegetarian":
+				return ec.fieldContext_Product_isVegetarian(ctx, field)
 			case "isVisible":
 				return ec.fieldContext_Product_isVisible(ctx, field)
 			case "pieceCount":
@@ -11192,8 +11192,8 @@ func (ec *executionContext) fieldContext_Query_product(ctx context.Context, fiel
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
-			case "isVegan":
-				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVegetarian":
+				return ec.fieldContext_Product_isVegetarian(ctx, field)
 			case "isVisible":
 				return ec.fieldContext_Product_isVisible(ctx, field)
 			case "pieceCount":
@@ -11270,8 +11270,8 @@ func (ec *executionContext) fieldContext_Query_products(_ context.Context, field
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
-			case "isVegan":
-				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVegetarian":
+				return ec.fieldContext_Product_isVegetarian(ctx, field)
 			case "isVisible":
 				return ec.fieldContext_Product_isVisible(ctx, field)
 			case "pieceCount":
@@ -12572,8 +12572,8 @@ func (ec *executionContext) fieldContext_Subscription_productUpdated(_ context.C
 				return ec.fieldContext_Product_isHalal(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
-			case "isVegan":
-				return ec.fieldContext_Product_isVegan(ctx, field)
+			case "isVegetarian":
+				return ec.fieldContext_Product_isVegetarian(ctx, field)
 			case "isVisible":
 				return ec.fieldContext_Product_isVisible(ctx, field)
 			case "pieceCount":
@@ -15048,7 +15048,7 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"categoryId", "code", "image", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegan", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
+	fieldsInOrder := [...]string{"categoryId", "code", "image", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegetarian", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -15104,13 +15104,13 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 				return it, err
 			}
 			it.IsSpicy = data
-		case "isVegan":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isVegan"))
+		case "isVegetarian":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isVegetarian"))
 			data, err := ec.unmarshalNBoolean2bool(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.IsVegan = data
+			it.IsVegetarian = data
 		case "isVisible":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isVisible"))
 			data, err := ec.unmarshalNBoolean2bool(ctx, v)
@@ -15721,7 +15721,7 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"categoryID", "code", "image", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegan", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
+	fieldsInOrder := [...]string{"categoryID", "code", "image", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegetarian", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -15777,13 +15777,13 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 				return it, err
 			}
 			it.IsSpicy = data
-		case "isVegan":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isVegan"))
+		case "isVegetarian":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isVegetarian"))
 			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.IsVegan = data
+			it.IsVegetarian = data
 		case "isVisible":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isVisible"))
 			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
@@ -17612,8 +17612,8 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
-		case "isVegan":
-			out.Values[i] = ec._Product_isVegan(ctx, field, obj)
+		case "isVegetarian":
+			out.Values[i] = ec._Product_isVegetarian(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}

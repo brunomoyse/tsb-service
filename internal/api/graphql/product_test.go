@@ -170,7 +170,7 @@ func TestProduct(t *testing.T) {
 				Price       string // Price is returned as string from numeric DB type
 				Slug        string
 				IsHalal     bool
-				IsVegan     bool
+				IsVegetarian     bool
 				IsSpicy     bool
 				PieceCount  *int
 			}
@@ -185,7 +185,7 @@ func TestProduct(t *testing.T) {
 					price
 					slug
 					isHalal
-					isVegan
+					isVegetarian
 					isSpicy
 					pieceCount
 				}
@@ -203,7 +203,7 @@ func TestProduct(t *testing.T) {
 		assert.Contains(t, []string{"12.5", "12.50"}, resp.Product.Price) // Price format may vary
 		assert.Equal(t, "salmon-sushi", resp.Product.Slug)
 		assert.False(t, resp.Product.IsHalal)
-		assert.False(t, resp.Product.IsVegan)
+		assert.False(t, resp.Product.IsVegetarian)
 		assert.False(t, resp.Product.IsSpicy)
 		assert.NotNil(t, resp.Product.PieceCount)
 		assert.Equal(t, 8, *resp.Product.PieceCount)
@@ -379,7 +379,7 @@ func TestCreateProduct(t *testing.T) {
 			"isVisible":      true,
 			"isAvailable":    true,
 			"isHalal":        false,
-			"isVegan":        false,
+			"isVegetarian":        false,
 			"isSpicy":        false,
 			"isDiscountable": true,
 			"vatCategory":    "food",
@@ -443,7 +443,7 @@ func TestCreateProduct(t *testing.T) {
 			"isVisible":      true,
 			"isAvailable":    true,
 			"isHalal":        false,
-			"isVegan":        false,
+			"isVegetarian":        false,
 			"isSpicy":        false,
 			"isDiscountable": true,
 			"vatCategory":    "food",
