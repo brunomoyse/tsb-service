@@ -18,7 +18,7 @@ type Product struct {
 	IsVisible      bool            `db:"is_visible" json:"isVisible"`
 	IsAvailable    bool            `db:"is_available" json:"isAvailable"`
 	IsHalal        bool            `db:"is_halal" json:"isHalal"`
-	IsVegan        bool            `db:"is_vegan" json:"isVegan"`
+	IsVegetarian        bool            `db:"is_vegetarian" json:"isVegetarian"`
 	IsSpicy        bool            `db:"is_spicy" json:"isSpicy"`
 	IsDiscountable bool            `db:"is_discountable" json:"isDiscountable"`
 	VatCategory    VatCategory     `db:"vat_category" json:"vatCategory"`

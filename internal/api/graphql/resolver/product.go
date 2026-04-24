@@ -47,7 +47,7 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 		input.IsVisible,
 		input.IsAvailable,
 		input.IsHalal,
-		input.IsVegan,
+		input.IsVegetarian,
 		input.IsSpicy,
 		input.IsDiscountable,
 		vatCategory,
@@ -109,8 +109,8 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 	if input.IsHalal != nil {
 		prod.IsHalal = *input.IsHalal
 	}
-	if input.IsVegan != nil {
-		prod.IsVegan = *input.IsVegan
+	if input.IsVegetarian != nil {
+		prod.IsVegetarian = *input.IsVegetarian
 	}
 	if input.IsSpicy != nil {
 		prod.IsSpicy = *input.IsSpicy
