@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reset Your Password | Tokyo Sushi Bar</title>
+    <title>Your Sign-in Code | Tokyo Sushi Bar</title>
 </head>
 <body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
@@ -17,20 +17,15 @@
     <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
     <!-- CONTENT -->
     <tr><td style="background-color:#ffffff;padding:36px;">
-        <p style="margin:0 0 16px;font-size:18px;color:#2D2D2D;font-weight:600;">Hello {{.UserName}},</p>
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">We received a request to reset the password for your <strong>Tokyo Sushi Bar</strong> account.</p>
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Click the button below to set a new password:</p>
-
+        <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">Hello {{.UserName}},</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Here is your sign-in code for <strong>Tokyo Sushi Bar</strong>. Enter it on the sign-in page to access your account:</p>
         <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;">
-        <tr><td style="background-color:#ef4444;border-radius:12px;padding:12px 28px;">
-            <a href="{{.ResetLink}}" style="color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;display:inline-block;">Reset My Password</a>
+        <tr><td style="background-color:#F0EBE3;border:1px solid #E5DED4;border-radius:12px;padding:20px 36px;text-align:center;">
+            <span style="font-family:'Courier New',monospace;font-size:32px;letter-spacing:8px;font-weight:700;color:#2D2D2D;">{{.Code}}</span>
         </td></tr>
         </table>
-
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">If the button above doesn't work, copy and paste the following URL into your browser:</p>
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;word-break:break-all;">{{.ResetLink}}</p>
-
-        <p style="margin:0;font-size:13px;line-height:1.6;color:#6B6B6B;">This link will expire in 1 hour. If you did not request a password reset, you can safely ignore this email — your password will not be changed.</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">This code is valid for just a few minutes. If you didn't try to sign in, ignore this email — your account stays secure.</p>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">See you soon at Tokyo Sushi Bar.<br/>お待ちしております！ (We're waiting for you!)</p>
     </td></tr>
     <!-- FOOTER -->
     <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:0 0 12px 12px;">

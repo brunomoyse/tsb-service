@@ -16,13 +16,9 @@ import (
 	"tsb-service/pkg/logging"
 )
 
-// sessionRequest is the frontend's login request.
-type sessionRequest struct {
-	LoginName string `json:"loginName"`
-	Password  string `json:"password"`
-}
-
-// sessionResponse is returned to the frontend.
+// sessionResponse is returned to the frontend after a successful session
+// creation or update. Used by both the OTP request (initial session) and
+// the OTP verify (session token re-issued with otpEmail check fulfilled).
 type sessionResponse struct {
 	SessionID    string `json:"sessionId"`
 	SessionToken string `json:"sessionToken"`
@@ -40,7 +36,9 @@ type finalizeResponse struct {
 	CallbackURL string `json:"callbackUrl"`
 }
 
-// zitadelSessionResponse is Zitadel's Session API response.
+// zitadelSessionResponse mirrors Zitadel's Session API response shape.
+// Used by IdP session creation; the OTP flow has its own struct that also
+// captures the otpEmail challenge code.
 type zitadelSessionResponse struct {
 	SessionID    string `json:"sessionId"`
 	SessionToken string `json:"sessionToken"`
@@ -49,72 +47,6 @@ type zitadelSessionResponse struct {
 // zitadelFinalizeResponse is Zitadel's OIDC authorize finalize response.
 type zitadelFinalizeResponse struct {
 	CallbackURL string `json:"callbackUrl"`
-}
-
-// CreateSessionHandler proxies login requests to Zitadel's Session API.
-// POST /auth/session { loginName, password }
-func CreateSessionHandler(c *gin.Context) {
-	var req sessionRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.LoginName == "" || req.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "loginName and password are required"})
-		return
-	}
-
-	body := map[string]any{
-		"checks": map[string]any{
-			"user":     map[string]any{"loginName": req.LoginName},
-			"password": map[string]any{"password": req.Password},
-		},
-	}
-
-	respBody, status, err := zitadelRequest("POST", "/v2/sessions", body)
-	if err != nil {
-		logging.FromContext(c.Request.Context()).Error("zitadel session create failed", zap.Error(err))
-		c.JSON(http.StatusBadGateway, gin.H{"error": "authentication service unavailable"})
-		return
-	}
-
-	if status != http.StatusCreated && status != http.StatusOK {
-		msg := parseZitadelError(respBody)
-		// Keep the social-login hint: users who signed up with Google/Apple need
-		// to know to click the social button, and the email is already disclosed
-		// to the client by the act of typing it.
-		if code, message := mapSessionError(msg); code != "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": code, "message": message})
-			return
-		}
-
-		// Collapse every other failure (wrong password, unknown account,
-		// account locked, etc.) into one canonical 401 so response bodies and
-		// status codes don't let an attacker distinguish the cases.
-		c.JSON(http.StatusUnauthorized, gin.H{"error": ErrWrongPassword})
-		return
-	}
-
-	var zResp zitadelSessionResponse
-	if err := json.Unmarshal(respBody, &zResp); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid response from auth service"})
-		return
-	}
-
-	// Post-success email-verified gate. The credentials were already accepted
-	// here, so disclosing the verification state doesn't enable enumeration
-	// beyond what the caller already knows. Delete the session we just
-	// created so the unverified user can't replay the sessionToken.
-	if userID, err := findZitadelUserByEmail(req.LoginName); err == nil {
-		if !isZitadelEmailVerified(userID) {
-			if _, _, delErr := zitadelRequest("DELETE", "/v2/sessions/"+zResp.SessionID, map[string]any{
-				"sessionToken": zResp.SessionToken,
-			}); delErr != nil {
-				logging.FromContext(c.Request.Context()).Warn("failed to revoke session for unverified email",
-					zap.String("session_id", zResp.SessionID), zap.Error(delErr))
-			}
-			c.JSON(http.StatusForbidden, gin.H{"error": "email_not_verified"})
-			return
-		}
-	}
-
-	c.JSON(http.StatusOK, sessionResponse(zResp))
 }
 
 // FinalizeOIDCHandler proxies the OIDC auth request finalization to Zitadel.

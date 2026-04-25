@@ -187,20 +187,20 @@ func prepareWelcomeEmailData(user userDomain.User, menuLink string) struct {
 	}
 }
 
-// prepareResetPasswordEmailData prepares the data for password reset emails.
-func prepareResetPasswordEmailData(user userDomain.User, resetLink string) struct {
-	UserName  string
-	ResetLink string
-	LogoURL   string
+// prepareLoginOtpEmailData prepares the data for passwordless login OTP emails.
+func prepareLoginOtpEmailData(user userDomain.User, code string) struct {
+	UserName string
+	Code     string
+	LogoURL  string
 } {
 	return struct {
-		UserName  string
-		ResetLink string
-		LogoURL   string
+		UserName string
+		Code     string
+		LogoURL  string
 	}{
-		UserName:  fmt.Sprintf("%s %s", user.FirstName, user.LastName),
-		ResetLink: resetLink,
-		LogoURL:   logoURL(),
+		UserName: fmt.Sprintf("%s %s", user.FirstName, user.LastName),
+		Code:     code,
+		LogoURL:  logoURL(),
 	}
 }
 
@@ -445,15 +445,15 @@ func renderOrderCanceledEmailText(path string, u userDomain.User, reason string)
 	return renderEmail(path, data, loadTextTemplate)
 }
 
-// renderResetPasswordEmailHTML renders the HTML version of the password reset email.
-func renderResetPasswordEmailHTML(path string, user userDomain.User, resetLink string) (string, error) {
-	data := prepareResetPasswordEmailData(user, resetLink)
+// renderLoginOtpEmailHTML renders the HTML version of the passwordless login OTP email.
+func renderLoginOtpEmailHTML(path string, user userDomain.User, code string) (string, error) {
+	data := prepareLoginOtpEmailData(user, code)
 	return renderEmail(path, data, loadHTMLTemplate)
 }
 
-// renderResetPasswordEmailText renders the plain text version of the password reset email.
-func renderResetPasswordEmailText(path string, user userDomain.User, resetLink string) (string, error) {
-	data := prepareResetPasswordEmailData(user, resetLink)
+// renderLoginOtpEmailText renders the plain text version of the passwordless login OTP email.
+func renderLoginOtpEmailText(path string, user userDomain.User, code string) (string, error) {
+	data := prepareLoginOtpEmailData(user, code)
 	return renderEmail(path, data, loadTextTemplate)
 }
 
