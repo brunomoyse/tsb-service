@@ -22,6 +22,7 @@ import (
 
 	"tsb-service/internal/api/auth"
 	"tsb-service/internal/api/feedback"
+	images "tsb-service/internal/api/images"
 	"tsb-service/internal/api/graphql/resolver"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
@@ -300,9 +301,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Request body size limit (1MB default, GraphQL multipart has its own 10MB limit)
+	// Request body size limit (1MB default). GraphQL multipart and the image
+	// preview proxy apply their own limits internally, so the global cap is
+	// skipped for those two paths.
 	router.Use(func(c *gin.Context) {
-		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
+		p := c.Request.URL.Path
+		if p != "/api/v1/graphql" && p != "/api/v1/images/preview" {
+			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
+		}
 		c.Next()
 	})
 
@@ -311,7 +317,13 @@ func main() {
 		CustomSchemas:    []string{"capacitor://"},
 		AllowMethods:     []string{"HEAD", "GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept-Language"},
-		ExposeHeaders:    []string{"Content-Length", "Authorization", "Content-Disposition"},
+		ExposeHeaders: []string{
+			"Content-Length", "Authorization", "Content-Disposition",
+			"X-Original-Width", "X-Original-Height",
+			"X-Post-Rembg-Width", "X-Post-Rembg-Height",
+			"X-Post-Trim-Width", "X-Post-Trim-Height",
+			"X-Trim-Applied",
+		},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
@@ -396,6 +408,7 @@ func main() {
 	api.POST("/payments/webhook", mollieLimiter.Middleware(), paymentHandler.UpdatePaymentStatusHandler)
 
 	strictAuth := oidcVerifier.StrictAuthMiddleware()
+	api.POST("/images/preview", strictAuth, images.PreviewHandler)
 	api.POST("/auth/change-password", strictAuth, auth.ChangePasswordHandler)
 	api.GET("/auth/has-password", strictAuth, auth.HasPasswordHandler)
 	api.GET("/orders/:id/invoice", strictAuth, orderHandler.DownloadInvoice)
