@@ -126,15 +126,15 @@ func (c *RestaurantConfig) NextOpeningAt(now time.Time, overrides map[string]*Sc
 }
 
 func parseHHMM(s string) (int, bool) {
-	parts := strings.SplitN(s, ":", 2)
-	if len(parts) != 2 {
+	hh, mm, ok := strings.Cut(s, ":")
+	if !ok {
 		return 0, false
 	}
-	h, err := strconv.Atoi(parts[0])
+	h, err := strconv.Atoi(hh)
 	if err != nil {
 		return 0, false
 	}
-	m, err := strconv.Atoi(parts[1])
+	m, err := strconv.Atoi(mm)
 	if err != nil {
 		return 0, false
 	}

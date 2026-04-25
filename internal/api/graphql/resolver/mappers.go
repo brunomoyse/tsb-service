@@ -32,6 +32,15 @@ func Map[T any, U any](in []T, fn func(T) U) []U {
 	return out
 }
 
+// decimalPtrStr returns a pointer to the string form of d, or nil if d is nil.
+func decimalPtrStr(d *decimal.Decimal) *string {
+	if d == nil {
+		return nil
+	}
+	s := d.String()
+	return &s
+}
+
 // ToGQLProduct converts a domain.Product into the GraphQL model.Product.
 func ToGQLProduct(p *productDomain.Product, lang string) *model.Product {
 	return &model.Product{
@@ -91,23 +100,14 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		}
 	}
 
-	var deliveryFeeStr *string
-	if o.DeliveryFee != nil {
-		tmp := o.DeliveryFee.String()
-		deliveryFeeStr = &tmp
-	}
+	deliveryFeeStr := decimalPtrStr(o.DeliveryFee)
 
 	var transactionFeeStr *string
 	if o.TransactionFee.GreaterThan(decimal.Zero) {
-		tmp := o.TransactionFee.String()
-		transactionFeeStr = &tmp
+		transactionFeeStr = decimalPtrStr(&o.TransactionFee)
 	}
 
-	var cashPaymentAmountStr *string
-	if o.CashPaymentAmount != nil {
-		tmp := o.CashPaymentAmount.String()
-		cashPaymentAmountStr = &tmp
-	}
+	cashPaymentAmountStr := decimalPtrStr(o.CashPaymentAmount)
 
 	isManual := o.IsManualAddress
 
@@ -190,18 +190,6 @@ func ToGQLTranslation(s *productDomain.Translation) *model.Translation {
 }
 
 func toDomainTranslations(in []*model.TranslationInput) []productDomain.Translation {
-	out := make([]productDomain.Translation, len(in))
-	for i, t := range in {
-		out[i] = productDomain.Translation{
-			Language:    t.Language,
-			Name:        t.Name,
-			Description: t.Description,
-		}
-	}
-	return out
-}
-
-func toDomainTranslationsPtr(in []*model.TranslationInput) []productDomain.Translation {
 	if in == nil {
 		return nil
 	}
@@ -437,10 +425,7 @@ func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.R
 		return fmt.Errorf("preferred ready time must be on the same day")
 	}
 
-	prepBuffer := time.Duration(config.PreparationMinutes) * time.Minute
-	if prepBuffer < 15*time.Minute {
-		prepBuffer = 15 * time.Minute
-	}
+	prepBuffer := max(time.Duration(config.PreparationMinutes)*time.Minute, 15*time.Minute)
 	if slot.Before(nowLocal.Add(prepBuffer)) {
 		return fmt.Errorf("preferred ready time is no longer available — it is within the minimum preparation window")
 	}
@@ -520,8 +505,7 @@ func isSlotInAllowedInterval(slotMins int, schedule *restaurantDomain.DaySchedul
 }
 
 func parseHHMMToMinutes(hhmm string) (int, bool) {
-	parts := strings.Split(hhmm, ":")
-	if len(parts) != 2 {
+	if _, _, ok := strings.Cut(hhmm, ":"); !ok {
 		return 0, false
 	}
 

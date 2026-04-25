@@ -232,7 +232,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 		}
 		return err
 	})
-	h.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
+	h.SetRecoverFunc(func(ctx context.Context, err any) error {
 		logging.FromContext(ctx).Error("graphql resolver panic", zap.Any("panic", err))
 		if hub := sentry.GetHubFromContext(ctx); hub != nil {
 			hub.RecoverWithContext(ctx, err)

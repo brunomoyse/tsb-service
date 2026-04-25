@@ -161,8 +161,8 @@ func claimString(m map[string]any, key string) string {
 
 // extractToken gets the token from Authorization header (or cookie as fallback).
 func extractToken(c *gin.Context) string {
-	if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
-		return strings.TrimPrefix(auth, "Bearer ")
+	if token, ok := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer "); ok {
+		return token
 	}
 	if cookie, err := c.Cookie("access_token"); err == nil && cookie != "" {
 		return cookie

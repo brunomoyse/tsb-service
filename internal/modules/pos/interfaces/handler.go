@@ -274,14 +274,14 @@ func (h *Handler) isAdminViaUserinfo(ctx context.Context, authHeader string) boo
 	if err != nil {
 		return false
 	}
-	var info map[string]interface{}
+	var info map[string]any
 	if err := json.Unmarshal(body, &info); err != nil {
 		return false
 	}
 	// Check all claim keys matching urn:zitadel:iam:org:project:*:roles for "admin"
 	for k, v := range info {
 		if len(k) > 30 && k[:30] == "urn:zitadel:iam:org:project:" {
-			if roles, ok := v.(map[string]interface{}); ok {
+			if roles, ok := v.(map[string]any); ok {
 				if _, hasAdmin := roles["admin"]; hasAdmin {
 					return true
 				}
@@ -289,7 +289,7 @@ func (h *Handler) isAdminViaUserinfo(ctx context.Context, authHeader string) boo
 		}
 	}
 	// Also check the generic claim
-	if roles, ok := info["urn:zitadel:iam:org:project:roles"].(map[string]interface{}); ok {
+	if roles, ok := info["urn:zitadel:iam:org:project:roles"].(map[string]any); ok {
 		if _, hasAdmin := roles["admin"]; hasAdmin {
 			return true
 		}
@@ -298,7 +298,7 @@ func (h *Handler) isAdminViaUserinfo(ctx context.Context, authHeader string) boo
 	return false
 }
 
-func keys(m map[string]interface{}) []string {
+func keys(m map[string]any) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
 		out = append(out, k)
