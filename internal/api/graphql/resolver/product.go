@@ -60,7 +60,7 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 
 	// 2. If an image was supplied, forward it to the file‑service
 	if input.Image != nil {
-		if err := utils.UploadProductImage(ctx, input.Image.File, input.Image.Filename, prod.Slug); err != nil {
+		if err := utils.UploadProductImage(ctx, input.Image.File, input.Image.Filename, prod.ID.String()); err != nil {
 			logging.FromContext(ctx).Error("image upload failed", zap.String("product_id", prod.ID.String()), zap.Error(err))
 		}
 	}
@@ -126,56 +126,30 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 		prod.Translations = toDomainTranslationsPtr(input.Translations)
 	}
 
-	// 3. Save the old slug before persisting the update.
-	oldSlug := ""
-	if prod.Slug != nil {
-		oldSlug = *prod.Slug
-	}
-
-	// 4. Persist the update with the single domain object.
+	// 3. Persist the update with the single domain object.
 	if err := r.ProductService.UpdateProduct(ctx, prod); err != nil {
 		return nil, fmt.Errorf("failed to update product: %w", err)
 	}
 
-	// 5. We need to refetch the product to get the latest slug
+	// 4. Refetch to get latest DB state (e.g. regenerated slug).
 	prod, err = r.ProductService.GetProduct(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch product %s: %w", id, err)
 	}
 
-	newSlug := ""
-	if prod.Slug != nil {
-		newSlug = *prod.Slug
-	}
-
-	// 6. Upload/replace image if provided.
+	// 5. Upload/replace image if provided (keyed by immutable product UUID).
 	if input.Image != nil {
 		if err := utils.UploadProductImage(
 			ctx,
 			input.Image.File,
 			input.Image.Filename,
-			prod.Slug, // slug might be nil; helper handles that
+			id.String(),
 		); err != nil {
 			logging.FromContext(ctx).Error("image upload failed", zap.String("product_id", id.String()), zap.Error(err))
 		}
-		// If slug changed and new image was uploaded, clean up old image
-		if oldSlug != "" && oldSlug != newSlug {
-			go func() {
-				if err := utils.DeleteProductImage(ctx, oldSlug); err != nil {
-					logging.FromContext(ctx).Error("failed to delete old product image", zap.String("old_slug", oldSlug), zap.Error(err))
-				}
-			}()
-		}
-	} else if oldSlug != "" && newSlug != "" && oldSlug != newSlug {
-		// 7. No new image, but slug changed — rename the existing image.
-		go func() {
-			if err := utils.RenameProductImage(ctx, oldSlug, newSlug); err != nil {
-				logging.FromContext(ctx).Error("failed to rename product image", zap.String("old_slug", oldSlug), zap.String("new_slug", newSlug), zap.Error(err))
-			}
-		}()
 	}
 
-	// 8. Notify subscribers of product update.
+	// 6. Notify subscribers of product update.
 	gqlProd := ToGQLProduct(prod, userLang)
 	r.Broker.Publish("productUpdated", gqlProd)
 
