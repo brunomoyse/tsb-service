@@ -332,6 +332,7 @@ func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) 
             p.code,
             p.price,
             p.is_discountable,
+            p.vat_category,
             pct.name AS category_name,
             pt.name  AS name
         FROM products p
@@ -362,6 +363,7 @@ func (r *ProductRepository) FindNamesByIDs(ctx context.Context, productIDs []str
             p.code,
             p.price,
             p.is_discountable,
+            p.vat_category,
             pct.name AS category_name,
             pt.name  AS name
         FROM products p
@@ -579,7 +581,7 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 		IsVisible        bool            `db:"is_visible"`
 		IsAvailable      bool            `db:"is_available"`
 		IsHalal          bool            `db:"is_halal"`
-		IsVegetarian          bool            `db:"is_vegetarian"`
+		IsVegetarian     bool            `db:"is_vegetarian"`
 		IsSpicy          bool            `db:"is_spicy"`
 		IsDiscountable   bool            `db:"is_discountable"`
 		VatCategory      string          `db:"vat_category"`
@@ -616,7 +618,7 @@ func (r *ProductRepository) queryProducts(ctx context.Context, query string, arg
 				IsVisible:      row.IsVisible,
 				IsAvailable:    row.IsAvailable,
 				IsHalal:        row.IsHalal,
-				IsVegetarian:        row.IsVegetarian,
+				IsVegetarian:   row.IsVegetarian,
 				IsSpicy:        row.IsSpicy,
 				IsDiscountable: row.IsDiscountable,
 				VatCategory:    domain.VatCategory(row.VatCategory),

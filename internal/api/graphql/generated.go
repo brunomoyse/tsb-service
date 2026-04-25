@@ -202,13 +202,14 @@ type ComplexityRoot struct {
 	}
 
 	OrderItem struct {
-		Choice     func(childComplexity int) int
-		ChoiceID   func(childComplexity int) int
-		Product    func(childComplexity int) int
-		ProductID  func(childComplexity int) int
-		Quantity   func(childComplexity int) int
-		TotalPrice func(childComplexity int) int
-		UnitPrice  func(childComplexity int) int
+		Choice         func(childComplexity int) int
+		ChoiceID       func(childComplexity int) int
+		Product        func(childComplexity int) int
+		ProductID      func(childComplexity int) int
+		Quantity       func(childComplexity int) int
+		TotalPrice     func(childComplexity int) int
+		UnitPrice      func(childComplexity int) int
+		VatRateApplied func(childComplexity int) int
 	}
 
 	OrderStatusHistory struct {
@@ -1355,6 +1356,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.OrderItem.UnitPrice(childComplexity), true
+	case "OrderItem.vatRateApplied":
+		if e.ComplexityRoot.OrderItem.VatRateApplied == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderItem.VatRateApplied(childComplexity), true
 
 	case "OrderStatusHistory.changedAt":
 		if e.ComplexityRoot.OrderStatusHistory.ChangedAt == nil {
@@ -7351,6 +7358,8 @@ func (ec *executionContext) fieldContext_Order_items(_ context.Context, field gr
 				return ec.fieldContext_OrderItem_quantity(ctx, field)
 			case "totalPrice":
 				return ec.fieldContext_OrderItem_totalPrice(ctx, field)
+			case "vatRateApplied":
+				return ec.fieldContext_OrderItem_vatRateApplied(ctx, field)
 			case "choiceId":
 				return ec.fieldContext_OrderItem_choiceId(ctx, field)
 			case "choice":
@@ -7877,6 +7886,35 @@ func (ec *executionContext) _OrderItem_totalPrice(ctx context.Context, field gra
 }
 
 func (ec *executionContext) fieldContext_OrderItem_totalPrice(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderItem_vatRateApplied(ctx context.Context, field graphql.CollectedField, obj *model.OrderItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OrderItem_vatRateApplied,
+		func(ctx context.Context) (any, error) {
+			return obj.VatRateApplied, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OrderItem_vatRateApplied(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "OrderItem",
 		Field:      field,
@@ -17252,6 +17290,11 @@ func (ec *executionContext) _OrderItem(ctx context.Context, sel ast.SelectionSet
 			}
 		case "totalPrice":
 			out.Values[i] = ec._OrderItem_totalPrice(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "vatRateApplied":
+			out.Values[i] = ec._OrderItem_vatRateApplied(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}

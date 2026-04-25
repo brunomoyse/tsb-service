@@ -70,15 +70,23 @@ func NewPaymentService(
 
 func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct, u userDomain.User, a *addressDomain.Address, customRedirectURL *string) (*domain.MolliePayment, error) {
 	var lines []mollie.PaymentLines
+	serviceType := serviceTypeFromOrderType(o.OrderType)
 
 	for _, line := range op {
+		vatRate := line.VatRate
+		if vatRate.IsZero() {
+			vatRate = decimal.NewFromFloat(productDomain.VatCategory(line.Product.VatCategory).VatRatePercent(serviceType))
+		}
+		vatAmount := vatAmountFromGross(line.TotalPrice, vatRate)
 		lines = append(lines, mollie.PaymentLines{
 			Type:         mollie.PhysicalProductLine,
 			Description:  describe(line.Product),
 			Quantity:     int(line.Quantity),
 			QuantityUnit: "pcs",
+			VATRate:      vatRate.StringFixed(2),
 			UnitPrice:    amt(line.UnitPrice),
 			TotalAmount:  amt(line.TotalPrice),
+			VATAmount:    amt(vatAmount),
 		})
 	}
 
@@ -336,10 +344,12 @@ func (s *paymentService) HandlePaymentPaid(ctx context.Context, orderID uuid.UUI
 				Code:         prod.Code,
 				CategoryName: prod.CategoryName,
 				Name:         prod.Name,
+				VatCategory:  string(prod.VatCategory),
 			},
 			Quantity:   op.Quantity,
 			UnitPrice:  op.UnitPrice,
 			TotalPrice: op.TotalPrice,
+			VatRate:    op.VatRateApplied,
 		}
 	}
 
@@ -517,4 +527,18 @@ func describe(p orderDomain.Product) string {
 		return fmt.Sprintf("%s ‒ %s %s", *p.Code, p.CategoryName, p.Name)
 	}
 	return fmt.Sprintf("%s %s", p.CategoryName, p.Name)
+}
+
+func serviceTypeFromOrderType(orderType orderDomain.OrderType) productDomain.ServiceType {
+	if orderType == orderDomain.OrderTypeDelivery {
+		return productDomain.ServiceTypeDelivery
+	}
+	return productDomain.ServiceTypeTakeaway
+}
+
+func vatAmountFromGross(gross decimal.Decimal, rate decimal.Decimal) decimal.Decimal {
+	if rate.IsZero() {
+		return decimal.Zero
+	}
+	return gross.Mul(rate).Div(decimal.NewFromInt(100).Add(rate))
 }

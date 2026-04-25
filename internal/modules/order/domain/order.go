@@ -42,39 +42,39 @@ const (
 var TransactionFee = decimal.NewFromFloatWithExponent(0.30, -2)
 
 type Order struct {
-	ID                 uuid.UUID        `db:"id" json:"id"`
-	CreatedAt          time.Time        `db:"created_at" json:"createdAt"`
-	UpdatedAt          time.Time        `db:"updated_at" json:"updatedAt"`
-	UserID             uuid.UUID        `db:"user_id" json:"userId"`
-	OrderStatus        OrderStatus      `db:"order_status" json:"orderStatus"`
-	OrderType          OrderType        `db:"order_type" json:"orderType"`
-	IsOnlinePayment    bool             `db:"is_online_payment" json:"isOnlinePayment"`
-	PaymentID          *uuid.UUID       `db:"payment_id" json:"paymentId,omitempty"`
-	TakeawayDiscount   decimal.Decimal  `db:"takeaway_discount" json:"takeawayDiscount"`
-	CouponDiscount     decimal.Decimal  `db:"coupon_discount" json:"couponDiscount"`
-	DeliveryFee        *decimal.Decimal `db:"delivery_fee" json:"deliveryFee,omitempty"`
-	TransactionFee     decimal.Decimal  `db:"transaction_fee" json:"transactionFee"`
-	TotalPrice         decimal.Decimal  `db:"total_price" json:"totalPrice"`
-	PreferredReadyTime *time.Time       `db:"preferred_ready_time" json:"preferredReadyTime,omitempty"`
-	EstimatedReadyTime *time.Time       `db:"estimated_ready_time" json:"estimatedReadyTime,omitempty"`
-	AddressID          *string          `db:"address_id" json:"addressId,omitempty"`
-	AddressExtra       *string          `db:"address_extra" json:"addressExtra,omitempty"`
-	OrderNote          *string          `db:"order_note" json:"orderNote,omitempty"`
-	OrderExtra         types.NullableJSON     `db:"order_extra" json:"orderExtras,omitempty"`
-	Language           string           `db:"language" json:"language"`
-	CouponCode         *string          `db:"coupon_code" json:"couponCode,omitempty"`
+	ID                 uuid.UUID          `db:"id" json:"id"`
+	CreatedAt          time.Time          `db:"created_at" json:"createdAt"`
+	UpdatedAt          time.Time          `db:"updated_at" json:"updatedAt"`
+	UserID             uuid.UUID          `db:"user_id" json:"userId"`
+	OrderStatus        OrderStatus        `db:"order_status" json:"orderStatus"`
+	OrderType          OrderType          `db:"order_type" json:"orderType"`
+	IsOnlinePayment    bool               `db:"is_online_payment" json:"isOnlinePayment"`
+	PaymentID          *uuid.UUID         `db:"payment_id" json:"paymentId,omitempty"`
+	TakeawayDiscount   decimal.Decimal    `db:"takeaway_discount" json:"takeawayDiscount"`
+	CouponDiscount     decimal.Decimal    `db:"coupon_discount" json:"couponDiscount"`
+	DeliveryFee        *decimal.Decimal   `db:"delivery_fee" json:"deliveryFee,omitempty"`
+	TransactionFee     decimal.Decimal    `db:"transaction_fee" json:"transactionFee"`
+	TotalPrice         decimal.Decimal    `db:"total_price" json:"totalPrice"`
+	PreferredReadyTime *time.Time         `db:"preferred_ready_time" json:"preferredReadyTime,omitempty"`
+	EstimatedReadyTime *time.Time         `db:"estimated_ready_time" json:"estimatedReadyTime,omitempty"`
+	AddressID          *string            `db:"address_id" json:"addressId,omitempty"`
+	AddressExtra       *string            `db:"address_extra" json:"addressExtra,omitempty"`
+	OrderNote          *string            `db:"order_note" json:"orderNote,omitempty"`
+	OrderExtra         types.NullableJSON `db:"order_extra" json:"orderExtras,omitempty"`
+	Language           string             `db:"language" json:"language"`
+	CouponCode         *string            `db:"coupon_code" json:"couponCode,omitempty"`
 	// Denormalized address fields (snapshot at order time)
-	StreetID         *string  `db:"street_id" json:"streetId,omitempty"`
-	StreetName       *string  `db:"street_name" json:"streetName,omitempty"`
-	HouseNumber      *string  `db:"house_number" json:"houseNumber,omitempty"`
-	BoxNumber        *string  `db:"box_number" json:"boxNumber,omitempty"`
-	MunicipalityName *string  `db:"municipality_name" json:"municipalityName,omitempty"`
-	Postcode         *string  `db:"postcode" json:"postcode,omitempty"`
-	AddressDistance  *float64 `db:"address_distance" json:"addressDistance,omitempty"`
-	IsManualAddress  bool     `db:"is_manual_address" json:"isManualAddress"`
-	AddressPlaceID   *string  `db:"address_place_id" json:"addressPlaceId,omitempty"`
-	AddressLat       *float64 `db:"address_lat" json:"addressLat,omitempty"`
-	AddressLng       *float64 `db:"address_lng" json:"addressLng,omitempty"`
+	StreetID           *string                  `db:"street_id" json:"streetId,omitempty"`
+	StreetName         *string                  `db:"street_name" json:"streetName,omitempty"`
+	HouseNumber        *string                  `db:"house_number" json:"houseNumber,omitempty"`
+	BoxNumber          *string                  `db:"box_number" json:"boxNumber,omitempty"`
+	MunicipalityName   *string                  `db:"municipality_name" json:"municipalityName,omitempty"`
+	Postcode           *string                  `db:"postcode" json:"postcode,omitempty"`
+	AddressDistance    *float64                 `db:"address_distance" json:"addressDistance,omitempty"`
+	IsManualAddress    bool                     `db:"is_manual_address" json:"isManualAddress"`
+	AddressPlaceID     *string                  `db:"address_place_id" json:"addressPlaceId,omitempty"`
+	AddressLat         *float64                 `db:"address_lat" json:"addressLat,omitempty"`
+	AddressLng         *float64                 `db:"address_lng" json:"addressLng,omitempty"`
 	CancellationReason *OrderCancellationReason `db:"cancellation_reason" json:"cancellationReason,omitempty"`
 	CashPaymentAmount  *decimal.Decimal         `db:"cash_payment_amount" json:"cashPaymentAmount,omitempty"`
 }
@@ -98,6 +98,7 @@ type OrderProductRaw struct {
 	Quantity        int64           `db:"quantity" json:"quantity"`
 	UnitPrice       decimal.Decimal `db:"unit_price" json:"unitPrice"`
 	TotalPrice      decimal.Decimal `db:"total_price" json:"totalPrice"`
+	VatRateApplied  decimal.Decimal `db:"vat_rate_applied" json:"vatRateApplied"`
 	ProductChoiceID *uuid.UUID      `db:"product_choice_id" json:"productChoiceId,omitempty"`
 }
 
@@ -106,6 +107,7 @@ type OrderProduct struct {
 	Quantity   int64           `json:"quantity"`
 	UnitPrice  decimal.Decimal `json:"unitPrice"`
 	TotalPrice decimal.Decimal `json:"totalPrice"`
+	VatRate    decimal.Decimal `json:"vatRate"`
 }
 
 type Product struct {
@@ -113,6 +115,7 @@ type Product struct {
 	Code         *string   `json:"code"`
 	CategoryName string    `json:"categoryName"`
 	Name         string    `json:"name"`
+	VatCategory  string    `json:"vatCategory"`
 }
 
 // CustomerStatsRow holds aggregated order statistics for a single customer.
@@ -218,4 +221,3 @@ func NewOrder(
 
 	return o
 }
-

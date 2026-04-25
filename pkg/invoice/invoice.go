@@ -43,6 +43,8 @@ type InvoiceData struct {
 	Items []InvoiceItem
 
 	Subtotal         string // sum of line totals before discounts/fees
+	VatBreakdown     []InvoiceVatLine
+	TotalVatAmount   *string
 	TakeawayDiscount *string
 	CouponDiscount   *string
 	CouponCode       *string
@@ -58,6 +60,12 @@ type InvoiceItem struct {
 	Quantity  int64
 	UnitPrice string
 	LineTotal string
+}
+
+type InvoiceVatLine struct {
+	Label  string
+	Rate   string
+	Amount string
 }
 
 type InvoiceAddress struct {
@@ -243,6 +251,22 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 	renderTotalLine(l.Subtotal, data.Subtotal, false)
 
 	// Discounts
+	if len(data.VatBreakdown) > 0 {
+		pdf.SetTextColor(60, 60, 60)
+		for _, vatLine := range data.VatBreakdown {
+			label := vatLine.Label
+			if vatLine.Rate != "" {
+				label = fmt.Sprintf("%s (%s%%)", label, vatLine.Rate)
+			}
+			renderTotalLine(label, vatLine.Amount, false)
+		}
+	}
+
+	if data.TotalVatAmount != nil {
+		pdf.SetTextColor(60, 60, 60)
+		renderTotalLine(l.TotalVAT, *data.TotalVatAmount, false)
+	}
+
 	if data.TakeawayDiscount != nil {
 		pdf.SetTextColor(0, 150, 80)
 		renderTotalLine(l.TakeawayDiscount, "- "+*data.TakeawayDiscount, false)

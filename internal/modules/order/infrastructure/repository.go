@@ -139,9 +139,9 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 	if op != nil && len(*op) > 0 {
 		const orderProductQuery = `
 			INSERT INTO order_product (
-				order_id, product_id, unit_price, quantity, total_price, product_choice_id
+				order_id, product_id, unit_price, quantity, total_price, vat_rate_applied, product_choice_id
 			) VALUES (
-				$1, $2, $3, $4, $5, $6
+				$1, $2, $3, $4, $5, $6, $7
 			);
 		`
 		for _, prod := range *op {
@@ -151,6 +151,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 				prod.UnitPrice,
 				prod.Quantity,
 				prod.TotalPrice,
+				prod.VatRateApplied,
 				prod.ProductChoiceID,
 			); err != nil {
 				return nil, nil, fmt.Errorf("failed to insert order product: %w", err)
@@ -201,6 +202,7 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 			op.quantity,
 			op.unit_price,
 			op.total_price,
+			op.vat_rate_applied,
 			op.product_choice_id
 		FROM order_product op
 		JOIN products p ON op.product_id = p.id
@@ -368,14 +370,15 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 	// build an IN (…) query with JOIN to products for sorting, expand args with sqlx.In, then rebind for your driver
 	lang := utils.GetLang(ctx)
 	query, args, err := sqlx.In(`
-        SELECT
-            op.order_id,
-            op.product_id,
-            op.quantity,
-            op.unit_price,
-            op.total_price,
-            op.product_choice_id
-        FROM order_product op
+		SELECT
+			op.order_id,
+			op.product_id,
+			op.quantity,
+			op.unit_price,
+			op.total_price,
+			op.vat_rate_applied,
+			op.product_choice_id
+		FROM order_product op
         JOIN products p ON op.product_id = p.id
         JOIN product_categories pc ON p.category_id = pc.id
         JOIN product_category_translations pct ON pc.id = pct.product_category_id AND pct.language = ?
@@ -395,6 +398,7 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 		Quantity        int64           `db:"quantity"`
 		UnitPrice       decimal.Decimal `db:"unit_price"`
 		TotalPrice      decimal.Decimal `db:"total_price"`
+		VatRateApplied  decimal.Decimal `db:"vat_rate_applied"`
 		ProductChoiceID *uuid.UUID      `db:"product_choice_id"`
 	}
 
@@ -411,6 +415,7 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 			Quantity:        row.Quantity,
 			UnitPrice:       row.UnitPrice,
 			TotalPrice:      row.TotalPrice,
+			VatRateApplied:  row.VatRateApplied,
 			ProductChoiceID: row.ProductChoiceID,
 		}
 		// key by the string form of the order UUID
