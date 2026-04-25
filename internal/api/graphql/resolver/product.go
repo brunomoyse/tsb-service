@@ -60,7 +60,8 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 
 	// 2. If an image was supplied, forward it to the file‑service
 	if input.Image != nil {
-		if err := utils.UploadProductImage(ctx, input.Image.File, input.Image.Filename, prod.ID.String()); err != nil {
+		removeBg := input.RemoveBackground != nil && *input.RemoveBackground
+		if err := utils.UploadProductImage(ctx, input.Image.File, input.Image.Filename, prod.ID.String(), removeBg); err != nil {
 			logging.FromContext(ctx).Error("image upload failed", zap.String("product_id", prod.ID.String()), zap.Error(err))
 		}
 	}
@@ -139,11 +140,13 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 
 	// 5. Upload/replace image if provided (keyed by immutable product UUID).
 	if input.Image != nil {
+		removeBg := input.RemoveBackground != nil && *input.RemoveBackground
 		if err := utils.UploadProductImage(
 			ctx,
 			input.Image.File,
 			input.Image.Filename,
 			id.String(),
+			removeBg,
 		); err != nil {
 			logging.FromContext(ctx).Error("image upload failed", zap.String("product_id", id.String()), zap.Error(err))
 		}

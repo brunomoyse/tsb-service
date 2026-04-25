@@ -15048,7 +15048,7 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"categoryId", "code", "image", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegetarian", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
+	fieldsInOrder := [...]string{"categoryId", "code", "image", "removeBackground", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegetarian", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -15076,6 +15076,13 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Image = data
+		case "removeBackground":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("removeBackground"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.RemoveBackground = data
 		case "isAvailable":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isAvailable"))
 			data, err := ec.unmarshalNBoolean2bool(ctx, v)
@@ -15721,7 +15728,7 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"categoryID", "code", "image", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegetarian", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
+	fieldsInOrder := [...]string{"categoryID", "code", "image", "removeBackground", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegetarian", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -15749,6 +15756,13 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 				return it, err
 			}
 			it.Image = data
+		case "removeBackground":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("removeBackground"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.RemoveBackground = data
 		case "isAvailable":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isAvailable"))
 			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)

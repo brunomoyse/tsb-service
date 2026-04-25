@@ -192,7 +192,7 @@ type dimensionInfo struct {
 	Height int `json:"height"`
 }
 
-func UploadProductImage(ctx context.Context, src io.Reader, filename string, imageKey string) error {
+func UploadProductImage(ctx context.Context, src io.Reader, filename string, imageKey string, removeBackground bool) error {
 	fileSvc := os.Getenv("FILE_SERVICE_URL")
 	if fileSvc == "" {
 		return fmt.Errorf("FILE_SERVICE_URL env var not set")
@@ -222,7 +222,12 @@ func UploadProductImage(ctx context.Context, src io.Reader, filename string, ima
 		return fmt.Errorf("close multipart writer: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fileSvc+"/images/upload/processed", &body)
+	endpoint := "/upload"
+	if removeBackground {
+		endpoint = "/images/upload/processed"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fileSvc+endpoint, &body)
 	if err != nil {
 		return fmt.Errorf("build upload request: %w", err)
 	}
@@ -240,12 +245,14 @@ func UploadProductImage(ctx context.Context, src io.Reader, filename string, ima
 		return fmt.Errorf("file service upload failed with status %d", resp.StatusCode)
 	}
 
-	var result uploadProcessedResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("decode upload response: %w", err)
-	}
-	if result.Status != "ok" {
-		return fmt.Errorf("file service returned status %q", result.Status)
+	if removeBackground {
+		var result uploadProcessedResponse
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return fmt.Errorf("decode upload response: %w", err)
+		}
+		if result.Status != "ok" {
+			return fmt.Errorf("file service returned status %q", result.Status)
+		}
 	}
 
 	return nil
