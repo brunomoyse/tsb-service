@@ -105,19 +105,20 @@ type CreateProductChoiceInput struct {
 }
 
 type CreateProductInput struct {
-	CategoryID     uuid.UUID           `json:"categoryId"`
-	Code           *string             `json:"code,omitempty"`
-	Image          *graphql.Upload     `json:"image,omitempty"`
-	IsAvailable    bool                `json:"isAvailable"`
-	IsDiscountable bool                `json:"isDiscountable"`
-	IsHalal        bool                `json:"isHalal"`
-	IsSpicy        bool                `json:"isSpicy"`
-	IsVegetarian   bool                `json:"isVegetarian"`
-	IsVisible      bool                `json:"isVisible"`
-	PieceCount     *int                `json:"pieceCount,omitempty"`
-	Price          string              `json:"price"`
-	VatCategory    string              `json:"vatCategory"`
-	Translations   []*TranslationInput `json:"translations"`
+	CategoryID       uuid.UUID           `json:"categoryId"`
+	Code             *string             `json:"code,omitempty"`
+	Image            *graphql.Upload     `json:"image,omitempty"`
+	RemoveBackground *bool               `json:"removeBackground,omitempty"`
+	IsAvailable      bool                `json:"isAvailable"`
+	IsDiscountable   bool                `json:"isDiscountable"`
+	IsHalal          bool                `json:"isHalal"`
+	IsSpicy          bool                `json:"isSpicy"`
+	IsVegetarian     bool                `json:"isVegetarian"`
+	IsVisible        bool                `json:"isVisible"`
+	PieceCount       *int                `json:"pieceCount,omitempty"`
+	Price            string              `json:"price"`
+	VatCategory      string              `json:"vatCategory"`
+	Translations     []*TranslationInput `json:"translations"`
 }
 
 type CustomerStats struct {
@@ -387,19 +388,20 @@ type UpdateProductChoiceInput struct {
 }
 
 type UpdateProductInput struct {
-	CategoryID     *uuid.UUID          `json:"categoryID,omitempty"`
-	Code           *string             `json:"code,omitempty"`
-	Image          *graphql.Upload     `json:"image,omitempty"`
-	IsAvailable    *bool               `json:"isAvailable,omitempty"`
-	IsDiscountable *bool               `json:"isDiscountable,omitempty"`
-	IsHalal        *bool               `json:"isHalal,omitempty"`
-	IsSpicy        *bool               `json:"isSpicy,omitempty"`
-	IsVegetarian   *bool               `json:"isVegetarian,omitempty"`
-	IsVisible      *bool               `json:"isVisible,omitempty"`
-	PieceCount     *int                `json:"pieceCount,omitempty"`
-	Price          *string             `json:"price,omitempty"`
-	VatCategory    *string             `json:"vatCategory,omitempty"`
-	Translations   []*TranslationInput `json:"translations,omitempty"`
+	CategoryID       *uuid.UUID          `json:"categoryID,omitempty"`
+	Code             *string             `json:"code,omitempty"`
+	Image            *graphql.Upload     `json:"image,omitempty"`
+	RemoveBackground *bool               `json:"removeBackground,omitempty"`
+	IsAvailable      *bool               `json:"isAvailable,omitempty"`
+	IsDiscountable   *bool               `json:"isDiscountable,omitempty"`
+	IsHalal          *bool               `json:"isHalal,omitempty"`
+	IsSpicy          *bool               `json:"isSpicy,omitempty"`
+	IsVegetarian     *bool               `json:"isVegetarian,omitempty"`
+	IsVisible        *bool               `json:"isVisible,omitempty"`
+	PieceCount       *int                `json:"pieceCount,omitempty"`
+	Price            *string             `json:"price,omitempty"`
+	VatCategory      *string             `json:"vatCategory,omitempty"`
+	Translations     []*TranslationInput `json:"translations,omitempty"`
 }
 
 type UpdateUserInput struct {
