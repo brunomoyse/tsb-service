@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/shopspring/decimal"
 	"io"
@@ -177,6 +178,20 @@ func FormatDecimal(d decimal.Decimal) string {
 	return out
 }
 
+type uploadProcessedResponse struct {
+	Status              string        `json:"status"`
+	OriginalDimensions  dimensionInfo `json:"original_dimensions"`
+	PostRembgDimensions dimensionInfo `json:"post_rembg_dimensions"`
+	PostTrimDimensions  dimensionInfo `json:"post_trim_dimensions"`
+	TrimApplied         bool          `json:"trim_applied"`
+	UploadToS3          bool          `json:"upload_to_s3"`
+}
+
+type dimensionInfo struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
 func UploadProductImage(ctx context.Context, src io.Reader, filename string, imageKey string) error {
 	fileSvc := os.Getenv("FILE_SERVICE_URL")
 	if fileSvc == "" {
@@ -190,13 +205,11 @@ func UploadProductImage(ctx context.Context, src io.Reader, filename string, ima
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 
-	// Create the file part
 	part, err := writer.CreateFormFile("image", filename)
 	if err != nil {
 		return fmt.Errorf("create multipart part: %w", err)
 	}
 
-	// Copy the file content
 	if _, err := io.Copy(part, src); err != nil {
 		return fmt.Errorf("copy file bytes: %w", err)
 	}
@@ -205,20 +218,18 @@ func UploadProductImage(ctx context.Context, src io.Reader, filename string, ima
 		return fmt.Errorf("write slug field: %w", err)
 	}
 
-	// Close the writer to finalise the multipart body
 	if err := writer.Close(); err != nil {
 		return fmt.Errorf("close multipart writer: %w", err)
 	}
 
-	// Build the request
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fileSvc+"/upload", &body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fileSvc+"/images/upload/processed", &body)
 	if err != nil {
 		return fmt.Errorf("build upload request: %w", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	// Fire the request
-	client := &http.Client{Timeout: 30 * time.Second}
+	// Longer timeout: background removal via rembg can take several seconds.
+	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("upload request failed: %w", err)
@@ -227,6 +238,14 @@ func UploadProductImage(ctx context.Context, src io.Reader, filename string, ima
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("file service upload failed with status %d", resp.StatusCode)
+	}
+
+	var result uploadProcessedResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("decode upload response: %w", err)
+	}
+	if result.Status != "ok" {
+		return fmt.Errorf("file service returned status %q", result.Status)
 	}
 
 	return nil
