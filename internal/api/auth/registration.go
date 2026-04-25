@@ -21,20 +21,20 @@ type registerRequest struct {
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
 	Email     string `json:"email"`
-	Password  string `json:"password"`
 	Phone     string `json:"phone,omitempty"`
 	Lang      string `json:"lang,omitempty"`
 }
 
 // RegisterHandler proxies user registration to Zitadel's User API and sends
-// the verification email via Scaleway using our own templates.
-// POST /auth/register { firstName, lastName, email, password, phone?, lang? }
+// the verification email via Scaleway using our own templates. The user is
+// created without a password — login happens via email OTP.
+// POST /auth/register { firstName, lastName, email, phone?, lang? }
 func RegisterHandler(c *gin.Context) {
 	log := logging.FromContext(c.Request.Context())
 
 	var req registerRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.FirstName == "" || req.LastName == "" || req.Email == "" || req.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "firstName, lastName, email and password are required"})
+	if err := c.ShouldBindJSON(&req); err != nil || req.FirstName == "" || req.LastName == "" || req.Email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "firstName, lastName and email are required"})
 		return
 	}
 
@@ -43,7 +43,8 @@ func RegisterHandler(c *gin.Context) {
 		lang = "fr"
 	}
 
-	// Zitadel v2: POST /v2/users/human — returnCode so we send the email ourselves
+	// Zitadel v2: POST /v2/users/human — returnCode so we send the email ourselves.
+	// No password block: passwordless accounts authenticate via Session API otpEmail.
 	body := map[string]any{
 		"userName": req.Email,
 		"profile": map[string]any{
@@ -53,10 +54,6 @@ func RegisterHandler(c *gin.Context) {
 		"email": map[string]any{
 			"email":      req.Email,
 			"returnCode": map[string]any{},
-		},
-		"password": map[string]any{
-			"password":       req.Password,
-			"changeRequired": false,
 		},
 	}
 	if req.Phone != "" {
@@ -77,34 +74,10 @@ func RegisterHandler(c *gin.Context) {
 		log.Warn("zitadel user creation rejected", zap.Int("status", status), zap.String("message", msg))
 
 		if status == http.StatusConflict || strings.Contains(msg, "already exists") {
-			// Google-first user linking: if user exists without a password, set the password
-			if linkedUserID, findErr := findZitadelUserByEmail(req.Email); findErr == nil && !hasZitadelPassword(linkedUserID) {
-				pwdBody := map[string]any{
-					"newPassword": map[string]any{
-						"password":       req.Password,
-						"changeRequired": false,
-					},
-				}
-				pwdResp, pwdStatus, pwdErr := zitadelAdminRequest("POST", "/v2/users/"+linkedUserID+"/password", pwdBody)
-				if pwdErr != nil || (pwdStatus != http.StatusOK && pwdStatus != http.StatusCreated) {
-					pwdMsg := parseZitadelError(pwdResp)
-					if isWeakPasswordError(pwdMsg) {
-						c.JSON(http.StatusBadRequest, gin.H{"error": ErrWeakPassword, "message": ErrWeakPassword})
-					} else {
-						c.JSON(http.StatusBadRequest, gin.H{"error": ErrRegistrationFailed, "message": pwdMsg})
-					}
-					return
-				}
-				log.Info("linked password to social-login user", zap.String("email", req.Email))
-				c.JSON(http.StatusCreated, gin.H{"success": true})
-				return
-			}
 			c.JSON(http.StatusConflict, gin.H{"error": ErrEmailAlreadyExists})
-		} else if isWeakPasswordError(msg) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": ErrWeakPassword, "message": ErrWeakPassword})
-		} else {
-			c.JSON(http.StatusBadRequest, gin.H{"error": ErrRegistrationFailed, "message": msg})
+			return
 		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": ErrRegistrationFailed, "message": msg})
 		return
 	}
 

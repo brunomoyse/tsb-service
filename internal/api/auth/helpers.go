@@ -100,22 +100,3 @@ func GetZitadelUserInfo(_ context.Context, userID string) (email, givenName, fam
 		nil
 }
 
-// hasZitadelPassword checks if a Zitadel user has a password set.
-func hasZitadelPassword(userID string) bool {
-	respBody, status, err := zitadelRequest("GET", "/v2/users/"+userID, nil)
-	if err != nil || status != http.StatusOK {
-		return true // Assume has password on error (safe default)
-	}
-	var userResp struct {
-		User struct {
-			Human struct {
-				PasswordChanged string `json:"passwordChanged"`
-			} `json:"human"`
-		} `json:"user"`
-	}
-	if json.Unmarshal(respBody, &userResp) != nil {
-		return true
-	}
-	return userResp.User.Human.PasswordChanged != "" &&
-		userResp.User.Human.PasswordChanged != "0001-01-01T00:00:00Z"
-}

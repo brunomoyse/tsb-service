@@ -1,0 +1,12 @@
+Hallo {{.UserName}},
+
+Hier is uw inlogcode voor Tokyo Sushi Bar. Voer hem in op de inlogpagina om toegang te krijgen tot uw account:
+
+{{.Code}}
+
+Deze code is slechts enkele minuten geldig. Hebt u niet geprobeerd in te loggen? Negeer deze e-mail — uw account blijft veilig.
+
+Tot snel bij Tokyo Sushi Bar.
+お待ちしております！ (Wij verwachten u!)
+
+© 2026 Tokyo Sushi Bar. Alle rechten voorbehouden.

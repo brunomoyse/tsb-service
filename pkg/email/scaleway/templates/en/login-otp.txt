@@ -1,0 +1,12 @@
+Hello {{.UserName}},
+
+Here is your sign-in code for Tokyo Sushi Bar. Enter it on the sign-in page to access your account:
+
+{{.Code}}
+
+This code is valid for just a few minutes. If you didn't try to sign in, ignore this email — your account stays secure.
+
+See you soon at Tokyo Sushi Bar.
+お待ちしております！ (We're waiting for you!)
+
+© 2026 Tokyo Sushi Bar. All rights reserved.

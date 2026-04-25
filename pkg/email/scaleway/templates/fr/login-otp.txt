@@ -1,0 +1,12 @@
+Bonjour {{.UserName}},
+
+Voici votre code de connexion à Tokyo Sushi Bar. Saisissez-le sur la page de connexion pour accéder à votre compte :
+
+{{.Code}}
+
+Ce code est valable quelques minutes seulement. Si vous n'avez pas demandé à vous connecter, ignorez cet e-mail — votre compte reste sécurisé.
+
+À très bientôt chez Tokyo Sushi Bar.
+お待ちしております！ (Nous vous attendons !)
+
+© 2026 Tokyo Sushi Bar. Tous droits réservés.

@@ -375,15 +375,16 @@ func main() {
 
 	// Auth proxy endpoints (proxies to Zitadel Session API with service account PAT)
 	authLimiter := middleware.NewRateLimiter(15.0/60, 10) // 15 req/min per IP, burst of 10
-	api.POST("/auth/session", authLimiter.Middleware(), auth.CreateSessionHandler)
+	// Passwordless email-OTP login (Zitadel Session API otpEmail challenge)
+	api.POST("/auth/session/otp/request", authLimiter.Middleware(), auth.RequestOtpHandler)
+	api.POST("/auth/session/otp/verify", authLimiter.Middleware(), auth.VerifyOtpHandler)
+	api.POST("/auth/session/otp/resend", authLimiter.Middleware(), auth.ResendOtpHandler)
 	api.POST("/auth/finalize", authLimiter.Middleware(), auth.FinalizeOIDCHandler)
 	api.POST("/auth/authorize-proxy", authLimiter.Middleware(), auth.AuthorizeProxyHandler)
 	api.POST("/auth/token-exchange", authLimiter.Middleware(), auth.TokenExchangeHandler)
 	api.POST("/auth/idp/start", authLimiter.Middleware(), auth.StartIdPIntentHandler)
 	api.POST("/auth/idp/session", authLimiter.Middleware(), auth.CreateIdPSessionHandler)
 	api.POST("/auth/register", authLimiter.Middleware(), auth.RegisterHandler)
-	api.POST("/auth/password/request-reset", authLimiter.Middleware(), auth.RequestPasswordResetHandler)
-	api.POST("/auth/password/reset", authLimiter.Middleware(), auth.SetNewPasswordHandler)
 	api.POST("/auth/verify-email", authLimiter.Middleware(), auth.VerifyEmailHandler)
 	api.POST("/auth/resend-verification", authLimiter.Middleware(), auth.ResendVerificationHandler)
 
@@ -410,8 +411,6 @@ func main() {
 
 	strictAuth := oidcVerifier.StrictAuthMiddleware()
 	api.POST("/images/preview", strictAuth, images.PreviewHandler)
-	api.POST("/auth/change-password", strictAuth, auth.ChangePasswordHandler)
-	api.GET("/auth/has-password", strictAuth, auth.HasPasswordHandler)
 	api.GET("/orders/:id/invoice", strictAuth, orderHandler.DownloadInvoice)
 
 	feedbackLimiter := middleware.NewRateLimiter(2.0/60, 2) // 2 req/min per IP

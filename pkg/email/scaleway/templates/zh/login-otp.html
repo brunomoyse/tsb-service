@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>重置您的密码 | Tokyo Sushi Bar</title>
+    <title>您的登录验证码 | Tokyo Sushi Bar</title>
 </head>
 <body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
@@ -18,16 +18,14 @@
     <!-- CONTENT -->
     <tr><td style="background-color:#ffffff;padding:36px;">
         <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">您好 {{.UserName}}，</p>
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">我们收到了重置您 <strong>Tokyo Sushi Bar</strong> 账户密码的请求。</p>
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">请点击下面的按钮设置新密码：</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">这是您的 <strong>Tokyo Sushi Bar</strong> 登录验证码。请在登录页面输入此验证码以访问您的账户：</p>
         <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;">
-        <tr><td style="background-color:#ef4444;border-radius:12px;padding:12px 28px;">
-            <a href="{{.ResetLink}}" style="color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;display:inline-block;">重置我的密码</a>
+        <tr><td style="background-color:#F0EBE3;border:1px solid #E5DED4;border-radius:12px;padding:20px 36px;text-align:center;">
+            <span style="font-family:'Courier New',monospace;font-size:32px;letter-spacing:8px;font-weight:700;color:#2D2D2D;">{{.Code}}</span>
         </td></tr>
         </table>
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">如果上面的按钮不起作用，请将以下链接复制并粘贴到您的浏览器中：</p>
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;word-break:break-all;">{{.ResetLink}}</p>
-        <p style="margin:0;font-size:13px;line-height:1.6;color:#6B6B6B;">此链接将在1小时后过期。如果您未请求重置密码，请忽略此邮件——您的密码不会被更改。</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">此验证码仅在几分钟内有效。如果您没有尝试登录，请忽略此邮件 — 您的账户依然安全。</p>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">期待在 Tokyo Sushi Bar 与您再次相见。<br/>お待ちしております！（我们期待您的光临！）</p>
     </td></tr>
     <!-- FOOTER -->
     <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:0 0 12px 12px;">
