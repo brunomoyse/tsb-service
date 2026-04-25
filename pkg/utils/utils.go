@@ -177,10 +177,14 @@ func FormatDecimal(d decimal.Decimal) string {
 	return out
 }
 
-func UploadProductImage(ctx context.Context, src io.Reader, filename string, slug *string) error {
+func UploadProductImage(ctx context.Context, src io.Reader, filename string, imageKey string) error {
 	fileSvc := os.Getenv("FILE_SERVICE_URL")
 	if fileSvc == "" {
 		return fmt.Errorf("FILE_SERVICE_URL env var not set")
+	}
+
+	if err := validateSlug(imageKey); err != nil {
+		return fmt.Errorf("invalid image key: %w", err)
 	}
 
 	var body bytes.Buffer
@@ -197,14 +201,8 @@ func UploadProductImage(ctx context.Context, src io.Reader, filename string, slu
 		return fmt.Errorf("copy file bytes: %w", err)
 	}
 
-	// Optional slug field
-	if slug != nil {
-		if err := validateSlug(*slug); err != nil {
-			return fmt.Errorf("invalid product slug: %w", err)
-		}
-		if err := writer.WriteField("product_slug", *slug); err != nil {
-			return fmt.Errorf("write slug field: %w", err)
-		}
+	if err := writer.WriteField("product_slug", imageKey); err != nil {
+		return fmt.Errorf("write slug field: %w", err)
 	}
 
 	// Close the writer to finalise the multipart body
