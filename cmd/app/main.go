@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/getsentry/sentry-go"
