@@ -19,6 +19,7 @@ type labels struct {
 	TakeawayDiscount string
 	CouponDiscount   string
 	DeliveryFee      string
+	TotalVAT         string
 	ThankYou         string
 	CompanyNumber    string
 	Phone            string
@@ -46,6 +47,7 @@ var translations = map[string]labels{
 		TakeawayDiscount: "Remise emporter (-10%)",
 		CouponDiscount:   "Coupon",
 		DeliveryFee:      "Frais de livraison",
+		TotalVAT:         "Total TVA",
 		ThankYou:         "Merci pour votre commande !",
 		CompanyNumber:    "N° d'entreprise",
 		Phone:            "Tél",
@@ -71,6 +73,7 @@ var translations = map[string]labels{
 		TakeawayDiscount: "Takeaway discount (-10%)",
 		CouponDiscount:   "Coupon",
 		DeliveryFee:      "Delivery fee",
+		TotalVAT:         "Total VAT",
 		ThankYou:         "Thank you for your order!",
 		CompanyNumber:    "Company no.",
 		Phone:            "Phone",

@@ -44,6 +44,7 @@ type OrderItem {
     unitPrice: String!
     quantity: Int!
     totalPrice: String!
+    vatRateApplied: String!
     choiceId: ID
     choice: ProductChoice
 }

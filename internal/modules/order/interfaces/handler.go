@@ -3,6 +3,7 @@ package interfaces
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -112,6 +113,7 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 
 	// 8. Build invoice items with choice names
 	items := make([]invoice.InvoiceItem, 0, len(*orderProducts))
+	vatByRate := map[string]decimal.Decimal{}
 	for _, op := range *orderProducts {
 		prod := productMap[op.ProductID]
 		name := prod.Name
@@ -134,6 +136,14 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 			UnitPrice: utils.FormatDecimal(op.UnitPrice),
 			LineTotal: utils.FormatDecimal(op.TotalPrice),
 		})
+
+		vatRate := op.VatRateApplied
+		vatAmount := vatAmountFromGross(op.TotalPrice, vatRate)
+		if vatAmount.IsZero() {
+			continue
+		}
+		key := vatRate.StringFixed(2)
+		vatByRate[key] = vatByRate[key].Add(vatAmount)
 	}
 
 	// 9. Fetch customer
@@ -202,6 +212,34 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 		Total:         utils.FormatDecimal(totalPrice),
 	}
 
+	totalVAT := decimal.Zero
+	vatRates := make([]string, 0, len(vatByRate))
+	for rate := range vatByRate {
+		vatRates = append(vatRates, rate)
+	}
+	sort.Slice(vatRates, func(i, j int) bool {
+		ri, _ := decimal.NewFromString(vatRates[i])
+		rj, _ := decimal.NewFromString(vatRates[j])
+		return ri.GreaterThan(rj)
+	})
+	for _, rate := range vatRates {
+		amount := vatByRate[rate]
+		if amount.IsZero() {
+			continue
+		}
+		data.VatBreakdown = append(data.VatBreakdown, invoice.InvoiceVatLine{
+			Label:  vatLabel(order.Language),
+			Rate:   rate,
+			Amount: utils.FormatDecimal(amount),
+		})
+		totalVAT = totalVAT.Add(amount)
+	}
+
+	if !totalVAT.IsZero() {
+		t := utils.FormatDecimal(totalVAT)
+		data.TotalVatAmount = &t
+	}
+
 	if !order.TakeawayDiscount.IsZero() {
 		d := utils.FormatDecimal(order.TakeawayDiscount)
 		data.TakeawayDiscount = &d
@@ -250,4 +288,18 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+func vatLabel(language string) string {
+	if language == "en" {
+		return "VAT"
+	}
+	return "TVA"
+}
+
+func vatAmountFromGross(gross decimal.Decimal, rate decimal.Decimal) decimal.Decimal {
+	if rate.IsZero() {
+		return decimal.Zero
+	}
+	return gross.Mul(rate).Div(decimal.NewFromInt(100).Add(rate))
 }

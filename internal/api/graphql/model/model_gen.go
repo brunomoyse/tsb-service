@@ -211,13 +211,14 @@ type OrderHistorySummary struct {
 }
 
 type OrderItem struct {
-	Product    *Product       `json:"product"`
-	ProductID  uuid.UUID      `json:"productID"`
-	UnitPrice  string         `json:"unitPrice"`
-	Quantity   int            `json:"quantity"`
-	TotalPrice string         `json:"totalPrice"`
-	ChoiceID   *uuid.UUID     `json:"choiceId,omitempty"`
-	Choice     *ProductChoice `json:"choice,omitempty"`
+	Product        *Product       `json:"product"`
+	ProductID      uuid.UUID      `json:"productID"`
+	UnitPrice      string         `json:"unitPrice"`
+	Quantity       int            `json:"quantity"`
+	TotalPrice     string         `json:"totalPrice"`
+	VatRateApplied string         `json:"vatRateApplied"`
+	ChoiceID       *uuid.UUID     `json:"choiceId,omitempty"`
+	Choice         *ProductChoice `json:"choice,omitempty"`
 }
 
 type OrderStatusHistory struct {

@@ -79,11 +79,24 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		return nil, fmt.Errorf("failed to retrieve products: %w", err)
 	}
 	priceMap := make(map[uuid.UUID]decimal.Decimal, len(products))
+	vatCategoryMap := make(map[uuid.UUID]productDomain.VatCategory, len(products))
 	for _, p := range products {
 		priceMap[p.ID] = p.Price
+		vatCategoryMap[p.ID] = p.VatCategory
 	}
 
-	// 3) Compute line totals and overall total
+	// 4) Determine order type
+	var odType orderDomain.OrderType
+	orderServiceType := productDomain.ServiceTypeTakeaway
+	switch input.OrderType {
+	case model.OrderTypeEnumDelivery:
+		odType = orderDomain.OrderTypeDelivery
+		orderServiceType = productDomain.ServiceTypeDelivery
+	default:
+		odType = orderDomain.OrderTypePickUp
+	}
+
+	// 5) Compute line totals and overall total
 	rawItems := make([]orderDomain.OrderProductRaw, 0, prodCount)
 	total := decimal.Zero
 	for _, op := range input.Items {
@@ -126,26 +139,19 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 
 		lineTotal := unitPrice.Mul(decimal.NewFromInt(qty))
+		vatRateApplied := vatCategoryMap[pid].VatRatePercent(orderServiceType)
 		total = total.Add(lineTotal)
 		rawItems = append(rawItems, orderDomain.OrderProductRaw{
 			ProductID:       pid,
 			Quantity:        qty,
 			UnitPrice:       unitPrice,
 			TotalPrice:      lineTotal,
+			VatRateApplied:  decimal.NewFromFloat(vatRateApplied),
 			ProductChoiceID: choiceID,
 		})
 	}
 
-	// 4) Determine order type
-	var odType orderDomain.OrderType
-	switch input.OrderType {
-	case model.OrderTypeEnumDelivery:
-		odType = orderDomain.OrderTypeDelivery
-	default:
-		odType = orderDomain.OrderTypePickUp
-	}
-
-	// 5) Enforce minimum amounts
+	// 6) Enforce minimum amounts
 	if odType == orderDomain.OrderTypePickUp && total.LessThan(decimal.NewFromInt(20)) {
 		return nil, fmt.Errorf("minimum order amount for pickup is 20")
 	}
@@ -319,6 +325,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 				Code:         pd.Code,
 				CategoryName: pd.CategoryName,
 				Name:         pd.Name,
+				VatCategory:  string(pd.VatCategory),
 			},
 			Quantity:   ir.Quantity,
 			UnitPrice:  ir.UnitPrice,
@@ -453,6 +460,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 						Code:         pd.Code,
 						CategoryName: pd.CategoryName,
 						Name:         pd.Name,
+						VatCategory:  string(pd.VatCategory),
 					},
 					Quantity:   ir.Quantity,
 					UnitPrice:  ir.UnitPrice,

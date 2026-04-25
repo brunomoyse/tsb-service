@@ -46,7 +46,7 @@ func ToGQLProduct(p *productDomain.Product, lang string) *model.Product {
 		IsHalal:        p.IsHalal,
 		IsSpicy:        p.IsSpicy,
 		IsDiscountable: p.IsDiscountable,
-		IsVegetarian:        p.IsVegetarian,
+		IsVegetarian:   p.IsVegetarian,
 		VatCategory:    string(p.VatCategory),
 		Name:           p.GetTranslationFor(lang).Name,
 		Description:    p.GetTranslationFor(lang).Description,
@@ -129,12 +129,12 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		OrderExtra:         orderExtra,
 		CouponCode:         o.CouponCode,
 		// Denormalized address fields for Address() resolver
-		AddressID:        o.AddressID,
-		StreetName:       o.StreetName,
-		HouseNumber:      o.HouseNumber,
-		BoxNumber:        o.BoxNumber,
-		MunicipalityName: o.MunicipalityName,
-		Postcode:         o.Postcode,
+		AddressID:          o.AddressID,
+		StreetName:         o.StreetName,
+		HouseNumber:        o.HouseNumber,
+		BoxNumber:          o.BoxNumber,
+		MunicipalityName:   o.MunicipalityName,
+		Postcode:           o.Postcode,
 		AddressDistance:    o.AddressDistance,
 		IsManualAddr:       &isManual,
 		CancellationReason: o.CancellationReason,
@@ -144,11 +144,12 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 
 func ToGQLOrderItem(oi *orderDomain.OrderProductRaw) *model.OrderItem {
 	return &model.OrderItem{
-		ProductID:  oi.ProductID,
-		Quantity:   int(oi.Quantity),
-		UnitPrice:  oi.UnitPrice.String(),
-		TotalPrice: oi.TotalPrice.String(),
-		ChoiceID:   oi.ProductChoiceID,
+		ProductID:      oi.ProductID,
+		Quantity:       int(oi.Quantity),
+		UnitPrice:      oi.UnitPrice.String(),
+		TotalPrice:     oi.TotalPrice.String(),
+		VatRateApplied: oi.VatRateApplied.StringFixed(2),
+		ChoiceID:       oi.ProductChoiceID,
 	}
 }
 

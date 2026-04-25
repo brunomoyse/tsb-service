@@ -18,7 +18,7 @@ type Product struct {
 	IsVisible      bool            `db:"is_visible" json:"isVisible"`
 	IsAvailable    bool            `db:"is_available" json:"isAvailable"`
 	IsHalal        bool            `db:"is_halal" json:"isHalal"`
-	IsVegetarian        bool            `db:"is_vegetarian" json:"isVegetarian"`
+	IsVegetarian   bool            `db:"is_vegetarian" json:"isVegetarian"`
 	IsSpicy        bool            `db:"is_spicy" json:"isSpicy"`
 	IsDiscountable bool            `db:"is_discountable" json:"isDiscountable"`
 	VatCategory    VatCategory     `db:"vat_category" json:"vatCategory"`
@@ -30,10 +30,10 @@ type Product struct {
 
 // ProductChoice represents a selectable option for a product.
 type ProductChoice struct {
-	ID            uuid.UUID       `db:"id" json:"id"`
-	ProductID     uuid.UUID       `db:"product_id" json:"productId"`
-	PriceModifier decimal.Decimal `db:"price_modifier" json:"priceModifier"`
-	SortOrder     int             `db:"sort_order" json:"sortOrder"`
+	ID            uuid.UUID           `db:"id" json:"id"`
+	ProductID     uuid.UUID           `db:"product_id" json:"productId"`
+	PriceModifier decimal.Decimal     `db:"price_modifier" json:"priceModifier"`
+	SortOrder     int                 `db:"sort_order" json:"sortOrder"`
 	Translations  []ChoiceTranslation `json:"translations"`
 }
 
@@ -65,6 +65,7 @@ type ProductOrderDetails struct {
 	Name           string          `db:"name" json:"name"`
 	Price          decimal.Decimal `db:"price" json:"price"`
 	IsDiscountable bool            `db:"is_discountable" json:"isDiscountable"`
+	VatCategory    VatCategory     `db:"vat_category" json:"vatCategory"`
 }
 
 func NewProduct(price decimal.Decimal, categoryID uuid.UUID, isVisible bool, isAvailable bool, vatCategory VatCategory, translations []Translation) (*Product, error) {
