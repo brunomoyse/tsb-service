@@ -436,8 +436,12 @@ func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.R
 		return fmt.Errorf("preferred ready time must be on the same day")
 	}
 
-	if slot.Before(nowLocal.Add(1 * time.Hour)) {
-		return fmt.Errorf("preferred ready time must be at least 1 hour from now")
+	prepBuffer := time.Duration(config.PreparationMinutes) * time.Minute
+	if prepBuffer < 15*time.Minute {
+		prepBuffer = 15 * time.Minute
+	}
+	if slot.Before(nowLocal.Add(prepBuffer)) {
+		return fmt.Errorf("preferred ready time is no longer available — it is within the minimum preparation window")
 	}
 
 	if slot.Minute()%15 != 0 || slot.Second() != 0 || slot.Nanosecond() != 0 {
