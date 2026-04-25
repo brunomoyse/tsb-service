@@ -48,8 +48,11 @@ func Init(cfg Config) {
 	if cfg.ZitadelInternalURL != "" {
 		baseURL = cfg.ZitadelInternalURL
 		externalHost = cfg.ZitadelIssuer
-		externalHost = strings.TrimPrefix(externalHost, "https://")
-		externalHost = strings.TrimPrefix(externalHost, "http://")
+		if h, ok := strings.CutPrefix(externalHost, "https://"); ok {
+			externalHost = h
+		} else if h, ok := strings.CutPrefix(externalHost, "http://"); ok {
+			externalHost = h
+		}
 	}
 
 	adminPAT := cfg.AdminPAT

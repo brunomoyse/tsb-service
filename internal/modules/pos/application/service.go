@@ -497,7 +497,7 @@ func (s *Service) SetUserPin(ctx context.Context, userID uuid.UUID, pin string) 
 // alongside Zitadel ones. Returns (userID, isStaff, err). Any valid POS token
 // grants the staff role; admin rights are only conferred by Zitadel JWTs.
 func (s *Service) VerifyAccessToken(tokenStr string) (uuid.UUID, bool, error) {
-	parsed, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+	parsed, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}

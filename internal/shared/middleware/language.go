@@ -85,11 +85,11 @@ func parseAcceptLanguage(headerValue string) []languageQuality {
 		language := parts[0]
 		quality := 1.0 // Default quality factor
 
-		if len(parts) > 1 && strings.HasPrefix(parts[1], "q=") {
-			qualityStr := strings.TrimPrefix(parts[1], "q=")
-			parsedQuality, err := strconv.ParseFloat(qualityStr, 64)
-			if err == nil {
-				quality = parsedQuality
+		if len(parts) > 1 {
+			if qualityStr, ok := strings.CutPrefix(parts[1], "q="); ok {
+				if parsedQuality, err := strconv.ParseFloat(qualityStr, 64); err == nil {
+					quality = parsedQuality
+				}
 			}
 		}
 

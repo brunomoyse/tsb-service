@@ -124,7 +124,7 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 		prod.VatCategory = vc
 	}
 	if input.Translations != nil {
-		prod.Translations = toDomainTranslationsPtr(input.Translations)
+		prod.Translations = toDomainTranslations(input.Translations)
 	}
 
 	// 3. Persist the update with the single domain object.

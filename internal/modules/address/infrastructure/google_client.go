@@ -38,7 +38,7 @@ func NewGoogleClient(apiKey string, originLat, originLng, autocompleteRadiusMete
 }
 
 func (c *GoogleClient) Autocomplete(ctx context.Context, input, sessionToken, language string) ([]domain.Suggestion, error) {
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"input":                input,
 		"sessionToken":         sessionToken,
 		"languageCode":         language,
@@ -46,8 +46,8 @@ func (c *GoogleClient) Autocomplete(ctx context.Context, input, sessionToken, la
 		"includedPrimaryTypes": []string{"street_address", "premise", "subpremise"},
 	}
 	if c.autocompleteRadius > 0 {
-		reqBody["locationRestriction"] = map[string]interface{}{
-			"circle": map[string]interface{}{
+		reqBody["locationRestriction"] = map[string]any{
+			"circle": map[string]any{
 				"center": map[string]float64{
 					"latitude":  c.originLat,
 					"longitude": c.originLng,
@@ -218,17 +218,17 @@ func (c *GoogleClient) PlaceDetails(ctx context.Context, placeID, sessionToken, 
 }
 
 func (c *GoogleClient) ComputeRoute(ctx context.Context, destLat, destLng float64) (distanceMeters int, durationSeconds int, err error) {
-	reqBody := map[string]interface{}{
-		"origin": map[string]interface{}{
-			"location": map[string]interface{}{
+	reqBody := map[string]any{
+		"origin": map[string]any{
+			"location": map[string]any{
 				"latLng": map[string]float64{
 					"latitude":  c.originLat,
 					"longitude": c.originLng,
 				},
 			},
 		},
-		"destination": map[string]interface{}{
-			"location": map[string]interface{}{
+		"destination": map[string]any{
+			"location": map[string]any{
 				"latLng": map[string]float64{
 					"latitude":  destLat,
 					"longitude": destLng,

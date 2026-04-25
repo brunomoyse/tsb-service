@@ -224,9 +224,7 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 
 func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*domain.Order, error) {
 	// Basic pagination safety : ensure page & limit are > 0
-	if page < 1 {
-		page = 1
-	}
+	page = max(page, 1)
 	if limit < 1 {
 		limit = 10
 	}
@@ -278,9 +276,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 }
 
 func (r *OrderRepository) FindFiltered(ctx context.Context, filter domain.OrderHistoryFilter) ([]*domain.Order, *domain.OrderHistorySummary, error) {
-	if filter.Page < 1 {
-		filter.Page = 1
-	}
+	filter.Page = max(filter.Page, 1)
 	if filter.Limit < 1 {
 		filter.Limit = 20
 	}
@@ -520,7 +516,7 @@ func (r *OrderRepository) GetCustomerStats(ctx context.Context, startDate, endDa
 		WHERE o.order_status NOT IN ('CANCELLED', 'FAILED')
 	`
 
-	args := []interface{}{}
+	args := []any{}
 	argIdx := 1
 
 	if startDate != nil {

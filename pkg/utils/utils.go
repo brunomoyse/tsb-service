@@ -150,12 +150,7 @@ func FormatDecimal(d decimal.Decimal) string {
 	if neg {
 		fixed = fixed[1:]
 	}
-	parts := strings.SplitN(fixed, ".", 2)
-	intPart := parts[0]
-	decPart := ""
-	if len(parts) == 2 {
-		decPart = parts[1]
-	}
+	intPart, decPart, _ := strings.Cut(fixed, ".")
 
 	// Insert non-breaking space every 3 digits from the right.
 	const nbsp = "\u00a0"
