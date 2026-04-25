@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // findZitadelUserByEmail searches for a Zitadel user by email.
@@ -41,6 +42,44 @@ func findZitadelUserByEmail(email string) (string, error) {
 		return searchResp.Result[0].UserID, nil
 	}
 	return "", fmt.Errorf("no user found")
+}
+
+// ensureZitadelOtpEmail makes sure the user has the OTP Email factor enrolled
+// so that Zitadel will accept an `otpEmail` session challenge.
+//
+// Zitadel's `POST /v2/users/{userId}/otp_email` is idempotent in spirit: it
+// returns 2xx on first enrollment and a 409 / "already exists" error if the
+// factor is already there. Both shapes are treated as success. Any other
+// failure is returned so the caller can decide whether to abort.
+func ensureZitadelOtpEmail(userID string) error {
+	respBody, status, err := zitadelRequest("POST", "/v2/users/"+userID+"/otp_email", map[string]any{})
+	if err != nil {
+		return fmt.Errorf("enroll otp email: %w", err)
+	}
+	if status >= 200 && status < 300 {
+		return nil
+	}
+	// Zitadel returns 409 when the factor is already configured. Treat as success.
+	if status == http.StatusConflict {
+		return nil
+	}
+	// Some Zitadel versions return 400 with an "already exists"-style message
+	// instead of 409. Inspect the parsed message rather than the raw body so
+	// we don't depend on a specific JSON shape.
+	if msg := parseZitadelError(respBody); msg != "" && containsAny(msg, "already", "AlreadyExists") {
+		return nil
+	}
+	return fmt.Errorf("enroll otp email returned status %d: %s", status, parseZitadelError(respBody))
+}
+
+// containsAny reports whether s contains any of the provided substrings.
+func containsAny(s string, subs ...string) bool {
+	for _, sub := range subs {
+		if sub != "" && strings.Contains(s, sub) {
+			return true
+		}
+	}
+	return false
 }
 
 // isZitadelEmailVerified checks if a Zitadel user's email is verified.

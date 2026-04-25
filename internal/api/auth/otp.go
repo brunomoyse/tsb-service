@@ -83,6 +83,16 @@ func RequestOtpHandler(c *gin.Context) {
 		return
 	}
 
+	// Lazy-enroll the OTP Email factor: existing accounts (and freshly
+	// registered ones) don't have it configured by default, so Zitadel
+	// rejects the otpEmail challenge with "Multifactor OTP isn't ready"
+	// on the first attempt. Idempotent — already-enrolled users no-op.
+	if err := ensureZitadelOtpEmail(userID); err != nil {
+		log.Warn("zitadel otp email enrollment failed", zap.Error(err))
+		// Fall through anyway: the session create will fail and we'll
+		// return the same enumeration-resistant empty response.
+	}
+
 	body := map[string]any{
 		"checks": map[string]any{
 			"user": map[string]any{"loginName": req.LoginName},

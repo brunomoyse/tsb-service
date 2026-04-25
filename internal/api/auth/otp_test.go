@@ -23,6 +23,10 @@ func TestRequestOtpHandler_Success(t *testing.T) {
 			// Email-verified gate
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"email":{"isVerified":true}}}}`))
+		case r.URL.Path == "/v2/users/user-otp-1/otp_email" && r.Method == "POST":
+			// Lazy OTP-email factor enrollment — first attempt succeeds.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"details":{}}`))
 		case r.URL.Path == "/v2/sessions" && r.Method == "POST":
 			sessionCalled = true
 			assert.Equal(t, "Bearer test-pat", r.Header.Get("Authorization"))
@@ -126,6 +130,10 @@ func TestRequestOtpHandler_ZitadelSessionFails(t *testing.T) {
 		case r.URL.Path == "/v2/users/user-otp-2" && r.Method == "GET":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"email":{"isVerified":true}}}}`))
+		case r.URL.Path == "/v2/users/user-otp-2/otp_email" && r.Method == "POST":
+			// Already-enrolled response (Zitadel returns 409) — must be a no-op.
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"code":6,"message":"AlreadyExists"}`))
 		case r.URL.Path == "/v2/sessions":
 			// Zitadel rejects (e.g. user temporarily locked)
 			w.WriteHeader(http.StatusBadRequest)
@@ -146,6 +154,40 @@ func TestRequestOtpHandler_ZitadelSessionFails(t *testing.T) {
 	// No error field leaked — only the sentinel session shape.
 	_, hasError := resp["error"]
 	assert.False(t, hasError)
+}
+
+// TestRequestOtpHandler_LazyOtpEnrollment asserts that the handler enrolls
+// the user in the OTP Email factor before requesting the session challenge,
+// so first-time OTP logins don't fail with "Multifactor OTP isn't ready".
+func TestRequestOtpHandler_LazyOtpEnrollment(t *testing.T) {
+	var enrollCalled, sessionCalled bool
+	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/users" && r.Method == "POST":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"result":[{"userId":"user-lazy"}]}`))
+		case r.URL.Path == "/v2/users/user-lazy" && r.Method == "GET":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"email":{"isVerified":true}}}}`))
+		case r.URL.Path == "/v2/users/user-lazy/otp_email" && r.Method == "POST":
+			enrollCalled = true
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"details":{}}`))
+		case r.URL.Path == "/v2/sessions" && r.Method == "POST":
+			sessionCalled = true
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"sessionId":"sess-lazy","sessionToken":"tok-lazy","challenges":{"otpEmail":"123456"}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	w, c := ginContext("POST", "/auth/session/otp/request", `{"loginName":"new@example.com"}`)
+	RequestOtpHandler(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, enrollCalled, "OTP Email factor must be enrolled before session create")
+	assert.True(t, sessionCalled, "session creation must still happen after enrollment")
 }
 
 func TestRequestOtpHandler_MissingFields(t *testing.T) {
