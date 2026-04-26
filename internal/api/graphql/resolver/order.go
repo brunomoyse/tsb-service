@@ -80,9 +80,17 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	}
 	priceMap := make(map[uuid.UUID]decimal.Decimal, len(products))
 	vatCategoryMap := make(map[uuid.UUID]productDomain.VatCategory, len(products))
+	nameMap := make(map[uuid.UUID]string, len(products))
 	for _, p := range products {
 		priceMap[p.ID] = p.Price
 		vatCategoryMap[p.ID] = p.VatCategory
+		nameMap[p.ID] = p.Name
+	}
+	productLabel := func(id uuid.UUID) string {
+		if name, ok := nameMap[id]; ok && name != "" {
+			return name
+		}
+		return id.String()
 	}
 
 	// 4) Determine order type
@@ -103,11 +111,11 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		pid := op.ProductID
 		unitPrice, ok := priceMap[pid]
 		if !ok {
-			return nil, fmt.Errorf("product %s not found", pid)
+			return nil, fmt.Errorf("product %s not found", productLabel(pid))
 		}
 		qty := int64(op.Quantity)
 		if qty <= 0 || qty > 99 {
-			return nil, fmt.Errorf("invalid quantity for product %s: must be between 1 and 99", pid)
+			return nil, fmt.Errorf("invalid quantity for %s: must be between 1 and 99", productLabel(pid))
 		}
 
 		var choiceID *uuid.UUID
@@ -120,7 +128,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 				return nil, fmt.Errorf("choice %s not found", op.ChoiceID)
 			}
 			if choice.ProductID != pid {
-				return nil, fmt.Errorf("choice %s does not belong to product %s", op.ChoiceID, pid)
+				return nil, fmt.Errorf("choice %s does not belong to product %s", op.ChoiceID, productLabel(pid))
 			}
 			// Negative modifiers would let a choice discount the order unit
 			// price. The DB has a CHECK constraint enforcing modifier >= 0 and
@@ -133,7 +141,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			}
 			unitPrice = unitPrice.Add(modifier)
 			if unitPrice.LessThan(decimal.Zero) {
-				return nil, fmt.Errorf("invalid price for product %s with choice %s: price cannot be negative", pid, op.ChoiceID)
+				return nil, fmt.Errorf("invalid price for product %s with choice %s: price cannot be negative", productLabel(pid), op.ChoiceID)
 			}
 			choiceID = op.ChoiceID
 		}
