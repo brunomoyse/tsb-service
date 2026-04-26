@@ -133,10 +133,12 @@ func RequestOtpHandler(c *gin.Context) {
 		// email address if Zitadel returns no profile (e.g. social-only users
 		// who haven't filled a name yet).
 		firstName := req.LoginName
-		if email, given, _, err := GetZitadelUserInfo(c.Request.Context(), userID); err == nil {
+		var lastName string
+		if email, given, family, err := GetZitadelUserInfo(c.Request.Context(), userID); err == nil {
 			if given != "" {
 				firstName = given
 			}
+			lastName = family
 			if email != "" {
 				req.LoginName = email
 			}
@@ -144,6 +146,7 @@ func RequestOtpHandler(c *gin.Context) {
 
 		user := userDomain.User{
 			FirstName: firstName,
+			LastName:  lastName,
 			Email:     req.LoginName,
 		}
 		if err := scaleway.SendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
