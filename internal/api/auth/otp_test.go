@@ -19,10 +19,6 @@ func TestRequestOtpHandler_Success(t *testing.T) {
 			// Email lookup
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result":[{"userId":"user-otp-1"}]}`))
-		case r.URL.Path == "/v2/users/user-otp-1" && r.Method == "GET":
-			// Email-verified gate
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"user":{"human":{"email":{"isVerified":true}}}}`))
 		case r.URL.Path == "/v2/users/user-otp-1/otp_email" && r.Method == "POST":
 			// Lazy OTP-email factor enrollment — first attempt succeeds.
 			w.WriteHeader(http.StatusOK)
@@ -71,54 +67,52 @@ func TestRequestOtpHandler_Success(t *testing.T) {
 	assert.NotContains(t, w.Body.String(), "123456")
 }
 
-// TestRequestOtpHandler_UnknownEmail asserts the response shape is identical
-// to the success case so the endpoint can't be turned into an account
-// enumeration oracle.
+// TestRequestOtpHandler_UnknownEmail asserts that Pattern B provisions a
+// placeholder Zitadel user on the fly and returns a real session, keeping
+// the response shape identical to the existing-user case (anti-enumeration).
 func TestRequestOtpHandler_UnknownEmail(t *testing.T) {
+	var placeholderCreated, sessionCalled bool
 	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
-		// User search returns no result
-		assert.Equal(t, "/v2/users", r.URL.Path)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"result":[]}`))
+		switch {
+		case r.URL.Path == "/v2/users" && r.Method == "POST":
+			// Email lookup — no result, triggers placeholder creation.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"result":[]}`))
+		case r.URL.Path == "/v2/users/human" && r.Method == "POST":
+			placeholderCreated = true
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			profile := body["profile"].(map[string]any)
+			assert.Equal(t, "-", profile["givenName"], "placeholder must use sentinel marker")
+			assert.Equal(t, "-", profile["familyName"])
+			email := body["email"].(map[string]any)
+			assert.Equal(t, true, email["isVerified"], "placeholder email must be pre-verified — OTP completion proves control")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"userId":"placeholder-user"}`))
+		case r.URL.Path == "/v2/users/placeholder-user/otp_email" && r.Method == "POST":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"details":{}}`))
+		case r.URL.Path == "/v2/sessions" && r.Method == "POST":
+			sessionCalled = true
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"sessionId":"sess-new","sessionToken":"tok-new","challenges":{"otpEmail":"123456"}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
 	})
 
 	w, c := ginContext("POST", "/auth/session/otp/request", `{"loginName":"ghost@example.com"}`)
 	RequestOtpHandler(c)
 
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, placeholderCreated, "unknown email must provision a placeholder Zitadel user")
+	assert.True(t, sessionCalled, "session creation must run for the placeholder user")
+
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	// Same fields as success — value differences must not be observable as
-	// they would expose account state.
-	_, hasSessionID := resp["sessionId"]
-	_, hasSessionToken := resp["sessionToken"]
-	assert.True(t, hasSessionID)
-	assert.True(t, hasSessionToken)
-}
-
-func TestRequestOtpHandler_EmailNotVerified(t *testing.T) {
-	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/v2/users" && r.Method == "POST":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"result":[{"userId":"user-unverified"}]}`))
-		case r.URL.Path == "/v2/users/user-unverified" && r.Method == "GET":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"user":{"human":{"email":{"isVerified":false}}}}`))
-		case r.URL.Path == "/v2/sessions":
-			t.Error("session creation must not be called for unverified email")
-		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-		}
-	})
-
-	w, c := ginContext("POST", "/auth/session/otp/request", `{"loginName":"unverified@example.com"}`)
-	RequestOtpHandler(c)
-
-	assert.Equal(t, http.StatusForbidden, w.Code)
-	var resp map[string]any
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	assert.Equal(t, "email_not_verified", resp["error"])
+	// Same fields and same shape as the existing-user case.
+	assert.Equal(t, "sess-new", resp["sessionId"])
+	assert.Equal(t, "tok-new", resp["sessionToken"])
 }
 
 func TestRequestOtpHandler_ZitadelSessionFails(t *testing.T) {
@@ -127,9 +121,6 @@ func TestRequestOtpHandler_ZitadelSessionFails(t *testing.T) {
 		case r.URL.Path == "/v2/users" && r.Method == "POST":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result":[{"userId":"user-otp-2"}]}`))
-		case r.URL.Path == "/v2/users/user-otp-2" && r.Method == "GET":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"user":{"human":{"email":{"isVerified":true}}}}`))
 		case r.URL.Path == "/v2/users/user-otp-2/otp_email" && r.Method == "POST":
 			// Already-enrolled response (Zitadel returns 409) — must be a no-op.
 			w.WriteHeader(http.StatusConflict)
@@ -166,9 +157,6 @@ func TestRequestOtpHandler_LazyOtpEnrollment(t *testing.T) {
 		case r.URL.Path == "/v2/users" && r.Method == "POST":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result":[{"userId":"user-lazy"}]}`))
-		case r.URL.Path == "/v2/users/user-lazy" && r.Method == "GET":
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"user":{"human":{"email":{"isVerified":true}}}}`))
 		case r.URL.Path == "/v2/users/user-lazy/otp_email" && r.Method == "POST":
 			enrollCalled = true
 			w.WriteHeader(http.StatusOK)
@@ -211,23 +199,33 @@ func TestRequestOtpHandler_MissingFields(t *testing.T) {
 
 func TestVerifyOtpHandler_Success(t *testing.T) {
 	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/v2/sessions/sess-otp-1", r.URL.Path)
-		assert.Equal(t, "PATCH", r.Method)
+		switch {
+		case r.URL.Path == "/v2/sessions/sess-otp-1" && r.Method == "PATCH":
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			// PATCH must include the original sessionToken to authorize the update.
+			assert.Equal(t, "tok-otp-1", body["sessionToken"])
 
-		var body map[string]any
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		// PATCH must include the original sessionToken to authorize the update.
-		assert.Equal(t, "tok-otp-1", body["sessionToken"])
+			// And the otpEmail.code check the user typed.
+			checks := body["checks"].(map[string]any)
+			otpEmail := checks["otpEmail"].(map[string]any)
+			assert.Equal(t, "123456", otpEmail["code"])
 
-		// And the otpEmail.code check the user typed.
-		checks := body["checks"].(map[string]any)
-		otpEmail := checks["otpEmail"].(map[string]any)
-		assert.Equal(t, "123456", otpEmail["code"])
-
-		w.WriteHeader(http.StatusOK)
-		// Zitadel responds with a fresh sessionToken whose otpEmail check is
-		// fulfilled — that's the token used to finalize OIDC.
-		_, _ = w.Write([]byte(`{"sessionToken":"tok-otp-2"}`))
+			w.WriteHeader(http.StatusOK)
+			// Zitadel responds with a fresh sessionToken whose otpEmail check is
+			// fulfilled — that's the token used to finalize OIDC.
+			_, _ = w.Write([]byte(`{"sessionToken":"tok-otp-2"}`))
+		case r.URL.Path == "/v2/sessions/sess-otp-1" && r.Method == "GET":
+			// Lookup of session userId for the requiresProfile check (Pattern B).
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"session":{"factors":{"user":{"id":"user-existing","loginName":"user@example.com"}}}}`))
+		case r.URL.Path == "/v2/users/user-existing" && r.Method == "GET":
+			// Existing user — real first name, no profile completion needed.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"Alice","familyName":"Wonderland"}}}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
 	})
 
 	body := `{"sessionId":"sess-otp-1","sessionToken":"tok-otp-1","code":"123456"}`
@@ -241,6 +239,39 @@ func TestVerifyOtpHandler_Success(t *testing.T) {
 	// it so the client uses the same session for finalize.
 	assert.Equal(t, "sess-otp-1", resp["sessionId"])
 	assert.Equal(t, "tok-otp-2", resp["sessionToken"])
+	// Existing user has a real name — no profile completion step needed.
+	assert.Equal(t, false, resp["requiresProfile"])
+}
+
+// TestVerifyOtpHandler_PlaceholderUser asserts that Pattern B signals to the
+// frontend when the user still has the placeholder name marker, so the UI
+// can render the name-capture step before /auth/finalize.
+func TestVerifyOtpHandler_PlaceholderUser(t *testing.T) {
+	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/sessions/sess-new" && r.Method == "PATCH":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"sessionToken":"tok-verified"}`))
+		case r.URL.Path == "/v2/sessions/sess-new" && r.Method == "GET":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"session":{"factors":{"user":{"id":"placeholder-user","loginName":"new@example.com"}}}}`))
+		case r.URL.Path == "/v2/users/placeholder-user" && r.Method == "GET":
+			// Placeholder marker still in place — frontend must capture name.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"-","familyName":"-"}}}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	body := `{"sessionId":"sess-new","sessionToken":"tok-pending","code":"123456"}`
+	w, c := ginContext("POST", "/auth/session/otp/verify", body)
+	VerifyOtpHandler(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, true, resp["requiresProfile"], "placeholder users must trigger the name-capture step")
 }
 
 func TestVerifyOtpHandler_InvalidCode(t *testing.T) {
