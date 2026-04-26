@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io"
 	"os"
+	"strings"
 	"time"
 	addressDomain "tsb-service/internal/modules/address/domain"
 
@@ -18,6 +19,22 @@ import (
 	"tsb-service/pkg/timezone"
 	"tsb-service/pkg/utils"
 )
+
+// formatUserName builds the salutation string used by every email template.
+// It tolerates missing first or last names (e.g. social-only Zitadel users
+// who haven't filled a profile yet) so we never render "Hello John ," with a
+// stray space before the comma. Falls back to the email local-part when no
+// name is on file.
+func formatUserName(u userDomain.User) string {
+	name := strings.TrimSpace(u.FirstName + " " + u.LastName)
+	if name != "" {
+		return name
+	}
+	if at := strings.IndexByte(u.Email, '@'); at > 0 {
+		return u.Email[:at]
+	}
+	return u.Email
+}
 
 // --------------------------------------------------------------------------------
 // Embedded Templates for HTML & plain text versions.
@@ -164,7 +181,7 @@ func prepareVerifyEmailData(user userDomain.User, verifyLink string) struct {
 		VerifyLink string
 		LogoURL    string
 	}{
-		UserName:   fmt.Sprintf("%s %s", user.FirstName, user.LastName),
+		UserName:   formatUserName(user),
 		VerifyLink: verifyLink,
 		LogoURL:    logoURL(),
 	}
@@ -181,7 +198,7 @@ func prepareWelcomeEmailData(user userDomain.User, menuLink string) struct {
 		MenuLink string
 		LogoURL  string
 	}{
-		UserName: fmt.Sprintf("%s %s", user.FirstName, user.LastName),
+		UserName: formatUserName(user),
 		MenuLink: menuLink,
 		LogoURL:  logoURL(),
 	}
@@ -198,7 +215,7 @@ func prepareLoginOtpEmailData(user userDomain.User, code string) struct {
 		Code     string
 		LogoURL  string
 	}{
-		UserName: fmt.Sprintf("%s %s", user.FirstName, user.LastName),
+		UserName: formatUserName(user),
 		Code:     code,
 		LogoURL:  logoURL(),
 	}
@@ -250,7 +267,7 @@ func prepareOrderPendingData(u userDomain.User, op []orderDomain.OrderProduct, o
 		TotalPrice       string
 		LogoURL          string
 	}{
-		UserName:         fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		UserName:         formatUserName(u),
 		OrderItems:       orderViews,
 		OrderType:        string(o.OrderType),
 		SubtotalPrice:    utils.FormatDecimal(subtotal),
@@ -273,7 +290,7 @@ func prepareOrderCanceledData(u userDomain.User, reason string) (any, error) {
 		LogoURL  string
 		Reason   string
 	}{
-		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		UserName: formatUserName(u),
 		LogoURL:  logoURL(),
 		Reason:   reason,
 	}
@@ -361,7 +378,7 @@ func prepareOrderConfirmedData(
 		Address            *AddressView
 		LogoURL            string
 	}{
-		UserName:           u.FirstName + " " + u.LastName,
+		UserName:           formatUserName(u),
 		OrderItems:         orderViews,
 		OrderType:          string(o.OrderType),
 		SubtotalPrice:      utils.FormatDecimal(subtotal),
@@ -487,7 +504,7 @@ func prepareOrderReadyData(u userDomain.User, o orderDomain.Order) any {
 		StatusLink string
 		LogoURL    string
 	}{
-		UserName:   fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		UserName:   formatUserName(u),
 		OrderType:  string(o.OrderType),
 		StatusLink: fmt.Sprintf("%s/me?followOrder=%s", os.Getenv("APP_BASE_URL"), o.ID),
 		LogoURL:    logoURL(),
@@ -514,7 +531,7 @@ func prepareOrderCompletedData(u userDomain.User) any {
 		MenuLink string
 		LogoURL  string
 	}{
-		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		UserName: formatUserName(u),
 		MenuLink: os.Getenv("APP_BASE_URL"),
 		LogoURL:  logoURL(),
 	}
@@ -540,7 +557,7 @@ func preparePaymentFailedData(u userDomain.User) any {
 		MenuLink string
 		LogoURL  string
 	}{
-		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		UserName: formatUserName(u),
 		MenuLink: os.Getenv("APP_BASE_URL"),
 		LogoURL:  logoURL(),
 	}
@@ -566,7 +583,7 @@ func prepareRefundIssuedData(u userDomain.User, refundAmount string) any {
 		RefundAmount string
 		LogoURL      string
 	}{
-		UserName:     fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		UserName:     formatUserName(u),
 		RefundAmount: refundAmount,
 		LogoURL:      logoURL(),
 	}
@@ -591,7 +608,7 @@ func prepareAccountLinkedData(u userDomain.User) any {
 		UserName string
 		LogoURL  string
 	}{
-		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		UserName: formatUserName(u),
 		LogoURL:  logoURL(),
 	}
 }
@@ -618,7 +635,7 @@ func prepareReadyTimeUpdatedData(u userDomain.User, o orderDomain.Order, lang st
 		StatusLink         string
 		LogoURL            string
 	}{
-		UserName:           fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		UserName:           formatUserName(u),
 		OrderType:          string(o.OrderType),
 		EstimatedReadyTime: formatEstimatedReadyTime(o.EstimatedReadyTime, lang),
 		StatusLink:         fmt.Sprintf("%s/me?followOrder=%s", os.Getenv("APP_BASE_URL"), o.ID),
@@ -647,7 +664,7 @@ func prepareDeletionRequestData(u userDomain.User) any {
 		UserID    string
 		LogoURL   string
 	}{
-		UserName:  fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		UserName:  formatUserName(u),
 		UserEmail: u.Email,
 		UserID:    u.ID.String(),
 		LogoURL:   logoURL(),
@@ -674,7 +691,7 @@ func prepareReengagementData(u userDomain.User) any {
 		MenuLink string
 		LogoURL  string
 	}{
-		UserName: fmt.Sprintf("%s %s", u.FirstName, u.LastName),
+		UserName: formatUserName(u),
 		MenuLink: os.Getenv("APP_BASE_URL"),
 		LogoURL:  logoURL(),
 	}
