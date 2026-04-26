@@ -50,11 +50,12 @@ type zitadelOtpSessionResponse struct {
 //
 // POST /auth/session/otp/request { loginName, lang? }
 //
-// Always returns 200 with a sessionId/sessionToken pair to keep the response
-// shape constant for unknown emails (enumeration resistance). Unverified
-// accounts get an explicit "email_not_verified" so the UI can offer the
-// resend-verification button — this matches the existing behavior of the
-// password handler we're replacing.
+// Pattern B (identifier-first signup): unknown emails are not rejected.
+// Instead the handler provisions a placeholder Zitadel user (givenName /
+// familyName = "-", email pre-verified) and issues the OTP session as
+// usual. This keeps the response shape identical for known and unknown
+// emails (enumeration resistance) and lets the verify step ask the user
+// for their real first/last name only after they prove email control.
 func RequestOtpHandler(c *gin.Context) {
 	log := logging.FromContext(c.Request.Context())
 
@@ -69,24 +70,26 @@ func RequestOtpHandler(c *gin.Context) {
 		lang = "fr"
 	}
 
-	// Look up the user before touching Zitadel sessions so we can short-circuit
-	// for unknown emails without leaking the difference to the caller.
+	// Resolve (or provision) the Zitadel user for this email. Unknown emails
+	// get a placeholder account so the OTP session can be created uniformly.
 	userID, err := findZitadelUserByEmail(req.LoginName)
 	if err != nil {
-		log.Debug("otp request for unknown email", zap.String("email", req.LoginName))
-		c.JSON(http.StatusOK, sessionResponse{})
-		return
-	}
-
-	if !isZitadelEmailVerified(userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "email_not_verified"})
-		return
+		log.Debug("otp request for unknown email — creating placeholder", zap.String("email", req.LoginName))
+		userID, err = createPlaceholderZitadelUser(req.LoginName)
+		if err != nil {
+			log.Warn("placeholder user creation failed", zap.Error(err), zap.String("email", req.LoginName))
+			// Same enumeration-resistant empty response on failure: the caller
+			// can't distinguish a real provisioning error from any other path
+			// that returns an empty session shape.
+			c.JSON(http.StatusOK, sessionResponse{})
+			return
+		}
 	}
 
 	// Lazy-enroll the OTP Email factor: existing accounts (and freshly
-	// registered ones) don't have it configured by default, so Zitadel
-	// rejects the otpEmail challenge with "Multifactor OTP isn't ready"
-	// on the first attempt. Idempotent — already-enrolled users no-op.
+	// provisioned placeholders) don't have it configured by default, so
+	// Zitadel rejects the otpEmail challenge with "Multifactor OTP isn't
+	// ready" on the first attempt. Idempotent — already-enrolled users no-op.
 	if err := ensureZitadelOtpEmail(userID); err != nil {
 		log.Warn("zitadel otp email enrollment failed", zap.Error(err))
 		// Fall through anyway: the session create will fail and we'll
@@ -130,15 +133,17 @@ func RequestOtpHandler(c *gin.Context) {
 
 	if zResp.Challenges.OtpEmail != "" && scaleway.IsInitialized() {
 		// Best-effort profile fetch for the email salutation. Falls back to the
-		// email address if Zitadel returns no profile (e.g. social-only users
-		// who haven't filled a name yet).
+		// email address for placeholder accounts (givenName == "-") or when
+		// Zitadel returns no profile.
 		firstName := req.LoginName
 		var lastName string
 		if email, given, family, err := GetZitadelUserInfo(c.Request.Context(), userID); err == nil {
-			if given != "" {
+			if given != "" && given != placeholderProfileMarker {
 				firstName = given
 			}
-			lastName = family
+			if family != placeholderProfileMarker {
+				lastName = family
+			}
 			if email != "" {
 				req.LoginName = email
 			}
@@ -160,6 +165,16 @@ func RequestOtpHandler(c *gin.Context) {
 	})
 }
 
+// verifyOtpResponse extends sessionResponse with a flag telling the frontend
+// whether the user still needs to fill in their first/last name before OIDC
+// finalize. True when the OTP request created a placeholder account on the
+// fly (Pattern B identifier-first signup).
+type verifyOtpResponse struct {
+	SessionID       string `json:"sessionId"`
+	SessionToken    string `json:"sessionToken"`
+	RequiresProfile bool   `json:"requiresProfile"`
+}
+
 // VerifyOtpHandler updates the Zitadel session with the user-supplied OTP
 // code. On success, Zitadel issues a new sessionToken whose otpEmail check
 // is fulfilled — this is the token used by /auth/finalize to complete the
@@ -170,6 +185,10 @@ func RequestOtpHandler(c *gin.Context) {
 // All Zitadel-side failures (wrong code, expired challenge, missing session)
 // collapse to a single "invalid_code" response so the endpoint can't be
 // turned into an enumeration oracle.
+//
+// On success the response also includes requiresProfile: true when the user
+// is a fresh placeholder created during the OTP request — the frontend then
+// renders the name-capture step before calling /auth/finalize.
 func VerifyOtpHandler(c *gin.Context) {
 	log := logging.FromContext(c.Request.Context())
 
@@ -210,11 +229,23 @@ func VerifyOtpHandler(c *gin.Context) {
 		return
 	}
 
+	// Best-effort: figure out whether the session belongs to a placeholder
+	// user that still needs first/last name. If either lookup fails the user
+	// can still log in — they keep the placeholder profile and can edit it
+	// from /me later. We don't want this check to block authentication.
+	var requiresProfile bool
+	if userID, err := lookupSessionUserID(req.SessionID); err == nil {
+		if needs, err := userNeedsProfileCompletion(userID); err == nil {
+			requiresProfile = needs
+		}
+	}
+
 	// Zitadel's PATCH /v2/sessions response only includes sessionToken;
 	// the sessionId in the URL is what the client must continue to use.
-	c.JSON(http.StatusOK, sessionResponse{
-		SessionID:    req.SessionID,
-		SessionToken: zResp.SessionToken,
+	c.JSON(http.StatusOK, verifyOtpResponse{
+		SessionID:       req.SessionID,
+		SessionToken:    zResp.SessionToken,
+		RequiresProfile: requiresProfile,
 	})
 }
 

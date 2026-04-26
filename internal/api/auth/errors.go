@@ -6,9 +6,7 @@ import (
 
 // Frontend-facing error codes returned by auth handlers.
 const (
-	ErrInvalidCode        = "invalid_code"
-	ErrEmailAlreadyExists = "email_already_exists"
-	ErrRegistrationFailed = "registration_failed"
+	ErrInvalidCode = "invalid_code"
 )
 
 // zitadelError represents an error response from the Zitadel API.

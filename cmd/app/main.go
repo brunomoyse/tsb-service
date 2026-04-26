@@ -379,14 +379,12 @@ func main() {
 	api.POST("/auth/session/otp/request", authLimiter.Middleware(), auth.RequestOtpHandler)
 	api.POST("/auth/session/otp/verify", authLimiter.Middleware(), auth.VerifyOtpHandler)
 	api.POST("/auth/session/otp/resend", authLimiter.Middleware(), auth.ResendOtpHandler)
+	api.POST("/auth/session/otp/complete-profile", authLimiter.Middleware(), auth.CompleteOtpProfileHandler)
 	api.POST("/auth/finalize", authLimiter.Middleware(), auth.FinalizeOIDCHandler)
 	api.POST("/auth/authorize-proxy", authLimiter.Middleware(), auth.AuthorizeProxyHandler)
 	api.POST("/auth/token-exchange", authLimiter.Middleware(), auth.TokenExchangeHandler)
 	api.POST("/auth/idp/start", authLimiter.Middleware(), auth.StartIdPIntentHandler)
 	api.POST("/auth/idp/session", authLimiter.Middleware(), auth.CreateIdPSessionHandler)
-	api.POST("/auth/register", authLimiter.Middleware(), auth.RegisterHandler)
-	api.POST("/auth/verify-email", authLimiter.Middleware(), auth.VerifyEmailHandler)
-	api.POST("/auth/resend-verification", authLimiter.Middleware(), auth.ResendVerificationHandler)
 
 	// POS (Sunmi V3H handheld) auth endpoints
 	posLimiter := middleware.NewRateLimiter(30.0/60, 10) // 30 req/min per IP
