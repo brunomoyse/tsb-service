@@ -45,18 +45,19 @@ type ChoiceTranslationInput struct {
 }
 
 type Coupon struct {
-	ID             uuid.UUID  `json:"id"`
-	Code           string     `json:"code"`
-	DiscountType   string     `json:"discountType"`
-	DiscountValue  string     `json:"discountValue"`
-	MinOrderAmount *string    `json:"minOrderAmount,omitempty"`
-	MaxUses        *int       `json:"maxUses,omitempty"`
-	MaxUsesPerUser *int       `json:"maxUsesPerUser,omitempty"`
-	UsedCount      int        `json:"usedCount"`
-	IsActive       bool       `json:"isActive"`
-	ValidFrom      *time.Time `json:"validFrom,omitempty"`
-	ValidUntil     *time.Time `json:"validUntil,omitempty"`
-	CreatedAt      time.Time  `json:"createdAt"`
+	ID             uuid.UUID    `json:"id"`
+	Code           string       `json:"code"`
+	DiscountType   string       `json:"discountType"`
+	DiscountValue  string       `json:"discountValue"`
+	MinOrderAmount *string      `json:"minOrderAmount,omitempty"`
+	MaxUses        *int         `json:"maxUses,omitempty"`
+	MaxUsesPerUser *int         `json:"maxUsesPerUser,omitempty"`
+	UsedCount      int          `json:"usedCount"`
+	IsActive       bool         `json:"isActive"`
+	Status         CouponStatus `json:"status"`
+	ValidFrom      *time.Time   `json:"validFrom,omitempty"`
+	ValidUntil     *time.Time   `json:"validUntil,omitempty"`
+	CreatedAt      time.Time    `json:"createdAt"`
 }
 
 type CouponValidation struct {
@@ -398,6 +399,67 @@ type UpdateUserInput struct {
 	AddressPlaceID     *string `json:"addressPlaceId,omitempty"`
 	NotifyMarketing    *bool   `json:"notifyMarketing,omitempty"`
 	NotifyOrderUpdates *bool   `json:"notifyOrderUpdates,omitempty"`
+}
+
+type CouponStatus string
+
+const (
+	CouponStatusActive    CouponStatus = "ACTIVE"
+	CouponStatusInactive  CouponStatus = "INACTIVE"
+	CouponStatusScheduled CouponStatus = "SCHEDULED"
+	CouponStatusExpired   CouponStatus = "EXPIRED"
+	CouponStatusExhausted CouponStatus = "EXHAUSTED"
+)
+
+var AllCouponStatus = []CouponStatus{
+	CouponStatusActive,
+	CouponStatusInactive,
+	CouponStatusScheduled,
+	CouponStatusExpired,
+	CouponStatusExhausted,
+}
+
+func (e CouponStatus) IsValid() bool {
+	switch e {
+	case CouponStatusActive, CouponStatusInactive, CouponStatusScheduled, CouponStatusExpired, CouponStatusExhausted:
+		return true
+	}
+	return false
+}
+
+func (e CouponStatus) String() string {
+	return string(e)
+}
+
+func (e *CouponStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = CouponStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid CouponStatus", str)
+	}
+	return nil
+}
+
+func (e CouponStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *CouponStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e CouponStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }
 
 type OrderTypeEnum string

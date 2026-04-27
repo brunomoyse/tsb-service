@@ -1,3 +1,11 @@
+enum CouponStatus {
+    ACTIVE
+    INACTIVE
+    SCHEDULED
+    EXPIRED
+    EXHAUSTED
+}
+
 type Coupon {
     id: ID!
     code: String!
@@ -8,6 +16,7 @@ type Coupon {
     maxUsesPerUser: Int
     usedCount: Int!
     isActive: Boolean!
+    status: CouponStatus!
     validFrom: DateTime
     validUntil: DateTime
     createdAt: DateTime!

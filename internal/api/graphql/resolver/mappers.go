@@ -336,6 +336,7 @@ func ToGQLCoupon(c *couponDomain.Coupon) *model.Coupon {
 		MaxUsesPerUser: c.MaxUsesPerUser,
 		UsedCount:      c.UsedCount,
 		IsActive:       c.IsActive,
+		Status:         model.CouponStatus(strings.ToUpper(string(c.Status()))),
 		ValidFrom:      c.ValidFrom,
 		ValidUntil:     c.ValidUntil,
 		CreatedAt:      c.CreatedAt,

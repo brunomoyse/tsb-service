@@ -15,6 +15,16 @@ const (
 	DiscountTypeFixed      DiscountType = "fixed"
 )
 
+type Status string
+
+const (
+	StatusActive    Status = "active"
+	StatusInactive  Status = "inactive"
+	StatusScheduled Status = "scheduled"
+	StatusExpired   Status = "expired"
+	StatusExhausted Status = "exhausted"
+)
+
 type Coupon struct {
 	ID             uuid.UUID       `db:"id"`
 	Code           string          `db:"code"`
@@ -28,6 +38,27 @@ type Coupon struct {
 	ValidFrom      *time.Time      `db:"valid_from"`
 	ValidUntil     *time.Time      `db:"valid_until"`
 	CreatedAt      time.Time       `db:"created_at"`
+}
+
+// Status returns the effective status of the coupon, combining the admin
+// IsActive flag with validity window and global usage limits.
+// Admin intent (IsActive=false) takes precedence so the dashboard can
+// distinguish a manually disabled coupon from an expired/exhausted one.
+func (c *Coupon) Status() Status {
+	if !c.IsActive {
+		return StatusInactive
+	}
+	now := time.Now()
+	if c.ValidFrom != nil && now.Before(*c.ValidFrom) {
+		return StatusScheduled
+	}
+	if c.ValidUntil != nil && now.After(*c.ValidUntil) {
+		return StatusExpired
+	}
+	if c.MaxUses != nil && c.UsedCount >= *c.MaxUses {
+		return StatusExhausted
+	}
+	return StatusActive
 }
 
 // Validate checks whether the coupon can be applied to an order with the given amount.

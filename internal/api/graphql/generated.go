@@ -84,6 +84,7 @@ type ComplexityRoot struct {
 		MaxUses        func(childComplexity int) int
 		MaxUsesPerUser func(childComplexity int) int
 		MinOrderAmount func(childComplexity int) int
+		Status         func(childComplexity int) int
 		UsedCount      func(childComplexity int) int
 		ValidFrom      func(childComplexity int) int
 		ValidUntil     func(childComplexity int) int
@@ -621,6 +622,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Coupon.MinOrderAmount(childComplexity), true
+	case "Coupon.status":
+		if e.ComplexityRoot.Coupon.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Coupon.Status(childComplexity), true
 	case "Coupon.usedCount":
 		if e.ComplexityRoot.Coupon.UsedCount == nil {
 			break
@@ -3452,6 +3459,35 @@ func (ec *executionContext) fieldContext_Coupon_isActive(_ context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Coupon_status(ctx context.Context, field graphql.CollectedField, obj *model.Coupon) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Coupon_status,
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		ec.marshalNCouponStatus2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCouponStatus,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Coupon_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Coupon",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type CouponStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Coupon_validFrom(ctx context.Context, field graphql.CollectedField, obj *model.Coupon) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4418,6 +4454,8 @@ func (ec *executionContext) fieldContext_Mutation_createCoupon(ctx context.Conte
 				return ec.fieldContext_Coupon_usedCount(ctx, field)
 			case "isActive":
 				return ec.fieldContext_Coupon_isActive(ctx, field)
+			case "status":
+				return ec.fieldContext_Coupon_status(ctx, field)
 			case "validFrom":
 				return ec.fieldContext_Coupon_validFrom(ctx, field)
 			case "validUntil":
@@ -4498,6 +4536,8 @@ func (ec *executionContext) fieldContext_Mutation_updateCoupon(ctx context.Conte
 				return ec.fieldContext_Coupon_usedCount(ctx, field)
 			case "isActive":
 				return ec.fieldContext_Coupon_isActive(ctx, field)
+			case "status":
+				return ec.fieldContext_Coupon_status(ctx, field)
 			case "validFrom":
 				return ec.fieldContext_Coupon_validFrom(ctx, field)
 			case "validUntil":
@@ -9556,6 +9596,8 @@ func (ec *executionContext) fieldContext_Query_coupons(_ context.Context, field 
 				return ec.fieldContext_Coupon_usedCount(ctx, field)
 			case "isActive":
 				return ec.fieldContext_Coupon_isActive(ctx, field)
+			case "status":
+				return ec.fieldContext_Coupon_status(ctx, field)
 			case "validFrom":
 				return ec.fieldContext_Coupon_validFrom(ctx, field)
 			case "validUntil":
@@ -9625,6 +9667,8 @@ func (ec *executionContext) fieldContext_Query_coupon(ctx context.Context, field
 				return ec.fieldContext_Coupon_usedCount(ctx, field)
 			case "isActive":
 				return ec.fieldContext_Coupon_isActive(ctx, field)
+			case "status":
+				return ec.fieldContext_Coupon_status(ctx, field)
 			case "validFrom":
 				return ec.fieldContext_Coupon_validFrom(ctx, field)
 			case "validUntil":
@@ -11303,6 +11347,8 @@ func (ec *executionContext) fieldContext_Subscription_couponUpdated(_ context.Co
 				return ec.fieldContext_Coupon_usedCount(ctx, field)
 			case "isActive":
 				return ec.fieldContext_Coupon_isActive(ctx, field)
+			case "status":
+				return ec.fieldContext_Coupon_status(ctx, field)
 			case "validFrom":
 				return ec.fieldContext_Coupon_validFrom(ctx, field)
 			case "validUntil":
@@ -15175,6 +15221,11 @@ func (ec *executionContext) _Coupon(ctx context.Context, sel ast.SelectionSet, o
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "status":
+			out.Values[i] = ec._Coupon_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "validFrom":
 			out.Values[i] = ec._Coupon_validFrom(ctx, field, obj)
 		case "validUntil":
@@ -18323,6 +18374,16 @@ func (ec *executionContext) marshalNCoupon2ᚖtsbᚑserviceᚋinternalᚋapiᚋg
 		return graphql.Null
 	}
 	return ec._Coupon(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNCouponStatus2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCouponStatus(ctx context.Context, v any) (model.CouponStatus, error) {
+	var res model.CouponStatus
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNCouponStatus2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCouponStatus(ctx context.Context, sel ast.SelectionSet, v model.CouponStatus) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) marshalNCouponValidation2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCouponValidation(ctx context.Context, sel ast.SelectionSet, v model.CouponValidation) graphql.Marshaler {
