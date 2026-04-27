@@ -261,21 +261,6 @@ type Payment struct {
 	SettlementAmount                *float64   `json:"settlementAmount,omitempty"`
 }
 
-type PosDevice struct {
-	ID           uuid.UUID  `json:"id"`
-	Label        string     `json:"label"`
-	SerialNumber string     `json:"serialNumber"`
-	RegisteredAt time.Time  `json:"registeredAt"`
-	LastSeenAt   *time.Time `json:"lastSeenAt,omitempty"`
-	RevokedAt    *time.Time `json:"revokedAt,omitempty"`
-}
-
-type PosStaff struct {
-	ID          uuid.UUID `json:"id"`
-	DisplayName string    `json:"displayName"`
-	CreatedAt   time.Time `json:"createdAt"`
-}
-
 type Product struct {
 	Code           *string          `json:"code,omitempty"`
 	CreatedAt      time.Time        `json:"createdAt"`

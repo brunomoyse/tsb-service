@@ -14,12 +14,10 @@ import (
 	couponDomain "tsb-service/internal/modules/coupon/domain"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	paymentDomain "tsb-service/internal/modules/payment/domain"
-	posDomain "tsb-service/internal/modules/pos/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
 	restaurantDomain "tsb-service/internal/modules/restaurant/domain"
 	userDomain "tsb-service/internal/modules/user/domain"
 
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
@@ -81,7 +79,6 @@ func ToGQLUser(u *userDomain.User) *model.User {
 		NotifyMarketing:     u.NotifyMarketing,
 		NotifyOrderUpdates:  u.NotifyOrderUpdates,
 		DeletionRequestedAt: u.DeletionRequestedAt,
-		Rrn:                 u.RRN,
 		DefaultPlaceID:      u.DefaultPlaceID,
 	}
 }
@@ -515,33 +512,6 @@ func parseHHMMToMinutes(hhmm string) (int, bool) {
 	}
 
 	return hour.Hour()*60 + hour.Minute(), true
-}
-
-func toGQLPosDevice(d *posDomain.Device) *model.PosDevice {
-	return &model.PosDevice{
-		ID:           d.ID,
-		Label:        d.Label,
-		SerialNumber: d.SerialNumber,
-		RegisteredAt: d.RegisteredAt,
-		LastSeenAt:   d.LastSeenAt,
-		RevokedAt:    d.RevokedAt,
-	}
-}
-
-func toGQLPosStaff(s *posDomain.Staff) *model.PosStaff {
-	return &model.PosStaff{
-		ID:          s.ID,
-		DisplayName: s.DisplayName,
-		CreatedAt:   s.CreatedAt,
-	}
-}
-
-func (r *mutationResolver) posHelperFetchUser(ctx context.Context, id uuid.UUID) (*model.User, error) {
-	u, err := r.UserService.GetUserByID(ctx, id.String())
-	if err != nil {
-		return nil, fmt.Errorf("load user: %w", err)
-	}
-	return ToGQLUser(u), nil
 }
 
 func ToGQLProductChoice(c *productDomain.ProductChoice, lang string) *model.ProductChoice {

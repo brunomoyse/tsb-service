@@ -23,11 +23,10 @@ type DBPool struct {
 }
 
 // ForContext returns the appropriate database connection based on role flags
-// in the context. Admin and POS staff share the Admin pool because both need
-// privileged access (order reads/writes, device management, catalog mutations).
-// Regular customers use the Customer pool.
+// in the context. Admin callers (Zitadel admins and POS devices) get the Admin
+// pool — both need privileged access. Regular customers use the Customer pool.
 func (p *DBPool) ForContext(ctx context.Context) *sqlx.DB {
-	if utils.GetIsAdmin(ctx) || utils.GetIsStaff(ctx) {
+	if utils.GetIsAdmin(ctx) {
 		return p.Admin
 	}
 	return p.Customer

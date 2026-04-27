@@ -5,7 +5,6 @@ import (
 	"context"
 	cryptoRand "crypto/rand"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -203,7 +202,7 @@ func main() {
 	}
 	zap.L().Info("OIDC verifier initialized", zap.String("issuer", zitadelIssuer))
 
-	// POS (shop-floor handheld) auth module — RRN + PIN with device HMAC.
+	// POS (shop-floor handheld) auth module — single trusted device, HMAC-only.
 	// Falls back to a generated ephemeral secret if POS_JWT_SECRET is unset so
 	// dev servers start cleanly; production MUST set POS_JWT_SECRET.
 	posJWTSecret := []byte(os.Getenv("POS_JWT_SECRET"))
@@ -217,26 +216,12 @@ func main() {
 		posJWTSecret = ephemeral
 	}
 	posDeviceRepo := posInfrastructure.NewDeviceRepository(dbPool)
-	posRefreshRepo := posInfrastructure.NewRefreshTokenRepository(dbPool)
-	posUserRepo := posInfrastructure.NewPosUserRepository(dbPool)
-	posStaffRepo := posInfrastructure.NewStaffRepository(dbPool)
-	posNonceRepo := posInfrastructure.NewNonceRepository(dbPool)
 	posService := posApplication.NewService(
 		posApplication.DefaultConfig(posJWTSecret),
-		posDeviceRepo, posRefreshRepo, posUserRepo, posStaffRepo, posNonceRepo,
+		posDeviceRepo,
 	)
 	oidcVerifier.SetAppJWTVerifier(posService)
-	posHandler := posInterfaces.NewHandler(
-		posService,
-		zitadelIssuer+"/oidc/v1/userinfo",
-		os.Getenv("ZITADEL_INTERNAL_URL"),
-		func() string {
-			if u, err := url.Parse(zitadelIssuer); err == nil {
-				return u.Host
-			}
-			return ""
-		}(),
-	)
+	posHandler := posInterfaces.NewHandler(posService)
 
 	// Initialize auth proxy handlers with pre-resolved configuration
 	auth.Init(auth.Config{
@@ -386,17 +371,9 @@ func main() {
 	api.POST("/auth/idp/start", authLimiter.Middleware(), auth.StartIdPIntentHandler)
 	api.POST("/auth/idp/session", authLimiter.Middleware(), auth.CreateIdPSessionHandler)
 
-	// POS (Sunmi V3H handheld) auth endpoints
+	// POS (Sunmi V3H handheld) auth endpoints — HMAC-signed, no Zitadel.
 	posLimiter := middleware.NewRateLimiter(30.0/60, 10) // 30 req/min per IP
-	api.POST("/pos/auth/rrn-login", posLimiter.Middleware(), posHandler.RrnLogin)
-	api.POST("/pos/auth/refresh", posLimiter.Middleware(), posHandler.Refresh)
-	// Enrollment requires a valid Zitadel admin JWT and is throttled to a
-	// slow bucket — every successful enrollment hits the Zitadel userinfo
-	// endpoint, so the limiter also protects the upstream IdP from being
-	// flooded by a compromised admin session.
-	enrollLimiter := middleware.NewRateLimiter(5.0/60, 3) // 5 req/min per IP, burst 3
-	api.POST("/pos/devices/enroll", enrollLimiter.Middleware(), oidcVerifier.StrictAuthMiddleware(), posHandler.Enroll)
-	// FCM token registration — HMAC-signed, no Zitadel session required.
+	api.POST("/pos/auth/device-login", posLimiter.Middleware(), posHandler.DeviceLogin)
 	api.PATCH("/pos/devices/fcm-token", posLimiter.Middleware(), posHandler.UpdateFCMToken)
 
 	// Other endpoints
@@ -434,29 +411,10 @@ func main() {
 		}
 	}()
 
-	// Periodic prune of expired POS enrollment nonces.
-	noncePruneCtx, noncePruneCancel := context.WithCancel(context.Background())
-	defer noncePruneCancel()
-	go func() {
-		ticker := time.NewTicker(5 * time.Minute)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-noncePruneCtx.Done():
-				return
-			case <-ticker.C:
-				if err := posService.PruneExpiredNonces(noncePruneCtx); err != nil {
-					zap.L().Warn("pos nonce prune failed", zap.Error(err))
-				}
-			}
-		}
-	}()
-
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	zap.L().Info("shutting down server")
-	noncePruneCancel()
 	authLimiter.Stop()
 	feedbackLimiter.Stop()
 	broker.Shutdown()

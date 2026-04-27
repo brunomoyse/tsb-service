@@ -45,11 +45,12 @@ type UserLookup interface {
 }
 
 // AppJWTVerifier is a secondary verifier for tsb-service-signed JWTs issued by
-// the POS /auth/rrn-login endpoint. It lets shop-floor devices hit GraphQL with
-// an app token instead of a Zitadel JWT — see internal/modules/pos. POS tokens
-// only ever grant the staff role; admin is reserved for Zitadel JWTs.
+// the POS /auth/device-login endpoint. It lets the shop-floor device hit
+// GraphQL with an app token instead of a Zitadel JWT — see internal/modules/pos.
+// POS tokens always grant admin scope; the device IS trusted (you control the
+// APK and the secret baked into it).
 type AppJWTVerifier interface {
-	VerifyAccessToken(token string) (userID uuid.UUID, isStaff bool, err error)
+	VerifyAccessToken(token string) (deviceID uuid.UUID, err error)
 	// AccessTokenExpiry parses the token's exp claim without re-verifying
 	// the signature. Callers SHOULD only use the returned time after a
 	// successful VerifyAccessToken. Zero means the token carries no exp.
@@ -129,24 +130,23 @@ func (v *OIDCVerifier) SetAppJWTVerifier(appJWT AppJWTVerifier) {
 }
 
 // tryVerifyAppJWT attempts to validate a POS-issued HS256 token. Returns true
-// on success and populates userID/isStaff in the Gin context. POS tokens are
-// never granted admin — only the staff role.
+// on success and populates the device principal in the Gin context with admin
+// scope so the same GraphQL surface used by Zitadel admins is reachable.
 func (v *OIDCVerifier) tryVerifyAppJWT(c *gin.Context, tokenStr string) bool {
 	if v.appJWT == nil {
 		return false
 	}
-	userID, isStaff, err := v.appJWT.VerifyAccessToken(tokenStr)
-	if err != nil || userID == uuid.Nil {
+	deviceID, err := v.appJWT.VerifyAccessToken(tokenStr)
+	if err != nil || deviceID == uuid.Nil {
 		zap.L().Debug("app JWT verification failed", zap.Error(err))
 		return false
 	}
-	zap.L().Debug("app JWT verified", zap.String("userID", userID.String()), zap.Bool("isStaff", isStaff))
-	ctx := utils.SetUserID(c.Request.Context(), userID.String())
-	ctx = utils.SetIsAdmin(ctx, false)
-	ctx = utils.SetIsStaff(ctx, isStaff)
+	zap.L().Debug("app JWT verified", zap.String("deviceID", deviceID.String()))
+	ctx := utils.SetUserID(c.Request.Context(), deviceID.String())
+	ctx = utils.SetIsAdmin(ctx, true)
 	ctx = utils.SetTokenExpiry(ctx, v.appJWT.AccessTokenExpiry(tokenStr))
 	c.Request = c.Request.WithContext(ctx)
-	c.Set(string(utils.UserIDKey), userID.String())
+	c.Set(string(utils.UserIDKey), deviceID.String())
 	return true
 }
 
@@ -272,34 +272,33 @@ func (v *OIDCVerifier) OptionalAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// VerifyToken verifies a raw JWT string and returns the subject plus role flags.
+// VerifyToken verifies a raw JWT string and returns the subject plus admin flag.
 // Used by the GraphQL WebSocket InitFunc. Tries Zitadel first, then falls back
-// to the POS app JWT verifier. Returns the raw Zitadel sub (no DB lookup) for
-// Zitadel tokens, or the app user UUID for POS tokens. Admin implies staff —
-// callers may rely on isStaff to gate @staff-protected subscriptions.
+// to the POS app JWT verifier. Returns the raw Zitadel sub for Zitadel tokens,
+// or the device UUID for POS tokens (in which case isPOS=true and the caller
+// should NOT run Zitadel JIT provisioning on the subject).
 //
 // exp is the access token's expiry (UTC). The caller should bind the WS/HTTP
 // context to this deadline so long-lived subscriptions die when the token
 // expires instead of outliving the credential that authorized them. A zero
 // value means the token had no readable exp claim; callers should treat that
 // as "do not enforce a deadline" rather than "token is already expired".
-func (v *OIDCVerifier) VerifyToken(ctx context.Context, tokenStr string) (subject string, isAdmin, isStaff bool, exp time.Time, err error) {
+func (v *OIDCVerifier) VerifyToken(ctx context.Context, tokenStr string) (subject string, isAdmin, isPOS bool, exp time.Time, err error) {
 	authCtx, zitadelErr := v.authorizer.CheckAuthorization(ctx, "Bearer "+tokenStr)
 	if zitadelErr == nil {
 		admin := authCtx.IsGrantedRole("admin")
 		if !admin && v.projectID != "" {
 			admin = authCtx.IsGrantedRoleInProject(v.projectID, "admin", "")
 		}
-		// The SDK's introspection context exposes exp via the raw claims map.
 		var tokenExp time.Time
 		if expRaw, ok := authCtx.Claims["exp"].(float64); ok {
 			tokenExp = time.Unix(int64(expRaw), 0).UTC()
 		}
-		return authCtx.UserID(), admin, admin, tokenExp, nil
+		return authCtx.UserID(), admin, false, tokenExp, nil
 	}
 	if v.appJWT != nil {
-		if uid, staff, appErr := v.appJWT.VerifyAccessToken(tokenStr); appErr == nil {
-			return uid.String(), false, staff, v.appJWT.AccessTokenExpiry(tokenStr), nil
+		if deviceID, appErr := v.appJWT.VerifyAccessToken(tokenStr); appErr == nil {
+			return deviceID.String(), true, true, v.appJWT.AccessTokenExpiry(tokenStr), nil
 		}
 	}
 	return "", false, false, time.Time{}, zitadelErr

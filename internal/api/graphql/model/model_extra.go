@@ -58,7 +58,6 @@ type User struct {
 	NotifyMarketing     bool       `json:"notifyMarketing"`
 	NotifyOrderUpdates  bool       `json:"notifyOrderUpdates"`
 	DeletionRequestedAt *time.Time `json:"deletionRequestedAt,omitempty"`
-	Rrn                 *string    `json:"rrn,omitempty"`
 
 	DefaultPlaceID *string `json:"-"`
 }
