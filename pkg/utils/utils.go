@@ -22,7 +22,6 @@ type contextKey string
 const LangKey contextKey = "lang"
 const UserIDKey contextKey = "userID"
 const IsAdminKey contextKey = "isAdmin"
-const IsStaffKey contextKey = "isStaff"
 const ZitadelSubKey contextKey = "zitadelSub"
 const TokenExpiryKey contextKey = "tokenExpiry"
 
@@ -70,10 +69,6 @@ func GetIsAdmin(ctx context.Context) bool {
 	return isAdmin
 }
 
-func SetIsStaff(ctx context.Context, isStaff bool) context.Context {
-	return context.WithValue(ctx, IsStaffKey, isStaff)
-}
-
 // SetTokenExpiry stores the JWT exp claim (UTC) in the context. Zero means
 // "no expiry information available" and callers should not enforce a deadline
 // on that path.
@@ -86,15 +81,6 @@ func SetTokenExpiry(ctx context.Context, exp time.Time) context.Context {
 func GetTokenExpiry(ctx context.Context) time.Time {
 	exp, _ := ctx.Value(TokenExpiryKey).(time.Time)
 	return exp
-}
-
-// GetIsStaff returns true when the caller holds the POS staff role OR is an
-// admin (admin is a superset of staff).
-func GetIsStaff(ctx context.Context) bool {
-	if isStaff, _ := ctx.Value(IsStaffKey).(bool); isStaff {
-		return true
-	}
-	return GetIsAdmin(ctx)
 }
 
 var slugRegex = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)

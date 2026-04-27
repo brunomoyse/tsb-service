@@ -135,15 +135,13 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 				return ctx, &initPayload, nil
 			}
 			tokenStr := strings.TrimPrefix(auth, "Bearer ")
-			sub, isAdmin, isStaff, exp, err := oidcVerifier.VerifyToken(ctx, tokenStr)
+			sub, isAdmin, isPOS, exp, err := oidcVerifier.VerifyToken(ctx, tokenStr)
 			if err == nil && sub != "" {
-				isPOS := isStaff && !isAdmin
 				if isPOS {
-					// POS staff tokens already carry the app UUID in `sub`; don't
-					// hit Zitadel's user API for them.
+					// Device tokens carry the device UUID in `sub`; no Zitadel
+					// resolution needed.
 					ctx = utils.SetUserID(ctx, sub)
 				} else {
-					// Zitadel tokens: resolve sub → app UUID via JIT provisioning.
 					appID, lookupErr := resolver.UserService.ResolveZitadelID(ctx, sub, "", "", "")
 					if lookupErr == nil {
 						ctx = utils.SetUserID(ctx, appID)
@@ -152,7 +150,6 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 					}
 				}
 				ctx = utils.SetIsAdmin(ctx, isAdmin)
-				ctx = utils.SetIsStaff(ctx, isStaff)
 				ctx = utils.SetTokenExpiry(ctx, exp)
 				// Bind the WebSocket context lifetime to the access token.
 				// When exp hits, ctx.Done() fires, every in-flight subscription
