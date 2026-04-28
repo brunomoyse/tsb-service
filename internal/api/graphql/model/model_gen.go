@@ -93,13 +93,29 @@ type CreateOrderInput struct {
 }
 
 type CreateOrderItemInput struct {
-	ProductID uuid.UUID  `json:"productId"`
-	Quantity  int        `json:"quantity"`
-	ChoiceID  *uuid.UUID `json:"choiceId,omitempty"`
+	ProductID  uuid.UUID                        `json:"productId"`
+	Quantity   int                              `json:"quantity"`
+	ChoiceID   *uuid.UUID                       `json:"choiceId,omitempty"`
+	Selections []*CreateOrderItemSelectionInput `json:"selections,omitempty"`
+}
+
+type CreateOrderItemSelectionInput struct {
+	GroupID  uuid.UUID `json:"groupId"`
+	ChoiceID uuid.UUID `json:"choiceId"`
+	Quantity int       `json:"quantity"`
+}
+
+type CreateProductChoiceGroupInput struct {
+	ProductID     uuid.UUID                 `json:"productId"`
+	MinSelections int                       `json:"minSelections"`
+	MaxSelections int                       `json:"maxSelections"`
+	SortOrder     int                       `json:"sortOrder"`
+	Translations  []*ChoiceTranslationInput `json:"translations"`
 }
 
 type CreateProductChoiceInput struct {
-	ProductID     uuid.UUID                 `json:"productId"`
+	ProductID     *uuid.UUID                `json:"productId,omitempty"`
+	ChoiceGroupID *uuid.UUID                `json:"choiceGroupId,omitempty"`
 	PriceModifier string                    `json:"priceModifier"`
 	SortOrder     int                       `json:"sortOrder"`
 	Translations  []*ChoiceTranslationInput `json:"translations"`
@@ -212,14 +228,23 @@ type OrderHistorySummary struct {
 }
 
 type OrderItem struct {
-	Product        *Product       `json:"product"`
-	ProductID      uuid.UUID      `json:"productID"`
-	UnitPrice      string         `json:"unitPrice"`
-	Quantity       int            `json:"quantity"`
-	TotalPrice     string         `json:"totalPrice"`
-	VatRateApplied string         `json:"vatRateApplied"`
-	ChoiceID       *uuid.UUID     `json:"choiceId,omitempty"`
-	Choice         *ProductChoice `json:"choice,omitempty"`
+	Product        *Product              `json:"product"`
+	ProductID      uuid.UUID             `json:"productID"`
+	UnitPrice      string                `json:"unitPrice"`
+	Quantity       int                   `json:"quantity"`
+	TotalPrice     string                `json:"totalPrice"`
+	VatRateApplied string                `json:"vatRateApplied"`
+	ChoiceID       *uuid.UUID            `json:"choiceId,omitempty"`
+	Choice         *ProductChoice        `json:"choice,omitempty"`
+	Selections     []*OrderItemSelection `json:"selections"`
+}
+
+type OrderItemSelection struct {
+	GroupID  uuid.UUID           `json:"groupId"`
+	ChoiceID uuid.UUID           `json:"choiceId"`
+	Quantity int                 `json:"quantity"`
+	Group    *ProductChoiceGroup `json:"group"`
+	Choice   *ProductChoice      `json:"choice"`
 }
 
 type OrderStatusHistory struct {
@@ -263,24 +288,25 @@ type Payment struct {
 }
 
 type Product struct {
-	Code           *string          `json:"code,omitempty"`
-	CreatedAt      time.Time        `json:"createdAt"`
-	ID             uuid.UUID        `json:"id"`
-	IsAvailable    bool             `json:"isAvailable"`
-	IsDiscountable bool             `json:"isDiscountable"`
-	IsHalal        bool             `json:"isHalal"`
-	IsSpicy        bool             `json:"isSpicy"`
-	IsVegetarian   bool             `json:"isVegetarian"`
-	IsVisible      bool             `json:"isVisible"`
-	PieceCount     *int             `json:"pieceCount,omitempty"`
-	Price          string           `json:"price"`
-	Slug           string           `json:"slug"`
-	VatCategory    string           `json:"vatCategory"`
-	Name           string           `json:"name"`
-	Description    *string          `json:"description,omitempty"`
-	Category       *ProductCategory `json:"category"`
-	Choices        []*ProductChoice `json:"choices"`
-	Translations   []*Translation   `json:"translations"`
+	Code           *string               `json:"code,omitempty"`
+	CreatedAt      time.Time             `json:"createdAt"`
+	ID             uuid.UUID             `json:"id"`
+	IsAvailable    bool                  `json:"isAvailable"`
+	IsDiscountable bool                  `json:"isDiscountable"`
+	IsHalal        bool                  `json:"isHalal"`
+	IsSpicy        bool                  `json:"isSpicy"`
+	IsVegetarian   bool                  `json:"isVegetarian"`
+	IsVisible      bool                  `json:"isVisible"`
+	PieceCount     *int                  `json:"pieceCount,omitempty"`
+	Price          string                `json:"price"`
+	Slug           string                `json:"slug"`
+	VatCategory    string                `json:"vatCategory"`
+	Name           string                `json:"name"`
+	Description    *string               `json:"description,omitempty"`
+	Category       *ProductCategory      `json:"category"`
+	Choices        []*ProductChoice      `json:"choices"`
+	ChoiceGroups   []*ProductChoiceGroup `json:"choiceGroups"`
+	Translations   []*Translation        `json:"translations"`
 }
 
 type ProductCategory struct {
@@ -294,10 +320,22 @@ type ProductCategory struct {
 type ProductChoice struct {
 	ID            uuid.UUID            `json:"id"`
 	ProductID     uuid.UUID            `json:"productId"`
+	ChoiceGroupID uuid.UUID            `json:"choiceGroupId"`
 	PriceModifier string               `json:"priceModifier"`
 	SortOrder     int                  `json:"sortOrder"`
 	Name          string               `json:"name"`
 	Translations  []*ChoiceTranslation `json:"translations"`
+}
+
+type ProductChoiceGroup struct {
+	ID            uuid.UUID            `json:"id"`
+	ProductID     uuid.UUID            `json:"productId"`
+	MinSelections int                  `json:"minSelections"`
+	MaxSelections int                  `json:"maxSelections"`
+	SortOrder     int                  `json:"sortOrder"`
+	Name          string               `json:"name"`
+	Translations  []*ChoiceTranslation `json:"translations"`
+	Choices       []*ProductChoice     `json:"choices"`
 }
 
 type Query struct {
@@ -366,6 +404,13 @@ type UpdateOrderInput struct {
 	Status             *domain.OrderStatus             `json:"status,omitempty"`
 	EstimatedReadyTime *time.Time                      `json:"estimatedReadyTime,omitempty"`
 	CancellationReason *domain.OrderCancellationReason `json:"cancellationReason,omitempty"`
+}
+
+type UpdateProductChoiceGroupInput struct {
+	MinSelections *int                      `json:"minSelections,omitempty"`
+	MaxSelections *int                      `json:"maxSelections,omitempty"`
+	SortOrder     *int                      `json:"sortOrder,omitempty"`
+	Translations  []*ChoiceTranslationInput `json:"translations,omitempty"`
 }
 
 type UpdateProductChoiceInput struct {

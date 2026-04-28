@@ -138,7 +138,9 @@ type ComplexityRoot struct {
 		CreateOrder               func(childComplexity int, input model.CreateOrderInput) int
 		CreateProduct             func(childComplexity int, input model.CreateProductInput) int
 		CreateProductChoice       func(childComplexity int, input model.CreateProductChoiceInput) int
+		CreateProductChoiceGroup  func(childComplexity int, input model.CreateProductChoiceGroupInput) int
 		DeleteProductChoice       func(childComplexity int, id uuid.UUID) int
+		DeleteProductChoiceGroup  func(childComplexity int, id uuid.UUID) int
 		DeleteScheduleOverride    func(childComplexity int, date time.Time) int
 		RegisterDeviceToken       func(childComplexity int, deviceToken string, platform string) int
 		RegisterLiveActivityToken func(childComplexity int, orderID uuid.UUID, pushToken string) int
@@ -154,6 +156,7 @@ type ComplexityRoot struct {
 		UpdatePreparationMinutes  func(childComplexity int, minutes int) int
 		UpdateProduct             func(childComplexity int, id uuid.UUID, input model.UpdateProductInput) int
 		UpdateProductChoice       func(childComplexity int, id uuid.UUID, input model.UpdateProductChoiceInput) int
+		UpdateProductChoiceGroup  func(childComplexity int, id uuid.UUID, input model.UpdateProductChoiceGroupInput) int
 		UpsertScheduleOverride    func(childComplexity int, input model.ScheduleOverrideInput) int
 	}
 
@@ -203,9 +206,18 @@ type ComplexityRoot struct {
 		Product        func(childComplexity int) int
 		ProductID      func(childComplexity int) int
 		Quantity       func(childComplexity int) int
+		Selections     func(childComplexity int) int
 		TotalPrice     func(childComplexity int) int
 		UnitPrice      func(childComplexity int) int
 		VatRateApplied func(childComplexity int) int
+	}
+
+	OrderItemSelection struct {
+		Choice   func(childComplexity int) int
+		ChoiceID func(childComplexity int) int
+		Group    func(childComplexity int) int
+		GroupID  func(childComplexity int) int
+		Quantity func(childComplexity int) int
 	}
 
 	OrderStatusHistory struct {
@@ -250,6 +262,7 @@ type ComplexityRoot struct {
 
 	Product struct {
 		Category       func(childComplexity int) int
+		ChoiceGroups   func(childComplexity int) int
 		Choices        func(childComplexity int) int
 		Code           func(childComplexity int) int
 		CreatedAt      func(childComplexity int) int
@@ -278,9 +291,21 @@ type ComplexityRoot struct {
 	}
 
 	ProductChoice struct {
+		ChoiceGroupID func(childComplexity int) int
 		ID            func(childComplexity int) int
 		Name          func(childComplexity int) int
 		PriceModifier func(childComplexity int) int
+		ProductID     func(childComplexity int) int
+		SortOrder     func(childComplexity int) int
+		Translations  func(childComplexity int) int
+	}
+
+	ProductChoiceGroup struct {
+		Choices       func(childComplexity int) int
+		ID            func(childComplexity int) int
+		MaxSelections func(childComplexity int) int
+		MinSelections func(childComplexity int) int
+		Name          func(childComplexity int) int
 		ProductID     func(childComplexity int) int
 		SortOrder     func(childComplexity int) int
 		Translations  func(childComplexity int) int
@@ -375,6 +400,9 @@ type MutationResolver interface {
 	UpdatePaymentStatus(ctx context.Context, orderID uuid.UUID, status string) (*model.Payment, error)
 	CreateProduct(ctx context.Context, input model.CreateProductInput) (*model.Product, error)
 	UpdateProduct(ctx context.Context, id uuid.UUID, input model.UpdateProductInput) (*model.Product, error)
+	CreateProductChoiceGroup(ctx context.Context, input model.CreateProductChoiceGroupInput) (*model.ProductChoiceGroup, error)
+	UpdateProductChoiceGroup(ctx context.Context, id uuid.UUID, input model.UpdateProductChoiceGroupInput) (*model.ProductChoiceGroup, error)
+	DeleteProductChoiceGroup(ctx context.Context, id uuid.UUID) (bool, error)
 	CreateProductChoice(ctx context.Context, input model.CreateProductChoiceInput) (*model.ProductChoice, error)
 	UpdateProductChoice(ctx context.Context, id uuid.UUID, input model.UpdateProductChoiceInput) (*model.ProductChoice, error)
 	DeleteProductChoice(ctx context.Context, id uuid.UUID) (bool, error)
@@ -408,6 +436,7 @@ type OrderItemResolver interface {
 type ProductResolver interface {
 	Category(ctx context.Context, obj *model.Product) (*model.ProductCategory, error)
 	Choices(ctx context.Context, obj *model.Product) ([]*model.ProductChoice, error)
+
 	Translations(ctx context.Context, obj *model.Product) ([]*model.Translation, error)
 }
 type ProductCategoryResolver interface {
@@ -864,6 +893,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateProductChoice(childComplexity, args["input"].(model.CreateProductChoiceInput)), true
+	case "Mutation.createProductChoiceGroup":
+		if e.ComplexityRoot.Mutation.CreateProductChoiceGroup == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createProductChoiceGroup_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateProductChoiceGroup(childComplexity, args["input"].(model.CreateProductChoiceGroupInput)), true
 	case "Mutation.deleteProductChoice":
 		if e.ComplexityRoot.Mutation.DeleteProductChoice == nil {
 			break
@@ -875,6 +915,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteProductChoice(childComplexity, args["id"].(uuid.UUID)), true
+	case "Mutation.deleteProductChoiceGroup":
+		if e.ComplexityRoot.Mutation.DeleteProductChoiceGroup == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteProductChoiceGroup_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.DeleteProductChoiceGroup(childComplexity, args["id"].(uuid.UUID)), true
 	case "Mutation.deleteScheduleOverride":
 		if e.ComplexityRoot.Mutation.DeleteScheduleOverride == nil {
 			break
@@ -1035,6 +1086,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.UpdateProductChoice(childComplexity, args["id"].(uuid.UUID), args["input"].(model.UpdateProductChoiceInput)), true
+	case "Mutation.updateProductChoiceGroup":
+		if e.ComplexityRoot.Mutation.UpdateProductChoiceGroup == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateProductChoiceGroup_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateProductChoiceGroup(childComplexity, args["id"].(uuid.UUID), args["input"].(model.UpdateProductChoiceGroupInput)), true
 	case "Mutation.upsertScheduleOverride":
 		if e.ComplexityRoot.Mutation.UpsertScheduleOverride == nil {
 			break
@@ -1266,6 +1328,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.OrderItem.Quantity(childComplexity), true
+	case "OrderItem.selections":
+		if e.ComplexityRoot.OrderItem.Selections == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderItem.Selections(childComplexity), true
 	case "OrderItem.totalPrice":
 		if e.ComplexityRoot.OrderItem.TotalPrice == nil {
 			break
@@ -1284,6 +1352,37 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.OrderItem.VatRateApplied(childComplexity), true
+
+	case "OrderItemSelection.choice":
+		if e.ComplexityRoot.OrderItemSelection.Choice == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderItemSelection.Choice(childComplexity), true
+	case "OrderItemSelection.choiceId":
+		if e.ComplexityRoot.OrderItemSelection.ChoiceID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderItemSelection.ChoiceID(childComplexity), true
+	case "OrderItemSelection.group":
+		if e.ComplexityRoot.OrderItemSelection.Group == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderItemSelection.Group(childComplexity), true
+	case "OrderItemSelection.groupId":
+		if e.ComplexityRoot.OrderItemSelection.GroupID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderItemSelection.GroupID(childComplexity), true
+	case "OrderItemSelection.quantity":
+		if e.ComplexityRoot.OrderItemSelection.Quantity == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderItemSelection.Quantity(childComplexity), true
 
 	case "OrderStatusHistory.changedAt":
 		if e.ComplexityRoot.OrderStatusHistory.ChangedAt == nil {
@@ -1497,6 +1596,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Product.Category(childComplexity), true
+	case "Product.choiceGroups":
+		if e.ComplexityRoot.Product.ChoiceGroups == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Product.ChoiceGroups(childComplexity), true
 	case "Product.choices":
 		if e.ComplexityRoot.Product.Choices == nil {
 			break
@@ -1631,6 +1736,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ProductCategory.Translations(childComplexity), true
 
+	case "ProductChoice.choiceGroupId":
+		if e.ComplexityRoot.ProductChoice.ChoiceGroupID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductChoice.ChoiceGroupID(childComplexity), true
 	case "ProductChoice.id":
 		if e.ComplexityRoot.ProductChoice.ID == nil {
 			break
@@ -1667,6 +1778,55 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ProductChoice.Translations(childComplexity), true
+
+	case "ProductChoiceGroup.choices":
+		if e.ComplexityRoot.ProductChoiceGroup.Choices == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductChoiceGroup.Choices(childComplexity), true
+	case "ProductChoiceGroup.id":
+		if e.ComplexityRoot.ProductChoiceGroup.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductChoiceGroup.ID(childComplexity), true
+	case "ProductChoiceGroup.maxSelections":
+		if e.ComplexityRoot.ProductChoiceGroup.MaxSelections == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductChoiceGroup.MaxSelections(childComplexity), true
+	case "ProductChoiceGroup.minSelections":
+		if e.ComplexityRoot.ProductChoiceGroup.MinSelections == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductChoiceGroup.MinSelections(childComplexity), true
+	case "ProductChoiceGroup.name":
+		if e.ComplexityRoot.ProductChoiceGroup.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductChoiceGroup.Name(childComplexity), true
+	case "ProductChoiceGroup.productId":
+		if e.ComplexityRoot.ProductChoiceGroup.ProductID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductChoiceGroup.ProductID(childComplexity), true
+	case "ProductChoiceGroup.sortOrder":
+		if e.ComplexityRoot.ProductChoiceGroup.SortOrder == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductChoiceGroup.SortOrder(childComplexity), true
+	case "ProductChoiceGroup.translations":
+		if e.ComplexityRoot.ProductChoiceGroup.Translations == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductChoiceGroup.Translations(childComplexity), true
 
 	case "Query.autocompleteAddresses":
 		if e.ComplexityRoot.Query.AutocompleteAddresses == nil {
@@ -2094,6 +2254,8 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCreateCouponInput,
 		ec.unmarshalInputCreateOrderInput,
 		ec.unmarshalInputCreateOrderItemInput,
+		ec.unmarshalInputCreateOrderItemSelectionInput,
+		ec.unmarshalInputCreateProductChoiceGroupInput,
 		ec.unmarshalInputCreateProductChoiceInput,
 		ec.unmarshalInputCreateProductInput,
 		ec.unmarshalInputCustomerStatsInput,
@@ -2105,6 +2267,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputTranslationInput,
 		ec.unmarshalInputUpdateCouponInput,
 		ec.unmarshalInputUpdateOrderInput,
+		ec.unmarshalInputUpdateProductChoiceGroupInput,
 		ec.unmarshalInputUpdateProductChoiceInput,
 		ec.unmarshalInputUpdateProductInput,
 		ec.unmarshalInputUpdateUserInput,
@@ -2249,6 +2412,17 @@ func (ec *executionContext) field_Mutation_createOrder_args(ctx context.Context,
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_createProductChoiceGroup_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNCreateProductChoiceGroupInput2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCreateProductChoiceGroupInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createProductChoice_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2268,6 +2442,17 @@ func (ec *executionContext) field_Mutation_createProduct_args(ctx context.Contex
 		return nil, err
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_deleteProductChoiceGroup_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -2436,6 +2621,22 @@ func (ec *executionContext) field_Mutation_updatePreparationMinutes_args(ctx con
 		return nil, err
 	}
 	args["minutes"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateProductChoiceGroup_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "input", ec.unmarshalNUpdateProductChoiceGroupInput2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUpdateProductChoiceGroupInput)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg1
 	return args, nil
 }
 
@@ -5130,6 +5331,8 @@ func (ec *executionContext) fieldContext_Mutation_createProduct(ctx context.Cont
 				return ec.fieldContext_Product_category(ctx, field)
 			case "choices":
 				return ec.fieldContext_Product_choices(ctx, field)
+			case "choiceGroups":
+				return ec.fieldContext_Product_choiceGroups(ctx, field)
 			case "translations":
 				return ec.fieldContext_Product_translations(ctx, field)
 			}
@@ -5222,6 +5425,8 @@ func (ec *executionContext) fieldContext_Mutation_updateProduct(ctx context.Cont
 				return ec.fieldContext_Product_category(ctx, field)
 			case "choices":
 				return ec.fieldContext_Product_choices(ctx, field)
+			case "choiceGroups":
+				return ec.fieldContext_Product_choiceGroups(ctx, field)
 			case "translations":
 				return ec.fieldContext_Product_translations(ctx, field)
 			}
@@ -5236,6 +5441,204 @@ func (ec *executionContext) fieldContext_Mutation_updateProduct(ctx context.Cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_updateProduct_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createProductChoiceGroup(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_createProductChoiceGroup,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateProductChoiceGroup(ctx, fc.Args["input"].(model.CreateProductChoiceGroupInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.ProductChoiceGroup
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNProductChoiceGroup2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceGroup,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createProductChoiceGroup(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ProductChoiceGroup_id(ctx, field)
+			case "productId":
+				return ec.fieldContext_ProductChoiceGroup_productId(ctx, field)
+			case "minSelections":
+				return ec.fieldContext_ProductChoiceGroup_minSelections(ctx, field)
+			case "maxSelections":
+				return ec.fieldContext_ProductChoiceGroup_maxSelections(ctx, field)
+			case "sortOrder":
+				return ec.fieldContext_ProductChoiceGroup_sortOrder(ctx, field)
+			case "name":
+				return ec.fieldContext_ProductChoiceGroup_name(ctx, field)
+			case "translations":
+				return ec.fieldContext_ProductChoiceGroup_translations(ctx, field)
+			case "choices":
+				return ec.fieldContext_ProductChoiceGroup_choices(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ProductChoiceGroup", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createProductChoiceGroup_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateProductChoiceGroup(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_updateProductChoiceGroup,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateProductChoiceGroup(ctx, fc.Args["id"].(uuid.UUID), fc.Args["input"].(model.UpdateProductChoiceGroupInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.ProductChoiceGroup
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNProductChoiceGroup2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceGroup,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_updateProductChoiceGroup(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ProductChoiceGroup_id(ctx, field)
+			case "productId":
+				return ec.fieldContext_ProductChoiceGroup_productId(ctx, field)
+			case "minSelections":
+				return ec.fieldContext_ProductChoiceGroup_minSelections(ctx, field)
+			case "maxSelections":
+				return ec.fieldContext_ProductChoiceGroup_maxSelections(ctx, field)
+			case "sortOrder":
+				return ec.fieldContext_ProductChoiceGroup_sortOrder(ctx, field)
+			case "name":
+				return ec.fieldContext_ProductChoiceGroup_name(ctx, field)
+			case "translations":
+				return ec.fieldContext_ProductChoiceGroup_translations(ctx, field)
+			case "choices":
+				return ec.fieldContext_ProductChoiceGroup_choices(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ProductChoiceGroup", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateProductChoiceGroup_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteProductChoiceGroup(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_deleteProductChoiceGroup,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().DeleteProductChoiceGroup(ctx, fc.Args["id"].(uuid.UUID))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal bool
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteProductChoiceGroup(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteProductChoiceGroup_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -5284,6 +5687,8 @@ func (ec *executionContext) fieldContext_Mutation_createProductChoice(ctx contex
 				return ec.fieldContext_ProductChoice_id(ctx, field)
 			case "productId":
 				return ec.fieldContext_ProductChoice_productId(ctx, field)
+			case "choiceGroupId":
+				return ec.fieldContext_ProductChoice_choiceGroupId(ctx, field)
 			case "priceModifier":
 				return ec.fieldContext_ProductChoice_priceModifier(ctx, field)
 			case "sortOrder":
@@ -5352,6 +5757,8 @@ func (ec *executionContext) fieldContext_Mutation_updateProductChoice(ctx contex
 				return ec.fieldContext_ProductChoice_id(ctx, field)
 			case "productId":
 				return ec.fieldContext_ProductChoice_productId(ctx, field)
+			case "choiceGroupId":
+				return ec.fieldContext_ProductChoice_choiceGroupId(ctx, field)
 			case "priceModifier":
 				return ec.fieldContext_ProductChoice_priceModifier(ctx, field)
 			case "sortOrder":
@@ -6817,6 +7224,8 @@ func (ec *executionContext) fieldContext_Order_items(_ context.Context, field gr
 				return ec.fieldContext_OrderItem_choiceId(ctx, field)
 			case "choice":
 				return ec.fieldContext_OrderItem_choice(ctx, field)
+			case "selections":
+				return ec.fieldContext_OrderItem_selections(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type OrderItem", field.Name)
 		},
@@ -7226,6 +7635,8 @@ func (ec *executionContext) fieldContext_OrderItem_product(_ context.Context, fi
 				return ec.fieldContext_Product_category(ctx, field)
 			case "choices":
 				return ec.fieldContext_Product_choices(ctx, field)
+			case "choiceGroups":
+				return ec.fieldContext_Product_choiceGroups(ctx, field)
 			case "translations":
 				return ec.fieldContext_Product_translations(ctx, field)
 			}
@@ -7437,6 +7848,228 @@ func (ec *executionContext) fieldContext_OrderItem_choice(_ context.Context, fie
 				return ec.fieldContext_ProductChoice_id(ctx, field)
 			case "productId":
 				return ec.fieldContext_ProductChoice_productId(ctx, field)
+			case "choiceGroupId":
+				return ec.fieldContext_ProductChoice_choiceGroupId(ctx, field)
+			case "priceModifier":
+				return ec.fieldContext_ProductChoice_priceModifier(ctx, field)
+			case "sortOrder":
+				return ec.fieldContext_ProductChoice_sortOrder(ctx, field)
+			case "name":
+				return ec.fieldContext_ProductChoice_name(ctx, field)
+			case "translations":
+				return ec.fieldContext_ProductChoice_translations(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ProductChoice", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderItem_selections(ctx context.Context, field graphql.CollectedField, obj *model.OrderItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OrderItem_selections,
+		func(ctx context.Context) (any, error) {
+			return obj.Selections, nil
+		},
+		nil,
+		ec.marshalNOrderItemSelection2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderItemSelectionᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OrderItem_selections(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "groupId":
+				return ec.fieldContext_OrderItemSelection_groupId(ctx, field)
+			case "choiceId":
+				return ec.fieldContext_OrderItemSelection_choiceId(ctx, field)
+			case "quantity":
+				return ec.fieldContext_OrderItemSelection_quantity(ctx, field)
+			case "group":
+				return ec.fieldContext_OrderItemSelection_group(ctx, field)
+			case "choice":
+				return ec.fieldContext_OrderItemSelection_choice(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type OrderItemSelection", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderItemSelection_groupId(ctx context.Context, field graphql.CollectedField, obj *model.OrderItemSelection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OrderItemSelection_groupId,
+		func(ctx context.Context) (any, error) {
+			return obj.GroupID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OrderItemSelection_groupId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderItemSelection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderItemSelection_choiceId(ctx context.Context, field graphql.CollectedField, obj *model.OrderItemSelection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OrderItemSelection_choiceId,
+		func(ctx context.Context) (any, error) {
+			return obj.ChoiceID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OrderItemSelection_choiceId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderItemSelection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderItemSelection_quantity(ctx context.Context, field graphql.CollectedField, obj *model.OrderItemSelection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OrderItemSelection_quantity,
+		func(ctx context.Context) (any, error) {
+			return obj.Quantity, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OrderItemSelection_quantity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderItemSelection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderItemSelection_group(ctx context.Context, field graphql.CollectedField, obj *model.OrderItemSelection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OrderItemSelection_group,
+		func(ctx context.Context) (any, error) {
+			return obj.Group, nil
+		},
+		nil,
+		ec.marshalNProductChoiceGroup2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceGroup,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OrderItemSelection_group(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderItemSelection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ProductChoiceGroup_id(ctx, field)
+			case "productId":
+				return ec.fieldContext_ProductChoiceGroup_productId(ctx, field)
+			case "minSelections":
+				return ec.fieldContext_ProductChoiceGroup_minSelections(ctx, field)
+			case "maxSelections":
+				return ec.fieldContext_ProductChoiceGroup_maxSelections(ctx, field)
+			case "sortOrder":
+				return ec.fieldContext_ProductChoiceGroup_sortOrder(ctx, field)
+			case "name":
+				return ec.fieldContext_ProductChoiceGroup_name(ctx, field)
+			case "translations":
+				return ec.fieldContext_ProductChoiceGroup_translations(ctx, field)
+			case "choices":
+				return ec.fieldContext_ProductChoiceGroup_choices(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ProductChoiceGroup", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderItemSelection_choice(ctx context.Context, field graphql.CollectedField, obj *model.OrderItemSelection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_OrderItemSelection_choice,
+		func(ctx context.Context) (any, error) {
+			return obj.Choice, nil
+		},
+		nil,
+		ec.marshalNProductChoice2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoice,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_OrderItemSelection_choice(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderItemSelection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ProductChoice_id(ctx, field)
+			case "productId":
+				return ec.fieldContext_ProductChoice_productId(ctx, field)
+			case "choiceGroupId":
+				return ec.fieldContext_ProductChoice_choiceGroupId(ctx, field)
 			case "priceModifier":
 				return ec.fieldContext_ProductChoice_priceModifier(ctx, field)
 			case "sortOrder":
@@ -8942,6 +9575,8 @@ func (ec *executionContext) fieldContext_Product_choices(_ context.Context, fiel
 				return ec.fieldContext_ProductChoice_id(ctx, field)
 			case "productId":
 				return ec.fieldContext_ProductChoice_productId(ctx, field)
+			case "choiceGroupId":
+				return ec.fieldContext_ProductChoice_choiceGroupId(ctx, field)
 			case "priceModifier":
 				return ec.fieldContext_ProductChoice_priceModifier(ctx, field)
 			case "sortOrder":
@@ -8952,6 +9587,53 @@ func (ec *executionContext) fieldContext_Product_choices(_ context.Context, fiel
 				return ec.fieldContext_ProductChoice_translations(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ProductChoice", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Product_choiceGroups(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Product_choiceGroups,
+		func(ctx context.Context) (any, error) {
+			return obj.ChoiceGroups, nil
+		},
+		nil,
+		ec.marshalNProductChoiceGroup2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceGroupᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Product_choiceGroups(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Product",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ProductChoiceGroup_id(ctx, field)
+			case "productId":
+				return ec.fieldContext_ProductChoiceGroup_productId(ctx, field)
+			case "minSelections":
+				return ec.fieldContext_ProductChoiceGroup_minSelections(ctx, field)
+			case "maxSelections":
+				return ec.fieldContext_ProductChoiceGroup_maxSelections(ctx, field)
+			case "sortOrder":
+				return ec.fieldContext_ProductChoiceGroup_sortOrder(ctx, field)
+			case "name":
+				return ec.fieldContext_ProductChoiceGroup_name(ctx, field)
+			case "translations":
+				return ec.fieldContext_ProductChoiceGroup_translations(ctx, field)
+			case "choices":
+				return ec.fieldContext_ProductChoiceGroup_choices(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ProductChoiceGroup", field.Name)
 		},
 	}
 	return fc, nil
@@ -9139,6 +9821,8 @@ func (ec *executionContext) fieldContext_ProductCategory_products(_ context.Cont
 				return ec.fieldContext_Product_category(ctx, field)
 			case "choices":
 				return ec.fieldContext_Product_choices(ctx, field)
+			case "choiceGroups":
+				return ec.fieldContext_Product_choiceGroups(ctx, field)
 			case "translations":
 				return ec.fieldContext_Product_translations(ctx, field)
 			}
@@ -9231,6 +9915,35 @@ func (ec *executionContext) _ProductChoice_productId(ctx context.Context, field 
 }
 
 func (ec *executionContext) fieldContext_ProductChoice_productId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProductChoice",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProductChoice_choiceGroupId(ctx context.Context, field graphql.CollectedField, obj *model.ProductChoice) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProductChoice_choiceGroupId,
+		func(ctx context.Context) (any, error) {
+			return obj.ChoiceGroupID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProductChoice_choiceGroupId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ProductChoice",
 		Field:      field,
@@ -9360,6 +10073,260 @@ func (ec *executionContext) fieldContext_ProductChoice_translations(_ context.Co
 				return ec.fieldContext_ChoiceTranslation_name(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ChoiceTranslation", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProductChoiceGroup_id(ctx context.Context, field graphql.CollectedField, obj *model.ProductChoiceGroup) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProductChoiceGroup_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProductChoiceGroup_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProductChoiceGroup",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProductChoiceGroup_productId(ctx context.Context, field graphql.CollectedField, obj *model.ProductChoiceGroup) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProductChoiceGroup_productId,
+		func(ctx context.Context) (any, error) {
+			return obj.ProductID, nil
+		},
+		nil,
+		ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProductChoiceGroup_productId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProductChoiceGroup",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProductChoiceGroup_minSelections(ctx context.Context, field graphql.CollectedField, obj *model.ProductChoiceGroup) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProductChoiceGroup_minSelections,
+		func(ctx context.Context) (any, error) {
+			return obj.MinSelections, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProductChoiceGroup_minSelections(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProductChoiceGroup",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProductChoiceGroup_maxSelections(ctx context.Context, field graphql.CollectedField, obj *model.ProductChoiceGroup) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProductChoiceGroup_maxSelections,
+		func(ctx context.Context) (any, error) {
+			return obj.MaxSelections, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProductChoiceGroup_maxSelections(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProductChoiceGroup",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProductChoiceGroup_sortOrder(ctx context.Context, field graphql.CollectedField, obj *model.ProductChoiceGroup) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProductChoiceGroup_sortOrder,
+		func(ctx context.Context) (any, error) {
+			return obj.SortOrder, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProductChoiceGroup_sortOrder(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProductChoiceGroup",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProductChoiceGroup_name(ctx context.Context, field graphql.CollectedField, obj *model.ProductChoiceGroup) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProductChoiceGroup_name,
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProductChoiceGroup_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProductChoiceGroup",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProductChoiceGroup_translations(ctx context.Context, field graphql.CollectedField, obj *model.ProductChoiceGroup) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProductChoiceGroup_translations,
+		func(ctx context.Context) (any, error) {
+			return obj.Translations, nil
+		},
+		nil,
+		ec.marshalNChoiceTranslation2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐChoiceTranslationᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProductChoiceGroup_translations(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProductChoiceGroup",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "locale":
+				return ec.fieldContext_ChoiceTranslation_locale(ctx, field)
+			case "name":
+				return ec.fieldContext_ChoiceTranslation_name(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ChoiceTranslation", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ProductChoiceGroup_choices(ctx context.Context, field graphql.CollectedField, obj *model.ProductChoiceGroup) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_ProductChoiceGroup_choices,
+		func(ctx context.Context) (any, error) {
+			return obj.Choices, nil
+		},
+		nil,
+		ec.marshalNProductChoice2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_ProductChoiceGroup_choices(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ProductChoiceGroup",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ProductChoice_id(ctx, field)
+			case "productId":
+				return ec.fieldContext_ProductChoice_productId(ctx, field)
+			case "choiceGroupId":
+				return ec.fieldContext_ProductChoice_choiceGroupId(ctx, field)
+			case "priceModifier":
+				return ec.fieldContext_ProductChoice_priceModifier(ctx, field)
+			case "sortOrder":
+				return ec.fieldContext_ProductChoice_sortOrder(ctx, field)
+			case "name":
+				return ec.fieldContext_ProductChoice_name(ctx, field)
+			case "translations":
+				return ec.fieldContext_ProductChoice_translations(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ProductChoice", field.Name)
 		},
 	}
 	return fc, nil
@@ -10340,6 +11307,8 @@ func (ec *executionContext) fieldContext_Query_product(ctx context.Context, fiel
 				return ec.fieldContext_Product_category(ctx, field)
 			case "choices":
 				return ec.fieldContext_Product_choices(ctx, field)
+			case "choiceGroups":
+				return ec.fieldContext_Product_choiceGroups(ctx, field)
 			case "translations":
 				return ec.fieldContext_Product_translations(ctx, field)
 			}
@@ -10418,6 +11387,8 @@ func (ec *executionContext) fieldContext_Query_products(_ context.Context, field
 				return ec.fieldContext_Product_category(ctx, field)
 			case "choices":
 				return ec.fieldContext_Product_choices(ctx, field)
+			case "choiceGroups":
+				return ec.fieldContext_Product_choiceGroups(ctx, field)
 			case "translations":
 				return ec.fieldContext_Product_translations(ctx, field)
 			}
@@ -11720,6 +12691,8 @@ func (ec *executionContext) fieldContext_Subscription_productUpdated(_ context.C
 				return ec.fieldContext_Product_category(ctx, field)
 			case "choices":
 				return ec.fieldContext_Product_choices(ctx, field)
+			case "choiceGroups":
+				return ec.fieldContext_Product_choiceGroups(ctx, field)
 			case "translations":
 				return ec.fieldContext_Product_translations(ctx, field)
 			}
@@ -14039,7 +15012,7 @@ func (ec *executionContext) unmarshalInputCreateOrderItemInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"productId", "quantity", "choiceId"}
+	fieldsInOrder := [...]string{"productId", "quantity", "choiceId", "selections"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -14067,6 +15040,115 @@ func (ec *executionContext) unmarshalInputCreateOrderItemInput(ctx context.Conte
 				return it, err
 			}
 			it.ChoiceID = data
+		case "selections":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("selections"))
+			data, err := ec.unmarshalOCreateOrderItemSelectionInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCreateOrderItemSelectionInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Selections = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputCreateOrderItemSelectionInput(ctx context.Context, obj any) (model.CreateOrderItemSelectionInput, error) {
+	var it model.CreateOrderItemSelectionInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"groupId", "choiceId", "quantity"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "groupId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("groupId"))
+			data, err := ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.GroupID = data
+		case "choiceId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("choiceId"))
+			data, err := ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ChoiceID = data
+		case "quantity":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("quantity"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Quantity = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputCreateProductChoiceGroupInput(ctx context.Context, obj any) (model.CreateProductChoiceGroupInput, error) {
+	var it model.CreateProductChoiceGroupInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"productId", "minSelections", "maxSelections", "sortOrder", "translations"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "productId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
+			data, err := ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ProductID = data
+		case "minSelections":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minSelections"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MinSelections = data
+		case "maxSelections":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxSelections"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MaxSelections = data
+		case "sortOrder":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sortOrder"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SortOrder = data
+		case "translations":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("translations"))
+			data, err := ec.unmarshalNChoiceTranslationInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐChoiceTranslationInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Translations = data
 		}
 	}
 	return it, nil
@@ -14083,7 +15165,7 @@ func (ec *executionContext) unmarshalInputCreateProductChoiceInput(ctx context.C
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"productId", "priceModifier", "sortOrder", "translations"}
+	fieldsInOrder := [...]string{"productId", "choiceGroupId", "priceModifier", "sortOrder", "translations"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -14092,11 +15174,18 @@ func (ec *executionContext) unmarshalInputCreateProductChoiceInput(ctx context.C
 		switch k {
 		case "productId":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("productId"))
-			data, err := ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+			data, err := ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
 			if err != nil {
 				return it, err
 			}
 			it.ProductID = data
+		case "choiceGroupId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("choiceGroupId"))
+			data, err := ec.unmarshalOID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ChoiceGroupID = data
 		case "priceModifier":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("priceModifier"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -14754,6 +15843,57 @@ func (ec *executionContext) unmarshalInputUpdateOrderInput(ctx context.Context, 
 				return it, err
 			}
 			it.CancellationReason = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUpdateProductChoiceGroupInput(ctx context.Context, obj any) (model.UpdateProductChoiceGroupInput, error) {
+	var it model.UpdateProductChoiceGroupInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"minSelections", "maxSelections", "sortOrder", "translations"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "minSelections":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("minSelections"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MinSelections = data
+		case "maxSelections":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxSelections"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MaxSelections = data
+		case "sortOrder":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sortOrder"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SortOrder = data
+		case "translations":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("translations"))
+			data, err := ec.unmarshalOChoiceTranslationInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐChoiceTranslationInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Translations = data
 		}
 	}
 	return it, nil
@@ -15640,6 +16780,27 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "createProductChoiceGroup":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createProductChoiceGroup(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateProductChoiceGroup":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateProductChoiceGroup(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteProductChoiceGroup":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteProductChoiceGroup(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createProductChoice":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_createProductChoice(ctx, field)
@@ -16351,6 +17512,70 @@ func (ec *executionContext) _OrderItem(ctx context.Context, sel ast.SelectionSet
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "selections":
+			out.Values[i] = ec._OrderItem_selections(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var orderItemSelectionImplementors = []string{"OrderItemSelection"}
+
+func (ec *executionContext) _OrderItemSelection(ctx context.Context, sel ast.SelectionSet, obj *model.OrderItemSelection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, orderItemSelectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("OrderItemSelection")
+		case "groupId":
+			out.Values[i] = ec._OrderItemSelection_groupId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "choiceId":
+			out.Values[i] = ec._OrderItemSelection_choiceId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "quantity":
+			out.Values[i] = ec._OrderItemSelection_quantity(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "group":
+			out.Values[i] = ec._OrderItemSelection_group(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "choice":
+			out.Values[i] = ec._OrderItemSelection_choice(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -16686,6 +17911,11 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "choiceGroups":
+			out.Values[i] = ec._Product_choiceGroups(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "translations":
 			field := field
 
@@ -16887,6 +18117,11 @@ func (ec *executionContext) _ProductChoice(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "choiceGroupId":
+			out.Values[i] = ec._ProductChoice_choiceGroupId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "priceModifier":
 			out.Values[i] = ec._ProductChoice_priceModifier(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -16904,6 +18139,80 @@ func (ec *executionContext) _ProductChoice(ctx context.Context, sel ast.Selectio
 			}
 		case "translations":
 			out.Values[i] = ec._ProductChoice_translations(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var productChoiceGroupImplementors = []string{"ProductChoiceGroup"}
+
+func (ec *executionContext) _ProductChoiceGroup(ctx context.Context, sel ast.SelectionSet, obj *model.ProductChoiceGroup) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, productChoiceGroupImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProductChoiceGroup")
+		case "id":
+			out.Values[i] = ec._ProductChoiceGroup_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "productId":
+			out.Values[i] = ec._ProductChoiceGroup_productId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "minSelections":
+			out.Values[i] = ec._ProductChoiceGroup_minSelections(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "maxSelections":
+			out.Values[i] = ec._ProductChoiceGroup_maxSelections(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sortOrder":
+			out.Values[i] = ec._ProductChoiceGroup_sortOrder(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._ProductChoiceGroup_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "translations":
+			out.Values[i] = ec._ProductChoiceGroup_translations(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "choices":
+			out.Values[i] = ec._ProductChoiceGroup_choices(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -18430,6 +19739,16 @@ func (ec *executionContext) unmarshalNCreateOrderItemInput2ᚖtsbᚑserviceᚋin
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNCreateOrderItemSelectionInput2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCreateOrderItemSelectionInput(ctx context.Context, v any) (*model.CreateOrderItemSelectionInput, error) {
+	res, err := ec.unmarshalInputCreateOrderItemSelectionInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNCreateProductChoiceGroupInput2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCreateProductChoiceGroupInput(ctx context.Context, v any) (model.CreateProductChoiceGroupInput, error) {
+	res, err := ec.unmarshalInputCreateProductChoiceGroupInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateProductChoiceInput2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCreateProductChoiceInput(ctx context.Context, v any) (model.CreateProductChoiceInput, error) {
 	res, err := ec.unmarshalInputCreateProductChoiceInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -18666,6 +19985,32 @@ func (ec *executionContext) marshalNOrderItem2ᚖtsbᚑserviceᚋinternalᚋapi�
 	return ec._OrderItem(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNOrderItemSelection2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderItemSelectionᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.OrderItemSelection) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNOrderItemSelection2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderItemSelection(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNOrderItemSelection2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderItemSelection(ctx context.Context, sel ast.SelectionSet, v *model.OrderItemSelection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._OrderItemSelection(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNOrderStatusEnum2tsbᚑserviceᚋinternalᚋmodulesᚋorderᚋdomainᚐOrderStatus(ctx context.Context, v any) (domain.OrderStatus, error) {
 	tmp, err := graphql.UnmarshalString(v)
 	res := domain.OrderStatus(tmp)
@@ -18823,6 +20168,36 @@ func (ec *executionContext) marshalNProductChoice2ᚖtsbᚑserviceᚋinternalᚋ
 	return ec._ProductChoice(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNProductChoiceGroup2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceGroup(ctx context.Context, sel ast.SelectionSet, v model.ProductChoiceGroup) graphql.Marshaler {
+	return ec._ProductChoiceGroup(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNProductChoiceGroup2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceGroupᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ProductChoiceGroup) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNProductChoiceGroup2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceGroup(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNProductChoiceGroup2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceGroup(ctx context.Context, sel ast.SelectionSet, v *model.ProductChoiceGroup) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProductChoiceGroup(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNRestaurantConfig2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐRestaurantConfig(ctx context.Context, sel ast.SelectionSet, v model.RestaurantConfig) graphql.Marshaler {
 	return ec._RestaurantConfig(ctx, sel, &v)
 }
@@ -18967,6 +20342,11 @@ func (ec *executionContext) unmarshalNUpdateCouponInput2tsbᚑserviceᚋinternal
 
 func (ec *executionContext) unmarshalNUpdateOrderInput2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUpdateOrderInput(ctx context.Context, v any) (model.UpdateOrderInput, error) {
 	res, err := ec.unmarshalInputUpdateOrderInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNUpdateProductChoiceGroupInput2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUpdateProductChoiceGroupInput(ctx context.Context, v any) (model.UpdateProductChoiceGroupInput, error) {
+	res, err := ec.unmarshalInputUpdateProductChoiceGroupInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -19188,6 +20568,24 @@ func (ec *executionContext) unmarshalOChoiceTranslationInput2ᚕᚖtsbᚑservice
 	for i := range vSlice {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
 		res[i], err = ec.unmarshalNChoiceTranslationInput2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐChoiceTranslationInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalOCreateOrderItemSelectionInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCreateOrderItemSelectionInputᚄ(ctx context.Context, v any) ([]*model.CreateOrderItemSelectionInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]*model.CreateOrderItemSelectionInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNCreateOrderItemSelectionInput2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCreateOrderItemSelectionInput(ctx, vSlice[i])
 		if err != nil {
 			return nil, err
 		}

@@ -47,6 +47,15 @@ type OrderItem {
     vatRateApplied: String!
     choiceId: ID
     choice: ProductChoice
+    selections: [OrderItemSelection!]!
+}
+
+type OrderItemSelection {
+    groupId: ID!
+    choiceId: ID!
+    quantity: Int!
+    group: ProductChoiceGroup!
+    choice: ProductChoice!
 }
 
 enum OrderStatusEnum {
@@ -98,6 +107,13 @@ input CreateOrderItemInput {
     productId: ID!
     quantity: Int!
     choiceId: ID
+    selections: [CreateOrderItemSelectionInput!]
+}
+
+input CreateOrderItemSelectionInput {
+    groupId: ID!
+    choiceId: ID!
+    quantity: Int!
 }
 
 input UpdateOrderInput {

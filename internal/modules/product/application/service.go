@@ -26,6 +26,13 @@ type ProductService interface {
 	BatchGetProductTranslations(ctx context.Context, productIDs []string) (map[string][]*domain.Translation, error)
 
 	// Product choices
+	GetChoiceGroupsByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoiceGroup, error)
+	GetChoiceGroupByID(ctx context.Context, groupID uuid.UUID) (*domain.ProductChoiceGroup, error)
+	BatchGetChoiceGroupsByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.ProductChoiceGroup, error)
+	CreateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error
+	UpdateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error
+	DeleteChoiceGroup(ctx context.Context, groupID uuid.UUID) error
+
 	GetChoicesByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoice, error)
 	GetChoiceByID(ctx context.Context, choiceID uuid.UUID) (*domain.ProductChoice, error)
 	BatchGetChoicesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.ProductChoice, error)
@@ -134,6 +141,30 @@ func (s *productService) BatchGetProductTranslations(ctx context.Context, produc
 
 func (s *productService) GetChoicesByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoice, error) {
 	return s.repo.FindChoicesByProductID(ctx, productID)
+}
+
+func (s *productService) GetChoiceGroupsByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoiceGroup, error) {
+	return s.repo.FindChoiceGroupsByProductID(ctx, productID)
+}
+
+func (s *productService) GetChoiceGroupByID(ctx context.Context, groupID uuid.UUID) (*domain.ProductChoiceGroup, error) {
+	return s.repo.FindChoiceGroupByID(ctx, groupID)
+}
+
+func (s *productService) BatchGetChoiceGroupsByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.ProductChoiceGroup, error) {
+	return s.repo.BatchGetChoiceGroupsByProductIDs(ctx, productIDs)
+}
+
+func (s *productService) CreateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error {
+	return s.repo.CreateChoiceGroup(ctx, group)
+}
+
+func (s *productService) UpdateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error {
+	return s.repo.UpdateChoiceGroup(ctx, group)
+}
+
+func (s *productService) DeleteChoiceGroup(ctx context.Context, groupID uuid.UUID) error {
+	return s.repo.DeleteChoiceGroup(ctx, groupID)
 }
 
 func (s *productService) GetChoiceByID(ctx context.Context, choiceID uuid.UUID) (*domain.ProductChoice, error) {

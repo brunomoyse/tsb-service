@@ -94,12 +94,20 @@ type OrderExtra struct {
 }
 
 type OrderProductRaw struct {
+	ID              uuid.UUID       `db:"id" json:"id"`
 	ProductID       uuid.UUID       `db:"product_id" json:"productId"`
 	Quantity        int64           `db:"quantity" json:"quantity"`
 	UnitPrice       decimal.Decimal `db:"unit_price" json:"unitPrice"`
 	TotalPrice      decimal.Decimal `db:"total_price" json:"totalPrice"`
 	VatRateApplied  decimal.Decimal `db:"vat_rate_applied" json:"vatRateApplied"`
 	ProductChoiceID *uuid.UUID      `db:"product_choice_id" json:"productChoiceId,omitempty"`
+	Selections      []OrderProductSelection `json:"selections,omitempty"`
+}
+
+type OrderProductSelection struct {
+	GroupID  uuid.UUID `db:"product_choice_group_id" json:"groupId"`
+	ChoiceID uuid.UUID `db:"product_choice_id" json:"choiceId"`
+	Quantity int       `db:"quantity" json:"quantity"`
 }
 
 type OrderProduct struct {
