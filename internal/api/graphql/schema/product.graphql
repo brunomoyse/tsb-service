@@ -25,6 +25,7 @@ type Product {
     category: ProductCategory!
 
     choices: [ProductChoice!]!
+    choiceGroups: [ProductChoiceGroup!]!
 
     # Admin only
     translations: [Translation!]!
@@ -33,10 +34,22 @@ type Product {
 type ProductChoice {
     id: ID!
     productId: ID!
+    choiceGroupId: ID!
     priceModifier: String!
     sortOrder: Int!
     name: String!
     translations: [ChoiceTranslation!]!
+}
+
+type ProductChoiceGroup {
+    id: ID!
+    productId: ID!
+    minSelections: Int!
+    maxSelections: Int!
+    sortOrder: Int!
+    name: String!
+    translations: [ChoiceTranslation!]!
+    choices: [ProductChoice!]!
 }
 
 type ChoiceTranslation {
@@ -108,10 +121,26 @@ input ChoiceTranslationInput {
 }
 
 input CreateProductChoiceInput {
-    productId: ID!
+    productId: ID
+    choiceGroupId: ID
     priceModifier: String!
     sortOrder: Int!
     translations: [ChoiceTranslationInput!]!
+}
+
+input CreateProductChoiceGroupInput {
+    productId: ID!
+    minSelections: Int!
+    maxSelections: Int!
+    sortOrder: Int!
+    translations: [ChoiceTranslationInput!]!
+}
+
+input UpdateProductChoiceGroupInput {
+    minSelections: Int
+    maxSelections: Int
+    sortOrder: Int
+    translations: [ChoiceTranslationInput!]
 }
 
 input UpdateProductChoiceInput {
@@ -137,6 +166,19 @@ extend type Mutation {
         id: ID!
         input: UpdateProductInput!
     ): Product! @admin
+
+    createProductChoiceGroup(
+        input: CreateProductChoiceGroupInput!
+    ): ProductChoiceGroup! @admin
+
+    updateProductChoiceGroup(
+        id: ID!
+        input: UpdateProductChoiceGroupInput!
+    ): ProductChoiceGroup! @admin
+
+    deleteProductChoiceGroup(
+        id: ID!
+    ): Boolean! @admin
 
     createProductChoice(
         input: CreateProductChoiceInput!

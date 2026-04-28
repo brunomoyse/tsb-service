@@ -140,6 +140,15 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 }
 
 func ToGQLOrderItem(oi *orderDomain.OrderProductRaw) *model.OrderItem {
+	selections := make([]*model.OrderItemSelection, 0, len(oi.Selections))
+	for _, selection := range oi.Selections {
+		selections = append(selections, &model.OrderItemSelection{
+			GroupID:  selection.GroupID,
+			ChoiceID: selection.ChoiceID,
+			Quantity: selection.Quantity,
+		})
+	}
+
 	return &model.OrderItem{
 		ProductID:      oi.ProductID,
 		Quantity:       int(oi.Quantity),
@@ -147,6 +156,7 @@ func ToGQLOrderItem(oi *orderDomain.OrderProductRaw) *model.OrderItem {
 		TotalPrice:     oi.TotalPrice.String(),
 		VatRateApplied: oi.VatRateApplied.StringFixed(2),
 		ChoiceID:       oi.ProductChoiceID,
+		Selections:     selections,
 	}
 }
 
@@ -526,9 +536,30 @@ func ToGQLProductChoice(c *productDomain.ProductChoice, lang string) *model.Prod
 	return &model.ProductChoice{
 		ID:            c.ID,
 		ProductID:     c.ProductID,
+		ChoiceGroupID: c.ChoiceGroupID,
 		PriceModifier: c.PriceModifier.String(),
 		SortOrder:     c.SortOrder,
 		Name:          c.GetTranslationFor(lang),
+		Translations:  translations,
+	}
+}
+
+func ToGQLProductChoiceGroup(g *productDomain.ProductChoiceGroup, lang string) *model.ProductChoiceGroup {
+	translations := make([]*model.ChoiceTranslation, len(g.Translations))
+	for i, t := range g.Translations {
+		translations[i] = &model.ChoiceTranslation{
+			Locale: t.Locale,
+			Name:   t.Name,
+		}
+	}
+
+	return &model.ProductChoiceGroup{
+		ID:            g.ID,
+		ProductID:     g.ProductID,
+		MinSelections: g.MinSelections,
+		MaxSelections: g.MaxSelections,
+		SortOrder:     g.SortOrder,
+		Name:          g.GetTranslationFor(lang),
 		Translations:  translations,
 	}
 }

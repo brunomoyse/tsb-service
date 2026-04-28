@@ -159,6 +159,98 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 	return gqlProd, nil
 }
 
+// CreateProductChoiceGroup is the resolver for the createProductChoiceGroup field.
+func (r *mutationResolver) CreateProductChoiceGroup(ctx context.Context, input model.CreateProductChoiceGroupInput) (*model.ProductChoiceGroup, error) {
+	userLang := utils.GetLang(ctx)
+
+	if input.MinSelections < 0 {
+		return nil, fmt.Errorf("min selections must be >= 0")
+	}
+	if input.MaxSelections < 1 {
+		return nil, fmt.Errorf("max selections must be >= 1")
+	}
+	if input.MinSelections > input.MaxSelections {
+		return nil, fmt.Errorf("min selections cannot be greater than max selections")
+	}
+
+	translations := make([]domain.ChoiceTranslation, len(input.Translations))
+	for i, t := range input.Translations {
+		translations[i] = domain.ChoiceTranslation{
+			Locale: t.Locale,
+			Name:   t.Name,
+		}
+	}
+
+	group := &domain.ProductChoiceGroup{
+		ID:            uuid.New(),
+		ProductID:     input.ProductID,
+		MinSelections: input.MinSelections,
+		MaxSelections: input.MaxSelections,
+		SortOrder:     input.SortOrder,
+		Translations:  translations,
+	}
+
+	if err := r.ProductService.CreateChoiceGroup(ctx, group); err != nil {
+		return nil, fmt.Errorf("failed to create product choice group: %w", err)
+	}
+
+	return ToGQLProductChoiceGroup(group, userLang), nil
+}
+
+// UpdateProductChoiceGroup is the resolver for the updateProductChoiceGroup field.
+func (r *mutationResolver) UpdateProductChoiceGroup(ctx context.Context, id uuid.UUID, input model.UpdateProductChoiceGroupInput) (*model.ProductChoiceGroup, error) {
+	userLang := utils.GetLang(ctx)
+
+	group, err := r.ProductService.GetChoiceGroupByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch product choice group: %w", err)
+	}
+
+	if input.MinSelections != nil {
+		group.MinSelections = *input.MinSelections
+	}
+	if input.MaxSelections != nil {
+		group.MaxSelections = *input.MaxSelections
+	}
+	if group.MinSelections < 0 {
+		return nil, fmt.Errorf("min selections must be >= 0")
+	}
+	if group.MaxSelections < 1 {
+		return nil, fmt.Errorf("max selections must be >= 1")
+	}
+	if group.MinSelections > group.MaxSelections {
+		return nil, fmt.Errorf("min selections cannot be greater than max selections")
+	}
+
+	if input.SortOrder != nil {
+		group.SortOrder = *input.SortOrder
+	}
+	if input.Translations != nil {
+		translations := make([]domain.ChoiceTranslation, len(input.Translations))
+		for i, t := range input.Translations {
+			translations[i] = domain.ChoiceTranslation{
+				Locale: t.Locale,
+				Name:   t.Name,
+			}
+		}
+		group.Translations = translations
+	}
+
+	if err := r.ProductService.UpdateChoiceGroup(ctx, group); err != nil {
+		return nil, fmt.Errorf("failed to update product choice group: %w", err)
+	}
+
+	return ToGQLProductChoiceGroup(group, userLang), nil
+}
+
+// DeleteProductChoiceGroup is the resolver for the deleteProductChoiceGroup field.
+func (r *mutationResolver) DeleteProductChoiceGroup(ctx context.Context, id uuid.UUID) (bool, error) {
+	if err := r.ProductService.DeleteChoiceGroup(ctx, id); err != nil {
+		return false, fmt.Errorf("failed to delete product choice group: %w", err)
+	}
+	return true, nil
+}
+
 // CreateProductChoice is the resolver for the createProductChoice field.
 func (r *mutationResolver) CreateProductChoice(ctx context.Context, input model.CreateProductChoiceInput) (*model.ProductChoice, error) {
 	userLang := utils.GetLang(ctx)
@@ -180,9 +272,46 @@ func (r *mutationResolver) CreateProductChoice(ctx context.Context, input model.
 		}
 	}
 
+	var group *domain.ProductChoiceGroup
+	if input.ChoiceGroupID != nil {
+		groupByID, err := r.ProductService.GetChoiceGroupByID(ctx, *input.ChoiceGroupID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch choice group: %w", err)
+		}
+		group = groupByID
+	} else if input.ProductID != nil {
+		groups, err := r.ProductService.GetChoiceGroupsByProductID(ctx, *input.ProductID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch product choice groups: %w", err)
+		}
+		if len(groups) == 0 {
+			defaultGroup := &domain.ProductChoiceGroup{
+				ID:            uuid.New(),
+				ProductID:     *input.ProductID,
+				MinSelections: 1,
+				MaxSelections: 1,
+				SortOrder:     0,
+				Translations: []domain.ChoiceTranslation{
+					{Locale: "fr", Name: "Choix"},
+					{Locale: "en", Name: "Choice"},
+					{Locale: "zh", Name: "选择"},
+				},
+			}
+			if err := r.ProductService.CreateChoiceGroup(ctx, defaultGroup); err != nil {
+				return nil, fmt.Errorf("failed to create default choice group: %w", err)
+			}
+			group = defaultGroup
+		} else {
+			group = groups[0]
+		}
+	} else {
+		return nil, fmt.Errorf("either choiceGroupId or productId is required")
+	}
+
 	choice := &domain.ProductChoice{
 		ID:            uuid.New(),
-		ProductID:     input.ProductID,
+		ProductID:     group.ProductID,
+		ChoiceGroupID: group.ID,
 		PriceModifier: priceMod,
 		SortOrder:     input.SortOrder,
 		Translations:  translations,

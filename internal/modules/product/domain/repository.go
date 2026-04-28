@@ -24,6 +24,13 @@ type ProductRepository interface {
 	BatchGetProductTranslations(ctx context.Context, productIDs []string) (map[string][]*Translation, error)
 
 	// Product choices
+	FindChoiceGroupsByProductID(ctx context.Context, productID uuid.UUID) ([]*ProductChoiceGroup, error)
+	FindChoiceGroupByID(ctx context.Context, groupID uuid.UUID) (*ProductChoiceGroup, error)
+	BatchGetChoiceGroupsByProductIDs(ctx context.Context, productIDs []string) (map[string][]*ProductChoiceGroup, error)
+	CreateChoiceGroup(ctx context.Context, group *ProductChoiceGroup) error
+	UpdateChoiceGroup(ctx context.Context, group *ProductChoiceGroup) error
+	DeleteChoiceGroup(ctx context.Context, groupID uuid.UUID) error
+
 	FindChoicesByProductID(ctx context.Context, productID uuid.UUID) ([]*ProductChoice, error)
 	FindChoiceByID(ctx context.Context, choiceID uuid.UUID) (*ProductChoice, error)
 	BatchGetChoicesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*ProductChoice, error)

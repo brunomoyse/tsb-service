@@ -139,13 +139,22 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 	if op != nil && len(*op) > 0 {
 		const orderProductQuery = `
 			INSERT INTO order_product (
-				order_id, product_id, unit_price, quantity, total_price, vat_rate_applied, product_choice_id
+				id, order_id, product_id, unit_price, quantity, total_price, vat_rate_applied, product_choice_id
 			) VALUES (
-				$1, $2, $3, $4, $5, $6, $7
+				$1, $2, $3, $4, $5, $6, $7, $8
 			);
 		`
+		const orderProductChoiceQuery = `
+			INSERT INTO order_product_choices (
+				order_product_id, product_choice_group_id, product_choice_id, quantity
+			) VALUES (
+				$1, $2, $3, $4
+			)
+		`
 		for _, prod := range *op {
+			lineID := uuid.New()
 			if _, err = tx.ExecContext(ctx, orderProductQuery,
+				lineID,
 				o.ID,
 				prod.ProductID,
 				prod.UnitPrice,
@@ -155,6 +164,17 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 				prod.ProductChoiceID,
 			); err != nil {
 				return nil, nil, fmt.Errorf("failed to insert order product: %w", err)
+			}
+
+			for _, selection := range prod.Selections {
+				if _, err = tx.ExecContext(ctx, orderProductChoiceQuery,
+					lineID,
+					selection.GroupID,
+					selection.ChoiceID,
+					selection.Quantity,
+				); err != nil {
+					return nil, nil, fmt.Errorf("failed to insert order product selection: %w", err)
+				}
 			}
 		}
 	}
@@ -198,6 +218,7 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 	lang := utils.GetLang(ctx)
 	query = `
 		SELECT
+			op.id,
 			op.product_id,
 			op.quantity,
 			op.unit_price,
@@ -217,6 +238,47 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 
 	if err := r.pool.ForContext(ctx).SelectContext(ctx, &orderProducts, query, order.ID, lang); err != nil {
 		return nil, nil, fmt.Errorf("failed to query order products: %w", err)
+	}
+
+	if len(orderProducts) > 0 {
+		lineIDs := make([]uuid.UUID, 0, len(orderProducts))
+		itemsByLineID := make(map[uuid.UUID]*domain.OrderProductRaw, len(orderProducts))
+		for i := range orderProducts {
+			lineIDs = append(lineIDs, orderProducts[i].ID)
+			itemsByLineID[orderProducts[i].ID] = &orderProducts[i]
+		}
+
+		selQuery, selArgs, err := sqlx.In(`
+			SELECT order_product_id, product_choice_group_id, product_choice_id, quantity
+			FROM order_product_choices
+			WHERE order_product_id IN (?)
+		`, lineIDs)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to build order product selections query: %w", err)
+		}
+		selQuery = r.pool.ForContext(ctx).Rebind(selQuery)
+
+		type selectionRow struct {
+			OrderProductID uuid.UUID `db:"order_product_id"`
+			GroupID        uuid.UUID `db:"product_choice_group_id"`
+			ChoiceID       uuid.UUID `db:"product_choice_id"`
+			Quantity       int       `db:"quantity"`
+		}
+
+		var selectionRows []selectionRow
+		if err := r.pool.ForContext(ctx).SelectContext(ctx, &selectionRows, selQuery, selArgs...); err != nil {
+			return nil, nil, fmt.Errorf("failed to query order product selections: %w", err)
+		}
+
+		for _, sel := range selectionRows {
+			if item := itemsByLineID[sel.OrderProductID]; item != nil {
+				item.Selections = append(item.Selections, domain.OrderProductSelection{
+					GroupID:  sel.GroupID,
+					ChoiceID: sel.ChoiceID,
+					Quantity: sel.Quantity,
+				})
+			}
+		}
 	}
 
 	return &order, &orderProducts, nil
@@ -367,6 +429,7 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 	lang := utils.GetLang(ctx)
 	query, args, err := sqlx.In(`
 		SELECT
+			op.id,
 			op.order_id,
 			op.product_id,
 			op.quantity,
@@ -389,6 +452,7 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 
 	// temp struct to hold each row (including the order_id)
 	type rawRow struct {
+		ID              uuid.UUID       `db:"id"`
 		OrderID         uuid.UUID       `db:"order_id"`
 		ProductID       uuid.UUID       `db:"product_id"`
 		Quantity        int64           `db:"quantity"`
@@ -405,8 +469,10 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 
 	// now group into map[string][]*domain.OrderProductRaw
 	result := make(map[string][]*domain.OrderProductRaw, len(rows))
+	itemsByLineID := make(map[uuid.UUID]*domain.OrderProductRaw, len(rows))
 	for _, row := range rows {
 		op := &domain.OrderProductRaw{
+			ID:              row.ID,
 			ProductID:       row.ProductID,
 			Quantity:        row.Quantity,
 			UnitPrice:       row.UnitPrice,
@@ -416,6 +482,46 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 		}
 		// key by the string form of the order UUID
 		result[row.OrderID.String()] = append(result[row.OrderID.String()], op)
+		itemsByLineID[row.ID] = op
+	}
+
+	if len(rows) > 0 {
+		lineIDs := make([]uuid.UUID, 0, len(rows))
+		for i := range rows {
+			lineIDs = append(lineIDs, rows[i].ID)
+		}
+
+		selQuery, selArgs, selErr := sqlx.In(`
+			SELECT order_product_id, product_choice_group_id, product_choice_id, quantity
+			FROM order_product_choices
+			WHERE order_product_id IN (?)
+		`, lineIDs)
+		if selErr != nil {
+			return nil, fmt.Errorf("failed to build order_product_choices query: %w", selErr)
+		}
+		selQuery = r.pool.ForContext(ctx).Rebind(selQuery)
+
+		type selectionRow struct {
+			OrderProductID uuid.UUID `db:"order_product_id"`
+			GroupID        uuid.UUID `db:"product_choice_group_id"`
+			ChoiceID       uuid.UUID `db:"product_choice_id"`
+			Quantity       int       `db:"quantity"`
+		}
+
+		var selectionRows []selectionRow
+		if selErr := r.pool.ForContext(ctx).SelectContext(ctx, &selectionRows, selQuery, selArgs...); selErr != nil {
+			return nil, fmt.Errorf("failed to select order product choices: %w", selErr)
+		}
+
+		for _, sel := range selectionRows {
+			if item := itemsByLineID[sel.OrderProductID]; item != nil {
+				item.Selections = append(item.Selections, domain.OrderProductSelection{
+					GroupID:  sel.GroupID,
+					ChoiceID: sel.ChoiceID,
+					Quantity: sel.Quantity,
+				})
+			}
+		}
 	}
 
 	return result, nil

@@ -1012,11 +1012,142 @@ func (r *ProductRepository) BatchGetCategoryTranslations(
 	return translationsByCat, nil
 }
 
+func (r *ProductRepository) FindChoiceGroupsByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoiceGroup, error) {
+	query := `
+		SELECT
+			pcg.id, pcg.product_id, pcg.min_selections, pcg.max_selections, pcg.sort_order,
+			pcgt.locale, pcgt.name
+		FROM product_choice_groups pcg
+		LEFT JOIN product_choice_group_translations pcgt ON pcg.id = pcgt.product_choice_group_id
+		WHERE pcg.product_id = $1
+		ORDER BY pcg.sort_order
+	`
+	return r.queryChoiceGroups(ctx, query, productID)
+}
+
+func (r *ProductRepository) FindChoiceGroupByID(ctx context.Context, groupID uuid.UUID) (*domain.ProductChoiceGroup, error) {
+	query := `
+		SELECT
+			pcg.id, pcg.product_id, pcg.min_selections, pcg.max_selections, pcg.sort_order,
+			pcgt.locale, pcgt.name
+		FROM product_choice_groups pcg
+		LEFT JOIN product_choice_group_translations pcgt ON pcg.id = pcgt.product_choice_group_id
+		WHERE pcg.id = $1
+	`
+	groups, err := r.queryChoiceGroups(ctx, query, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if len(groups) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return groups[0], nil
+}
+
+func (r *ProductRepository) BatchGetChoiceGroupsByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.ProductChoiceGroup, error) {
+	if len(productIDs) == 0 {
+		return make(map[string][]*domain.ProductChoiceGroup), nil
+	}
+
+	query := `
+		SELECT
+			pcg.id, pcg.product_id, pcg.min_selections, pcg.max_selections, pcg.sort_order,
+			pcgt.locale, pcgt.name
+		FROM product_choice_groups pcg
+		LEFT JOIN product_choice_group_translations pcgt ON pcg.id = pcgt.product_choice_group_id
+		WHERE pcg.product_id = ANY($1)
+		ORDER BY pcg.sort_order
+	`
+	groups, err := r.queryChoiceGroups(ctx, query, pq.Array(productIDs))
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string][]*domain.ProductChoiceGroup, len(productIDs))
+	for _, g := range groups {
+		key := g.ProductID.String()
+		result[key] = append(result[key], g)
+	}
+	return result, nil
+}
+
+func (r *ProductRepository) CreateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error {
+	tx, err := r.pool.ForContext(ctx).BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO product_choice_groups (id, product_id, min_selections, max_selections, sort_order) VALUES ($1, $2, $3, $4, $5)`,
+		group.ID, group.ProductID, group.MinSelections, group.MaxSelections, group.SortOrder,
+	)
+	if err != nil {
+		return fmt.Errorf("insert product choice group: %w", err)
+	}
+
+	for _, t := range group.Translations {
+		_, err = tx.ExecContext(ctx,
+			`INSERT INTO product_choice_group_translations (product_choice_group_id, locale, name) VALUES ($1, $2, $3)`,
+			group.ID, t.Locale, t.Name,
+		)
+		if err != nil {
+			return fmt.Errorf("insert choice group translation: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (r *ProductRepository) UpdateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error {
+	tx, err := r.pool.ForContext(ctx).BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	_, err = tx.ExecContext(ctx,
+		`UPDATE product_choice_groups SET min_selections = $2, max_selections = $3, sort_order = $4 WHERE id = $1`,
+		group.ID, group.MinSelections, group.MaxSelections, group.SortOrder,
+	)
+	if err != nil {
+		return fmt.Errorf("update product choice group: %w", err)
+	}
+
+	for _, t := range group.Translations {
+		_, err = tx.ExecContext(ctx,
+			`INSERT INTO product_choice_group_translations (product_choice_group_id, locale, name)
+			 VALUES ($1, $2, $3)
+			 ON CONFLICT (product_choice_group_id, locale)
+			 DO UPDATE SET name = EXCLUDED.name`,
+			group.ID, t.Locale, t.Name,
+		)
+		if err != nil {
+			return fmt.Errorf("upsert choice group translation: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (r *ProductRepository) DeleteChoiceGroup(ctx context.Context, groupID uuid.UUID) error {
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx, `DELETE FROM product_choice_groups WHERE id = $1`, groupID)
+	return err
+}
+
 // FindChoicesByProductID retrieves all choices for a product with their translations.
 func (r *ProductRepository) FindChoicesByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoice, error) {
 	query := `
 		SELECT
-			pc.id, pc.product_id, pc.price_modifier, pc.sort_order,
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
 			pct.locale, pct.name
 		FROM product_choices pc
 		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
@@ -1030,7 +1161,7 @@ func (r *ProductRepository) FindChoicesByProductID(ctx context.Context, productI
 func (r *ProductRepository) FindChoiceByID(ctx context.Context, choiceID uuid.UUID) (*domain.ProductChoice, error) {
 	query := `
 		SELECT
-			pc.id, pc.product_id, pc.price_modifier, pc.sort_order,
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
 			pct.locale, pct.name
 		FROM product_choices pc
 		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
@@ -1054,7 +1185,7 @@ func (r *ProductRepository) BatchGetChoicesByProductIDs(ctx context.Context, pro
 
 	query := `
 		SELECT
-			pc.id, pc.product_id, pc.price_modifier, pc.sort_order,
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
 			pct.locale, pct.name
 		FROM product_choices pc
 		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
@@ -1087,8 +1218,8 @@ func (r *ProductRepository) CreateChoice(ctx context.Context, choice *domain.Pro
 	}()
 
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO product_choices (id, product_id, price_modifier, sort_order) VALUES ($1, $2, $3, $4)`,
-		choice.ID, choice.ProductID, choice.PriceModifier, choice.SortOrder,
+		`INSERT INTO product_choices (id, product_id, choice_group_id, price_modifier, sort_order) VALUES ($1, $2, $3, $4, $5)`,
+		choice.ID, choice.ProductID, choice.ChoiceGroupID, choice.PriceModifier, choice.SortOrder,
 	)
 	if err != nil {
 		return fmt.Errorf("insert product choice: %w", err)
@@ -1120,8 +1251,8 @@ func (r *ProductRepository) UpdateChoice(ctx context.Context, choice *domain.Pro
 	}()
 
 	_, err = tx.ExecContext(ctx,
-		`UPDATE product_choices SET price_modifier = $2, sort_order = $3 WHERE id = $1`,
-		choice.ID, choice.PriceModifier, choice.SortOrder,
+		`UPDATE product_choices SET choice_group_id = $2, price_modifier = $3, sort_order = $4 WHERE id = $1`,
+		choice.ID, choice.ChoiceGroupID, choice.PriceModifier, choice.SortOrder,
 	)
 	if err != nil {
 		return fmt.Errorf("update product choice: %w", err)
@@ -1160,6 +1291,7 @@ func (r *ProductRepository) queryChoices(ctx context.Context, query string, args
 	type choiceRow struct {
 		ID            uuid.UUID       `db:"id"`
 		ProductID     uuid.UUID       `db:"product_id"`
+		ChoiceGroupID uuid.UUID       `db:"choice_group_id"`
 		PriceModifier decimal.Decimal `db:"price_modifier"`
 		SortOrder     int             `db:"sort_order"`
 		Locale        *string         `db:"locale"`
@@ -1180,6 +1312,7 @@ func (r *ProductRepository) queryChoices(ctx context.Context, query string, args
 			choice = &domain.ProductChoice{
 				ID:            row.ID,
 				ProductID:     row.ProductID,
+				ChoiceGroupID: row.ChoiceGroupID,
 				PriceModifier: row.PriceModifier,
 				SortOrder:     row.SortOrder,
 				Translations:  []domain.ChoiceTranslation{},
@@ -1205,4 +1338,62 @@ func (r *ProductRepository) queryChoices(ctx context.Context, query string, args
 		choices = append(choices, choicesMap[id])
 	}
 	return choices, nil
+}
+
+func (r *ProductRepository) queryChoiceGroups(ctx context.Context, query string, args ...any) ([]*domain.ProductChoiceGroup, error) {
+	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	type groupRow struct {
+		ID            uuid.UUID `db:"id"`
+		ProductID     uuid.UUID `db:"product_id"`
+		MinSelections int       `db:"min_selections"`
+		MaxSelections int       `db:"max_selections"`
+		SortOrder     int       `db:"sort_order"`
+		Locale        *string   `db:"locale"`
+		Name          *string   `db:"name"`
+	}
+
+	groupsMap := make(map[uuid.UUID]*domain.ProductChoiceGroup)
+	var order []uuid.UUID
+
+	for rows.Next() {
+		var row groupRow
+		if err := rows.StructScan(&row); err != nil {
+			return nil, err
+		}
+
+		group, exists := groupsMap[row.ID]
+		if !exists {
+			group = &domain.ProductChoiceGroup{
+				ID:            row.ID,
+				ProductID:     row.ProductID,
+				MinSelections: row.MinSelections,
+				MaxSelections: row.MaxSelections,
+				SortOrder:     row.SortOrder,
+				Translations:  []domain.ChoiceTranslation{},
+			}
+			groupsMap[row.ID] = group
+			order = append(order, row.ID)
+		}
+
+		if row.Locale != nil && row.Name != nil {
+			group.Translations = append(group.Translations, domain.ChoiceTranslation{
+				Locale: *row.Locale,
+				Name:   *row.Name,
+			})
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	groups := make([]*domain.ProductChoiceGroup, 0, len(order))
+	for _, id := range order {
+		groups = append(groups, groupsMap[id])
+	}
+	return groups, nil
 }
