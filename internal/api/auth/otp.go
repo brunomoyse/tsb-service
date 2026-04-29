@@ -198,6 +198,18 @@ func VerifyOtpHandler(c *gin.Context) {
 		return
 	}
 
+	// Serialize verifies for the same sessionID and short-circuit a duplicate
+	// (sessionID, code) submit by returning the cached success. Without this
+	// gate, a double-fire (form double-click, accidental retry, hydration
+	// remount) consumes the OTP code on the first call and the second call
+	// hits Zitadel with no live code → "Code not found" → user sees "expired".
+	entry := verifyGate.acquire(req.SessionID)
+	defer verifyGate.release(entry)
+	if cached, ok := entry.hit(req.Code); ok {
+		c.JSON(http.StatusOK, cached)
+		return
+	}
+
 	body := map[string]any{
 		"sessionToken": req.SessionToken,
 		"checks": map[string]any{
@@ -242,11 +254,13 @@ func VerifyOtpHandler(c *gin.Context) {
 
 	// Zitadel's PATCH /v2/sessions response only includes sessionToken;
 	// the sessionId in the URL is what the client must continue to use.
-	c.JSON(http.StatusOK, verifyOtpResponse{
+	resp := verifyOtpResponse{
 		SessionID:       req.SessionID,
 		SessionToken:    zResp.SessionToken,
 		RequiresProfile: requiresProfile,
-	})
+	}
+	verifyGate.cache(entry, req.Code, resp)
+	c.JSON(http.StatusOK, resp)
 }
 
 // ResendOtpHandler asks Zitadel to issue a fresh otpEmail code on the

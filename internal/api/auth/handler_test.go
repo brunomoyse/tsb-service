@@ -24,6 +24,7 @@ func setupMockZitadel(t *testing.T, handler http.HandlerFunc) {
 		ServicePAT:      "test-pat",
 		AdminPAT:        "test-admin-pat",
 	})
+	resetIdempotencyGatesForTest()
 }
 
 // setupMockZitadelWithIdP is like setupMockZitadel but also configures IdP IDs.
@@ -38,6 +39,7 @@ func setupMockZitadelWithIdP(t *testing.T, handler http.HandlerFunc) {
 		AdminPAT:        "test-admin-pat",
 		IdPGoogleID:     "test-google-idp",
 	})
+	resetIdempotencyGatesForTest()
 }
 
 func ginContext(method, path, body string) (*httptest.ResponseRecorder, *gin.Context) {

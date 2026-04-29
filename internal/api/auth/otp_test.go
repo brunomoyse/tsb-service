@@ -3,7 +3,10 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -347,6 +350,133 @@ func TestVerifyOtpHandler_MissingFields(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, w.Code)
 		})
 	}
+}
+
+// TestVerifyOtpHandler_DuplicateSubmitReturnsCachedResponse asserts that a
+// second verify on the same (sessionId, code) returns the first response
+// without re-hitting Zitadel. This is the user-visible bug from the test
+// dashboard: a double-fired submit consumed the OTP code on the first call
+// and returned "Code not found" on the second.
+func TestVerifyOtpHandler_DuplicateSubmitReturnsCachedResponse(t *testing.T) {
+	var patchHits, getSessionHits, getUserHits int32
+	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/sessions/sess-dup" && r.Method == "PATCH":
+			atomic.AddInt32(&patchHits, 1)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"sessionToken":"tok-verified"}`))
+		case r.URL.Path == "/v2/sessions/sess-dup" && r.Method == "GET":
+			atomic.AddInt32(&getSessionHits, 1)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"session":{"factors":{"user":{"id":"user-dup","loginName":"u@example.com"}}}}`))
+		case r.URL.Path == "/v2/users/user-dup" && r.Method == "GET":
+			atomic.AddInt32(&getUserHits, 1)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"Alice","familyName":"Wonderland"}}}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	body := `{"sessionId":"sess-dup","sessionToken":"tok","code":"111111"}`
+
+	w1, c1 := ginContext("POST", "/auth/session/otp/verify", body)
+	VerifyOtpHandler(c1)
+	require.Equal(t, http.StatusOK, w1.Code)
+
+	w2, c2 := ginContext("POST", "/auth/session/otp/verify", body)
+	VerifyOtpHandler(c2)
+	require.Equal(t, http.StatusOK, w2.Code)
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&patchHits), "duplicate submit must hit Zitadel PATCH exactly once")
+	assert.Equal(t, int32(1), atomic.LoadInt32(&getSessionHits), "session lookup must run once — cache replays the full response")
+	assert.Equal(t, int32(1), atomic.LoadInt32(&getUserHits), "user lookup must run once for the same reason")
+	assert.JSONEq(t, w1.Body.String(), w2.Body.String(), "cached response must equal first response")
+}
+
+// TestVerifyOtpHandler_ConcurrentSubmitsAreSerialized asserts that several
+// in-flight verifies for the same sessionID end up calling Zitadel exactly
+// once, the rest get the cached success.
+func TestVerifyOtpHandler_ConcurrentSubmitsAreSerialized(t *testing.T) {
+	var patchHits int32
+	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/sessions/sess-conc" && r.Method == "PATCH":
+			atomic.AddInt32(&patchHits, 1)
+			// Hold the response briefly so the other goroutines pile up on
+			// the per-session mutex rather than racing serially through.
+			time.Sleep(20 * time.Millisecond)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"sessionToken":"tok-verified"}`))
+		case r.URL.Path == "/v2/sessions/sess-conc" && r.Method == "GET":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"session":{"factors":{"user":{"id":"user-conc"}}}}`))
+		case r.URL.Path == "/v2/users/user-conc" && r.Method == "GET":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"Bob","familyName":"Builder"}}}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	body := `{"sessionId":"sess-conc","sessionToken":"tok","code":"222222"}`
+	const concurrency = 5
+
+	var wg sync.WaitGroup
+	results := make([]int, concurrency)
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			w, c := ginContext("POST", "/auth/session/otp/verify", body)
+			VerifyOtpHandler(c)
+			results[idx] = w.Code
+		}(i)
+	}
+	wg.Wait()
+
+	assert.Equal(t, int32(1), atomic.LoadInt32(&patchHits), "concurrent verifies must hit Zitadel exactly once")
+	for i, code := range results {
+		assert.Equal(t, http.StatusOK, code, "goroutine %d must have observed a successful verify", i)
+	}
+}
+
+// TestVerifyOtpHandler_DifferentCodeBypassesCache asserts that after a
+// failed verify, retrying with a different code still hits Zitadel — only
+// successful (sessionID, code) pairs are cached.
+func TestVerifyOtpHandler_DifferentCodeBypassesCache(t *testing.T) {
+	var patchCalls int32
+	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/sessions/sess-mix" && r.Method == "PATCH":
+			n := atomic.AddInt32(&patchCalls, 1)
+			if n == 1 {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"code":3,"message":"otp invalid"}`))
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"sessionToken":"tok-v"}`))
+		case r.URL.Path == "/v2/sessions/sess-mix" && r.Method == "GET":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"session":{"factors":{"user":{"id":"user-mix"}}}}`))
+		case r.URL.Path == "/v2/users/user-mix" && r.Method == "GET":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"Carol","familyName":"Danvers"}}}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	w1, c1 := ginContext("POST", "/auth/session/otp/verify", `{"sessionId":"sess-mix","sessionToken":"tok","code":"000000"}`)
+	VerifyOtpHandler(c1)
+	require.Equal(t, http.StatusUnauthorized, w1.Code)
+
+	w2, c2 := ginContext("POST", "/auth/session/otp/verify", `{"sessionId":"sess-mix","sessionToken":"tok","code":"123456"}`)
+	VerifyOtpHandler(c2)
+	require.Equal(t, http.StatusOK, w2.Code)
+
+	assert.Equal(t, int32(2), atomic.LoadInt32(&patchCalls), "wrong-then-right code must hit Zitadel twice — failures are not cached")
 }
 
 // --- ResendOtpHandler Tests ---

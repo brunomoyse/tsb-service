@@ -58,6 +58,16 @@ func FinalizeOIDCHandler(c *gin.Context) {
 		return
 	}
 
+	// Serialize finalizes for the same authRequestID. Zitadel's auth request
+	// is one-shot — a duplicate POST after a stutter would 4xx and the user
+	// sees "expired". The cache returns the already-resolved callbackUrl.
+	entry := finalizeGate.acquire(req.AuthRequestID)
+	defer finalizeGate.release(entry)
+	if cached, ok := entry.hit(req.SessionID); ok {
+		c.JSON(http.StatusOK, cached)
+		return
+	}
+
 	// Finalize the OIDC auth request by linking it to the session
 	// Zitadel v2 API: POST /v2/oidc/auth_requests/{authRequestId}
 	body := map[string]any{
@@ -103,7 +113,9 @@ func FinalizeOIDCHandler(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, finalizeResponse{CallbackURL: finalURL})
+	finalResp := finalizeResponse{CallbackURL: finalURL}
+	finalizeGate.cache(entry, req.SessionID, finalResp)
+	c.JSON(http.StatusOK, finalResp)
 }
 
 // POST /auth/authorize-proxy { authorizeUrl }
