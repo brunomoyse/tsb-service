@@ -170,6 +170,11 @@ models:
 
   ProductChoice:
 
+  ProductChoiceGroup:
+    fields:
+      choices:
+        resolver: true
+
   Order:
     model:
       - tsb-service/internal/api/graphql/model.Order
