@@ -198,13 +198,15 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 		for _, group := range groups {
 			selectedCount := selectionCountByGroup[group.ID]
-			if selectedCount < group.MinSelections || selectedCount > group.MaxSelections {
+			minRequired := group.MinSelections * int(qty)
+			maxAllowed := group.MaxSelections * int(qty)
+			if selectedCount < minRequired || selectedCount > maxAllowed {
 				return nil, fmt.Errorf(
 					"invalid number of selections for group %s on product %s: expected between %d and %d, got %d",
 					group.GetTranslationFor(orderLang),
 					productLabel(pid),
-					group.MinSelections,
-					group.MaxSelections,
+					minRequired,
+					maxAllowed,
 					selectedCount,
 				)
 			}
