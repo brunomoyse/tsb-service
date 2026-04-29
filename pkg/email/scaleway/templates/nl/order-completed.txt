@@ -6,4 +6,6 @@ Wij zouden u graag snel weer verwelkomen.
 
 Opnieuw bestellen: {{.MenuLink}}
 
+Dit is een geautomatiseerde e-mail — gelieve niet te antwoorden.
+
 © 2026 Tokyo Sushi Bar. Alle rechten voorbehouden.

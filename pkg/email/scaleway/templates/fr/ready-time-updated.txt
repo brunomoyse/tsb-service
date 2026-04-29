@@ -8,4 +8,6 @@ Nous nous excusons pour tout désagrément.
 
 Suivre votre commande : {{.StatusLink}}
 
+Cet e-mail est automatique, merci de ne pas y répondre.
+
 © 2026 Tokyo Sushi Bar. Tous droits réservés.

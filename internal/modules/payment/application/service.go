@@ -412,7 +412,7 @@ func (s *paymentService) HandlePaymentFailed(ctx context.Context, orderID uuid.U
 		}
 
 		if u.NotifyOrderUpdates {
-			if emailErr := es.SendPaymentFailedEmail(*u, order.Language); emailErr != nil {
+			if emailErr := es.SendPaymentFailedEmail(*u, order.Language, orderID.String()); emailErr != nil {
 				zap.L().Error("failed to send payment failed email", zap.String("order_id", orderID.String()), zap.Error(emailErr))
 			}
 		}
