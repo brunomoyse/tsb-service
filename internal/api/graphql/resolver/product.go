@@ -422,6 +422,25 @@ func (r *productResolver) Choices(ctx context.Context, obj *model.Product) ([]*m
 	}), nil
 }
 
+// ChoiceGroups is the resolver for the choiceGroups field.
+func (r *productResolver) ChoiceGroups(ctx context.Context, obj *model.Product) ([]*model.ProductChoiceGroup, error) {
+	userLang := utils.GetLang(ctx)
+
+	loader := productApplication.GetProductChoiceGroupLoader(ctx)
+	if loader == nil {
+		return nil, errors.New("no product choice group loader found")
+	}
+
+	groups, err := loader.Loader.Load(ctx, obj.ID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load product choice groups: %w", err)
+	}
+
+	return Map(groups, func(g *domain.ProductChoiceGroup) *model.ProductChoiceGroup {
+		return ToGQLProductChoiceGroup(g, userLang)
+	}), nil
+}
+
 // Translations is the resolver for the translations field.
 func (r *productResolver) Translations(ctx context.Context, obj *model.Product) ([]*model.Translation, error) {
 	loader := productApplication.GetProductTranslationLoader(ctx)

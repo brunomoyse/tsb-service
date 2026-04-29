@@ -165,6 +165,8 @@ models:
         resolver: true
       choices:
         resolver: true
+      choiceGroups:
+        resolver: true
 
   ProductChoice:
 

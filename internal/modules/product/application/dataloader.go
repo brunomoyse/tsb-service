@@ -17,6 +17,7 @@ const (
 	categoryTranslation       contextKey = "categoryTranslation"
 	productTranslation        contextKey = "productTranslation"
 	productChoiceLoaderKey    contextKey = "productChoiceLoader"
+	productChoiceGroupLoaderKey contextKey = "productChoiceGroupLoader"
 )
 
 type ProductCategoryLoader struct {
@@ -43,6 +44,10 @@ type ProductChoiceLoader struct {
 	Loader *db.TypedLoader[*domain.ProductChoice]
 }
 
+type ProductChoiceGroupLoader struct {
+	Loader *db.TypedLoader[*domain.ProductChoiceGroup]
+}
+
 // AttachDataLoaders attaches all necessary DataLoaders for products to the context.
 func AttachDataLoaders(ctx context.Context, ps ProductService) context.Context {
 	ctx = context.WithValue(ctx, productCategoryLoaderKey, NewProductCategoryLoader(ps))
@@ -51,6 +56,7 @@ func AttachDataLoaders(ctx context.Context, ps ProductService) context.Context {
 	ctx = context.WithValue(ctx, categoryTranslation, NewCategoryTranslation(ps))
 	ctx = context.WithValue(ctx, productTranslation, NewProductTranslation(ps))
 	ctx = context.WithValue(ctx, productChoiceLoaderKey, NewProductChoiceLoader(ps))
+	ctx = context.WithValue(ctx, productChoiceGroupLoaderKey, NewProductChoiceGroupLoader(ps))
 	return ctx
 }
 
@@ -122,6 +128,17 @@ func NewProductChoiceLoader(ps ProductService) *ProductChoiceLoader {
 	}
 }
 
+func NewProductChoiceGroupLoader(ps ProductService) *ProductChoiceGroupLoader {
+	return &ProductChoiceGroupLoader{
+		Loader: db.NewTypedLoader[*domain.ProductChoiceGroup](
+			func(ctx context.Context, productIDs []string) (map[string][]*domain.ProductChoiceGroup, error) {
+				return ps.BatchGetChoiceGroupsByProductIDs(ctx, productIDs)
+			},
+			"failed to fetch product choice groups",
+		),
+	}
+}
+
 // GetProductCategoryLoader reads the loader from context.
 func GetProductCategoryLoader(ctx context.Context) *ProductCategoryLoader {
 	loader, ok := ctx.Value(productCategoryLoaderKey).(*ProductCategoryLoader)
@@ -170,6 +187,15 @@ func GetProductTranslationLoader(ctx context.Context) *ProductTranslation {
 // GetProductChoiceLoader reads the loader from context.
 func GetProductChoiceLoader(ctx context.Context) *ProductChoiceLoader {
 	loader, ok := ctx.Value(productChoiceLoaderKey).(*ProductChoiceLoader)
+	if !ok {
+		return nil
+	}
+	return loader
+}
+
+// GetProductChoiceGroupLoader reads the loader from context.
+func GetProductChoiceGroupLoader(ctx context.Context) *ProductChoiceGroupLoader {
+	loader, ok := ctx.Value(productChoiceGroupLoaderKey).(*ProductChoiceGroupLoader)
 	if !ok {
 		return nil
 	}
