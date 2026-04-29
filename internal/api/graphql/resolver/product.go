@@ -519,6 +519,29 @@ func (r *productCategoryResolver) Translations(ctx context.Context, obj *model.P
 	return translations, nil
 }
 
+// Choices is the resolver for the choices field.
+func (r *productChoiceGroupResolver) Choices(ctx context.Context, obj *model.ProductChoiceGroup) ([]*model.ProductChoice, error) {
+	userLang := utils.GetLang(ctx)
+
+	loader := productApplication.GetProductChoiceLoader(ctx)
+	if loader == nil {
+		return nil, errors.New("no product choice loader found")
+	}
+
+	choices, err := loader.Loader.Load(ctx, obj.ProductID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load product choices: %w", err)
+	}
+
+	filtered := make([]*model.ProductChoice, 0, len(choices))
+	for _, c := range choices {
+		if c.ChoiceGroupID == obj.ID {
+			filtered = append(filtered, ToGQLProductChoice(c, userLang))
+		}
+	}
+	return filtered, nil
+}
+
 // Product is the resolver for the product field.
 func (r *queryResolver) Product(ctx context.Context, id uuid.UUID) (*model.Product, error) {
 	userLang := utils.GetLang(ctx)
@@ -629,5 +652,11 @@ func (r *Resolver) ProductCategory() graphql1.ProductCategoryResolver {
 	return &productCategoryResolver{r}
 }
 
+// ProductChoiceGroup returns graphql1.ProductChoiceGroupResolver implementation.
+func (r *Resolver) ProductChoiceGroup() graphql1.ProductChoiceGroupResolver {
+	return &productChoiceGroupResolver{r}
+}
+
 type productResolver struct{ *Resolver }
 type productCategoryResolver struct{ *Resolver }
+type productChoiceGroupResolver struct{ *Resolver }

@@ -36,6 +36,7 @@ type ResolverRoot interface {
 	OrderItem() OrderItemResolver
 	Product() ProductResolver
 	ProductCategory() ProductCategoryResolver
+	ProductChoiceGroup() ProductChoiceGroupResolver
 	Query() QueryResolver
 	RestaurantConfig() RestaurantConfigResolver
 	Subscription() SubscriptionResolver
@@ -442,6 +443,9 @@ type ProductResolver interface {
 type ProductCategoryResolver interface {
 	Products(ctx context.Context, obj *model.ProductCategory) ([]*model.Product, error)
 	Translations(ctx context.Context, obj *model.ProductCategory) ([]*model.Translation, error)
+}
+type ProductChoiceGroupResolver interface {
+	Choices(ctx context.Context, obj *model.ProductChoiceGroup) ([]*model.ProductChoice, error)
 }
 type QueryResolver interface {
 	AutocompleteAddresses(ctx context.Context, input string, sessionToken string) ([]*model.AddressSuggestion, error)
@@ -10294,7 +10298,7 @@ func (ec *executionContext) _ProductChoiceGroup_choices(ctx context.Context, fie
 		field,
 		ec.fieldContext_ProductChoiceGroup_choices,
 		func(ctx context.Context) (any, error) {
-			return obj.Choices, nil
+			return ec.Resolvers.ProductChoiceGroup().Choices(ctx, obj)
 		},
 		nil,
 		ec.marshalNProductChoice2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceᚄ,
@@ -10307,8 +10311,8 @@ func (ec *executionContext) fieldContext_ProductChoiceGroup_choices(_ context.Co
 	fc = &graphql.FieldContext{
 		Object:     "ProductChoiceGroup",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -18210,43 +18214,74 @@ func (ec *executionContext) _ProductChoiceGroup(ctx context.Context, sel ast.Sel
 		case "id":
 			out.Values[i] = ec._ProductChoiceGroup_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "productId":
 			out.Values[i] = ec._ProductChoiceGroup_productId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "minSelections":
 			out.Values[i] = ec._ProductChoiceGroup_minSelections(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "maxSelections":
 			out.Values[i] = ec._ProductChoiceGroup_maxSelections(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "sortOrder":
 			out.Values[i] = ec._ProductChoiceGroup_sortOrder(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "name":
 			out.Values[i] = ec._ProductChoiceGroup_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "translations":
 			out.Values[i] = ec._ProductChoiceGroup_translations(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "choices":
-			out.Values[i] = ec._ProductChoiceGroup_choices(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._ProductChoiceGroup_choices(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
