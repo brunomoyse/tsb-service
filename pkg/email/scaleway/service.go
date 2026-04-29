@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/scaleway/scaleway-sdk-go/logger"
 	"os"
+	"time"
 	addressDomain "tsb-service/internal/modules/address/domain"
 	orderDomain "tsb-service/internal/modules/order/domain"
 
@@ -59,6 +60,20 @@ func InitService() error {
 // IsInitialized returns true if the Scaleway TEM client has been initialized.
 func IsInitialized() bool {
 	return baseReq != nil
+}
+
+// orderThreadHeaders returns RFC 5322 headers that group every email for one
+// order into a single conversation in the recipient's inbox. The thread root
+// is a synthetic Message-ID that is never sent — clients thread by shared
+// References ancestry, so the root only needs to exist as a reference target.
+func orderThreadHeaders(orderID string) []*temv1alpha1.CreateEmailRequestHeader {
+	root := fmt.Sprintf("<order-thread-%s@tokyosushibarliege.be>", orderID)
+	msgID := fmt.Sprintf("<email-%s-%d@tokyosushibarliege.be>", orderID, time.Now().UnixNano())
+	return []*temv1alpha1.CreateEmailRequestHeader{
+		{Key: "Message-ID", Value: msgID},
+		{Key: "In-Reply-To", Value: root},
+		{Key: "References", Value: root},
+	}
 }
 
 func SendVerificationEmail(user userDomain.User, lang string, verificationURL string) error {
@@ -215,6 +230,7 @@ func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
+	newReq.AdditionalHeaders = orderThreadHeaders(order.ID.String())
 
 	// Send the email using the Scaleway TEM API.
 	_, err = temClient.CreateEmail(&newReq)
@@ -270,6 +286,7 @@ func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomai
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
+	newReq.AdditionalHeaders = orderThreadHeaders(order.ID.String())
 
 	// Send the email using the Scaleway TEM API.
 	_, err = temClient.CreateEmail(&newReq)
@@ -379,7 +396,7 @@ func LocalizedCancellationReason(reason *orderDomain.OrderCancellationReason, la
 	return labels[*reason]
 }
 
-func SendOrderCanceledEmail(user userDomain.User, lang string, reason *orderDomain.OrderCancellationReason) error {
+func SendOrderCanceledEmail(user userDomain.User, lang string, orderID string, reason *orderDomain.OrderCancellationReason) error {
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -424,6 +441,7 @@ func SendOrderCanceledEmail(user userDomain.User, lang string, reason *orderDoma
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
+	newReq.AdditionalHeaders = orderThreadHeaders(orderID)
 
 	// Send the email using the Scaleway TEM API.
 	_, err = temClient.CreateEmail(&newReq)
@@ -484,6 +502,7 @@ func SendOrderReadyEmail(user userDomain.User, lang string, order orderDomain.Or
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
+	newReq.AdditionalHeaders = orderThreadHeaders(order.ID.String())
 
 	_, err = temClient.CreateEmail(&newReq)
 	if err != nil {
@@ -541,7 +560,7 @@ func SendOrderCompletedEmail(user userDomain.User, lang string) error {
 	return nil
 }
 
-func SendPaymentFailedEmail(user userDomain.User, lang string) error {
+func SendPaymentFailedEmail(user userDomain.User, lang string, orderID string) error {
 	newReq := *baseReq
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
@@ -578,6 +597,7 @@ func SendPaymentFailedEmail(user userDomain.User, lang string) error {
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
+	newReq.AdditionalHeaders = orderThreadHeaders(orderID)
 
 	_, err = temClient.CreateEmail(&newReq)
 	if err != nil {
@@ -588,7 +608,7 @@ func SendPaymentFailedEmail(user userDomain.User, lang string) error {
 	return nil
 }
 
-func SendRefundIssuedEmail(user userDomain.User, lang string, refundAmount string) error {
+func SendRefundIssuedEmail(user userDomain.User, lang string, orderID string, refundAmount string) error {
 	newReq := *baseReq
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
@@ -625,6 +645,7 @@ func SendRefundIssuedEmail(user userDomain.User, lang string, refundAmount strin
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
+	newReq.AdditionalHeaders = orderThreadHeaders(orderID)
 
 	_, err = temClient.CreateEmail(&newReq)
 	if err != nil {
@@ -719,6 +740,7 @@ func SendReadyTimeUpdatedEmail(user userDomain.User, lang string, order orderDom
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
+	newReq.AdditionalHeaders = orderThreadHeaders(order.ID.String())
 
 	_, err = temClient.CreateEmail(&newReq)
 	if err != nil {

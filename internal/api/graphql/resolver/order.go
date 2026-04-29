@@ -659,7 +659,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 					return
 				}
 				refundAmount := utils.FormatDecimal(o.TotalPrice)
-				err = es.SendRefundIssuedEmail(*user, lang, refundAmount)
+				err = es.SendRefundIssuedEmail(*user, lang, o.ID.String(), refundAmount)
 				if err != nil {
 					zap.L().Error("failed to send refund issued email", zap.String("order_id", o.ID.String()), zap.Error(err))
 				}
@@ -678,7 +678,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			if !user.NotifyOrderUpdates {
 				return
 			}
-			err = es.SendOrderCanceledEmail(*user, lang, o.CancellationReason)
+			err = es.SendOrderCanceledEmail(*user, lang, o.ID.String(), o.CancellationReason)
 			if err != nil {
 				zap.L().Error("failed to send order canceled email", zap.String("order_id", o.ID.String()), zap.Error(err))
 			}
