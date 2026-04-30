@@ -13,7 +13,7 @@ import (
 	"tsb-service/pkg/utils"
 )
 
-const maxPreviewSize = 5 << 20 // 5 MB
+const maxPreviewSize = 50 << 20 // 50 MB
 
 // PreviewHandler proxies an uploaded image to the file service's
 // background-removal preview endpoint (/images/preview/processed) and streams
@@ -33,8 +33,6 @@ func PreviewHandler(c *gin.Context) {
 		return
 	}
 
-	// Apply a per-endpoint body limit; the global 1 MB middleware is skipped for
-	// this path (see main.go) to allow image payloads up to 5 MB.
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxPreviewSize)
 
 	file, header, err := c.Request.FormFile("image")

@@ -98,8 +98,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 	h := handler.New(graphql.NewExecutableSchema(cfg))
 
 	h.AddTransport(transport.MultipartForm{
-		// same 10MB limit you used in the REST handler
-		MaxMemory: 10 << 20,
+		MaxMemory: 50 << 20,
 	})
 
 	h.AddTransport(transport.Websocket{
