@@ -5,8 +5,8 @@ go 1.26
 require (
 	firebase.google.com/go/v4 v4.19.0
 	github.com/99designs/gqlgen v0.17.89
-	github.com/getsentry/sentry-go v0.46.0
-	github.com/getsentry/sentry-go/gin v0.46.0
+	github.com/getsentry/sentry-go v0.46.1
+	github.com/getsentry/sentry-go/gin v0.46.1
 	github.com/gin-contrib/cors v1.7.7
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
