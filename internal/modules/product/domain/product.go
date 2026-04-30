@@ -20,6 +20,7 @@ type Product struct {
 	IsHalal        bool            `db:"is_halal" json:"isHalal"`
 	IsVegetarian   bool            `db:"is_vegetarian" json:"isVegetarian"`
 	IsSpicy        bool            `db:"is_spicy" json:"isSpicy"`
+	IsLunchOnly    bool            `db:"is_lunch_only" json:"isLunchOnly"`
 	IsDiscountable bool            `db:"is_discountable" json:"isDiscountable"`
 	VatCategory    VatCategory     `db:"vat_category" json:"vatCategory"`
 	CategoryID     uuid.UUID       `db:"category_id" json:"categoryId"`
@@ -75,6 +76,7 @@ type ProductOrderDetails struct {
 	Name           string          `db:"name" json:"name"`
 	Price          decimal.Decimal `db:"price" json:"price"`
 	IsDiscountable bool            `db:"is_discountable" json:"isDiscountable"`
+	IsLunchOnly    bool            `db:"is_lunch_only" json:"isLunchOnly"`
 	VatCategory    VatCategory     `db:"vat_category" json:"vatCategory"`
 }
 

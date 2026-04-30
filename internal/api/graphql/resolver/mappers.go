@@ -51,6 +51,7 @@ func ToGQLProduct(p *productDomain.Product, lang string) *model.Product {
 		IsVisible:      p.IsVisible,
 		IsAvailable:    p.IsAvailable,
 		IsHalal:        p.IsHalal,
+		IsLunchOnly:    p.IsLunchOnly,
 		IsSpicy:        p.IsSpicy,
 		IsDiscountable: p.IsDiscountable,
 		IsVegetarian:   p.IsVegetarian,
@@ -264,7 +265,11 @@ func toGQLDaySchedule(s *restaurantDomain.DaySchedule) *model.DaySchedule {
 func toGQLTimeSlots(slots []restaurantDomain.TimeSlot) []*model.TimeSlot {
 	out := make([]*model.TimeSlot, len(slots))
 	for i, s := range slots {
-		out[i] = &model.TimeSlot{Label: s.Label, Value: s.Value}
+		out[i] = &model.TimeSlot{
+			Label:              s.Label,
+			Value:              s.Value,
+			IsLunchOnlyAllowed: s.IsLunchOnlyAllowed,
+		}
 	}
 	return out
 }

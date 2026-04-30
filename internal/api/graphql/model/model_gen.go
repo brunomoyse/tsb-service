@@ -129,6 +129,7 @@ type CreateProductInput struct {
 	IsAvailable      bool                `json:"isAvailable"`
 	IsDiscountable   bool                `json:"isDiscountable"`
 	IsHalal          bool                `json:"isHalal"`
+	IsLunchOnly      bool                `json:"isLunchOnly"`
 	IsSpicy          bool                `json:"isSpicy"`
 	IsVegetarian     bool                `json:"isVegetarian"`
 	IsVisible        bool                `json:"isVisible"`
@@ -294,6 +295,7 @@ type Product struct {
 	IsAvailable    bool                  `json:"isAvailable"`
 	IsDiscountable bool                  `json:"isDiscountable"`
 	IsHalal        bool                  `json:"isHalal"`
+	IsLunchOnly    bool                  `json:"isLunchOnly"`
 	IsSpicy        bool                  `json:"isSpicy"`
 	IsVegetarian   bool                  `json:"isVegetarian"`
 	IsVisible      bool                  `json:"isVisible"`
@@ -372,8 +374,9 @@ type Subscription struct {
 }
 
 type TimeSlot struct {
-	Label string    `json:"label"`
-	Value time.Time `json:"value"`
+	Label              string    `json:"label"`
+	Value              time.Time `json:"value"`
+	IsLunchOnlyAllowed bool      `json:"isLunchOnlyAllowed"`
 }
 
 type Translation struct {
@@ -427,6 +430,7 @@ type UpdateProductInput struct {
 	IsAvailable      *bool               `json:"isAvailable,omitempty"`
 	IsDiscountable   *bool               `json:"isDiscountable,omitempty"`
 	IsHalal          *bool               `json:"isHalal,omitempty"`
+	IsLunchOnly      *bool               `json:"isLunchOnly,omitempty"`
 	IsSpicy          *bool               `json:"isSpicy,omitempty"`
 	IsVegetarian     *bool               `json:"isVegetarian,omitempty"`
 	IsVisible        *bool               `json:"isVisible,omitempty"`

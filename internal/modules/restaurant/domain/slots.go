@@ -10,8 +10,9 @@ import (
 
 // TimeSlot is a single bookable ordering slot.
 type TimeSlot struct {
-	Label string    // wall-clock "HH:MM" in restaurant timezone
-	Value time.Time // exact instant (tz-aware)
+	Label              string    // wall-clock "HH:MM" in restaurant timezone
+	Value              time.Time // exact instant (tz-aware)
+	IsLunchOnlyAllowed bool      // true iff this slot is in the day's first interval AND falls on a Mon–Fri (Brussels)
 }
 
 const slotStepMinutes = 15
@@ -55,7 +56,7 @@ func (c *RestaurantConfig) AvailableSlotsToday(now time.Time, overrides map[stri
 	var slots []TimeSlot
 	seen := make(map[time.Time]struct{})
 
-	for _, iv := range intervals {
+	for i, iv := range intervals {
 		openMins, okOpen := parseHHMM(iv[0])
 		closeMins, okClose := parseHHMM(iv[1])
 		if !okOpen || !okClose {
@@ -70,20 +71,65 @@ func (c *RestaurantConfig) AvailableSlotsToday(now time.Time, overrides map[stri
 			continue
 		}
 
+		isFirstInterval := i == 0
 		start := roundUpToNextQuarter(maxTime(openPlusPrep, minAllowed))
 		for cur := start; !cur.After(intervalEnd); cur = cur.Add(slotStepMinutes * time.Minute) {
 			if _, dup := seen[cur]; dup {
 				continue
 			}
 			seen[cur] = struct{}{}
+			weekday := timezone.In(cur).Weekday()
+			isWeekday := weekday >= time.Monday && weekday <= time.Friday
 			slots = append(slots, TimeSlot{
-				Label: cur.Format("15:04"),
-				Value: cur,
+				Label:              cur.Format("15:04"),
+				Value:              cur,
+				IsLunchOnlyAllowed: isFirstInterval && isWeekday,
 			})
 		}
 	}
 
 	return slots
+}
+
+// IsLunchOnlyAllowed reports whether the given instant is acceptable for an
+// order line flagged as lunch-only: the instant must fall on a Mon–Fri in
+// Europe/Brussels AND be inside the day's first opening interval (the lunch
+// service, before any dinner break). Honors schedule overrides and falls back
+// to ordering hours, then opening hours, mirroring AvailableSlotsToday.
+func (c *RestaurantConfig) IsLunchOnlyAllowed(t time.Time, overrides map[string]*ScheduleOverride) bool {
+	local := timezone.In(t)
+	weekday := local.Weekday()
+	if weekday < time.Monday || weekday > time.Friday {
+		return false
+	}
+
+	orderingHours, err := c.GetOrderingHours()
+	if err != nil {
+		return false
+	}
+	var hours OpeningHours
+	if orderingHours != nil {
+		hours = orderingHours
+	} else {
+		hours, err = c.GetOpeningHours()
+		if err != nil {
+			return false
+		}
+	}
+
+	schedule, _ := resolveDaySchedule(t, hours, overrides)
+	if schedule == nil {
+		return false
+	}
+
+	openMins, okOpen := parseHHMM(schedule.Open)
+	closeMins, okClose := parseHHMM(schedule.Close)
+	if !okOpen || !okClose {
+		return false
+	}
+
+	tMins := local.Hour()*60 + local.Minute()
+	return tMins >= openMins && tMins <= closeMins
 }
 
 // NextOpeningAt returns the next instant at which the restaurant opens
