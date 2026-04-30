@@ -8,6 +8,7 @@ type DaySchedule {
 type TimeSlot {
     label: String!
     value: DateTime!
+    isLunchOnlyAllowed: Boolean!
 }
 
 type ScheduleOverride {

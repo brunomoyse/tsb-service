@@ -35,7 +35,10 @@ import (
 
 // CreateOrder is the resolver for the createOrder field.
 func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error) {
-	// 0) Validate ordering availability and preferred ready time constraints
+	// 0) Validate ordering availability and preferred ready time constraints.
+	// allowLunchOnly defaults to true so dev mode does not block testing of
+	// lunch-only items; production paths populate it from the resolved schedule.
+	allowLunchOnly := true
 	if !r.RestaurantService.IsDevMode() {
 		config, overrides, err := r.RestaurantService.GetConfigWithOverrides(ctx)
 		if err != nil {
@@ -50,6 +53,12 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		if err := validatePreferredReadyTime(input.PreferredReadyTime, config, overrides, now, isOpenNow); err != nil {
 			return nil, err
 		}
+
+		slotTime := now
+		if input.PreferredReadyTime != nil {
+			slotTime = *input.PreferredReadyTime
+		}
+		allowLunchOnly = config.IsLunchOnlyAllowed(slotTime, overrides)
 	}
 
 	// 1) Authenticated user
@@ -91,6 +100,15 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			return name
 		}
 		return id.String()
+	}
+
+	// 3) Reject lunch-only products when the chosen slot is not a weekday lunch slot.
+	if !allowLunchOnly {
+		for _, p := range products {
+			if p.IsLunchOnly {
+				return nil, fmt.Errorf("product %q is only available for a weekday lunch slot", productLabel(p.ID))
+			}
+		}
 	}
 
 	// 4) Determine order type

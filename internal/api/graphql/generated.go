@@ -272,6 +272,7 @@ type ComplexityRoot struct {
 		IsAvailable    func(childComplexity int) int
 		IsDiscountable func(childComplexity int) int
 		IsHalal        func(childComplexity int) int
+		IsLunchOnly    func(childComplexity int) int
 		IsSpicy        func(childComplexity int) int
 		IsVegetarian   func(childComplexity int) int
 		IsVisible      func(childComplexity int) int
@@ -365,8 +366,9 @@ type ComplexityRoot struct {
 	}
 
 	TimeSlot struct {
-		Label func(childComplexity int) int
-		Value func(childComplexity int) int
+		IsLunchOnlyAllowed func(childComplexity int) int
+		Label              func(childComplexity int) int
+		Value              func(childComplexity int) int
 	}
 
 	Translation struct {
@@ -1654,6 +1656,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Product.IsHalal(childComplexity), true
+	case "Product.isLunchOnly":
+		if e.ComplexityRoot.Product.IsLunchOnly == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Product.IsLunchOnly(childComplexity), true
 	case "Product.isSpicy":
 		if e.ComplexityRoot.Product.IsSpicy == nil {
 			break
@@ -2147,6 +2155,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Subscription.ScheduleOverridesUpdated(childComplexity), true
 
+	case "TimeSlot.isLunchOnlyAllowed":
+		if e.ComplexityRoot.TimeSlot.IsLunchOnlyAllowed == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeSlot.IsLunchOnlyAllowed(childComplexity), true
 	case "TimeSlot.label":
 		if e.ComplexityRoot.TimeSlot.Label == nil {
 			break
@@ -5313,6 +5327,8 @@ func (ec *executionContext) fieldContext_Mutation_createProduct(ctx context.Cont
 				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
+			case "isLunchOnly":
+				return ec.fieldContext_Product_isLunchOnly(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
 			case "isVegetarian":
@@ -5407,6 +5423,8 @@ func (ec *executionContext) fieldContext_Mutation_updateProduct(ctx context.Cont
 				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
+			case "isLunchOnly":
+				return ec.fieldContext_Product_isLunchOnly(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
 			case "isVegetarian":
@@ -7617,6 +7635,8 @@ func (ec *executionContext) fieldContext_OrderItem_product(_ context.Context, fi
 				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
+			case "isLunchOnly":
+				return ec.fieldContext_Product_isLunchOnly(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
 			case "isVegetarian":
@@ -9249,6 +9269,35 @@ func (ec *executionContext) fieldContext_Product_isHalal(_ context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Product_isLunchOnly(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Product_isLunchOnly,
+		func(ctx context.Context) (any, error) {
+			return obj.IsLunchOnly, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Product_isLunchOnly(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Product",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Product_isSpicy(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9803,6 +9852,8 @@ func (ec *executionContext) fieldContext_ProductCategory_products(_ context.Cont
 				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
+			case "isLunchOnly":
+				return ec.fieldContext_Product_isLunchOnly(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
 			case "isVegetarian":
@@ -11289,6 +11340,8 @@ func (ec *executionContext) fieldContext_Query_product(ctx context.Context, fiel
 				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
+			case "isLunchOnly":
+				return ec.fieldContext_Product_isLunchOnly(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
 			case "isVegetarian":
@@ -11369,6 +11422,8 @@ func (ec *executionContext) fieldContext_Query_products(_ context.Context, field
 				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
+			case "isLunchOnly":
+				return ec.fieldContext_Product_isLunchOnly(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
 			case "isVegetarian":
@@ -12047,6 +12102,8 @@ func (ec *executionContext) fieldContext_RestaurantConfig_availableSlotsToday(_ 
 				return ec.fieldContext_TimeSlot_label(ctx, field)
 			case "value":
 				return ec.fieldContext_TimeSlot_value(ctx, field)
+			case "isLunchOnlyAllowed":
+				return ec.fieldContext_TimeSlot_isLunchOnlyAllowed(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type TimeSlot", field.Name)
 		},
@@ -12673,6 +12730,8 @@ func (ec *executionContext) fieldContext_Subscription_productUpdated(_ context.C
 				return ec.fieldContext_Product_isDiscountable(ctx, field)
 			case "isHalal":
 				return ec.fieldContext_Product_isHalal(ctx, field)
+			case "isLunchOnly":
+				return ec.fieldContext_Product_isLunchOnly(ctx, field)
 			case "isSpicy":
 				return ec.fieldContext_Product_isSpicy(ctx, field)
 			case "isVegetarian":
@@ -12849,6 +12908,35 @@ func (ec *executionContext) fieldContext_TimeSlot_value(_ context.Context, field
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSlot_isLunchOnlyAllowed(ctx context.Context, field graphql.CollectedField, obj *model.TimeSlot) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeSlot_isLunchOnlyAllowed,
+		func(ctx context.Context) (any, error) {
+			return obj.IsLunchOnlyAllowed, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeSlot_isLunchOnlyAllowed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSlot",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -15227,7 +15315,7 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"categoryId", "code", "image", "removeBackground", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegetarian", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
+	fieldsInOrder := [...]string{"categoryId", "code", "image", "removeBackground", "isAvailable", "isDiscountable", "isHalal", "isLunchOnly", "isSpicy", "isVegetarian", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -15283,6 +15371,13 @@ func (ec *executionContext) unmarshalInputCreateProductInput(ctx context.Context
 				return it, err
 			}
 			it.IsHalal = data
+		case "isLunchOnly":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isLunchOnly"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsLunchOnly = data
 		case "isSpicy":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isSpicy"))
 			data, err := ec.unmarshalNBoolean2bool(ctx, v)
@@ -15958,7 +16053,7 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"categoryID", "code", "image", "removeBackground", "isAvailable", "isDiscountable", "isHalal", "isSpicy", "isVegetarian", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
+	fieldsInOrder := [...]string{"categoryID", "code", "image", "removeBackground", "isAvailable", "isDiscountable", "isHalal", "isLunchOnly", "isSpicy", "isVegetarian", "isVisible", "pieceCount", "price", "vatCategory", "translations"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -16014,6 +16109,13 @@ func (ec *executionContext) unmarshalInputUpdateProductInput(ctx context.Context
 				return it, err
 			}
 			it.IsHalal = data
+		case "isLunchOnly":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isLunchOnly"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IsLunchOnly = data
 		case "isSpicy":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("isSpicy"))
 			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
@@ -17804,6 +17906,11 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "isLunchOnly":
+			out.Values[i] = ec._Product_isLunchOnly(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		case "isSpicy":
 			out.Values[i] = ec._Product_isSpicy(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -19073,6 +19180,11 @@ func (ec *executionContext) _TimeSlot(ctx context.Context, sel ast.SelectionSet,
 			}
 		case "value":
 			out.Values[i] = ec._TimeSlot_value(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isLunchOnlyAllowed":
+			out.Values[i] = ec._TimeSlot_isLunchOnlyAllowed(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

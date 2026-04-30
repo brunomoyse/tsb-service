@@ -10,7 +10,7 @@ import (
 
 // ProductService defines the application service interface for product operations.
 type ProductService interface {
-	CreateProduct(ctx context.Context, categoryID uuid.UUID, price decimal.Decimal, code *string, pieceCount *int, isVisible bool, isAvailable bool, isHalal bool, isVegetarian bool, isSpicy bool, isDiscountable bool, vatCategory domain.VatCategory, translations []domain.Translation) (*domain.Product, error)
+	CreateProduct(ctx context.Context, categoryID uuid.UUID, price decimal.Decimal, code *string, pieceCount *int, isVisible bool, isAvailable bool, isHalal bool, isVegetarian bool, isSpicy bool, isLunchOnly bool, isDiscountable bool, vatCategory domain.VatCategory, translations []domain.Translation) (*domain.Product, error)
 	GetProduct(ctx context.Context, id uuid.UUID) (*domain.Product, error)
 	GetProducts(ctx context.Context) ([]*domain.Product, error)
 	GetProductsByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error)
@@ -62,6 +62,7 @@ func (s *productService) CreateProduct(
 	isHalal bool,
 	isVegetarian bool,
 	isSpicy bool,
+	isLunchOnly bool,
 	isDiscountable bool,
 	vatCategory domain.VatCategory,
 	translations []domain.Translation,
@@ -78,6 +79,7 @@ func (s *productService) CreateProduct(
 	product.IsHalal = isHalal
 	product.IsVegetarian = isVegetarian
 	product.IsSpicy = isSpicy
+	product.IsLunchOnly = isLunchOnly
 	product.IsDiscountable = isDiscountable
 
 	if err := s.repo.Create(ctx, product); err != nil {
