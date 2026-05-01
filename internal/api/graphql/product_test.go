@@ -379,8 +379,9 @@ func TestCreateProduct(t *testing.T) {
 			"isVisible":      true,
 			"isAvailable":    true,
 			"isHalal":        false,
-			"isVegetarian":        false,
+			"isVegetarian":   false,
 			"isSpicy":        false,
+			"isLunchOnly":    false,
 			"isDiscountable": true,
 			"vatCategory":    "food",
 			"translations": []map[string]any{
@@ -443,8 +444,9 @@ func TestCreateProduct(t *testing.T) {
 			"isVisible":      true,
 			"isAvailable":    true,
 			"isHalal":        false,
-			"isVegetarian":        false,
+			"isVegetarian":   false,
 			"isSpicy":        false,
+			"isLunchOnly":    false,
 			"isDiscountable": true,
 			"vatCategory":    "food",
 			"translations": []map[string]any{
