@@ -7,7 +7,7 @@ import (
 	"tsb-service/pkg/db"
 )
 
-const configColumns = `ordering_enabled, opening_hours, ordering_hours, preparation_minutes, updated_at`
+const configColumns = `ordering_enabled, opening_hours, COALESCE(ordering_hours, 'null'::jsonb) AS ordering_hours, preparation_minutes, updated_at`
 
 type RestaurantRepository struct {
 	pool *db.DBPool
