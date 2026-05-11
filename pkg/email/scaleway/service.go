@@ -754,8 +754,7 @@ func SendReadyTimeUpdatedEmail(user userDomain.User, lang string, order orderDom
 func SendDeletionRequestEmail(user userDomain.User) error {
 	newReq := *baseReq
 
-	// Send to admin (the sender email)
-	adminEmail := os.Getenv("SCW_SENDER_EMAIL")
+	adminEmail := os.Getenv("DELETION_REQUEST_RECIPIENT_EMAIL")
 	adminName := "Tokyo Sushi Bar Admin"
 	newReq.To = []*temv1alpha1.CreateEmailRequestAddress{
 		{
@@ -839,8 +838,7 @@ func SendReengagementEmail(user userDomain.User, lang string) error {
 func SendFeedbackEmail(name, email, serviceType, feedbackType, message, lang string) error {
 	newReq := *baseReq
 
-	// Send to admin (same pattern as SendDeletionRequestEmail)
-	adminEmail := os.Getenv("SCW_SENDER_EMAIL")
+	adminEmail := os.Getenv("FEEDBACK_RECIPIENT_EMAIL")
 	adminName := "Tokyo Sushi Bar Admin"
 	newReq.To = []*temv1alpha1.CreateEmailRequestAddress{
 		{
