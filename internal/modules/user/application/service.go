@@ -2,13 +2,35 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/nyaruka/phonenumbers"
 	"go.uber.org/zap"
 
 	"tsb-service/internal/modules/user/domain"
 	es "tsb-service/pkg/email/scaleway"
 )
+
+// ErrInvalidPhoneNumber is returned when a phone number cannot be parsed into E.164 form.
+// Default region is BE: a leading "0" parses as a Belgian national number; a leading "+" parses as international.
+var ErrInvalidPhoneNumber = errors.New("invalid phone number")
+
+// normalizePhoneNumber parses raw input into E.164 form (e.g. "+32470123456").
+// Returns nil + nil for empty input (caller decides whether to clear the column).
+func normalizePhoneNumber(raw string) (*string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, nil
+	}
+	parsed, err := phonenumbers.Parse(trimmed, "BE")
+	if err != nil || !phonenumbers.IsValidNumber(parsed) {
+		return nil, ErrInvalidPhoneNumber
+	}
+	e164 := phonenumbers.Format(parsed, phonenumbers.E164)
+	return &e164, nil
+}
 
 type UserService interface {
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
@@ -67,7 +89,11 @@ func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *st
 		user.Email = *email
 	}
 	if phoneNumber != nil {
-		user.PhoneNumber = phoneNumber
+		normalized, err := normalizePhoneNumber(*phoneNumber)
+		if err != nil {
+			return nil, err
+		}
+		user.PhoneNumber = normalized
 	}
 	if addressPlaceID != nil {
 		// Empty string clears the saved default address; non-empty sets it.

@@ -15,6 +15,7 @@ require (
 	github.com/gosimple/slug v1.15.0
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/jmoiron/sqlx v1.4.0
+	github.com/nyaruka/phonenumbers v1.7.4
 	github.com/ory/dockertest/v3 v3.12.0
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.36
