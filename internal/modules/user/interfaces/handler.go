@@ -1,6 +1,7 @@
 package interfaces
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -68,6 +69,10 @@ func (h *UserHandler) UpdateMeHandler(c *gin.Context) {
 
 	user, err := h.service.UpdateMe(ctx, userID, req.FirstName, req.LastName, req.Email, req.PhoneNumber, req.AddressPlaceID, nil, nil)
 	if err != nil {
+		if errors.Is(err, application.ErrInvalidPhoneNumber) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid phone number"})
+			return
+		}
 		logging.FromContext(ctx).Error("failed to update user profile", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user profile"})
 		return
