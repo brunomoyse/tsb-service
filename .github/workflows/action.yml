@@ -82,6 +82,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
+            --build-arg APP_VERSION=${{ github.ref_name }} \
             --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:production \
             --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
             --push \
