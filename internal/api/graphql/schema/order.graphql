@@ -157,7 +157,6 @@ extend type Mutation {
     updateOrder(id: ID!, input: UpdateOrderInput!): Order! @staff
 
     # Push notification token management
-    registerLiveActivityToken(orderId: ID!, pushToken: String!): Boolean! @auth
     registerDeviceToken(deviceToken: String!, platform: String!): Boolean! @auth
     unregisterDeviceToken(deviceToken: String!): Boolean! @auth
 }
