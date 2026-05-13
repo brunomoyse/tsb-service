@@ -8,6 +8,7 @@ import (
 	"tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/logging"
+	"tsb-service/pkg/money"
 	"tsb-service/pkg/utils"
 
 	"github.com/google/uuid"
@@ -62,7 +63,10 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 			computedTotal = computedTotal.Add(o.TransactionFee)
 		}
 
-		o.TotalPrice = computedTotal
+		// Snap the total to 0,10 € — defensive: with rounded discounts and
+		// .x0-priced products this is already a no-op, but it guards future
+		// pricing changes (.x5 unit prices, fractional delivery fees, etc.).
+		o.TotalPrice = money.RoundToNearest10Cents(computedTotal)
 	}
 
 	// Insert the order record.

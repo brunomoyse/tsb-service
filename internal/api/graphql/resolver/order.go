@@ -26,6 +26,7 @@ import (
 	"tsb-service/pkg/apns"
 	es "tsb-service/pkg/email/scaleway"
 	"tsb-service/pkg/fcm"
+	"tsb-service/pkg/money"
 	"tsb-service/pkg/utils"
 
 	"github.com/google/uuid"
@@ -312,7 +313,9 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 	}
 
-	// Compute takeaway discount for PICKUP orders (10% on discountable items, only when subtotal ≥ 20€)
+	// Compute takeaway discount for PICKUP orders (10% on discountable items, only when subtotal ≥ 20€).
+	// The raw 10% is then rounded to 0,10 € so the customer sees a clean
+	// multiple of 10 cents on every surface (cart, receipt, Mollie).
 	takeawayDiscount := decimal.Zero
 	if odType == orderDomain.OrderTypePickUp && total.GreaterThanOrEqual(decimal.NewFromInt(20)) {
 		discountMap := make(map[uuid.UUID]bool, len(products))
@@ -324,6 +327,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 				takeawayDiscount = takeawayDiscount.Add(item.TotalPrice.Mul(decimal.NewFromFloat(0.10)))
 			}
 		}
+		takeawayDiscount = money.RoundToNearest10Cents(takeawayDiscount)
 	}
 
 	// Validate and apply coupon discount (stacks with pickup discount)
@@ -335,18 +339,18 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		if err != nil {
 			return nil, fmt.Errorf("invalid coupon: %w", err)
 		}
-		couponDiscount = cd
+		couponDiscount = money.RoundToNearest10Cents(cd)
 		couponCode = input.CouponCode
 		validatedCouponID = &coupon.ID
 	}
 
-	// Ensure combined discounts never exceed the order total
+	// Ensure combined discounts never exceed the order total.
 	totalDiscount := takeawayDiscount.Add(couponDiscount)
 	if totalDiscount.GreaterThan(total) {
-		// Scale both proportionally
+		// Scale both proportionally, then snap to 0,10 €.
 		ratio := total.Div(totalDiscount)
-		takeawayDiscount = takeawayDiscount.Mul(ratio).Round(2)
-		couponDiscount = total.Sub(takeawayDiscount)
+		takeawayDiscount = money.RoundToNearest10Cents(takeawayDiscount.Mul(ratio))
+		couponDiscount = money.RoundToNearest10Cents(total.Sub(takeawayDiscount))
 	}
 
 	var extras []orderDomain.OrderExtra
