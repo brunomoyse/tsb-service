@@ -92,7 +92,7 @@ func formatOrderRef(orderID string, orderDate time.Time) string {
 	if len(id) > 8 {
 		short = id[len(id)-8:]
 	}
-	return fmt.Sprintf("TSB-%d-%s", orderDate.Year(), strings.ToUpper(short))
+	return fmt.Sprintf("TSB-%d-%s", timezone.In(orderDate).Year(), strings.ToUpper(short))
 }
 
 // GeneratePDF generates a PDF invoice and returns the raw bytes.

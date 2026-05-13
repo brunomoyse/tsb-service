@@ -17,6 +17,7 @@ import (
 	productDomain "tsb-service/internal/modules/product/domain"
 	restaurantDomain "tsb-service/internal/modules/restaurant/domain"
 	userDomain "tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/timezone"
 
 	"github.com/shopspring/decimal"
 )
@@ -431,8 +432,8 @@ func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.R
 		return nil
 	}
 
-	nowLocal := now.In(now.Location())
-	slot := preferred.In(now.Location())
+	nowLocal := timezone.In(now)
+	slot := timezone.In(*preferred)
 
 	if slot.Year() != nowLocal.Year() || slot.Month() != nowLocal.Month() || slot.Day() != nowLocal.Day() {
 		return fmt.Errorf("preferred ready time must be on the same day")
@@ -468,7 +469,7 @@ func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.R
 // same override > ordering hours > opening hours priority as domain resolution.
 func resolveSchedule(config *restaurantDomain.RestaurantConfig, overrides map[string]*restaurantDomain.ScheduleOverride, now time.Time) *restaurantDomain.DaySchedule {
 	// Override for today wins regardless of weekly config.
-	local := now.In(now.Location())
+	local := timezone.In(now)
 	dateKey := local.Format("2006-01-02")
 	if ov, ok := overrides[dateKey]; ok && ov != nil {
 		if ov.Closed {
