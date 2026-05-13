@@ -161,3 +161,29 @@ func TestValidatePreferredReadyTime_RejectsSlotNotAlignedToQuarter(t *testing.T)
 		t.Fatalf("expected slot 12:07 to be rejected for not being quarter-aligned")
 	}
 }
+
+func TestIsOrderUpdateTooLate(t *testing.T) {
+	now := time.Date(2026, 5, 13, 19, 0, 0, 0, time.UTC)
+	ptr := func(d time.Duration) *time.Time {
+		ts := now.Add(d)
+		return &ts
+	}
+	tests := []struct {
+		name string
+		eta  *time.Time
+		want bool
+	}{
+		{"nil ETA never suppresses", nil, false},
+		{"ETA in the future", ptr(30 * time.Minute), false},
+		{"ETA 30 min ago — still inside threshold", ptr(-30 * time.Minute), false},
+		{"ETA exactly 40 min ago — boundary, not yet stale", ptr(-40 * time.Minute), false},
+		{"ETA 41 min ago — over threshold", ptr(-41 * time.Minute), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isOrderUpdateTooLate(now, tt.eta); got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
