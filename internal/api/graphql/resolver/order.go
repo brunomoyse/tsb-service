@@ -36,6 +36,23 @@ import (
 	"go.uber.org/zap"
 )
 
+// lateNotificationThreshold caps how long after the estimated ready time we
+// keep sending status-progression notifications. Beyond this window, the
+// customer has typically already collected the order in real life and a late
+// "your order is ready" email/push is noise, not information.
+const lateNotificationThreshold = 40 * time.Minute
+
+// isOrderUpdateTooLate reports whether now is more than
+// lateNotificationThreshold past the order's estimated ready time. Returns
+// false when estimatedReadyTime is nil — without an anchor we cannot judge
+// timeliness, so the default is to send.
+func isOrderUpdateTooLate(now time.Time, estimatedReadyTime *time.Time) bool {
+	if estimatedReadyTime == nil {
+		return false
+	}
+	return now.Sub(*estimatedReadyTime) > lateNotificationThreshold
+}
+
 // CreateOrder is the resolver for the createOrder field.
 func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error) {
 	// 0) Validate ordering availability and preferred ready time constraints.
@@ -534,6 +551,21 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	// Use the stored order language for all emails (captured at order creation)
 	lang := o.Language
 
+	// Skip progression-status notifications when the update lands well after
+	// the customer has likely already received the order. CANCELLED / FAILED
+	// stay exempt — those carry information regardless of timing (refund,
+	// "your order wasn't fulfilled").
+	suppressLate := isOrderUpdateTooLate(time.Now(), o.EstimatedReadyTime) &&
+		o.OrderStatus != orderDomain.OrderStatusCanceled &&
+		o.OrderStatus != orderDomain.OrderStatusFailed
+	if suppressLate {
+		zap.L().Info("suppressed late order notification",
+			zap.String("order_id", o.ID.String()),
+			zap.String("status", string(o.OrderStatus)),
+			zap.Time("estimated_ready_time", *o.EstimatedReadyTime),
+		)
+	}
+
 	// If new status is "CONFIRMED" or "PREPARING", send the confirmation email
 	if oldOrder.OrderStatus == orderDomain.OrderStatusPending && (o.OrderStatus == orderDomain.OrderStatusConfirmed || o.OrderStatus == orderDomain.OrderStatusPreparing) {
 		go func() {
@@ -607,7 +639,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	// Send order ready email for actionable statuses:
 	// - AWAITING_PICK_UP: pickup customers need to come get their order
 	// - OUT_FOR_DELIVERY: delivery customers need to know food is on its way
-	if o.OrderStatus == orderDomain.OrderStatusAwaitingUp || o.OrderStatus == orderDomain.OrderStatusOutForDelivery {
+	if (o.OrderStatus == orderDomain.OrderStatusAwaitingUp || o.OrderStatus == orderDomain.OrderStatusOutForDelivery) && !suppressLate {
 		go func() {
 			ctx, cancel := emailContext()
 			defer cancel()
@@ -719,7 +751,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	statusChanged := oldOrder.OrderStatus != o.OrderStatus
 	suppressDelivered := oldOrder.OrderStatus == orderDomain.OrderStatusOutForDelivery &&
 		o.OrderStatus == orderDomain.OrderStatusDelivered
-	if r.APNsClient != nil && statusChanged && !suppressDelivered {
+	if r.APNsClient != nil && statusChanged && !suppressDelivered && !suppressLate {
 		go func() {
 			deviceTokens, tokenErr := r.NotificationService.GetDeviceTokens(context.Background(), o.UserID)
 			if tokenErr != nil || len(deviceTokens) == 0 {
