@@ -273,10 +273,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		})
 	}
 
-	// 6) Enforce minimum amounts
-	if odType == orderDomain.OrderTypePickUp && total.LessThan(decimal.NewFromInt(20)) {
-		return nil, fmt.Errorf("minimum order amount for pickup is 20")
-	}
+	// 6) Enforce minimum amounts (pickup has no minimum)
 	if odType == orderDomain.OrderTypeDelivery && total.LessThan(decimal.NewFromInt(25)) {
 		return nil, fmt.Errorf("minimum order amount for delivery is 25")
 	}
@@ -315,9 +312,9 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 	}
 
-	// Compute takeaway discount for PICKUP orders (10% on discountable items)
+	// Compute takeaway discount for PICKUP orders (10% on discountable items, only when subtotal ≥ 20€)
 	takeawayDiscount := decimal.Zero
-	if odType == orderDomain.OrderTypePickUp {
+	if odType == orderDomain.OrderTypePickUp && total.GreaterThanOrEqual(decimal.NewFromInt(20)) {
 		discountMap := make(map[uuid.UUID]bool, len(products))
 		for _, p := range products {
 			discountMap[p.ID] = p.IsDiscountable
