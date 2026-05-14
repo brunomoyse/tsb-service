@@ -17,8 +17,27 @@ func TestProductTranslationFallbackForDutch(t *testing.T) {
 	if got == nil {
 		t.Fatal("expected translation, got nil")
 	}
-	if got.Language != "en" {
-		t.Fatalf("expected english fallback for nl, got %q", got.Language)
+	if got.Language != "fr" {
+		t.Fatalf("expected french fallback for nl (FR is authoritative), got %q", got.Language)
+	}
+}
+
+func TestProductTranslationFallbackSkipsEmptyDutch(t *testing.T) {
+	descFR := "Description francaise"
+
+	p := &Product{
+		Translations: []Translation{
+			{Language: "nl", Name: ""}, // blank NL row must not shadow FR
+			{Language: "fr", Name: "Nom FR", Description: &descFR},
+		},
+	}
+
+	got := p.GetTranslationFor("nl")
+	if got == nil {
+		t.Fatal("expected translation, got nil")
+	}
+	if got.Language != "fr" {
+		t.Fatalf("expected fr when nl name is empty, got %q", got.Language)
 	}
 }
 
@@ -55,7 +74,7 @@ func TestChoiceTranslationFallbackForDutch(t *testing.T) {
 
 func TestTranslationFallbackOrderForDutch(t *testing.T) {
 	got := translationFallbackOrder("nl")
-	want := []string{"nl", "en", "fr", "zh"}
+	want := []string{"nl", "fr", "en", "zh"}
 
 	if len(got) != len(want) {
 		t.Fatalf("expected %d fallback entries, got %d", len(want), len(got))
@@ -100,7 +119,7 @@ func TestTranslationFallbackOrderForFrenchHasZhLast(t *testing.T) {
 
 func TestTranslationFallbackOrderForUnknownHasZhLast(t *testing.T) {
 	got := translationFallbackOrder("de")
-	want := []string{"de", "en", "fr", "nl", "zh"}
+	want := []string{"de", "fr", "en", "nl", "zh"}
 
 	if len(got) != len(want) {
 		t.Fatalf("expected %d fallback entries, got %d", len(want), len(got))

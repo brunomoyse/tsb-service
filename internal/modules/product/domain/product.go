@@ -55,16 +55,20 @@ type ChoiceTranslation struct {
 }
 
 // GetTranslationFor returns the translation matching the given locale.
+// Empty Name values are skipped — a blank row for the requested locale
+// must not shadow a valid translation in the fallback chain.
 func (c *ProductChoice) GetTranslationFor(locale string) string {
 	for _, candidate := range translationFallbackOrder(locale) {
 		for i := range c.Translations {
-			if c.Translations[i].Locale == candidate {
+			if c.Translations[i].Locale == candidate && c.Translations[i].Name != "" {
 				return c.Translations[i].Name
 			}
 		}
 	}
-	if len(c.Translations) > 0 {
-		return c.Translations[0].Name
+	for i := range c.Translations {
+		if c.Translations[i].Name != "" {
+			return c.Translations[i].Name
+		}
 	}
 	return ""
 }
@@ -83,13 +87,15 @@ type ProductOrderDetails struct {
 func (g *ProductChoiceGroup) GetTranslationFor(locale string) string {
     for _, candidate := range translationFallbackOrder(locale) {
         for i := range g.Translations {
-            if g.Translations[i].Locale == candidate {
+            if g.Translations[i].Locale == candidate && g.Translations[i].Name != "" {
                 return g.Translations[i].Name
             }
         }
     }
-    if len(g.Translations) > 0 {
-        return g.Translations[0].Name
+    for i := range g.Translations {
+        if g.Translations[i].Name != "" {
+            return g.Translations[i].Name
+        }
     }
     return ""
 }
@@ -124,13 +130,21 @@ func NewProduct(price decimal.Decimal, categoryID uuid.UUID, isVisible bool, isA
 }
 
 // GetTranslationFor returns the translation matching the given language,
-// or falls back to the first available translation if no exact match is found.
+// or falls back through the configured chain (French first after the
+// requested locale, since FR is the authoring language and always
+// present). Translations with an empty Name are skipped so a blank row
+// for the requested locale does not shadow a valid fallback.
 func (p *Product) GetTranslationFor(language string) *Translation {
 	for _, candidate := range translationFallbackOrder(language) {
 		for i := range p.Translations {
-			if p.Translations[i].Language == candidate {
+			if p.Translations[i].Language == candidate && p.Translations[i].Name != "" {
 				return &p.Translations[i]
 			}
+		}
+	}
+	for i := range p.Translations {
+		if p.Translations[i].Name != "" {
+			return &p.Translations[i]
 		}
 	}
 	if len(p.Translations) > 0 {
