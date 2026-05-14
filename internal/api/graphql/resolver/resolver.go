@@ -4,6 +4,7 @@ package resolver
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -211,9 +212,13 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 			zap.String("message", err.Message),
 		}
 		logger := logging.FromContext(ctx)
-		if expected {
+		switch {
+		case expected:
 			logger.Warn("graphql user error", fields...)
-		} else {
+		case errors.Is(e, context.Canceled) || strings.Contains(e.Error(), "canceling statement due to user request"):
+			// Client disconnected mid-request; log at Warn and skip Sentry.
+			logger.Warn("graphql resolver error (client disconnect)", append(fields, zap.String("query", query))...)
+		default:
 			logger.Error("graphql resolver error", append(fields, zap.String("query", query), zap.Error(e))...)
 			if hub := sentry.GetHubFromContext(ctx); hub != nil {
 				hub.WithScope(func(scope *sentry.Scope) {
