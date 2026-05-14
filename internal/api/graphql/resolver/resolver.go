@@ -4,6 +4,7 @@ package resolver
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -213,19 +214,22 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 		logger := logging.FromContext(ctx)
 		if expected {
 			logger.Warn("graphql user error", fields...)
+	} else {
+		logger.Error("graphql resolver error", append(fields, zap.String("query", query), zap.Error(e))...)
+		// Skip Sentry capture for context cancellation errors (client disconnects, etc.)
+		if errors.Is(e, context.Canceled) || strings.Contains(e.Error(), "canceling statement due to user request") {
+			logger.Warn("graphql resolver error (client disconnect, skipping Sentry)", append(fields, zap.String("query", query))...)
+		} else if hub := sentry.GetHubFromContext(ctx); hub != nil {
+			hub.WithScope(func(scope *sentry.Scope) {
+				scope.SetTag("graphql.operation", opName)
+				scope.SetTag("graphql.path", path)
+				scope.SetContext("graphql", map[string]any{"query": query})
+				hub.CaptureException(e)
+			})
 		} else {
-			logger.Error("graphql resolver error", append(fields, zap.String("query", query), zap.Error(e))...)
-			if hub := sentry.GetHubFromContext(ctx); hub != nil {
-				hub.WithScope(func(scope *sentry.Scope) {
-					scope.SetTag("graphql.operation", opName)
-					scope.SetTag("graphql.path", path)
-					scope.SetContext("graphql", map[string]any{"query": query})
-					hub.CaptureException(e)
-				})
-			} else {
-				sentry.CaptureException(e)
-			}
+			sentry.CaptureException(e)
 		}
+	}
 		return err
 	})
 	h.SetRecoverFunc(func(ctx context.Context, err any) error {
