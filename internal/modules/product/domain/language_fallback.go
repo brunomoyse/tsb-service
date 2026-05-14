@@ -2,20 +2,21 @@ package domain
 
 // translationFallbackOrder returns the preferred language lookup order.
 //
-// For Dutch requests, we explicitly use: nl -> en -> fr -> zh.
-// For other languages, we still prefer the requested language first,
-// then fall back to common menu languages in a stable order.
+// French is always tried immediately after the requested language because
+// FR is the authoring language for every product and is guaranteed to be
+// present in the DB — a missing or empty NL/EN/ZH translation falls back
+// to FR rather than to another partially-translated locale.
 func translationFallbackOrder(language string) []string {
 	switch language {
-	case "nl":
-		return []string{"nl", "en", "fr", "zh"}
-	case "en":
-		return []string{"en", "fr", "nl", "zh"}
 	case "fr":
 		return []string{"fr", "en", "nl", "zh"}
+	case "en":
+		return []string{"en", "fr", "nl", "zh"}
+	case "nl":
+		return []string{"nl", "fr", "en", "zh"}
 	case "zh":
-		return []string{"zh", "en", "fr", "nl"}
+		return []string{"zh", "fr", "en", "nl"}
 	default:
-		return []string{language, "en", "fr", "nl", "zh"}
+		return []string{language, "fr", "en", "nl", "zh"}
 	}
 }

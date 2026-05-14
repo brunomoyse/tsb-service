@@ -25,13 +25,22 @@ func NewCategory(order int, translations []Translation) (*Category, error) {
 	}, nil
 }
 
-// GetTranslationFor returns the translation for the given language, or falls back to the first available.
+// GetTranslationFor returns the translation for the given language,
+// falling back through the configured chain (French first after the
+// requested locale, since FR is the authoring language and always
+// present). Translations with an empty Name are skipped so a blank row
+// does not shadow a valid fallback.
 func (c *Category) GetTranslationFor(language string) *Translation {
 	for _, candidate := range translationFallbackOrder(language) {
 		for i := range c.Translations {
-			if c.Translations[i].Language == candidate {
+			if c.Translations[i].Language == candidate && c.Translations[i].Name != "" {
 				return &c.Translations[i]
 			}
+		}
+	}
+	for i := range c.Translations {
+		if c.Translations[i].Name != "" {
+			return &c.Translations[i]
 		}
 	}
 	if len(c.Translations) > 0 {
