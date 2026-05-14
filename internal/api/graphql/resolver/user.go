@@ -7,15 +7,19 @@ package resolver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderDomain "tsb-service/internal/modules/order/domain"
+	userApplication "tsb-service/internal/modules/user/application"
 	"tsb-service/pkg/utils"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/shopspring/decimal"
+	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
 // UpdateMe is the resolver for the updateMe field.
@@ -35,6 +39,13 @@ func (r *mutationResolver) UpdateMe(ctx context.Context, input model.UpdateUserI
 	)
 
 	if err != nil {
+		if errors.Is(err, userApplication.ErrInvalidPhoneNumber) {
+			return nil, &gqlerror.Error{
+				Message:    "invalid phone number",
+				Path:       graphql.GetPath(ctx),
+				Extensions: map[string]any{"code": "USER_ERROR", "field": "phoneNumber"},
+			}
+		}
 		return nil, err
 	}
 
