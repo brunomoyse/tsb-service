@@ -24,6 +24,7 @@ import (
 	"tsb-service/internal/api/feedback"
 	images "tsb-service/internal/api/images"
 	"tsb-service/internal/api/graphql/resolver"
+	mcpapi "tsb-service/internal/api/mcp"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
 	"tsb-service/pkg/logging"
@@ -385,6 +386,22 @@ func main() {
 	api.POST("/payments/webhook", mollieLimiter.Middleware(), paymentHandler.UpdatePaymentStatusHandler)
 
 	strictAuth := oidcVerifier.StrictAuthMiddleware()
+
+	// MCP (Model Context Protocol) endpoint for the management chatbot.
+	// Auth: Zitadel bearer (admin role required) — typically a service
+	// account PAT carried by the Telegram bot. The streamable HTTP
+	// handler implements both POST (request) and GET (server-side
+	// stream), so we mount via Any.
+	mcpDeps := mcpapi.Deps{
+		Product:    productService,
+		Coupon:     couponService,
+		Restaurant: restaurantService,
+		Order:      orderService,
+	}
+	mcpHandler := mcpapi.WrapHTTPHandler(mcpapi.Handler(mcpDeps))
+	mcpLimiter := middleware.NewRateLimiter(1.0, 20) // 60 req/min per IP, burst 20
+	api.Any("/mcp", mcpLimiter.Middleware(), strictAuth, mcpapi.RequireAdmin(), mcpHandler)
+
 	api.POST("/images/preview", strictAuth, images.PreviewHandler)
 	api.GET("/orders/:id/invoice", strictAuth, orderHandler.DownloadInvoice)
 
