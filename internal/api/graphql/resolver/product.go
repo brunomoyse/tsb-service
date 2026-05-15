@@ -117,6 +117,9 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 	if input.IsSpicy != nil {
 		prod.IsSpicy = *input.IsSpicy
 	}
+	if input.IsDiscountable != nil {
+		prod.IsDiscountable = *input.IsDiscountable
+	}
 	if input.IsLunchOnly != nil {
 		prod.IsLunchOnly = *input.IsLunchOnly
 	}
