@@ -215,9 +215,12 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 		switch {
 		case expected:
 			logger.Warn("graphql user error", fields...)
-		case errors.Is(e, context.Canceled) || strings.Contains(e.Error(), "canceling statement due to user request"):
-			// Client disconnected mid-request; log at Warn and skip Sentry.
-			logger.Warn("graphql resolver error (client disconnect)", append(fields, zap.String("query", query))...)
+		// gqlgen validation errors (client-sent malformed input) and context
+		// cancellation errors (client disconnects) are expected; skip Sentry.
+		case errors.Is(e, context.Canceled) ||
+			strings.Contains(e.Error(), "canceling statement due to user request") ||
+			strings.HasPrefix(e.Error(), "input: "):
+			logger.Warn("graphql resolver error (expected, skipping Sentry)", append(fields, zap.String("query", query))...)
 		default:
 			logger.Error("graphql resolver error", append(fields, zap.String("query", query), zap.Error(e))...)
 			if hub := sentry.GetHubFromContext(ctx); hub != nil {
