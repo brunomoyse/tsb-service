@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -167,7 +168,7 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 	}
 
 	// 2. Try to find existing Zitadel user by the IdP email
-	email := intentInfo.IdpInfo.UserName
+	email := strings.ToLower(strings.TrimSpace(intentInfo.IdpInfo.UserName))
 	if email != "" {
 		userID, findErr := findZitadelUserByEmail(email)
 		if findErr == nil && userID != "" {
