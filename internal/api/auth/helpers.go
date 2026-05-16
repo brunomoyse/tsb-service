@@ -8,8 +8,11 @@ import (
 	"strings"
 )
 
-// findZitadelUserByEmail searches for a Zitadel user by email.
+// findZitadelUserByEmail searches for a Zitadel user by email. The lookup
+// uses TEXT_QUERY_METHOD_EQUALS which is case-sensitive, so the input is
+// normalized to lowercase to match how placeholder users are written.
 func findZitadelUserByEmail(email string) (string, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
 	body := map[string]any{
 		"queries": []map[string]any{
 			{
@@ -134,6 +137,7 @@ const placeholderProfileMarker = "-"
 // (e.g. quota / instance misconfiguration); the caller should treat that as a
 // silent failure and return the enumeration-resistant empty session response.
 func createPlaceholderZitadelUser(email string) (string, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
 	body := map[string]any{
 		"userName": email,
 		"profile": map[string]any{

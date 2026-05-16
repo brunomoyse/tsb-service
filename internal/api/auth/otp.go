@@ -98,6 +98,7 @@ func RequestOtpHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "loginName is required"})
 		return
 	}
+	req.LoginName = strings.ToLower(strings.TrimSpace(req.LoginName))
 
 	lang := req.Lang
 	if lang == "" {
