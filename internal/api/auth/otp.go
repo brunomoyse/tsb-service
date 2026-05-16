@@ -3,6 +3,9 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -12,6 +15,37 @@ import (
 
 	userDomain "tsb-service/internal/modules/user/domain"
 )
+
+/*
+ * E2E_NO_SEND_LOGINS: comma-separated loginNames that bypass the real OTP
+ * email send. Zitadel still creates the session and persists the encrypted
+ * code in events2, so the e2e suite can recover it from the DB without
+ * spamming a real mailbox. Empty / unset in prod disables this entirely.
+ */
+var (
+	noSendLogins     map[string]struct{}
+	noSendLoginsOnce sync.Once
+)
+
+func shouldSkipOtpEmail(loginName string) bool {
+	noSendLoginsOnce.Do(func() {
+		raw := os.Getenv("E2E_NO_SEND_LOGINS")
+		if raw == "" {
+			return
+		}
+		noSendLogins = make(map[string]struct{})
+		for _, l := range strings.Split(raw, ",") {
+			if l = strings.ToLower(strings.TrimSpace(l)); l != "" {
+				noSendLogins[l] = struct{}{}
+			}
+		}
+	})
+	if noSendLogins == nil {
+		return false
+	}
+	_, ok := noSendLogins[strings.ToLower(strings.TrimSpace(loginName))]
+	return ok
+}
 
 // requestOtpBody is the frontend's request to start a passwordless login.
 type requestOtpBody struct {
@@ -154,7 +188,9 @@ func RequestOtpHandler(c *gin.Context) {
 			LastName:  lastName,
 			Email:     req.LoginName,
 		}
-		if err := scaleway.SendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
+		if shouldSkipOtpEmail(req.LoginName) {
+			log.Debug("otp email send skipped via E2E_NO_SEND_LOGINS", zap.String("loginName", req.LoginName))
+		} else if err := scaleway.SendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
 			log.Error("failed to send login otp email", zap.Error(err))
 		}
 	}
@@ -325,7 +361,9 @@ func ResendOtpHandler(c *gin.Context) {
 				FirstName: firstName,
 				Email:     loginName,
 			}
-			if err := scaleway.SendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
+			if shouldSkipOtpEmail(loginName) {
+				log.Debug("otp resend email skipped via E2E_NO_SEND_LOGINS", zap.String("loginName", loginName))
+			} else if err := scaleway.SendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
 				log.Error("failed to send login otp email", zap.Error(err))
 			}
 		}

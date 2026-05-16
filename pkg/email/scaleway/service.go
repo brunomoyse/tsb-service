@@ -13,19 +13,57 @@ import (
 	userDomain "tsb-service/internal/modules/user/domain"
 )
 
-// temClient is our instance for interacting with Scaleway TEM.
+// temClient is our instance for interacting with Scaleway TEM. nil when SMTP backend is active.
 var temClient *temv1alpha1.API
 
 var baseReq *temv1alpha1.CreateEmailRequest
 
-// InitService initializes the Scaleway TEM client using credentials from environment variables.
+/*
+ * SMTP backend configuration. When smtpHost is non-empty (set via SMTP_HOST
+ * env var), dispatch() routes every email through net/smtp instead of the
+ * Scaleway TEM API. Used by dev/e2e against a local Mailpit; safe in prod
+ * for any deployment that prefers SMTP. See smtp.go for the send path.
+ */
+var (
+	smtpHost     string
+	smtpPort     string
+	smtpUser     string
+	smtpPassword string
+)
+
+// InitService initializes the email backend. Picks SMTP when SMTP_HOST is set,
+// otherwise the Scaleway TEM client using credentials from environment variables.
 func InitService() error {
+	senderEmail := os.Getenv("SCW_SENDER_EMAIL")
+	senderName := os.Getenv("SCW_SENDER_NAME")
+	region := os.Getenv("SCW_REGION")
+	projectID := os.Getenv("SCW_DEFAULT_PROJECT_ID")
+
+	smtpHost = os.Getenv("SMTP_HOST")
+	if smtpHost != "" {
+		smtpPort = os.Getenv("SMTP_PORT")
+		if smtpPort == "" {
+			smtpPort = "1025"
+		}
+		smtpUser = os.Getenv("SMTP_USER")
+		smtpPassword = os.Getenv("SMTP_PASSWORD")
+
+		// baseReq still carries From/region/project so Send*Email functions can
+		// build requests identically; dispatch() decides where they go.
+		baseReq = &temv1alpha1.CreateEmailRequest{
+			Region: scw.Region(region),
+			From: &temv1alpha1.CreateEmailRequestAddress{
+				Email: senderEmail,
+				Name:  &senderName,
+			},
+			ProjectID: projectID,
+		}
+		return nil
+	}
+
 	accessKey := os.Getenv("SCW_ACCESS_KEY")
 	secretKey := os.Getenv("SCW_SECRET_KEY")
-
 	organizationID := os.Getenv("SCW_DEFAULT_ORGANIZATION_ID")
-	projectID := os.Getenv("SCW_DEFAULT_PROJECT_ID")
-	region := os.Getenv("SCW_REGION")
 
 	// Create a Scaleway client with your credentials.
 	scwClient, err := scw.NewClient(
@@ -41,9 +79,6 @@ func InitService() error {
 	// Instantiate the TEM API using the Scaleway client.
 	temClient = temv1alpha1.NewAPI(scwClient)
 
-	senderEmail := os.Getenv("SCW_SENDER_EMAIL")
-	senderName := os.Getenv("SCW_SENDER_NAME")
-
 	// Load infos in the base CreateEmailRequest
 	baseReq = &temv1alpha1.CreateEmailRequest{
 		Region: scw.Region(region),
@@ -57,9 +92,20 @@ func InitService() error {
 	return nil
 }
 
-// IsInitialized returns true if the Scaleway TEM client has been initialized.
+// IsInitialized returns true if either email backend has been initialized.
 func IsInitialized() bool {
 	return baseReq != nil
+}
+
+// dispatch delivers an email through the active backend (SMTP if SMTP_HOST is
+// set, otherwise Scaleway TEM). Centralized so every Send*Email function flows
+// through one switch point.
+func dispatch(req *temv1alpha1.CreateEmailRequest) error {
+	if smtpHost != "" {
+		return sendViaSMTP(req)
+	}
+	_, err := temClient.CreateEmail(req)
+	return err
 }
 
 // orderThreadHeaders returns RFC 5322 headers that group every email for one
@@ -121,7 +167,7 @@ func SendVerificationEmail(user userDomain.User, lang string, verificationURL st
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
 	// Send the email using the Scaleway TEM API.
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -177,7 +223,7 @@ func SendWelcomeEmail(user userDomain.User, lang, menuURL string) error {
 	newReq.Text = plainTextContent
 
 	// Send the email using the Scaleway TEM API.
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -233,7 +279,7 @@ func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.
 	newReq.AdditionalHeaders = orderThreadHeaders(order.ID.String())
 
 	// Send the email using the Scaleway TEM API.
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -289,7 +335,7 @@ func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomai
 	newReq.AdditionalHeaders = orderThreadHeaders(order.ID.String())
 
 	// Send the email using the Scaleway TEM API.
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -348,7 +394,7 @@ func SendLoginOtpEmail(user userDomain.User, lang string, code string) error {
 	newReq.Text = plainTextContent
 
 	// Send the email using the Scaleway TEM API.
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -444,7 +490,7 @@ func SendOrderCanceledEmail(user userDomain.User, lang string, orderID string, r
 	newReq.AdditionalHeaders = orderThreadHeaders(orderID)
 
 	// Send the email using the Scaleway TEM API.
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -504,7 +550,7 @@ func SendOrderReadyEmail(user userDomain.User, lang string, order orderDomain.Or
 	newReq.Text = plainTextContent
 	newReq.AdditionalHeaders = orderThreadHeaders(order.ID.String())
 
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -551,7 +597,7 @@ func SendOrderCompletedEmail(user userDomain.User, lang string) error {
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
 
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -599,7 +645,7 @@ func SendPaymentFailedEmail(user userDomain.User, lang string, orderID string) e
 	newReq.Text = plainTextContent
 	newReq.AdditionalHeaders = orderThreadHeaders(orderID)
 
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -647,7 +693,7 @@ func SendRefundIssuedEmail(user userDomain.User, lang string, orderID string, re
 	newReq.Text = plainTextContent
 	newReq.AdditionalHeaders = orderThreadHeaders(orderID)
 
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -694,7 +740,7 @@ func SendAccountLinkedEmail(user userDomain.User, lang string) error {
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
 
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -742,7 +788,7 @@ func SendReadyTimeUpdatedEmail(user userDomain.User, lang string, order orderDom
 	newReq.Text = plainTextContent
 	newReq.AdditionalHeaders = orderThreadHeaders(order.ID.String())
 
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -779,7 +825,7 @@ func SendDeletionRequestEmail(user userDomain.User) error {
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
 
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -826,7 +872,7 @@ func SendReengagementEmail(user userDomain.User, lang string) error {
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
 
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -863,7 +909,7 @@ func SendFeedbackEmail(name, email, serviceType, feedbackType, message, lang str
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
 
-	_, err = temClient.CreateEmail(&newReq)
+	err = dispatch(&newReq)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
