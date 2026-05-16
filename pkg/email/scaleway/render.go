@@ -548,32 +548,6 @@ func renderOrderCompletedEmailText(path string, u userDomain.User) (string, erro
 }
 
 // --------------------------------------------------------------------------------
-// Payment Failed
-// --------------------------------------------------------------------------------
-
-func preparePaymentFailedData(u userDomain.User) any {
-	return struct {
-		UserName string
-		MenuLink string
-		LogoURL  string
-	}{
-		UserName: formatUserName(u),
-		MenuLink: os.Getenv("APP_BASE_URL"),
-		LogoURL:  logoURL(),
-	}
-}
-
-func renderPaymentFailedEmailHTML(path string, u userDomain.User) (string, error) {
-	data := preparePaymentFailedData(u)
-	return renderEmail(path, data, loadHTMLTemplate)
-}
-
-func renderPaymentFailedEmailText(path string, u userDomain.User) (string, error) {
-	data := preparePaymentFailedData(u)
-	return renderEmail(path, data, loadTextTemplate)
-}
-
-// --------------------------------------------------------------------------------
 // Refund Issued
 // --------------------------------------------------------------------------------
 

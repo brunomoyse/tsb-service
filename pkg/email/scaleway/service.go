@@ -606,54 +606,6 @@ func SendOrderCompletedEmail(user userDomain.User, lang string) error {
 	return nil
 }
 
-func SendPaymentFailedEmail(user userDomain.User, lang string, orderID string) error {
-	newReq := *baseReq
-
-	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
-	to := temv1alpha1.CreateEmailRequestAddress{
-		Email: user.Email,
-		Name:  &userFullName,
-	}
-	newReq.To = append(newReq.To, &to)
-
-	path := fmt.Sprintf("templates/%s/payment-failed", lang)
-
-	htmlContent, err := renderPaymentFailedEmailHTML(path, user)
-	if err != nil {
-		return fmt.Errorf("failed to render email template: %w", err)
-	}
-
-	plainTextContent, err := renderPaymentFailedEmailText(path, user)
-	if err != nil {
-		return fmt.Errorf("failed to render email template: %w", err)
-	}
-
-	subjects := map[string]string{
-		"en": "Payment unsuccessful",
-		"fr": "Paiement non abouti",
-		"zh": "付款未成功",
-		"nl": "Betaling mislukt",
-	}
-
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
-
-	newReq.Subject = subject
-	newReq.HTML = htmlContent
-	newReq.Text = plainTextContent
-	newReq.AdditionalHeaders = orderThreadHeaders(orderID)
-
-	err = dispatch(&newReq)
-	if err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-
-	logger.Debugf("Email sent to %s with subject: %s", user.Email, subject)
-	return nil
-}
-
 func SendRefundIssuedEmail(user userDomain.User, lang string, orderID string, refundAmount string) error {
 	newReq := *baseReq
 
