@@ -196,7 +196,7 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 	// given_name/family_name) must be read from the raw Claims map. If the
 	// JWT doesn't carry them at all (common for social-IdP logins), the user
 	// service falls back to fetching from Zitadel's user API.
-	email := claimString(authCtx.Claims, "email")
+	email := strings.ToLower(strings.TrimSpace(claimString(authCtx.Claims, "email")))
 	givenName := claimString(authCtx.Claims, "given_name")
 	familyName := claimString(authCtx.Claims, "family_name")
 

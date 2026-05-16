@@ -3,12 +3,20 @@ package infrastructure
 import (
 	"context"
 	"fmt"
+	"strings"
 	"tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/db"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
+
+// normalizeEmail is a defense-in-depth duplicate of the application-layer
+// helper — every email written to or queried from the users table goes through
+// it so capitalisation can never leak into storage even if a caller forgets.
+func normalizeEmail(raw string) string {
+	return strings.ToLower(strings.TrimSpace(raw))
+}
 
 type UserRepository struct {
 	pool *db.DBPool
@@ -19,6 +27,7 @@ func NewUserRepository(pool *db.DBPool) domain.UserRepository {
 }
 
 func (r *UserRepository) Save(ctx context.Context, user *domain.User) (uuid.UUID, error) {
+	user.Email = normalizeEmail(user.Email)
 	query := `
 		INSERT INTO users (first_name, last_name, email, phone_number, address_id, zitadel_user_id)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -39,7 +48,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 		FROM users
 		WHERE email = $1;
 	`
-	if err := r.pool.ForContext(ctx).GetContext(ctx, &u, query, email); err != nil {
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &u, query, normalizeEmail(email)); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -72,6 +81,7 @@ func (r *UserRepository) FindByZitadelID(ctx context.Context, zitadelID string) 
 }
 
 func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) (*domain.User, error) {
+	user.Email = normalizeEmail(user.Email)
 	query := `
 		UPDATE users
 		SET first_name = $1, last_name = $2, email = $3, phone_number = $4, address_id = $5, default_place_id = $6, notify_marketing = $7, notify_order_updates = $8, zitadel_user_id = $9

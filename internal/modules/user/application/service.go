@@ -17,6 +17,14 @@ import (
 // Default region is BE: a leading "0" parses as a Belgian national number; a leading "+" parses as international.
 var ErrInvalidPhoneNumber = errors.New("invalid phone number")
 
+// normalizeEmail lowercases and trims surrounding whitespace.
+// Email comparison is case-insensitive per RFC 5321 §2.4 for the domain part,
+// and storing a single canonical form prevents duplicate accounts when callers
+// vary capitalisation between login and registration.
+func normalizeEmail(raw string) string {
+	return strings.ToLower(strings.TrimSpace(raw))
+}
+
 // normalizePhoneNumber parses raw input into E.164 form (e.g. "+32470123456").
 // Returns nil + nil for empty input (caller decides whether to clear the column).
 func normalizePhoneNumber(raw string) (*string, error) {
@@ -70,7 +78,7 @@ func (s *userService) GetUserByID(ctx context.Context, id string) (*domain.User,
 }
 
 func (s *userService) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
-	return s.repo.FindByEmail(ctx, email)
+	return s.repo.FindByEmail(ctx, normalizeEmail(email))
 }
 
 func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressPlaceID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error) {
@@ -86,7 +94,7 @@ func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *st
 		user.LastName = *lastName
 	}
 	if email != nil {
-		user.Email = *email
+		user.Email = normalizeEmail(*email)
 	}
 	if phoneNumber != nil {
 		normalized, err := normalizePhoneNumber(*phoneNumber)
@@ -139,6 +147,7 @@ func (s *userService) CancelDeletionRequest(ctx context.Context, userID string) 
 
 func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, email, firstName, lastName string) (*domain.User, error) {
 	log := zap.L().With(zap.String("zitadel_sub", zitadelID))
+	email = normalizeEmail(email)
 
 	// Try to find existing user by Zitadel ID
 	user, err := s.repo.FindByZitadelID(ctx, zitadelID)
@@ -225,7 +234,7 @@ func (s *userService) enrichFromZitadel(ctx context.Context, zitadelID, email, f
 		return email, firstName, lastName
 	}
 	if email == "" {
-		email = zEmail
+		email = normalizeEmail(zEmail)
 	}
 	if firstName == "" {
 		firstName = zFirst
