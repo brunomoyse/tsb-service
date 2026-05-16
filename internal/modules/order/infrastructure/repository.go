@@ -347,7 +347,11 @@ func (r *OrderRepository) FindFiltered(ctx context.Context, filter domain.OrderH
 		filter.Limit = 20
 	}
 
-	var conditions []string
+	// The order-history view tracks fulfilled business — cancelled and failed
+	// orders never count toward revenue, average, or the listing. Pin these
+	// exclusions server-side so the summary aggregates and the page list stay
+	// consistent regardless of the filters the caller supplies.
+	conditions := []string{"o.order_status NOT IN ('CANCELLED', 'FAILED')"}
 	var args []any
 	idx := 1
 
