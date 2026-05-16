@@ -20,7 +20,8 @@ COPY . .
 # Step 7: Build the Go app and migration tool with cross-compilation support
 ENV GIN_MODE=release
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-service cmd/app/main.go && \
-    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-migrate cmd/migrate/main.go
+    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-migrate cmd/migrate/main.go && \
+    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-zitadel-lowercase-emails cmd/zitadel-lowercase-emails/main.go
 
 # Step 7: Use base alpine image to create the final image
 FROM alpine:3.23
@@ -34,6 +35,7 @@ WORKDIR /app
 # Step 10: Copy binaries and migration files from the build container
 COPY --from=builder /app/tsb-service .
 COPY --from=builder /app/tsb-migrate .
+COPY --from=builder /app/tsb-zitadel-lowercase-emails .
 COPY --from=builder /app/migrations ./migrations
 
 # Step 11: Switch to non-root user
