@@ -28,8 +28,9 @@ import (
 const userPageSize = 100
 
 type userRecord struct {
-	UserID string `json:"userId"`
-	Human  struct {
+	UserID   string `json:"userId"`
+	Username string `json:"username"`
+	Human    struct {
 		Email struct {
 			Email      string `json:"email"`
 			IsVerified bool   `json:"isVerified"`
@@ -143,26 +144,31 @@ func main() {
 				continue
 			}
 			drift++
+			// If username == old email (placeholder users created by
+			// createPlaceholderZitadelUser fit this pattern), the username
+			// must be rewritten too — Zitadel's SetEmail endpoint touches the
+			// email field only, leaving username/loginNames stale.
+			usernameNeedsUpdate := u.Username == original
 			log.Info("drift detected",
 				zap.String("user_id", u.UserID),
 				zap.String("from", original),
 				zap.String("to", canonical),
 				zap.Bool("verified", u.Human.Email.IsVerified),
+				zap.Bool("rewrite_username", usernameNeedsUpdate),
 			)
 			if *dryRun {
 				continue
 			}
 
+			// SetEmail body: oneof verification at top level — `isVerified: true`
+			// preserves verified status for casing-only changes. Omitting the
+			// flag leaves the email unverified, which is the right default for
+			// rows that were unverified to begin with.
 			updateBody := map[string]any{
 				"email": canonical,
 			}
-			// Preserve existing verification state — for a casing-only change,
-			// the address is the same RFC-wise, so a previously-verified email
-			// stays verified. Unverified addresses stay unverified (no
-			// verification field sent, which Zitadel treats as "unverified,
-			// no code sent").
 			if u.Human.Email.IsVerified {
-				updateBody["verification"] = map[string]any{"isVerified": true}
+				updateBody["isVerified"] = true
 			}
 			updateResp, updateStatus, err := call("POST", "/v2/users/"+u.UserID+"/email", updateBody)
 			if err != nil {
@@ -182,6 +188,34 @@ func main() {
 				)
 				continue
 			}
+
+			if usernameNeedsUpdate {
+				// The v2 API has no username endpoint; fall back to the
+				// management v1 surface which exposes it as a PUT.
+				unameResp, unameStatus, err := call(
+					"PUT",
+					"/management/v1/users/"+u.UserID+"/username",
+					map[string]any{"userName": canonical},
+				)
+				if err != nil {
+					failed++
+					log.Error("update username failed",
+						zap.String("user_id", u.UserID),
+						zap.Error(err),
+					)
+					continue
+				}
+				if unameStatus != http.StatusOK {
+					failed++
+					log.Error("update username returned non-200",
+						zap.String("user_id", u.UserID),
+						zap.Int("status", unameStatus),
+						zap.ByteString("body", unameResp),
+					)
+					continue
+				}
+			}
+
 			updated++
 		}
 
