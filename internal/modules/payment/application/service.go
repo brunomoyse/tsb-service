@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
@@ -369,14 +368,16 @@ func (s *paymentService) HandlePaymentPaid(ctx context.Context, orderID uuid.UUI
 }
 
 // HandlePaymentFailed handles the business logic when a payment is cancelled/failed/expired:
-// updates order status to CANCELLED and sends failure email.
+// updates order status to CANCELLED and rolls back coupon usage. No email is sent —
+// users frequently retry the checkout in a fresh order, and a failure notification on
+// the abandoned attempt would contradict the successful retry.
 func (s *paymentService) HandlePaymentFailed(ctx context.Context, orderID uuid.UUID) (*orderDomain.Order, error) {
 	canceledStatus := orderDomain.OrderStatusCanceled
 	if err := s.orderService.UpdateOrder(ctx, orderID, &canceledStatus, nil, nil); err != nil {
 		return nil, fmt.Errorf("failed to update order status: %w", err)
 	}
 
-	// Fetch the updated order for PubSub notification and email
+	// Fetch the updated order for PubSub notification
 	order, _, orderErr := s.orderService.GetOrderByID(ctx, orderID)
 	if orderErr != nil || order == nil {
 		zap.L().Error("failed to retrieve order after payment failure", zap.String("order_id", orderID.String()), zap.Error(orderErr))
@@ -399,24 +400,6 @@ func (s *paymentService) HandlePaymentFailed(ctx context.Context, orderID uuid.U
 				zap.Error(dErr))
 		}
 	}
-
-	// Send failure email asynchronously
-	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		u, userErr := s.userService.GetUserByID(bgCtx, order.UserID.String())
-		if userErr != nil {
-			zap.L().Error("failed to retrieve user for payment failed email", zap.String("order_id", orderID.String()), zap.Error(userErr))
-			return
-		}
-
-		if u.NotifyOrderUpdates {
-			if emailErr := es.SendPaymentFailedEmail(*u, order.Language, orderID.String()); emailErr != nil {
-				zap.L().Error("failed to send payment failed email", zap.String("order_id", orderID.String()), zap.Error(emailErr))
-			}
-		}
-	}()
 
 	return order, nil
 }
