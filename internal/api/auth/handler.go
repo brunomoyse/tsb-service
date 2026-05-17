@@ -115,6 +115,9 @@ func FinalizeOIDCHandler(c *gin.Context) {
 
 	finalResp := finalizeResponse{CallbackURL: finalURL}
 	finalizeGate.cache(entry, req.SessionID, finalResp)
+	logging.FromContext(c.Request.Context()).Info("oidc finalize callback resolved",
+		zap.String("zitadel_callback", zResp.CallbackURL),
+		zap.String("final_callback", finalURL))
 	c.JSON(http.StatusOK, finalResp)
 }
 
