@@ -18,6 +18,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
 	"tsb-service/internal/api/auth"
@@ -276,6 +277,7 @@ func main() {
 	router.Use(gin.Recovery())
 	router.Use(middleware.RequestIDMiddleware())
 	router.Use(middleware.ZapRequestLogger())
+	router.Use(middleware.PrometheusMetrics())
 	router.Use(middleware.SentryContext())
 	router.RedirectTrailingSlash = true
 	router.RedirectFixedPath = true
@@ -322,6 +324,11 @@ func main() {
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 		c.Next()
 	})
+
+	// Prometheus scrape endpoint. Registered at the router level (outside
+	// /api/v1) so it isn't auth/rate-limited/CORS'd. Public ingress only
+	// forwards /api/v1/* and /auth/*, so this stays in-cluster.
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// API routes
 	api := router.Group("/api/v1")
