@@ -95,29 +95,19 @@ func FinalizeOIDCHandler(c *gin.Context) {
 		return
 	}
 
-	// Follow the Zitadel callback URL to get the final redirect with code+state.
-	// This is needed for Capacitor apps where the frontend can't follow HTTP→custom-scheme redirects.
+	// Zitadel returns the final OIDC-client redirect URL (with ?code+&state)
+	// directly. For http(s) clients we MUST return it as-is: doing a server-side
+	// GET would (a) consume the one-shot OAuth code and (b) hit confidential
+	// clients without their state cookie, getting bounced to /login with a
+	// relative redirect that we'd then mis-resolve.
+	//
+	// Custom-scheme URIs (Capacitor: be.tokyosushibarliege.app:/) can't be
+	// fetched server-side anyway; the frontend extracts the code from the
+	// URL and exchanges it via /auth/token-exchange.
 	finalURL := zResp.CallbackURL
-	httpClient := &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// Capture the redirect URL without following it
-			finalURL = req.URL.String()
-			return http.ErrUseLastResponse
-		},
-	}
-	resp, err := httpClient.Get(zResp.CallbackURL)
-	if err == nil {
-		_ = resp.Body.Close()
-		if loc := resp.Header.Get("Location"); loc != "" {
-			finalURL = loc
-		}
-	}
 
 	finalResp := finalizeResponse{CallbackURL: finalURL}
 	finalizeGate.cache(entry, req.SessionID, finalResp)
-	logging.FromContext(c.Request.Context()).Info("oidc finalize callback resolved",
-		zap.String("zitadel_callback", zResp.CallbackURL),
-		zap.String("final_callback", finalURL))
 	c.JSON(http.StatusOK, finalResp)
 }
 
