@@ -149,6 +149,8 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 						// columns and produce "invalid input syntax for type
 						// uuid". Leave userID empty so the @auth directive
 						// sees no authenticated user and returns UNAUTHENTICATED.
+						zap.L().Warn("failed to resolve Zitadel user on WS init — proceeding unauthenticated",
+							zap.String("sub", sub), zap.Error(lookupErr))
 						return ctx, &initPayload, nil
 					}
 					ctx = utils.SetUserID(ctx, appID)

@@ -170,6 +170,26 @@ func extractToken(c *gin.Context) string {
 	return ""
 }
 
+// resolveAppUserID resolves a Zitadel sub to an app user UUID via the
+// configured userLookup (with JIT provisioning). Returns ("", false) if no
+// lookup is configured or resolution fails. Callers should refuse the request
+// when ok is false — raw subs may be opaque provider identifiers (e.g. Google
+// numeric IDs) that break Postgres UUID columns downstream.
+func (v *OIDCVerifier) resolveAppUserID(ctx context.Context, sub, email, givenName, familyName string) (string, bool) {
+	if v.userLookup == nil {
+		zap.L().Warn("OIDC verifier has no userLookup configured — refusing request",
+			zap.String("sub", sub))
+		return "", false
+	}
+	appID, err := v.userLookup.ResolveZitadelID(ctx, sub, email, givenName, familyName)
+	if err != nil {
+		zap.L().Warn("failed to resolve Zitadel user — refusing request",
+			zap.String("sub", sub), zap.Error(err))
+		return "", false
+	}
+	return appID, true
+}
+
 // verifyAndSetContext verifies the JWT and sets userID/isAdmin in context.
 func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool {
 	authCtx, err := v.authorizer.CheckAuthorization(c.Request.Context(), "Bearer "+tokenStr)
@@ -209,24 +229,8 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 	)
 
 	// Resolve Zitadel sub → app user UUID (with JIT provisioning)
-	if v.userLookup == nil {
-		// No user lookup configured — we cannot resolve the Zitadel sub to an
-		// app user UUID. Refuse the request rather than risking a raw sub
-		// (often a numeric Google user ID) hitting Postgres UUID columns.
-		zap.L().Warn("OIDC verifier has no userLookup configured — refusing request",
-			zap.String("sub", sub))
-		return false
-	}
-	appID, lookupErr := v.userLookup.ResolveZitadelID(
-		c.Request.Context(), sub, email, givenName, familyName,
-	)
-	// On resolution failure, don't fall back to the raw sub — it's an
-	// opaque provider identifier (e.g. a Google numeric user ID) that
-	// downstream code expects to be a UUID. Setting it causes
-	// "pq: invalid input syntax for type uuid" on any user table lookup.
-	if lookupErr != nil {
-		zap.L().Warn("failed to resolve Zitadel user — refusing request",
-			zap.String("sub", sub), zap.Error(lookupErr))
+	appID, ok := v.resolveAppUserID(c.Request.Context(), sub, email, givenName, familyName)
+	if !ok {
 		return false
 	}
 	ctx := utils.SetUserID(c.Request.Context(), appID)
