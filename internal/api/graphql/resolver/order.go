@@ -74,7 +74,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			return nil, &gqlerror.Error{
 				Message:    err.Error(),
 				Path:       graphql.GetPath(ctx),
-				Extensions: map[string]any{"code": "USER_ERROR"},
+				Extensions: map[string]any{"code": "USER_ERROR", "field": "preferredReadyTime"},
 			}
 		}
 
