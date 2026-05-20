@@ -170,6 +170,26 @@ func extractToken(c *gin.Context) string {
 	return ""
 }
 
+// resolveAppUserID resolves a Zitadel sub to an app user UUID via the
+// configured userLookup (with JIT provisioning). Returns ("", false) if no
+// lookup is configured or resolution fails. Callers should refuse the request
+// when ok is false — raw subs may be opaque provider identifiers (e.g. Google
+// numeric IDs) that break Postgres UUID columns downstream.
+func (v *OIDCVerifier) resolveAppUserID(ctx context.Context, sub, email, givenName, familyName string) (string, bool) {
+	if v.userLookup == nil {
+		zap.L().Warn("OIDC verifier has no userLookup configured — refusing request",
+			zap.String("sub", sub))
+		return "", false
+	}
+	appID, err := v.userLookup.ResolveZitadelID(ctx, sub, email, givenName, familyName)
+	if err != nil {
+		zap.L().Warn("failed to resolve Zitadel user — refusing request",
+			zap.String("sub", sub), zap.Error(err))
+		return "", false
+	}
+	return appID, true
+}
+
 // verifyAndSetContext verifies the JWT and sets userID/isAdmin in context.
 func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool {
 	authCtx, err := v.authorizer.CheckAuthorization(c.Request.Context(), "Bearer "+tokenStr)
@@ -209,28 +229,18 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 	)
 
 	// Resolve Zitadel sub → app user UUID (with JIT provisioning)
-	userID := sub
-	if v.userLookup != nil {
-		appID, lookupErr := v.userLookup.ResolveZitadelID(
-			c.Request.Context(), sub, email, givenName, familyName,
-		)
-		if lookupErr != nil {
-			zap.L().Warn("failed to resolve Zitadel user", zap.String("sub", sub), zap.Error(lookupErr))
-			// Fall back to raw sub — downstream will handle the error
-		} else {
-			userID = appID
-		}
+	appID, ok := v.resolveAppUserID(c.Request.Context(), sub, email, givenName, familyName)
+	if !ok {
+		return false
 	}
-
-	ctx := utils.SetUserID(c.Request.Context(), userID)
+	ctx := utils.SetUserID(c.Request.Context(), appID)
 	ctx = utils.SetZitadelSub(ctx, sub)
 	ctx = utils.SetIsAdmin(ctx, isAdmin)
 	if expRaw, ok := authCtx.Claims["exp"].(float64); ok {
 		ctx = utils.SetTokenExpiry(ctx, time.Unix(int64(expRaw), 0).UTC())
 	}
 	c.Request = c.Request.WithContext(ctx)
-	c.Set(string(utils.UserIDKey), userID)
-
+	c.Set(string(utils.UserIDKey), appID)
 	return true
 }
 

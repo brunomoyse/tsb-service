@@ -143,11 +143,17 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 					ctx = utils.SetUserID(ctx, sub)
 				} else {
 					appID, lookupErr := resolver.UserService.ResolveZitadelID(ctx, sub, "", "", "")
-					if lookupErr == nil {
-						ctx = utils.SetUserID(ctx, appID)
-					} else {
-						ctx = utils.SetUserID(ctx, sub)
+					if lookupErr != nil {
+						// Don't set a raw Zitadel sub (often a numeric Google
+						// user ID) as the userID — it will hit Postgres UUID
+						// columns and produce "invalid input syntax for type
+						// uuid". Leave userID empty so the @auth directive
+						// sees no authenticated user and returns UNAUTHENTICATED.
+						zap.L().Warn("failed to resolve Zitadel user on WS init — proceeding unauthenticated",
+							zap.String("sub", sub), zap.Error(lookupErr))
+						return ctx, &initPayload, nil
 					}
+					ctx = utils.SetUserID(ctx, appID)
 				}
 				ctx = utils.SetIsAdmin(ctx, isAdmin)
 				ctx = utils.SetTokenExpiry(ctx, exp)
