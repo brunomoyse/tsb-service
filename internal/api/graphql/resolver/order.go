@@ -71,7 +71,11 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		now := time.Now()
 		isOpenNow := config.IsOrderingCurrentlyOpen(now, overrides)
 		if err := validatePreferredReadyTime(input.PreferredReadyTime, config, overrides, now, isOpenNow); err != nil {
-			return nil, err
+			return nil, &gqlerror.Error{
+				Message:    err.Error(),
+				Path:       graphql.GetPath(ctx),
+				Extensions: map[string]any{"code": "USER_ERROR"},
+			}
 		}
 
 		slotTime := now
