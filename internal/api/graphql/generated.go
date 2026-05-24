@@ -289,6 +289,7 @@ type ComplexityRoot struct {
 		Name         func(childComplexity int) int
 		Order        func(childComplexity int) int
 		Products     func(childComplexity int) int
+		Slug         func(childComplexity int) int
 		Translations func(childComplexity int) int
 	}
 
@@ -1729,6 +1730,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ProductCategory.Products(childComplexity), true
+	case "ProductCategory.slug":
+		if e.ComplexityRoot.ProductCategory.Slug == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductCategory.Slug(childComplexity), true
 	case "ProductCategory.translations":
 		if e.ComplexityRoot.ProductCategory.Translations == nil {
 			break
@@ -2814,6 +2821,8 @@ func (ec *executionContext) childFields_ProductCategory(ctx context.Context, fie
 		return ec.fieldContext_ProductCategory_id(ctx, field)
 	case "order":
 		return ec.fieldContext_ProductCategory_order(ctx, field)
+	case "slug":
+		return ec.fieldContext_ProductCategory_slug(ctx, field)
 	case "name":
 		return ec.fieldContext_ProductCategory_name(ctx, field)
 	case "products":
@@ -8896,6 +8905,29 @@ func (ec *executionContext) _ProductCategory_order(ctx context.Context, field gr
 }
 func (ec *executionContext) fieldContext_ProductCategory_order(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ProductCategory", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ProductCategory_slug(ctx context.Context, field graphql.CollectedField, obj *model.ProductCategory) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductCategory_slug(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Slug, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductCategory_slug(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductCategory", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _ProductCategory_name(ctx context.Context, field graphql.CollectedField, obj *model.ProductCategory) (ret graphql.Marshaler) {
@@ -15707,6 +15739,11 @@ func (ec *executionContext) _ProductCategory(ctx context.Context, sel ast.Select
 			}
 		case "order":
 			out.Values[i] = ec._ProductCategory_order(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "slug":
+			out.Values[i] = ec._ProductCategory_slug(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}

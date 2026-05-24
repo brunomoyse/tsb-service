@@ -10,17 +10,22 @@ import (
 type Category struct {
 	ID           uuid.UUID
 	Order        int
+	Slug         string
 	Translations []Translation
 }
 
 // NewCategory creates a new category ensuring at least one translation is provided.
-func NewCategory(order int, translations []Translation) (*Category, error) {
+func NewCategory(order int, slug string, translations []Translation) (*Category, error) {
 	if len(translations) == 0 {
 		return nil, errors.New("at least one translation is required")
+	}
+	if slug == "" {
+		return nil, errors.New("slug is required")
 	}
 	return &Category{
 		ID:           uuid.New(),
 		Order:        order,
+		Slug:         slug,
 		Translations: translations,
 	}, nil
 }

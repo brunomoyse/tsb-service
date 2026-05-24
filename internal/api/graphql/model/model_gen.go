@@ -314,6 +314,7 @@ type Product struct {
 type ProductCategory struct {
 	ID           uuid.UUID      `json:"id"`
 	Order        int            `json:"order"`
+	Slug         string         `json:"slug"`
 	Name         string         `json:"name"`
 	Products     []*Product     `json:"products"`
 	Translations []*Translation `json:"translations"`
