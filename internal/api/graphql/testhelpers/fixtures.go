@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gosimple/slug"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 )
@@ -206,13 +207,15 @@ func createTestUser(t *testing.T, ctx context.Context, db *sqlx.DB, firstName, l
 func createTestProductCategory(t *testing.T, ctx context.Context, db *sqlx.DB, order int, nameEN, nameNL, nameFR, descEN, descNL, descFR string) *TestProductCategory {
 	categoryID := uuid.New()
 
-	// Insert category
+	// Insert category. slug is NOT NULL UNIQUE in production; tests derive it from
+	// the FR name + a UUID suffix to stay unique across parallel fixture builds.
 	categoryQuery := `
-		INSERT INTO product_categories (id, created_at, updated_at, "order")
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO product_categories (id, created_at, updated_at, "order", slug)
+		VALUES ($1, $2, $3, $4, $5)
 	`
 	now := time.Now()
-	_, err := db.ExecContext(ctx, categoryQuery, categoryID, now, now, order)
+	categorySlug := slug.MakeLang(nameFR, "fr") + "-" + categoryID.String()[:8]
+	_, err := db.ExecContext(ctx, categoryQuery, categoryID, now, now, order, categorySlug)
 	require.NoError(t, err, "Failed to create product category")
 
 	// Insert translations (note: column is product_category_id, not category_id)

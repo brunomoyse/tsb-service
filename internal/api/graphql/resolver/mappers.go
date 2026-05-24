@@ -68,6 +68,7 @@ func ToGQLProductCategory(c *productDomain.Category, lang string) *model.Product
 		ID:    c.ID,
 		Name:  c.GetTranslationFor(lang).Name,
 		Order: c.Order,
+		Slug:  c.Slug,
 	}
 }
 

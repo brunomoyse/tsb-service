@@ -12,23 +12,23 @@ BEGIN;
 -- ============================================================
 -- Product Categories (17 categories)
 -- ============================================================
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c3-2e26-4082-8219-06ca8da5d66f', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c3-b51e-4b9d-845c-ec88b640977a', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 2);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c4-37c7-493e-b69a-0b71cc7af146', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 3);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c4-be65-4adf-8e18-6035219974ee', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 4);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c5-4002-4797-ba9d-feb545add16e', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 5);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c5-bf91-406b-88a7-61dc600d3990', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 6);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c6-4378-48cd-be59-aa585d9f90fc', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 7);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c6-c71c-4a29-9457-2c0eaecab8c8', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 8);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c7-47c9-44f5-8065-389f83ee6f6a', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 9);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c7-c630-47b9-9528-a3ebb9ed4f31', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 10);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c8-49d8-4bd1-8811-4ce3978789b7', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 11);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c8-c8fd-4974-803d-cd7f9c0c1e6d', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 12);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c9-4c21-4723-a416-96550589eb7c', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 13);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992c9-d637-4dcc-ae10-bd9a445495b8', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 14);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992ca-e360-4498-ab6a-62852f8f213b', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 15);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('9e1992cb-66d5-4334-b6e6-669f37047773', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 16);
-INSERT INTO product_categories (id, created_at, updated_at, "order") VALUES ('efbd4ee3-671a-4568-bd50-d00dc38905cc', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 17);
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c3-2e26-4082-8219-06ca8da5d66f', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, 'menu-plateau');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c3-b51e-4b9d-845c-ec88b640977a', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 2, 'menu-bento-box');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c4-37c7-493e-b69a-0b71cc7af146', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 3, 'sushi');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c4-be65-4adf-8e18-6035219974ee', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 4, 'maki');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c5-4002-4797-ba9d-feb545add16e', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 5, 'gunkan');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c5-bf91-406b-88a7-61dc600d3990', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 6, 'spring-roll');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c6-4378-48cd-be59-aa585d9f90fc', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 7, 'california-roll');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c6-c71c-4a29-9457-2c0eaecab8c8', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 8, 'temaki');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c7-47c9-44f5-8065-389f83ee6f6a', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 9, 'masago-roll');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c7-c630-47b9-9528-a3ebb9ed4f31', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 10, 'special-roll');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c8-49d8-4bd1-8811-4ce3978789b7', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 11, 'chirashi');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c8-c8fd-4974-803d-cd7f9c0c1e6d', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 12, 'sashimi');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c9-4c21-4723-a416-96550589eb7c', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 13, 'poke-bowl');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992c9-d637-4dcc-ae10-bd9a445495b8', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 14, 'tokyo-hot');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992ca-e360-4498-ab6a-62852f8f213b', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 15, 'accompagnement');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('9e1992cb-66d5-4334-b6e6-669f37047773', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 16, 'boisson');
+INSERT INTO product_categories (id, created_at, updated_at, "order", slug) VALUES ('efbd4ee3-671a-4568-bd50-d00dc38905cc', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 17, 'dessert');
 
 -- ============================================================
 -- Product Category Translations (51 rows: 17 categories x 3 languages)

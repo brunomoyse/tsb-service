@@ -67,6 +67,7 @@ type Translation {
 type ProductCategory {
     id: ID!
     order: Int!
+    slug: String!
 
     name: String!
 

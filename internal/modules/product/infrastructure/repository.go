@@ -423,9 +423,10 @@ func (r *ProductRepository) FindByCategoryID(ctx context.Context, categoryID str
 // FindAllCategories retrieves all categories and their translations.
 func (r *ProductRepository) FindAllCategories(ctx context.Context) ([]*domain.Category, error) {
 	query := `
-        SELECT 
+        SELECT
             c.id,
             c.order,
+            c.slug,
             t.language,
             t.name
         FROM product_categories c
@@ -447,6 +448,7 @@ func (r *ProductRepository) FindAllCategories(ctx context.Context) ([]*domain.Ca
 	type categoryRow struct {
 		ID       string  `db:"id"`
 		Order    int     `db:"order"`
+		Slug     string  `db:"slug"`
 		Language *string `db:"language"`
 		Name     *string `db:"name"`
 	}
@@ -469,6 +471,7 @@ func (r *ProductRepository) FindAllCategories(ctx context.Context) ([]*domain.Ca
 			cat = &domain.Category{
 				ID:           categoryID,
 				Order:        row.Order,
+				Slug:         row.Slug,
 				Translations: []domain.Translation{},
 			}
 			categoriesMap[row.ID] = cat
@@ -499,13 +502,14 @@ func (r *ProductRepository) FindAllCategories(ctx context.Context) ([]*domain.Ca
 // FindCategoryByID retrieves a category by its ID.
 func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) (*domain.Category, error) {
 	const query = `
-        SELECT 
+        SELECT
             c.id,
             c.order,
+            c.slug,
             t.language,
             t.name
         FROM product_categories c
-        LEFT JOIN product_category_translations t 
+        LEFT JOIN product_category_translations t
           ON c.id = t.product_category_id
         WHERE c.id = $1;
     `
@@ -524,6 +528,7 @@ func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) 
 	type categoryRow struct {
 		ID       uuid.UUID `db:"id"`
 		Order    int       `db:"order"`
+		Slug     string    `db:"slug"`
 		Language *string   `db:"language"`
 		Name     *string   `db:"name"`
 	}
@@ -542,6 +547,7 @@ func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) 
 			cat = &domain.Category{
 				ID:           cr.ID,
 				Order:        cr.Order,
+				Slug:         cr.Slug,
 				Translations: make([]domain.Translation, 0, 1),
 			}
 		}
@@ -738,10 +744,11 @@ func (r *ProductRepository) FindCategoriesByProductIDs(
 ) (map[string][]*domain.Category, error) {
 	// 1) Query without language‑filter so we get every translation row
 	query := `
-    SELECT 
+    SELECT
         p.id               AS product_id,
         pc.id              AS category_id,
         pc.order           AS category_order,
+        pc.slug            AS category_slug,
         pct.language       AS language,
         pct.name           AS category_name
     FROM products p
@@ -768,6 +775,7 @@ func (r *ProductRepository) FindCategoriesByProductIDs(
 			ProductID     uuid.UUID `db:"product_id"`
 			CategoryID    uuid.UUID `db:"category_id"`
 			CategoryOrder int       `db:"category_order"`
+			CategorySlug  string    `db:"category_slug"`
 			Language      string    `db:"language"`
 			CategoryName  string    `db:"category_name"`
 		}
@@ -793,6 +801,7 @@ func (r *ProductRepository) FindCategoriesByProductIDs(
 			catMap[cr.CategoryID] = &domain.Category{
 				ID:    cr.CategoryID,
 				Order: cr.CategoryOrder,
+				Slug:  cr.CategorySlug,
 				Translations: []domain.Translation{{
 					Language: cr.Language,
 					Name:     cr.CategoryName,
