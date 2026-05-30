@@ -748,7 +748,6 @@ func (r *ProductRepository) FindCategoriesByProductIDs(
         p.id               AS product_id,
         pc.id              AS category_id,
         pc.order           AS category_order,
-        pc.slug            AS category_slug,
         pct.language       AS language,
         pct.name           AS category_name
     FROM products p
@@ -775,7 +774,6 @@ func (r *ProductRepository) FindCategoriesByProductIDs(
 			ProductID     uuid.UUID `db:"product_id"`
 			CategoryID    uuid.UUID `db:"category_id"`
 			CategoryOrder int       `db:"category_order"`
-			CategorySlug  string    `db:"category_slug"`
 			Language      string    `db:"language"`
 			CategoryName  string    `db:"category_name"`
 		}
@@ -801,7 +799,7 @@ func (r *ProductRepository) FindCategoriesByProductIDs(
 			catMap[cr.CategoryID] = &domain.Category{
 				ID:    cr.CategoryID,
 				Order: cr.CategoryOrder,
-				Slug:  cr.CategorySlug,
+				Slug:  "",
 				Translations: []domain.Translation{{
 					Language: cr.Language,
 					Name:     cr.CategoryName,
