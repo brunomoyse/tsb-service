@@ -15,6 +15,12 @@ type NotificationService interface {
 	GetDeviceTokens(ctx context.Context, userID uuid.UUID) ([]domain.DevicePushToken, error)
 	GetAdminDeviceTokens(ctx context.Context) ([]domain.DevicePushToken, error)
 	UnregisterDeviceToken(ctx context.Context, userID uuid.UUID, deviceToken string) error
+
+	// Live Activity push tokens (per-order, iOS)
+	RegisterLiveActivityToken(ctx context.Context, orderID uuid.UUID, pushToken string) error
+	GetLiveActivityTokens(ctx context.Context, orderID uuid.UUID) ([]domain.LiveActivityToken, error)
+	ClearLiveActivityTokens(ctx context.Context, orderID uuid.UUID) error
+	PurgeExpiredLiveActivityTokens(ctx context.Context) error
 }
 
 type notificationService struct {
@@ -40,4 +46,20 @@ func (s *notificationService) GetAdminDeviceTokens(ctx context.Context) ([]domai
 
 func (s *notificationService) UnregisterDeviceToken(ctx context.Context, userID uuid.UUID, deviceToken string) error {
 	return s.repo.DeleteDeviceToken(ctx, userID, deviceToken)
+}
+
+func (s *notificationService) RegisterLiveActivityToken(ctx context.Context, orderID uuid.UUID, pushToken string) error {
+	return s.repo.SaveLiveActivityToken(ctx, orderID, pushToken)
+}
+
+func (s *notificationService) GetLiveActivityTokens(ctx context.Context, orderID uuid.UUID) ([]domain.LiveActivityToken, error) {
+	return s.repo.FindLiveActivityTokensByOrderID(ctx, orderID)
+}
+
+func (s *notificationService) ClearLiveActivityTokens(ctx context.Context, orderID uuid.UUID) error {
+	return s.repo.DeleteLiveActivityTokensByOrderID(ctx, orderID)
+}
+
+func (s *notificationService) PurgeExpiredLiveActivityTokens(ctx context.Context) error {
+	return s.repo.DeleteExpiredLiveActivityTokens(ctx)
 }

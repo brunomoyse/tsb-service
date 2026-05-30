@@ -224,9 +224,14 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 		case errors.Is(e, context.Canceled) || strings.Contains(e.Error(), "canceling statement due to user request"):
 			// Client disconnected mid-request; log at Warn and skip Sentry.
 			logger.Warn("graphql resolver error (client disconnect)", append(fields, zap.String("query", query))...)
-		case err.Path.String() == "input":
-			// gqlgen pre-execution rejection (malformed GET, parse error,
-			// variable coercion, complexity overflow, etc.); client noise, skip Sentry.
+		case opCtx == nil || opCtx.Operation == nil:
+			// gqlgen pre-execution rejection: the request was rejected before any
+			// operation was resolved (no operation provided, malformed GET, parse
+			// error, validation failure, persisted-query miss). Reached before any
+			// resolver ran, so it is always client/crawler noise, never a server
+			// fault. The "input:" prefix in the message is gqlerror's default
+			// filename, not the error Path — Path is empty here, which is why the
+			// previous err.Path.String() == "input" check never matched. Skip Sentry.
 			logger.Warn("graphql resolver error (client malformed request)", append(fields, zap.String("query", query))...)
 		default:
 			logger.Error("graphql resolver error", append(fields, zap.String("query", query), zap.Error(e))...)

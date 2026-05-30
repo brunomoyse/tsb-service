@@ -2,6 +2,8 @@ package application
 
 import (
 	"fmt"
+	"hash/fnv"
+	"strconv"
 	"time"
 
 	orderDomain "tsb-service/internal/modules/order/domain"
@@ -233,4 +235,99 @@ var pickupOverrides = map[string]map[orderDomain.OrderStatus]notificationText{
 	"nl": {
 		orderDomain.OrderStatusAwaitingUp: {Title: "Klaar om op te halen!", Body: "Uw bestelling is klaar om opgehaald te worden."},
 	},
+}
+
+// liveActivityDeliverySteps / liveActivityPickupSteps mirror the iOS app's
+// stepsFor() so the pushed Live Activity progress matches the in-app timeline.
+var liveActivityDeliverySteps = []orderDomain.OrderStatus{
+	orderDomain.OrderStatusPending,
+	orderDomain.OrderStatusConfirmed,
+	orderDomain.OrderStatusPreparing,
+	orderDomain.OrderStatusOutForDelivery,
+	orderDomain.OrderStatusDelivered,
+}
+
+var liveActivityPickupSteps = []orderDomain.OrderStatus{
+	orderDomain.OrderStatusPending,
+	orderDomain.OrderStatusConfirmed,
+	orderDomain.OrderStatusPreparing,
+	orderDomain.OrderStatusAwaitingUp,
+	orderDomain.OrderStatusPickedUp,
+}
+
+// liveActivityProgress returns the 0..1 step position for a status (determinate
+// progress; matches the app — no timer).
+func liveActivityProgress(status orderDomain.OrderStatus, orderType string) float64 {
+	steps := liveActivityDeliverySteps
+	if orderType == "PICKUP" {
+		steps = liveActivityPickupSteps
+	}
+	for i, s := range steps {
+		if s == status {
+			if len(steps) <= 1 {
+				return 0
+			}
+			return float64(i) / float64(len(steps)-1)
+		}
+	}
+	return 0
+}
+
+// GetLiveActivityContentState builds the ActivityKit content-state for an order
+// status (title + subtitle + progress). It reuses the localized status texts so
+// the Live Activity wording matches the alert push.
+func GetLiveActivityContentState(status orderDomain.OrderStatus, language, orderType string, cancellationReason *orderDomain.OrderCancellationReason) map[string]any {
+	msg := GetOrderStatusNotification(status, language, orderType, cancellationReason)
+	return map[string]any{
+		"title":    msg.Title,
+		"subtitle": msg.Body,
+		"progress": liveActivityProgress(status, orderType),
+	}
+}
+
+// IsTerminalOrderStatus reports whether a status ends the order's lifecycle, so
+// the Live Activity / Live Update should be ended rather than updated.
+func IsTerminalOrderStatus(status orderDomain.OrderStatus) bool {
+	switch status {
+	case orderDomain.OrderStatusDelivered,
+		orderDomain.OrderStatusPickedUp,
+		orderDomain.OrderStatusCanceled,
+		orderDomain.OrderStatusFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+// LiveUpdateNotificationID derives a stable positive 31-bit notification id from
+// an order id. The Android app computes the SAME id (FNV-1a 32-bit, masked) so
+// backend data messages target the Live Update the app created.
+func LiveUpdateNotificationID(orderID string) int32 {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(orderID))
+	return int32(h.Sum32() & 0x7fffffff)
+}
+
+// GetLiveUpdateData builds the FCM data-message payload (all string values) that
+// drives an Android Live Update for an order status change. event is "update" or
+// "stop"; progress is expressed as 0..100 to match the app's progress bar max.
+func GetLiveUpdateData(orderID string, status orderDomain.OrderStatus, language, orderType, deepLink string, cancellationReason *orderDomain.OrderCancellationReason) map[string]string {
+	cs := GetLiveActivityContentState(status, language, orderType, cancellationReason)
+	event := "update"
+	if IsTerminalOrderStatus(status) {
+		event = "stop"
+	}
+	progress, _ := cs["progress"].(float64)
+	title, _ := cs["title"].(string)
+	text, _ := cs["subtitle"].(string)
+
+	return map[string]string{
+		"event":          event,
+		"notificationId": strconv.Itoa(int(LiveUpdateNotificationID(orderID))),
+		"title":          title,
+		"text":           text,
+		"progressMax":    "100",
+		"progressValue":  strconv.Itoa(int(progress * 100)),
+		"deepLinkUrl":    deepLink,
+	}
 }

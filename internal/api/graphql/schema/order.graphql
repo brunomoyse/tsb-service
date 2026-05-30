@@ -159,6 +159,9 @@ extend type Mutation {
     # Push notification token management
     registerDeviceToken(deviceToken: String!, platform: String!): Boolean! @auth
     unregisterDeviceToken(deviceToken: String!): Boolean! @auth
+
+    # iOS Live Activity per-order push token (ActivityKit)
+    registerLiveActivityToken(orderId: ID!, token: String!): Boolean! @auth
 }
 
 extend type Subscription {

@@ -570,3 +570,16 @@ func ToGQLProductChoiceGroup(g *productDomain.ProductChoiceGroup, lang string) *
 		Translations:  translations,
 	}
 }
+
+// lateNotificationThreshold caps how long after the estimated ready time we
+// still send status notifications (suppresses very-late noise).
+const lateNotificationThreshold = 40 * time.Minute
+
+// isOrderUpdateTooLate reports whether now is more than lateNotificationThreshold
+// past the order's estimated ready time. Returns false when no ETA is set.
+func isOrderUpdateTooLate(now time.Time, estimatedReadyTime *time.Time) bool {
+	if estimatedReadyTime == nil {
+		return false
+	}
+	return now.Sub(*estimatedReadyTime) > lateNotificationThreshold
+}

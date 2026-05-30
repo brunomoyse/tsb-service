@@ -3,16 +3,19 @@ package apns
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/token"
 	"go.uber.org/zap"
 )
 
-// Client wraps the APNs HTTP/2 client for sending standard alert notifications.
+// Client wraps the APNs HTTP/2 client for sending standard alert notifications
+// and ActivityKit Live Activity updates.
 type Client struct {
-	apnsClient *apns2.Client
-	alertTopic string
+	apnsClient        *apns2.Client
+	alertTopic        string
+	liveActivityTopic string
 }
 
 // NewClient creates an APNs client using JWT (p8 key) authentication.
@@ -39,6 +42,8 @@ func NewClient(authKeyPath, keyID, teamID, bundleID string, isProduction bool) (
 	return &Client{
 		apnsClient: client,
 		alertTopic: bundleID,
+		// ActivityKit requires a dedicated topic suffix for Live Activity pushes.
+		liveActivityTopic: bundleID + ".push-type.liveactivity",
 	}, nil
 }
 
@@ -85,6 +90,47 @@ func (c *Client) SendAlert(deviceToken, title, body string, data map[string]stri
 		zap.L().Warn("APNs alert push not sent",
 			zap.Int("status", res.StatusCode),
 			zap.String("reason", res.Reason),
+		)
+		if res.Reason == apns2.ReasonBadDeviceToken || res.Reason == apns2.ReasonUnregistered || res.Reason == apns2.ReasonExpiredToken {
+			return ErrTokenInvalid
+		}
+	}
+	return nil
+}
+
+// SendLiveActivity sends an ActivityKit Live Activity push to a per-activity
+// push token. event is "update" (state change) or "end" (terminal). contentState
+// must match the app's LiveActivityAttributes.ContentState (title, subtitle,
+// progress, ...). Returns ErrTokenInvalid if APNs reports the token as bad.
+func (c *Client) SendLiveActivity(pushToken string, contentState map[string]any, event string) error {
+	aps := map[string]any{
+		"timestamp":     time.Now().Unix(),
+		"event":         event,
+		"content-state": contentState,
+	}
+
+	payloadBytes, err := json.Marshal(map[string]any{"aps": aps})
+	if err != nil {
+		return fmt.Errorf("marshal live activity payload: %w", err)
+	}
+
+	notification := &apns2.Notification{
+		DeviceToken: pushToken,
+		Topic:       c.liveActivityTopic,
+		PushType:    apns2.PushTypeLiveActivity,
+		Priority:    apns2.PriorityHigh,
+		Payload:     payloadBytes,
+	}
+
+	res, err := c.apnsClient.Push(notification)
+	if err != nil {
+		return fmt.Errorf("push live activity notification: %w", err)
+	}
+	if !res.Sent() {
+		zap.L().Warn("APNs live activity push not sent",
+			zap.Int("status", res.StatusCode),
+			zap.String("reason", res.Reason),
+			zap.String("event", event),
 		)
 		if res.Reason == apns2.ReasonBadDeviceToken || res.Reason == apns2.ReasonUnregistered || res.Reason == apns2.ReasonExpiredToken {
 			return ErrTokenInvalid
