@@ -224,9 +224,11 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 		case errors.Is(e, context.Canceled) || strings.Contains(e.Error(), "canceling statement due to user request"):
 			// Client disconnected mid-request; log at Warn and skip Sentry.
 			logger.Warn("graphql resolver error (client disconnect)", append(fields, zap.String("query", query))...)
-		case err.Path.String() == "input":
+		case strings.HasPrefix(e.Error(), "input: "):
 			// gqlgen pre-execution rejection (malformed GET, parse error,
 			// variable coercion, complexity overflow, etc.); client noise, skip Sentry.
+			// Uses strings.HasPrefix instead of err.Path.String() == "input"
+			// because nil Path (e.g. Applebot empty GET) serializes to "".
 			logger.Warn("graphql resolver error (client malformed request)", append(fields, zap.String("query", query))...)
 		default:
 			logger.Error("graphql resolver error", append(fields, zap.String("query", query), zap.Error(e))...)
