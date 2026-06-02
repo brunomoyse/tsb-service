@@ -242,7 +242,7 @@ func main() {
 	apnsKeyPath := os.Getenv("APNS_AUTH_KEY_PATH")
 	apnsKeyID := os.Getenv("APNS_KEY_ID")
 	apnsTeamID := os.Getenv("APNS_TEAM_ID")
-	apnsBundleID := cmp.Or(os.Getenv("APNS_BUNDLE_ID"), "be.tokyosushibarliege.app")
+	apnsBundleID := cmp.Or(os.Getenv("APNS_BUNDLE_ID"), "be.tokyosushibarliege.mobile")
 	if apnsKeyPath != "" && apnsKeyID != "" && apnsTeamID != "" {
 		isProduction := os.Getenv("APP_ENV") == "production"
 		var apnsErr error
