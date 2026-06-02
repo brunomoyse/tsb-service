@@ -63,3 +63,28 @@ func (c *Client) SendAlert(registrationToken, title, body string, data map[strin
 
 	return nil
 }
+
+// SendDataMessage sends a data-only FCM message (no visible Notification) to an
+// Android device. Used to drive Android Live Updates (expo-live-updates), which
+// render/update the promoted ongoing notification from the data payload.
+// Returns ErrTokenInvalid if FCM reports the registration token as invalid.
+func (c *Client) SendDataMessage(registrationToken string, data map[string]string) error {
+	message := &messaging.Message{
+		Token: registrationToken,
+		Data:  data,
+		Android: &messaging.AndroidConfig{
+			Priority: "high",
+		},
+	}
+
+	_, err := c.msgClient.Send(context.Background(), message)
+	if err != nil {
+		if messaging.IsUnregistered(err) || messaging.IsInvalidArgument(err) {
+			return ErrTokenInvalid
+		}
+		zap.L().Warn("FCM data message not sent", zap.Error(err))
+		return fmt.Errorf("send FCM data message: %w", err)
+	}
+
+	return nil
+}

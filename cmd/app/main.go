@@ -418,10 +418,29 @@ func main() {
 		}
 	}()
 
+	// Periodically purge expired Live Activity tokens (12h TTL) so stale push
+	// tokens don't accumulate. Runs hourly until shutdown.
+	purgeCtx, stopPurge := context.WithCancel(context.Background())
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-purgeCtx.Done():
+				return
+			case <-ticker.C:
+				if err := notificationService.PurgeExpiredLiveActivityTokens(purgeCtx); err != nil {
+					zap.L().Warn("failed to purge expired live activity tokens", zap.Error(err))
+				}
+			}
+		}
+	}()
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	zap.L().Info("shutting down server")
+	stopPurge()
 	authLimiter.Stop()
 	feedbackLimiter.Stop()
 	broker.Shutdown()

@@ -36,23 +36,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// lateNotificationThreshold caps how long after the estimated ready time we
-// keep sending status-progression notifications. Beyond this window, the
-// customer has typically already collected the order in real life and a late
-// "your order is ready" email/push is noise, not information.
-const lateNotificationThreshold = 40 * time.Minute
-
-// isOrderUpdateTooLate reports whether now is more than
-// lateNotificationThreshold past the order's estimated ready time. Returns
-// false when estimatedReadyTime is nil — without an anchor we cannot judge
-// timeliness, so the default is to send.
-func isOrderUpdateTooLate(now time.Time, estimatedReadyTime *time.Time) bool {
-	if estimatedReadyTime == nil {
-		return false
-	}
-	return now.Sub(*estimatedReadyTime) > lateNotificationThreshold
-}
-
 // CreateOrder is the resolver for the createOrder field.
 func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error) {
 	// 0) Validate ordering availability and preferred ready time constraints.
@@ -800,6 +783,83 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		}()
 	}
 
+	// Update the iOS Live Activity (Lock Screen / Dynamic Island) for this order.
+	// Fires on EVERY status change — including OUT_FOR_DELIVERY → DELIVERED, whose
+	// *alert* is suppressed above — because the activity must be ended on terminal
+	// statuses regardless of alert suppression.
+	if r.APNsClient != nil && statusChanged {
+		go func() {
+			laTokens, tokenErr := r.NotificationService.GetLiveActivityTokens(context.Background(), id)
+			if tokenErr != nil || len(laTokens) == 0 {
+				return
+			}
+
+			terminal := o.OrderStatus == orderDomain.OrderStatusDelivered ||
+				o.OrderStatus == orderDomain.OrderStatusPickedUp ||
+				o.OrderStatus == orderDomain.OrderStatusCanceled ||
+				o.OrderStatus == orderDomain.OrderStatusFailed
+			event := "update"
+			if terminal {
+				event = "end"
+			}
+
+			contentState := notificationApplication.GetLiveActivityContentState(
+				o.OrderStatus, o.Language, string(o.OrderType), o.CancellationReason,
+			)
+
+			for _, lt := range laTokens {
+				if pushErr := r.APNsClient.SendLiveActivity(lt.PushToken, contentState, event); pushErr != nil {
+					zap.L().Warn("failed to send live activity push",
+						zap.String("order_id", id.String()),
+						zap.Error(pushErr),
+					)
+				}
+			}
+
+			if terminal {
+				if clearErr := r.NotificationService.ClearLiveActivityTokens(context.Background(), id); clearErr != nil {
+					zap.L().Warn("failed to clear live activity tokens",
+						zap.String("order_id", id.String()),
+						zap.Error(clearErr),
+					)
+				}
+			}
+		}()
+	}
+
+	// Drive the Android Live Update (promoted ongoing notification) via an FCM
+	// data message to the user's Android devices. Like the iOS block, this fires
+	// on every status change so the Live Update ends on terminal statuses.
+	if r.FCMClient != nil && statusChanged {
+		go func() {
+			deviceTokens, tokenErr := r.NotificationService.GetDeviceTokens(context.Background(), o.UserID)
+			if tokenErr != nil || len(deviceTokens) == 0 {
+				return
+			}
+
+			deepLink := fmt.Sprintf("tsbmobile://order-completed/%s", id.String())
+			data := notificationApplication.GetLiveUpdateData(
+				id.String(), o.OrderStatus, o.Language, string(o.OrderType), deepLink, o.CancellationReason,
+			)
+
+			for _, dt := range deviceTokens {
+				if dt.Platform != "android" {
+					continue
+				}
+				if pushErr := r.FCMClient.SendDataMessage(dt.DeviceToken, data); pushErr != nil {
+					if errors.Is(pushErr, fcm.ErrTokenInvalid) {
+						_ = r.NotificationService.UnregisterDeviceToken(context.Background(), o.UserID, dt.DeviceToken)
+					} else {
+						zap.L().Warn("failed to send live update data message",
+							zap.String("order_id", id.String()),
+							zap.Error(pushErr),
+						)
+					}
+				}
+			}
+		}()
+	}
+
 	// Send a visible alert when the estimated ready time changes.
 	if (r.APNsClient != nil || r.FCMClient != nil) && readyTimeWasUpdated {
 		go func() {
@@ -886,6 +946,30 @@ func (r *mutationResolver) UnregisterDeviceToken(ctx context.Context, deviceToke
 
 	if err := r.NotificationService.UnregisterDeviceToken(ctx, uid, deviceToken); err != nil {
 		return false, fmt.Errorf("failed to unregister device token: %w", err)
+	}
+
+	return true, nil
+}
+
+// RegisterLiveActivityToken is the resolver for the registerLiveActivityToken field.
+// It binds an iOS ActivityKit per-activity push token to one of the caller's own orders.
+func (r *mutationResolver) RegisterLiveActivityToken(ctx context.Context, orderID uuid.UUID, token string) (bool, error) {
+	userID := utils.GetUserID(ctx)
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return false, fmt.Errorf("invalid user ID")
+	}
+
+	order, _, err := r.OrderService.GetOrderByID(ctx, orderID)
+	if err != nil {
+		return false, fmt.Errorf("failed to load order: %w", err)
+	}
+	if order == nil || order.UserID != uid {
+		return false, fmt.Errorf("order not found")
+	}
+
+	if err := r.NotificationService.RegisterLiveActivityToken(ctx, orderID, token); err != nil {
+		return false, fmt.Errorf("failed to register live activity token: %w", err)
 	}
 
 	return true, nil
