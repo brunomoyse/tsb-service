@@ -162,6 +162,12 @@ extend type Mutation {
 
     # iOS Live Activity per-order push token (ActivityKit)
     registerLiveActivityToken(orderId: ID!, token: String!): Boolean! @auth
+
+    # Set the caller's language on all their in-progress (non-terminal) orders so
+    # future status notifications + Live Activities use it; re-pushes active Live
+    # Activities immediately. Called when the user switches language in-app.
+    # Returns the number of orders updated.
+    updateMyOrdersLanguage(language: String!): Int! @auth
 }
 
 extend type Subscription {

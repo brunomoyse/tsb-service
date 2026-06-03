@@ -203,6 +203,25 @@ func (r *OrderRepository) Update(ctx context.Context, order *domain.Order) error
 	return nil
 }
 
+// UpdateActiveOrdersLanguage sets `language` on every non-terminal order of the
+// user and returns the affected rows (only the columns needed to re-push a Live
+// Activity). Terminal orders (DELIVERED/PICKED_UP/CANCELLED/FAILED) are left
+// untouched — their notifications are already sent.
+func (r *OrderRepository) UpdateActiveOrdersLanguage(ctx context.Context, userID uuid.UUID, language string) ([]*domain.Order, error) {
+	const query = `
+		UPDATE orders
+		SET language = $2, updated_at = CURRENT_TIMESTAMP
+		WHERE user_id = $1
+		  AND order_status NOT IN ('DELIVERED', 'PICKED_UP', 'CANCELLED', 'FAILED')
+		RETURNING id, user_id, order_status, order_type, language
+	`
+	var orders []*domain.Order
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &orders, query, userID, language); err != nil {
+		return nil, fmt.Errorf("failed to update active orders language: %w", err)
+	}
+	return orders, nil
+}
+
 // FindByID retrieves an order by its ID.
 func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error) {
 	query := `
