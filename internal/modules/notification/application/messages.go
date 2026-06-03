@@ -148,52 +148,24 @@ var orderNotificationTexts = map[string]map[orderDomain.OrderStatus]notification
 	},
 }
 
-// GetNewOrderNotification returns localized push notification text for admin devices when a new order is created.
-func GetNewOrderNotification(language, orderType, total string) notificationText {
+// GetNewOrderNotification returns localized push notification text for admin/POS
+// devices when a new order is created. Deliberately omits the amount (and type):
+// staff just need to know an order landed and is awaiting confirmation.
+// orderType/total are kept in the signature for callers but are intentionally
+// unused.
+func GetNewOrderNotification(language, _ /*orderType*/, _ /*total*/ string) notificationText {
 	texts := newOrderTexts[language]
 	if texts == nil {
 		texts = newOrderTexts["fr"]
 	}
-
-	var typeKey string
-	switch language {
-	case "en":
-		if orderType == "PICKUP" {
-			typeKey = "pickup"
-		} else {
-			typeKey = "delivery"
-		}
-	case "zh":
-		if orderType == "PICKUP" {
-			typeKey = "自取"
-		} else {
-			typeKey = "外送"
-		}
-	case "nl":
-		if orderType == "PICKUP" {
-			typeKey = "afhaling"
-		} else {
-			typeKey = "levering"
-		}
-	default: // fr
-		if orderType == "PICKUP" {
-			typeKey = "retrait"
-		} else {
-			typeKey = "livraison"
-		}
-	}
-
-	return notificationText{
-		Title: texts.Title,
-		Body:  fmt.Sprintf(texts.Body, typeKey, total),
-	}
+	return *texts
 }
 
 var newOrderTexts = map[string]*notificationText{
-	"fr": {Title: "Nouvelle commande", Body: "Nouvelle commande %s de %s€"},
-	"en": {Title: "New order", Body: "New %s order for %s€"},
-	"zh": {Title: "新订单", Body: "新%s订单 %s€"},
-	"nl": {Title: "Nieuwe bestelling", Body: "Nieuwe %s bestelling van %s€"},
+	"fr": {Title: "Nouvelle commande", Body: "En attente de confirmation"},
+	"en": {Title: "New order", Body: "Awaiting confirmation"},
+	"zh": {Title: "新订单", Body: "等待确认"},
+	"nl": {Title: "Nieuwe bestelling", Body: "Wacht op bevestiging"},
 }
 
 var readyTimeUpdatedTexts = map[string]*notificationText{
