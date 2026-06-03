@@ -60,10 +60,31 @@ func NewClient(authKeyPath, keyID, teamID, bundleID string, isProduction bool) (
 // ErrTokenInvalid indicates the device token is no longer valid and should be removed.
 var ErrTokenInvalid = fmt.Errorf("device token is invalid")
 
+// reasonBadEnvironmentKeyInToken is APNs's 403 reply when the auth key (p8) is
+// environment-scoped to the *other* environment than the endpoint it was used
+// against (e.g. a Production-only key sent to the sandbox endpoint). apns2
+// v0.25.0 has no constant for it, so match the wire string directly.
+const reasonBadEnvironmentKeyInToken = "BadEnvironmentKeyInToken"
+
+// isWrongEnvironmentReason reports whether an APNs rejection means "right
+// credentials, wrong environment" — i.e. retrying against the other endpoint
+// could succeed. Covers both the device-token mismatch (BadDeviceToken) and the
+// auth-key/certificate environment-scope mismatches.
+func isWrongEnvironmentReason(reason string) bool {
+	switch reason {
+	case apns2.ReasonBadDeviceToken,
+		reasonBadEnvironmentKeyInToken,
+		apns2.ReasonBadCertificateEnvironment:
+		return true
+	default:
+		return false
+	}
+}
+
 // push sends the notification to the preferred APNs environment and, if APNs
-// rejects the token as belonging to the other environment (BadDeviceToken),
-// retries once against the other endpoint. Returns the response that should be
-// acted on (the retry's response when a fallback happened).
+// rejects it as belonging to the other environment, retries once against the
+// other endpoint. Returns the response that should be acted on (the retry's
+// response when a fallback happened).
 func (c *Client) push(n *apns2.Notification) (*apns2.Response, error) {
 	first, second := c.dev, c.prod
 	if c.preferProd {
@@ -74,9 +95,10 @@ func (c *Client) push(n *apns2.Notification) (*apns2.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	// BadDeviceToken == the token belongs to the other environment. Unregistered
-	// / ExpiredToken mean the token is genuinely dead, so don't bother retrying.
-	if !res.Sent() && res.Reason == apns2.ReasonBadDeviceToken {
+	// A wrong-environment reason means the same notification might succeed on the
+	// other endpoint. Unregistered / ExpiredToken mean the token is genuinely
+	// dead, so don't bother retrying those.
+	if !res.Sent() && isWrongEnvironmentReason(res.Reason) {
 		retry, retryErr := second.Push(n)
 		if retryErr != nil {
 			return nil, retryErr

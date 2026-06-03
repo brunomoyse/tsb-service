@@ -244,7 +244,22 @@ func main() {
 	apnsTeamID := os.Getenv("APNS_TEAM_ID")
 	apnsBundleID := cmp.Or(os.Getenv("APNS_BUNDLE_ID"), "be.tokyosushibarliege.mobile")
 	if apnsKeyPath != "" && apnsKeyID != "" && apnsTeamID != "" {
+		// Which APNs endpoint to try FIRST. The client falls back to the other
+		// environment on a mismatch (see pkg/apns), so this only sets the
+		// preferred attempt. Decoupled from APP_ENV because the APNs environment
+		// is a property of the *build that minted the device token* (and of the
+		// auth key's environment scope), not of the backend deployment: a staging
+		// backend (APP_ENV != production) still serves TestFlight/ad-hoc builds
+		// whose tokens — and our prod-scoped p8 key — are Production. Set
+		// APNS_PRODUCTION explicitly; default to APP_ENV for backward compat.
 		isProduction := os.Getenv("APP_ENV") == "production"
+		if v := os.Getenv("APNS_PRODUCTION"); v != "" {
+			if parsed, perr := strconv.ParseBool(v); perr == nil {
+				isProduction = parsed
+			} else {
+				zap.L().Warn("invalid APNS_PRODUCTION value, ignoring", zap.String("value", v))
+			}
+		}
 		var apnsErr error
 		apnsClient, apnsErr = apns.NewClient(apnsKeyPath, apnsKeyID, apnsTeamID, apnsBundleID, isProduction)
 		if apnsErr != nil {
