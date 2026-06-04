@@ -387,6 +387,9 @@ func main() {
 	api.POST("/auth/session/otp/verify", authLimiter.Middleware(), auth.VerifyOtpHandler)
 	api.POST("/auth/session/otp/resend", authLimiter.Middleware(), auth.ResendOtpHandler)
 	api.POST("/auth/session/otp/complete-profile", authLimiter.Middleware(), auth.CompleteOtpProfileHandler)
+	// Store-review OTP retrieval (Google Play / App Store reviewers, no mailbox).
+	// Disabled unless REVIEW_OTP_KEY + REVIEW_OTP_LOGINS are set.
+	api.GET("/auth/review/last-otp", authLimiter.Middleware(), auth.ReviewLastOtpHandler)
 	api.POST("/auth/finalize", authLimiter.Middleware(), auth.FinalizeOIDCHandler)
 	api.POST("/auth/authorize-proxy", authLimiter.Middleware(), auth.AuthorizeProxyHandler)
 	api.POST("/auth/token-exchange", authLimiter.Middleware(), auth.TokenExchangeHandler)
