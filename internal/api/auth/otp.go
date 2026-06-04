@@ -166,6 +166,11 @@ func RequestOtpHandler(c *gin.Context) {
 		return
 	}
 
+	// Store-review accounts (Google Play / App Store): the reviewer has no
+	// mailbox, so expose the code via ReviewLastOtpHandler instead of email.
+	// No-op for every non-review login.
+	stashReviewOtp(req.LoginName, zResp.Challenges.OtpEmail)
+
 	if zResp.Challenges.OtpEmail != "" && scaleway.IsInitialized() {
 		// Best-effort profile fetch for the email salutation. Falls back to the
 		// email address for placeholder accounts (givenName == "-") or when
@@ -189,8 +194,8 @@ func RequestOtpHandler(c *gin.Context) {
 			LastName:  lastName,
 			Email:     req.LoginName,
 		}
-		if shouldSkipOtpEmail(req.LoginName) {
-			log.Debug("otp email send skipped via E2E_NO_SEND_LOGINS", zap.String("loginName", req.LoginName))
+		if shouldSkipOtpEmail(req.LoginName) || isReviewOtpLogin(req.LoginName) {
+			log.Debug("otp email send skipped (e2e/store-review login)", zap.String("loginName", req.LoginName))
 		} else if err := scaleway.SendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
 			log.Error("failed to send login otp email", zap.Error(err))
 		}
@@ -358,12 +363,15 @@ func ResendOtpHandler(c *gin.Context) {
 		// cheapest path is to re-fetch the session itself.
 		loginName, firstName := lookupSessionUser(req.SessionID)
 		if loginName != "" {
+			// Store-review accounts: keep the resent code retrievable over the
+			// static URL instead of emailing it. No-op for normal logins.
+			stashReviewOtp(loginName, zResp.Challenges.OtpEmail)
 			user := userDomain.User{
 				FirstName: firstName,
 				Email:     loginName,
 			}
-			if shouldSkipOtpEmail(loginName) {
-				log.Debug("otp resend email skipped via E2E_NO_SEND_LOGINS", zap.String("loginName", loginName))
+			if shouldSkipOtpEmail(loginName) || isReviewOtpLogin(loginName) {
+				log.Debug("otp resend email skipped (e2e/store-review login)", zap.String("loginName", loginName))
 			} else if err := scaleway.SendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
 				log.Error("failed to send login otp email", zap.Error(err))
 			}
