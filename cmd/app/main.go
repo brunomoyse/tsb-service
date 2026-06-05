@@ -29,6 +29,7 @@ import (
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
 	"tsb-service/pkg/logging"
 	"tsb-service/pkg/pubsub"
+	"tsb-service/pkg/utils"
 	"tsb-service/pkg/email/scaleway"
 
 	couponApplication "tsb-service/internal/modules/coupon/application"
@@ -454,11 +455,34 @@ func main() {
 		}
 	}()
 
+	// Auto-cancel store-review test orders 10 min after creation so they never
+	// linger as open orders. Admin context → writes via the admin DB pool.
+	// TEMPORARY (revert after launch). Runs every minute until shutdown.
+	sweepCtx, stopSweep := context.WithCancel(utils.SetIsAdmin(context.Background(), true))
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-sweepCtx.Done():
+				return
+			case <-ticker.C:
+				n, err := orderService.CancelStaleTestOrders(sweepCtx, 10*time.Minute)
+				if err != nil {
+					zap.L().Warn("failed to auto-cancel stale test orders", zap.Error(err))
+				} else if n > 0 {
+					zap.L().Info("auto-cancelled stale store-review test orders", zap.Int("count", n))
+				}
+			}
+		}
+	}()
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	zap.L().Info("shutting down server")
 	stopPurge()
+	stopSweep()
 	authLimiter.Stop()
 	feedbackLimiter.Stop()
 	broker.Shutdown()

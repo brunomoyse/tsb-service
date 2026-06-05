@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"tsb-service/internal/api/auth"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
 	addressDomain "tsb-service/internal/modules/address/domain"
@@ -384,6 +385,16 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 	}
 
+	// Resolve the ordering user up front so we can flag store-review orders
+	// (Google Play / App Store reviewers place a real order on prod to validate
+	// checkout). Such orders must never reach staff — hidden from the admin/POS
+	// lists, no subscription, no push — and auto-cancel after 10 min. TEMPORARY.
+	user, err := r.UserService.GetUserByID(ctx, userUUID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve user: %w", err)
+	}
+	isTestOrder := user != nil && auth.IsReviewLogin(user.Email)
+
 	tempOrder := orderDomain.NewOrder(
 		userUUID,
 		odType,
@@ -401,6 +412,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		cashPaymentAmount,
 	)
 	tempOrder.CouponCode = couponCode
+	tempOrder.IsTest = isTestOrder
 
 	// Atomically reserve coupon usage BEFORE creating the order to prevent race conditions
 	if validatedCouponID != nil {
@@ -456,11 +468,6 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 	}
 
-	user, err := r.UserService.GetUserByID(ctx, order.UserID.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve user: %w", err)
-	}
-
 	// Handle payment creation if needed.
 	if input.IsOnlinePayment {
 		// Build address from denormalized order fields for payment service
@@ -502,7 +509,9 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	// 11) Publish subscription. Online-payment orders are only published to
 	// the admin dashboard once the Mollie webhook confirms payment (see
 	// payment/interfaces/handler.go) — unpaid orders are not actionable.
-	if !input.IsOnlinePayment {
+	// Store-review test orders are never published — they must not appear in any
+	// admin/POS client's live order list. TEMPORARY (revert after launch).
+	if !input.IsOnlinePayment && !order.IsTest {
 		r.Broker.Publish("orderCreated", gql)
 	}
 
@@ -510,7 +519,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	// Online-payment orders defer this until the Mollie webhook confirms payment
 	// (see payment/interfaces/handler.go) — we must not wake up POS/staff for an
 	// order that may never be paid.
-	if !input.IsOnlinePayment {
+	if !input.IsOnlinePayment && !order.IsTest {
 		r.SendNewOrderPush(order)
 	}
 

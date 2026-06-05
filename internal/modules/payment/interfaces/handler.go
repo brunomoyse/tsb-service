@@ -96,6 +96,11 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 		order, handleErr := h.service.HandlePaymentPaid(adminCtx, *orderID)
 		if handleErr != nil {
 			log.Error("webhook: failed to handle paid payment", zap.String("payment_id", req.ExternalMolliePaymentID), zap.Error(handleErr))
+		} else if order != nil && order.IsTest {
+			// Store-review test order: stays fully invisible to staff — no
+			// subscription publish, no push. It will auto-cancel after 10 min.
+			// TEMPORARY (revert after launch).
+			log.Info("webhook: store-review test order paid — suppressing publish/push", zap.String("order_id", order.ID.String()))
 		} else if order != nil {
 			gqlOrder := resolver.ToGQLOrder(order)
 			// First time the dashboard sees this online-payment order — publish

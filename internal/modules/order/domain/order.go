@@ -77,6 +77,9 @@ type Order struct {
 	AddressLng         *float64                 `db:"address_lng" json:"addressLng,omitempty"`
 	CancellationReason *OrderCancellationReason `db:"cancellation_reason" json:"cancellationReason,omitempty"`
 	CashPaymentAmount  *decimal.Decimal         `db:"cash_payment_amount" json:"cashPaymentAmount,omitempty"`
+	// IsTest flags orders placed by store-review accounts. TEMPORARY (revert
+	// after launch): such orders are hidden from staff and auto-cancelled.
+	IsTest bool `db:"is_test" json:"isTest"`
 }
 
 type OrderStatusHistory struct {

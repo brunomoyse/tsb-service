@@ -25,6 +25,9 @@ type OrderService interface {
 	UpdateActiveOrdersLanguage(ctx context.Context, userID uuid.UUID, language string) ([]*domain.Order, error)
 	GetCustomerStats(ctx context.Context, startDate, endDate *time.Time, orderType *string, minOrders *int) ([]*domain.CustomerStatsRow, error)
 	GetOrderHistory(ctx context.Context, filter domain.OrderHistoryFilter) ([]*domain.Order, *domain.OrderHistorySummary, error)
+	// CancelStaleTestOrders auto-cancels store-review test orders older than
+	// olderThan and returns how many were cancelled. TEMPORARY (revert after launch).
+	CancelStaleTestOrders(ctx context.Context, olderThan time.Duration) (int, error)
 }
 
 type orderService struct {
@@ -95,6 +98,20 @@ func (s *orderService) UpdateOrder(ctx context.Context, orderID uuid.UUID, newSt
 	}
 
 	return nil
+}
+
+func (s *orderService) CancelStaleTestOrders(ctx context.Context, olderThan time.Duration) (int, error) {
+	ids, err := s.repo.CancelStaleTestOrders(ctx, olderThan)
+	if err != nil {
+		return 0, err
+	}
+	for _, id := range ids {
+		if err := s.repo.InsertStatusHistory(ctx, id, domain.OrderStatusCanceled); err != nil {
+			logging.FromContext(ctx).Warn("failed to record auto-cancel status history",
+				zap.String("order_id", id.String()), zap.Error(err))
+		}
+	}
+	return len(ids), nil
 }
 
 func (s *orderService) GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error) {

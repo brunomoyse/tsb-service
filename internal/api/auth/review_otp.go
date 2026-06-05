@@ -57,6 +57,14 @@ func isReviewOtpLogin(loginName string) bool {
 	return ok
 }
 
+// IsReviewLogin reports whether loginName belongs to a configured store-review
+// account (REVIEW_OTP_LOGINS). Exported for callers outside the auth package —
+// e.g. suppressing the kitchen handheld push for reviewer orders so staff don't
+// prepare a test order placed during a Google Play / App Store review.
+func IsReviewLogin(loginName string) bool {
+	return isReviewOtpLogin(loginName)
+}
+
 type reviewOtpEntry struct {
 	code     string
 	storedAt time.Time

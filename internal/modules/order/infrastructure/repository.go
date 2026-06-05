@@ -79,7 +79,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 			street_id, street_name, house_number, box_number,
 			municipality_name, postcode, address_distance, is_manual_address,
 			address_place_id, address_lat, address_lng,
-			cash_payment_amount
+			cash_payment_amount, is_test
 		) VALUES (
 			$1, $2, $3, $4,
 			$5, $6, $7, $8, $9,
@@ -88,7 +88,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 			$18, $19, $20, $21,
 			$22, $23, $24, $25,
 			$26, $27, $28,
-			$29
+			$29, $30
 		)
 		RETURNING id, created_at, updated_at;
 	`
@@ -129,6 +129,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		o.AddressLat,
 		o.AddressLng,
 		o.CashPaymentAmount,
+		o.IsTest,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to insert order: %w", err)
@@ -331,6 +332,11 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 		conditions = append(conditions, fmt.Sprintf("o.user_id = $%d", placeholderIndex))
 		args = append(args, *userID)
 		placeholderIndex++
+	} else {
+		// Global (admin/POS) listing — never surface store-review test orders.
+		// User-scoped listings (myOrders) still show the reviewer their own
+		// order so they can validate the checkout flow. TEMPORARY.
+		conditions = append(conditions, "o.is_test = false")
 	}
 
 	whereClause := "WHERE " + strings.Join(conditions, " AND ")
@@ -370,7 +376,7 @@ func (r *OrderRepository) FindFiltered(ctx context.Context, filter domain.OrderH
 	// orders never count toward revenue, average, or the listing. Pin these
 	// exclusions server-side so the summary aggregates and the page list stay
 	// consistent regardless of the filters the caller supplies.
-	conditions := []string{"o.order_status NOT IN ('CANCELLED', 'FAILED')"}
+	conditions := []string{"o.order_status NOT IN ('CANCELLED', 'FAILED')", "o.is_test = false"}
 	var args []any
 	idx := 1
 
@@ -590,6 +596,33 @@ func (r *OrderRepository) InsertStatusHistory(ctx context.Context, orderID uuid.
 		return fmt.Errorf("failed to insert status history: %w", err)
 	}
 	return nil
+}
+
+// CancelStaleTestOrders cancels store-review test orders older than olderThan
+// that are not already terminal, and returns the affected order IDs so the
+// caller can record status-history rows. TEMPORARY (revert after launch).
+func (r *OrderRepository) CancelStaleTestOrders(ctx context.Context, olderThan time.Duration) ([]uuid.UUID, error) {
+	const query = `
+		UPDATE orders
+		SET order_status = $1,
+		    cancellation_reason = $2,
+		    updated_at = now()
+		WHERE is_test = true
+		  AND order_status NOT IN ($3, $4)
+		  AND created_at < now() - make_interval(mins => $5)
+		RETURNING id;
+	`
+	var ids []uuid.UUID
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &ids, query,
+		string(domain.OrderStatusCanceled),
+		string(domain.OrderCancellationReasonOther),
+		string(domain.OrderStatusCanceled),
+		string(domain.OrderStatusFailed),
+		int(olderThan.Minutes()),
+	); err != nil {
+		return nil, fmt.Errorf("failed to cancel stale test orders: %w", err)
+	}
+	return ids, nil
 }
 
 func (r *OrderRepository) FindStatusHistoryByOrderID(ctx context.Context, orderID uuid.UUID) ([]*domain.OrderStatusHistory, error) {

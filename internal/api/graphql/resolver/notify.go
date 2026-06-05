@@ -26,6 +26,14 @@ func (r *Resolver) SendNewOrderPush(order *orderDomain.Order) {
 	if order == nil {
 		return
 	}
+	// Store-review test orders never alert staff (no admin push, no POS push).
+	// TEMPORARY (revert after launch).
+	if order.IsTest {
+		zap.L().Info("suppressing new-order push for store-review test order",
+			zap.String("order_id", order.ID.String()),
+		)
+		return
+	}
 
 	go func() {
 		msg := notificationApplication.GetNewOrderNotification(order.Language, string(order.OrderType), order.TotalPrice.StringFixed(2))
