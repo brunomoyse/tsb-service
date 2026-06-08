@@ -46,6 +46,7 @@ type UserService interface {
 	UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressPlaceID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error)
 	RequestDeletion(ctx context.Context, userID string) (*domain.User, error)
 	CancelDeletionRequest(ctx context.Context, userID string) (*domain.User, error)
+	DeleteMe(ctx context.Context, userID string) error
 	BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error)
 	FindOrCreateByZitadelID(ctx context.Context, zitadelID, email, firstName, lastName string) (*domain.User, error)
 	// ResolveZitadelID returns the app user UUID for a Zitadel sub (implements middleware.UserLookup)
@@ -59,6 +60,9 @@ type UserService interface {
 // Google) are created with empty firstName/lastName/email.
 type ZitadelUserFetcher interface {
 	FetchUserInfo(ctx context.Context, userID string) (email, givenName, familyName string, err error)
+	// DeleteUser permanently removes the Zitadel identity (account deletion).
+	// Idempotent: a missing user is treated as success.
+	DeleteUser(ctx context.Context, userID string) error
 }
 
 type userService struct {
@@ -143,6 +147,38 @@ func (s *userService) CancelDeletionRequest(ctx context.Context, userID string) 
 		return nil, fmt.Errorf("failed to cancel deletion request: %w", err)
 	}
 	return user, nil
+}
+
+// DeleteMe permanently deletes the caller's account in one in-app step
+// (App Store guideline 5.1.1(v) / GDPR erasure). It removes the Zitadel
+// identity so the account can no longer authenticate, then anonymises the app
+// user row. The row itself is kept — not dropped — because orders reference it
+// with ON DELETE RESTRICT and must be retained for Belgian VAT bookkeeping; all
+// personal data on the row is erased instead.
+func (s *userService) DeleteMe(ctx context.Context, userID string) error {
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("delete account: load user: %w", err)
+	}
+
+	// 1. Remove the Zitadel identity first so a partial failure can never leave
+	//    a still-loginable account whose PII we've already wiped. Idempotent.
+	if user.ZitadelUserID != nil && *user.ZitadelUserID != "" {
+		if err := s.zitadelFetcher.DeleteUser(ctx, *user.ZitadelUserID); err != nil {
+			return fmt.Errorf("delete account: remove zitadel identity: %w", err)
+		}
+	}
+
+	// 2. Anonymise the app user row (erase PII, drop push tokens). The identity
+	//    is already gone, so if this fails the account is still unusable; log
+	//    loudly so residual PII can be cleaned up out of band.
+	if err := s.repo.AnonymizeForDeletion(ctx, userID); err != nil {
+		zap.L().Error("account deletion: zitadel identity removed but DB anonymisation failed",
+			zap.String("user_id", userID), zap.Error(err))
+		return fmt.Errorf("delete account: anonymise user: %w", err)
+	}
+
+	return nil
 }
 
 func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, email, firstName, lastName string) (*domain.User, error) {

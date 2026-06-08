@@ -78,6 +78,17 @@ func (r *mutationResolver) CancelDeletionRequest(ctx context.Context) (*model.Us
 	return ToGQLUser(u), nil
 }
 
+// DeleteMe is the resolver for the deleteMe field.
+func (r *mutationResolver) DeleteMe(ctx context.Context) (bool, error) {
+	userID := utils.GetUserID(ctx)
+
+	if err := r.UserService.DeleteMe(ctx, userID); err != nil {
+		return false, fmt.Errorf("failed to delete account: %w", err)
+	}
+
+	return true, nil
+}
+
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 	// The userID in context is the app user UUID (resolved from Zitadel sub by OIDC middleware).

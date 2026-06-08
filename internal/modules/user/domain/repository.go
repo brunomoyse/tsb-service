@@ -14,5 +14,8 @@ type UserRepository interface {
 	UpdateUser(ctx context.Context, user *User) (*User, error)
 	RequestDeletion(ctx context.Context, userID string) (*User, error)
 	CancelDeletionRequest(ctx context.Context, userID string) (*User, error)
+	// AnonymizeForDeletion erases all PII on the user row (keeping the row so
+	// VAT-retained orders survive ON DELETE RESTRICT) and drops device push tokens.
+	AnonymizeForDeletion(ctx context.Context, userID string) error
 	BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*User, error)
 }

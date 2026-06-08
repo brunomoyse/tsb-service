@@ -113,6 +113,39 @@ func (r *UserRepository) CancelDeletionRequest(ctx context.Context, userID strin
 	return r.FindByID(ctx, userID)
 }
 
+func (r *UserRepository) AnonymizeForDeletion(ctx context.Context, userID string) error {
+	// Erase every personal field while keeping the row (orders.user_id is
+	// ON DELETE RESTRICT and must be retained for VAT). The email is replaced
+	// with a per-id placeholder on the reserved .invalid TLD (RFC 2606) so the
+	// users_email_unique constraint holds and the address is never deliverable.
+	const anonymize = `
+		UPDATE users SET
+			first_name            = 'Deleted',
+			last_name             = 'User',
+			email                 = 'deleted+' || id::text || '@deleted.invalid',
+			phone_number          = NULL,
+			address_id            = NULL,
+			default_place_id      = NULL,
+			notify_marketing      = false,
+			notify_order_updates  = false,
+			email_verified_at     = NULL,
+			zitadel_user_id       = NULL,
+			deletion_requested_at = NOW()
+		WHERE id = $1`
+	if _, err := r.pool.ForContext(ctx).ExecContext(ctx, anonymize, userID); err != nil {
+		return fmt.Errorf("anonymize user: %w", err)
+	}
+
+	// Drop device push tokens so a deleted account receives no further pushes.
+	// (live_activity_tokens are keyed by order with a 12h TTL and self-purge.)
+	if _, err := r.pool.ForContext(ctx).ExecContext(ctx,
+		`DELETE FROM device_push_tokens WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("delete device push tokens: %w", err)
+	}
+
+	return nil
+}
+
 func (r *UserRepository) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error) {
 	if len(orderIDs) == 0 {
 		return map[string][]*domain.User{}, nil
