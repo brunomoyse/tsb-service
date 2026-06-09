@@ -135,7 +135,6 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CancelDeletionRequest     func(childComplexity int) int
 		CreateCoupon              func(childComplexity int, input model.CreateCouponInput) int
 		CreateOrder               func(childComplexity int, input model.CreateOrderInput) int
 		CreateProduct             func(childComplexity int, input model.CreateProductInput) int
@@ -147,7 +146,6 @@ type ComplexityRoot struct {
 		DeleteScheduleOverride    func(childComplexity int, date time.Time) int
 		RegisterDeviceToken       func(childComplexity int, deviceToken string, platform string) int
 		RegisterLiveActivityToken func(childComplexity int, orderID uuid.UUID, token string) int
-		RequestDeletion           func(childComplexity int) int
 		UnregisterDeviceToken     func(childComplexity int, deviceToken string) int
 		UpdateCoupon              func(childComplexity int, id uuid.UUID, input model.UpdateCouponInput) int
 		UpdateMe                  func(childComplexity int, input model.UpdateUserInput) int
@@ -421,8 +419,6 @@ type MutationResolver interface {
 	UpsertScheduleOverride(ctx context.Context, input model.ScheduleOverrideInput) (*model.ScheduleOverride, error)
 	DeleteScheduleOverride(ctx context.Context, date time.Time) (bool, error)
 	UpdateMe(ctx context.Context, input model.UpdateUserInput) (*model.User, error)
-	RequestDeletion(ctx context.Context) (*model.User, error)
-	CancelDeletionRequest(ctx context.Context) (*model.User, error)
 	DeleteMe(ctx context.Context) (bool, error)
 }
 type OrderResolver interface {
@@ -855,12 +851,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.DaySchedule.Open(childComplexity), true
 
-	case "Mutation.cancelDeletionRequest":
-		if e.ComplexityRoot.Mutation.CancelDeletionRequest == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Mutation.CancelDeletionRequest(childComplexity), true
 	case "Mutation.createCoupon":
 		if e.ComplexityRoot.Mutation.CreateCoupon == nil {
 			break
@@ -977,12 +967,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.RegisterLiveActivityToken(childComplexity, args["orderId"].(uuid.UUID), args["token"].(string)), true
-	case "Mutation.requestDeletion":
-		if e.ComplexityRoot.Mutation.RequestDeletion == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Mutation.RequestDeletion(childComplexity), true
 	case "Mutation.unregisterDeviceToken":
 		if e.ComplexityRoot.Mutation.UnregisterDeviceToken == nil {
 			break
@@ -6517,96 +6501,6 @@ func (ec *executionContext) fieldContext_Mutation_updateMe(ctx context.Context, 
 	if fc.Args, err = ec.field_Mutation_updateMe_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_requestDeletion(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Mutation_requestDeletion(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Mutation().RequestDeletion(ctx)
-		},
-		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
-			directive0 := next
-
-			directive1 := func(ctx context.Context) (any, error) {
-				if ec.Directives.Auth == nil {
-					var zeroVal *model.User
-					return zeroVal, errors.New("directive auth is not implemented")
-				}
-				return ec.Directives.Auth(ctx, nil, directive0)
-			}
-
-			next = directive1
-			return next
-		},
-		func(ctx context.Context, selections ast.SelectionSet, v *model.User) graphql.Marshaler {
-			return ec.marshalNUser2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUser(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_Mutation_requestDeletion(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.childFields_User(ctx, field)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_cancelDeletionRequest(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Mutation_cancelDeletionRequest(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Mutation().CancelDeletionRequest(ctx)
-		},
-		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
-			directive0 := next
-
-			directive1 := func(ctx context.Context) (any, error) {
-				if ec.Directives.Auth == nil {
-					var zeroVal *model.User
-					return zeroVal, errors.New("directive auth is not implemented")
-				}
-				return ec.Directives.Auth(ctx, nil, directive0)
-			}
-
-			next = directive1
-			return next
-		},
-		func(ctx context.Context, selections ast.SelectionSet, v *model.User) graphql.Marshaler {
-			return ec.marshalNUser2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUser(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_Mutation_cancelDeletionRequest(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.childFields_User(ctx, field)
-		},
 	}
 	return fc, nil
 }
@@ -14811,20 +14705,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "updateMe":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_updateMe(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "requestDeletion":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_requestDeletion(ctx, field)
-			})
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "cancelDeletionRequest":
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_cancelDeletionRequest(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++

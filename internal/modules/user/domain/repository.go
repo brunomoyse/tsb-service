@@ -12,8 +12,6 @@ type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (*User, error)
 	FindByZitadelID(ctx context.Context, zitadelID string) (*User, error)
 	UpdateUser(ctx context.Context, user *User) (*User, error)
-	RequestDeletion(ctx context.Context, userID string) (*User, error)
-	CancelDeletionRequest(ctx context.Context, userID string) (*User, error)
 	// AnonymizeForDeletion erases all PII on the user row (keeping the row so
 	// VAT-retained orders survive ON DELETE RESTRICT) and drops device push tokens.
 	AnonymizeForDeletion(ctx context.Context, userID string) error

@@ -67,8 +67,6 @@ extend type Mutation {
     updateMe (
         input: UpdateUserInput!
     ): User! @auth
-    requestDeletion: User! @auth
-    cancelDeletionRequest: User! @auth
     "Permanently deletes the caller's account in one step (GDPR erasure): removes the Zitadel identity and anonymizes the user record. Returns true on success."
     deleteMe: Boolean! @auth
 }

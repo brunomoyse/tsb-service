@@ -749,43 +749,6 @@ func SendReadyTimeUpdatedEmail(user userDomain.User, lang string, order orderDom
 	return nil
 }
 
-func SendDeletionRequestEmail(user userDomain.User) error {
-	newReq := *baseReq
-
-	adminEmail := os.Getenv("DELETION_REQUEST_RECIPIENT_EMAIL")
-	adminName := "Tokyo Sushi Bar Admin"
-	newReq.To = []*temv1alpha1.CreateEmailRequestAddress{
-		{
-			Email: adminEmail,
-			Name:  &adminName,
-		},
-	}
-
-	path := "templates/en/deletion-request"
-
-	htmlContent, err := renderDeletionRequestEmailHTML(path, user)
-	if err != nil {
-		return fmt.Errorf("failed to render email template: %w", err)
-	}
-
-	plainTextContent, err := renderDeletionRequestEmailText(path, user)
-	if err != nil {
-		return fmt.Errorf("failed to render email template: %w", err)
-	}
-
-	newReq.Subject = fmt.Sprintf("Account deletion request - %s %s", user.FirstName, user.LastName)
-	newReq.HTML = htmlContent
-	newReq.Text = plainTextContent
-
-	err = dispatch(&newReq)
-	if err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-
-	logger.Debugf("Deletion request email sent to admin for user %s", user.Email)
-	return nil
-}
-
 func SendReengagementEmail(user userDomain.User, lang string) error {
 	newReq := *baseReq
 

@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 
 	"tsb-service/internal/modules/user/domain"
-	es "tsb-service/pkg/email/scaleway"
 )
 
 // ErrInvalidPhoneNumber is returned when a phone number cannot be parsed into E.164 form.
@@ -44,8 +43,6 @@ type UserService interface {
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressPlaceID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error)
-	RequestDeletion(ctx context.Context, userID string) (*domain.User, error)
-	CancelDeletionRequest(ctx context.Context, userID string) (*domain.User, error)
 	DeleteMe(ctx context.Context, userID string) error
 	BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error)
 	FindOrCreateByZitadelID(ctx context.Context, zitadelID, email, firstName, lastName string) (*domain.User, error)
@@ -123,30 +120,6 @@ func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *st
 	}
 
 	return s.repo.UpdateUser(ctx, user)
-}
-
-func (s *userService) RequestDeletion(ctx context.Context, userID string) (*domain.User, error) {
-	user, err := s.repo.RequestDeletion(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to request deletion: %w", err)
-	}
-
-	go func() {
-		err := es.SendDeletionRequestEmail(*user)
-		if err != nil {
-			zap.L().Error("failed to send deletion request email", zap.String("user_id", user.ID.String()), zap.Error(err))
-		}
-	}()
-
-	return user, nil
-}
-
-func (s *userService) CancelDeletionRequest(ctx context.Context, userID string) (*domain.User, error) {
-	user, err := s.repo.CancelDeletionRequest(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to cancel deletion request: %w", err)
-	}
-	return user, nil
 }
 
 // DeleteMe permanently deletes the caller's account in one in-app step
