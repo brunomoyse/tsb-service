@@ -1012,63 +1012,6 @@ func (r *mutationResolver) UpdateMyOrdersLanguage(ctx context.Context, language 
 	return len(orders), nil
 }
 
-// normalizeOrderLanguage maps an incoming locale to a supported short code
-// (fr/en/nl/zh), or "" when unsupported. Accepts BCP-47 tags (e.g. "en-US").
-func normalizeOrderLanguage(l string) string {
-	base := strings.ToLower(strings.TrimSpace(l))
-	if i := strings.IndexAny(base, "-_"); i >= 0 {
-		base = base[:i]
-	}
-	switch base {
-	case "fr", "en", "nl", "zh":
-		return base
-	default:
-		return ""
-	}
-}
-
-// repushActivitiesLanguage re-sends the iOS Live Activity and Android Live Update
-// for each order in the new language. Detached from the request context. Every
-// order here is non-terminal, so the event is always "update".
-func (r *mutationResolver) repushActivitiesLanguage(orders []*orderDomain.Order, lang string) {
-	for _, o := range orders {
-		cs := notificationApplication.GetLiveActivityContentState(o.OrderStatus, lang, string(o.OrderType), o.CancellationReason)
-		// PENDING has no localized status text — nothing meaningful to re-push.
-		if sub, _ := cs["subtitle"].(string); sub == "" {
-			continue
-		}
-
-		if r.APNsClient != nil {
-			if laTokens, lerr := r.NotificationService.GetLiveActivityTokens(context.Background(), o.ID); lerr == nil {
-				for _, lt := range laTokens {
-					if pushErr := r.APNsClient.SendLiveActivity(lt.PushToken, cs, "update"); pushErr != nil {
-						zap.L().Warn("failed to re-push live activity (language)",
-							zap.String("order_id", o.ID.String()), zap.Error(pushErr))
-					}
-				}
-			}
-		}
-
-		if r.FCMClient != nil {
-			if deviceTokens, derr := r.NotificationService.GetDeviceTokens(context.Background(), o.UserID); derr == nil {
-				deepLink := fmt.Sprintf("tsbmobile://order-completed/%s", o.ID.String())
-				data := notificationApplication.GetLiveUpdateData(
-					o.ID.String(), o.OrderStatus, lang, string(o.OrderType), deepLink, o.CancellationReason,
-				)
-				for _, dt := range deviceTokens {
-					if dt.Platform != "android" {
-						continue
-					}
-					if pushErr := r.FCMClient.SendDataMessage(dt.DeviceToken, data); pushErr != nil {
-						zap.L().Warn("failed to re-push live update (language)",
-							zap.String("order_id", o.ID.String()), zap.Error(pushErr))
-					}
-				}
-			}
-		}
-	}
-}
-
 // OrderExtra is the resolver for the orderExtra field.
 func (r *orderResolver) OrderExtra(ctx context.Context, obj *model.Order) (any, error) {
 	return obj.OrderExtra, nil

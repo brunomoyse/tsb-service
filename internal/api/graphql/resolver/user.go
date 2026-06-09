@@ -54,28 +54,15 @@ func (r *mutationResolver) UpdateMe(ctx context.Context, input model.UpdateUserI
 	return user, nil
 }
 
-// RequestDeletion is the resolver for the requestDeletion field.
-func (r *mutationResolver) RequestDeletion(ctx context.Context) (*model.User, error) {
+// DeleteMe is the resolver for the deleteMe field.
+func (r *mutationResolver) DeleteMe(ctx context.Context) (bool, error) {
 	userID := utils.GetUserID(ctx)
 
-	u, err := r.UserService.RequestDeletion(ctx, userID)
-	if err != nil {
-		return nil, err
+	if err := r.UserService.DeleteMe(ctx, userID); err != nil {
+		return false, fmt.Errorf("failed to delete account: %w", err)
 	}
 
-	return ToGQLUser(u), nil
-}
-
-// CancelDeletionRequest is the resolver for the cancelDeletionRequest field.
-func (r *mutationResolver) CancelDeletionRequest(ctx context.Context) (*model.User, error) {
-	userID := utils.GetUserID(ctx)
-
-	u, err := r.UserService.CancelDeletionRequest(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	return ToGQLUser(u), nil
+	return true, nil
 }
 
 // Me is the resolver for the me field.

@@ -121,6 +121,22 @@ func GetZitadelUserInfo(_ context.Context, userID string) (email, givenName, fam
 		nil
 }
 
+// DeleteZitadelUser permanently removes a user from Zitadel by their Zitadel
+// user ID. Used by account deletion (GDPR / App Store guideline 5.1.1) so the
+// identity can no longer authenticate. Uses the admin PAT (user management
+// permission). A 404 is treated as success, so the call is idempotent and safe
+// to retry after a partial failure.
+func DeleteZitadelUser(_ context.Context, userID string) error {
+	respBody, status, err := zitadelAdminRequest("DELETE", "/v2/users/"+userID, nil)
+	if err != nil {
+		return fmt.Errorf("delete user: %w", err)
+	}
+	if status != http.StatusOK && status != http.StatusNotFound {
+		return fmt.Errorf("delete user returned status %d: %s", status, respBody)
+	}
+	return nil
+}
+
 // placeholderProfileMarker is the sentinel value stored in givenName/familyName
 // when a Zitadel user is provisioned without a real name (Pattern B identifier-
 // first signup). Pure "-" is short and unlikely to collide with a legitimate

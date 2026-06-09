@@ -49,12 +49,8 @@ func (m *mockUserService) UpdateMe(ctx context.Context, userID string, firstName
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *mockUserService) RequestDeletion(ctx context.Context, userID string) (*domain.User, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (m *mockUserService) CancelDeletionRequest(ctx context.Context, userID string) (*domain.User, error) {
-	return nil, fmt.Errorf("not implemented")
+func (m *mockUserService) DeleteMe(ctx context.Context, userID string) error {
+	return fmt.Errorf("not implemented")
 }
 
 func (m *mockUserService) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error) {

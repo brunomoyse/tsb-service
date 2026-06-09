@@ -504,3 +504,7 @@ type zitadelUserFetcher struct{}
 func (zitadelUserFetcher) FetchUserInfo(ctx context.Context, userID string) (string, string, string, error) {
 	return auth.GetZitadelUserInfo(ctx, userID)
 }
+
+func (zitadelUserFetcher) DeleteUser(ctx context.Context, userID string) error {
+	return auth.DeleteZitadelUser(ctx, userID)
+}

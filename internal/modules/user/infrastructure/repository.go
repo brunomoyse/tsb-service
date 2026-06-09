@@ -95,22 +95,49 @@ func (r *UserRepository) UpdateUser(ctx context.Context, user *domain.User) (*do
 	return r.FindByID(ctx, user.ID.String())
 }
 
-func (r *UserRepository) RequestDeletion(ctx context.Context, userID string) (*domain.User, error) {
-	query := `UPDATE users SET deletion_requested_at = NOW() WHERE id = $1`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID)
-	if err != nil {
-		return nil, err
+func (r *UserRepository) AnonymizeForDeletion(ctx context.Context, userID string) error {
+	// Erase every personal field while keeping the row (orders.user_id is
+	// ON DELETE RESTRICT and must be retained for VAT). The email is replaced
+	// with a per-id placeholder on the reserved .invalid TLD (RFC 2606) so the
+	// users_email_unique constraint holds and the address is never deliverable.
+	//
+	// zitadel_user_id is deliberately NOT nulled. Access tokens are validated
+	// locally via JWKS (no introspection), so a token issued before deletion
+	// stays valid until it expires. If we dropped the sub, the next request on
+	// that stale token would miss FindByZitadelID, miss FindByEmail (email is
+	// anonymized), and JIT-provision a fresh row from the token claims —
+	// resurrecting the account with the PII we just erased. Keeping the (now
+	// dead, never-reused) Zitadel sub makes FindByZitadelID return this
+	// anonymized row instead, so the stale token resolves to "Deleted User"
+	// and no new row is created.
+	const anonymize = `
+		UPDATE users SET
+			first_name            = 'Deleted',
+			last_name             = 'User',
+			email                 = 'deleted+' || id::text || '@deleted.invalid',
+			phone_number          = NULL,
+			address_id            = NULL,
+			default_place_id      = NULL,
+			notify_marketing      = false,
+			notify_order_updates  = false,
+			email_verified_at     = NULL,
+			password_hash         = NULL,
+			salt                  = NULL,
+			google_id             = NULL,
+			deletion_requested_at = NOW()
+		WHERE id = $1`
+	if _, err := r.pool.ForContext(ctx).ExecContext(ctx, anonymize, userID); err != nil {
+		return fmt.Errorf("anonymize user: %w", err)
 	}
-	return r.FindByID(ctx, userID)
-}
 
-func (r *UserRepository) CancelDeletionRequest(ctx context.Context, userID string) (*domain.User, error) {
-	query := `UPDATE users SET deletion_requested_at = NULL WHERE id = $1`
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, userID)
-	if err != nil {
-		return nil, err
+	// Drop device push tokens so a deleted account receives no further pushes.
+	// (live_activity_tokens are keyed by order with a 12h TTL and self-purge.)
+	if _, err := r.pool.ForContext(ctx).ExecContext(ctx,
+		`DELETE FROM device_push_tokens WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("delete device push tokens: %w", err)
 	}
-	return r.FindByID(ctx, userID)
+
+	return nil
 }
 
 func (r *UserRepository) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.User, error) {

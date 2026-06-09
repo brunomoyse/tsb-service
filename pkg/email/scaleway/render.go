@@ -628,34 +628,6 @@ func renderReadyTimeUpdatedEmailText(path string, u userDomain.User, o orderDoma
 }
 
 // --------------------------------------------------------------------------------
-// Deletion Request
-// --------------------------------------------------------------------------------
-
-func prepareDeletionRequestData(u userDomain.User) any {
-	return struct {
-		UserName  string
-		UserEmail string
-		UserID    string
-		LogoURL   string
-	}{
-		UserName:  formatUserName(u),
-		UserEmail: u.Email,
-		UserID:    u.ID.String(),
-		LogoURL:   logoURL(),
-	}
-}
-
-func renderDeletionRequestEmailHTML(path string, u userDomain.User) (string, error) {
-	data := prepareDeletionRequestData(u)
-	return renderEmail(path, data, loadHTMLTemplate)
-}
-
-func renderDeletionRequestEmailText(path string, u userDomain.User) (string, error) {
-	data := prepareDeletionRequestData(u)
-	return renderEmail(path, data, loadTextTemplate)
-}
-
-// --------------------------------------------------------------------------------
 // Re-engagement
 // --------------------------------------------------------------------------------
 
