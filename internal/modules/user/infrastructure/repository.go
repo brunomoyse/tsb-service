@@ -108,22 +108,18 @@ func (r *UserRepository) AnonymizeForDeletion(ctx context.Context, userID string
 	// anonymized), and JIT-provision a fresh row from the token claims —
 	// resurrecting the account with the PII we just erased. Keeping the (now
 	// dead, never-reused) Zitadel sub makes FindByZitadelID return this
-	// anonymized row instead, so the stale token resolves to "Deleted User"
+	// anonymized row instead, so the stale token resolves to "Anonyme Anonyme"
 	// and no new row is created.
 	const anonymize = `
 		UPDATE users SET
-			first_name            = 'Deleted',
-			last_name             = 'User',
+			first_name            = 'Anonyme',
+			last_name             = 'Anonyme',
 			email                 = 'deleted+' || id::text || '@deleted.invalid',
 			phone_number          = NULL,
 			address_id            = NULL,
 			default_place_id      = NULL,
 			notify_marketing      = false,
 			notify_order_updates  = false,
-			email_verified_at     = NULL,
-			password_hash         = NULL,
-			salt                  = NULL,
-			google_id             = NULL,
 			deletion_requested_at = NOW()
 		WHERE id = $1`
 	if _, err := r.pool.ForContext(ctx).ExecContext(ctx, anonymize, userID); err != nil {
