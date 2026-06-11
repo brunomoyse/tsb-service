@@ -365,24 +365,36 @@ func emailContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 30*time.Second)
 }
 
+// excludedDeliveryPostcodes lists postcodes we never deliver to, regardless of distance.
+var excludedDeliveryPostcodes = map[string]bool{
+	"4610": true, // Beyne-Heusay
+}
+
+// isExcludedDeliveryPostcode reports whether the given postcode is excluded from delivery.
+func isExcludedDeliveryPostcode(postcode string) bool {
+	return excludedDeliveryPostcodes[strings.TrimSpace(postcode)]
+}
+
 // deliveryFeeFromDistance computes the delivery fee based on distance in meters.
 func deliveryFeeFromDistance(distance float64) decimal.Decimal {
 	var dFee int64
 	switch {
-	case distance < 4000:
+	case distance < 3000:
 		dFee = 0
-	case distance < 5000:
+	case distance < 4000:
 		dFee = 1
-	case distance < 6000:
+	case distance < 5000:
 		dFee = 2
-	case distance < 7000:
+	case distance < 6000:
 		dFee = 3
-	case distance < 8000:
+	case distance < 7000:
 		dFee = 4
-	case distance < 9000:
+	case distance < 8000:
 		dFee = 5
+	case distance < 9000:
+		dFee = 6
 	default:
-		dFee = 10
+		dFee = 10 // unreachable; order.go rejects distance >= 9000 first
 	}
 	return decimal.NewFromInt(dFee)
 }

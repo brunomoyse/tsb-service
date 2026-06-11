@@ -299,6 +299,9 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		if addr.Distance >= 9000 {
 			return nil, fmt.Errorf("address too far for delivery")
 		}
+		if isExcludedDeliveryPostcode(addr.Postcode) {
+			return nil, fmt.Errorf("address not eligible for delivery: excluded area")
+		}
 
 		fee = deliveryFeeFromDistance(addr.Distance)
 		total = total.Add(fee)
