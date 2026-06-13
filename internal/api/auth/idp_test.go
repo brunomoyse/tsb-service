@@ -84,19 +84,25 @@ func TestStartIdPIntentHandler_ZitadelError(t *testing.T) {
 
 func TestCreateIdPSessionHandler_WithExistingUserId(t *testing.T) {
 	setupMockZitadelWithIdP(t, func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/v2/sessions", r.URL.Path)
-		assert.Equal(t, "POST", r.Method)
+		switch {
+		case r.URL.Path == "/v2/sessions" && r.Method == "POST":
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			checks := body["checks"].(map[string]any)
+			user := checks["user"].(map[string]any)
+			assert.Equal(t, "existing-user-123", user["userId"])
+			idpIntent := checks["idpIntent"].(map[string]any)
+			assert.Equal(t, "intent-abc", idpIntent["idpIntentId"])
 
-		var body map[string]any
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		checks := body["checks"].(map[string]any)
-		user := checks["user"].(map[string]any)
-		assert.Equal(t, "existing-user-123", user["userId"])
-		idpIntent := checks["idpIntent"].(map[string]any)
-		assert.Equal(t, "intent-abc", idpIntent["idpIntentId"])
-
-		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"sessionId":"sess-idp-1","sessionToken":"tok-idp-1"}`))
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"sessionId":"sess-idp-1","sessionToken":"tok-idp-1"}`))
+		case r.URL.Path == "/v2/users/existing-user-123" && r.Method == "GET":
+			// Profile-completion probe — existing user has a real name.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"Existing","familyName":"User"}}}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
 	})
 
 	w, c := ginContext("POST", "/auth/idp/session", `{"idpIntentId":"intent-abc","idpIntentToken":"tok-abc","userId":"existing-user-123"}`)
@@ -107,6 +113,8 @@ func TestCreateIdPSessionHandler_WithExistingUserId(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "sess-idp-1", resp["sessionId"])
 	assert.Equal(t, "tok-idp-1", resp["sessionToken"])
+	// Real name → no profile completion needed.
+	assert.Equal(t, false, resp["requiresProfile"])
 }
 
 func TestCreateIdPSessionHandler_NewUserFromIdP(t *testing.T) {
@@ -124,13 +132,21 @@ func TestCreateIdPSessionHandler_NewUserFromIdP(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result":[]}`))
 		case r.URL.Path == "/v2/users/human" && r.Method == "POST":
-			// Create new user
+			// Create new user — the IdP supplied a name, so it is preserved.
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			profile := body["profile"].(map[string]any)
+			assert.Equal(t, "New", profile["givenName"])
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"userId":"new-user-789"}`))
 		case r.URL.Path == "/v2/sessions" && r.Method == "POST":
 			// Create session
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"sessionId":"sess-new","sessionToken":"tok-new"}`))
+		case r.URL.Path == "/v2/users/new-user-789" && r.Method == "GET":
+			// Profile-completion probe — real name was provided by the IdP.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"New","familyName":"User"}}}}`))
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -143,6 +159,57 @@ func TestCreateIdPSessionHandler_NewUserFromIdP(t *testing.T) {
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "sess-new", resp["sessionId"])
+	assert.Equal(t, false, resp["requiresProfile"])
+}
+
+// TestCreateIdPSessionHandler_NewUserNoName covers the Apple fix: when the IdP
+// returns no name (Apple omits it on repeat authorizations), the handler must
+// backfill a placeholder name so Zitadel accepts the user creation, and signal
+// requiresProfile so the frontend collects the real name before finalize.
+func TestCreateIdPSessionHandler_NewUserNoName(t *testing.T) {
+	setupMockZitadelWithIdP(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/idp_intents/intent-apple" && r.Method == "POST":
+			// IdP intent with NO profile — mirrors Apple on a repeat sign-in.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"addHumanUser":{"email":{"email":"relay@privaterelay.appleid.com"}},
+				"idpInformation":{"idpId":"test-apple-idp","userId":"apple-sub-1","userName":"relay@privaterelay.appleid.com"}
+			}`))
+		case r.URL.Path == "/v2/users" && r.Method == "POST":
+			// Email search — user not found.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"result":[]}`))
+		case r.URL.Path == "/v2/users/human" && r.Method == "POST":
+			// The missing name must be backfilled with the placeholder marker.
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			profile := body["profile"].(map[string]any)
+			assert.Equal(t, placeholderProfileMarker, profile["givenName"])
+			assert.Equal(t, placeholderProfileMarker, profile["familyName"])
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"userId":"apple-user-1"}`))
+		case r.URL.Path == "/v2/sessions" && r.Method == "POST":
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"sessionId":"sess-apple","sessionToken":"tok-apple"}`))
+		case r.URL.Path == "/v2/users/apple-user-1" && r.Method == "GET":
+			// Profile-completion probe — still the placeholder marker.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"-","familyName":"-"}}}}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	w, c := ginContext("POST", "/auth/idp/session", `{"idpIntentId":"intent-apple","idpIntentToken":"tok-apple"}`)
+	CreateIdPSessionHandler(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "sess-apple", resp["sessionId"])
+	// No name from the IdP → frontend must collect first/last name.
+	assert.Equal(t, true, resp["requiresProfile"])
 }
 
 func TestCreateIdPSessionHandler_MissingFields(t *testing.T) {
