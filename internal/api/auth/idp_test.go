@@ -212,6 +212,45 @@ func TestCreateIdPSessionHandler_NewUserNoName(t *testing.T) {
 	assert.Equal(t, true, resp["requiresProfile"])
 }
 
+// TestCreateIdPSessionHandler_AlreadyLinkedIdP covers a repeat IdP login where
+// the external identity is already linked to a Zitadel user (e.g. an incomplete
+// first sign-in left a placeholder account). Zitadel returns the linked userId
+// at the top level of the intent, and the handler must use it directly — never
+// re-searching, re-linking, or re-creating (those would fail on the duplicate).
+func TestCreateIdPSessionHandler_AlreadyLinkedIdP(t *testing.T) {
+	setupMockZitadelWithIdP(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/idp_intents/intent-linked" && r.Method == "POST":
+			// Already-linked identity → Zitadel includes the top-level userId.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"userId":"linked-user-1",
+				"addHumanUser":{"profile":{"givenName":"Ann","familyName":"Lee"},"email":{"email":"ann@google.com"}},
+				"idpInformation":{"idpId":"test-google-idp","userId":"google-sub-9","userName":"ann@google.com"}
+			}`))
+		case r.URL.Path == "/v2/sessions" && r.Method == "POST":
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"sessionId":"sess-linked","sessionToken":"tok-linked"}`))
+		case r.URL.Path == "/v2/users/linked-user-1" && r.Method == "GET":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"Ann","familyName":"Lee"}}}}`))
+		default:
+			// A search (/v2/users) or create (/v2/users/human) here means the
+			// short-circuit failed and we took the fragile path.
+			t.Errorf("unexpected request (should have used linked userId): %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	w, c := ginContext("POST", "/auth/idp/session", `{"idpIntentId":"intent-linked","idpIntentToken":"tok-linked"}`)
+	CreateIdPSessionHandler(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var resp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, "sess-linked", resp["sessionId"])
+	assert.Equal(t, false, resp["requiresProfile"])
+}
+
 func TestCreateIdPSessionHandler_MissingFields(t *testing.T) {
 	tests := []struct {
 		name string

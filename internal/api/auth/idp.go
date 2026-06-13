@@ -184,6 +184,10 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 	}
 
 	var intentInfo struct {
+		// Top-level userId is set by Zitadel when the external identity is ALREADY
+		// linked to a Zitadel user (a repeat IdP login). When present we use it
+		// directly — see step 0.
+		UserID       string          `json:"userId"`
 		AddHumanUser json.RawMessage `json:"addHumanUser"`
 		IdpInfo      struct {
 			IdpID    string `json:"idpId"`
@@ -193,6 +197,17 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 	}
 	if err := json.Unmarshal(intentBody, &intentInfo); err != nil {
 		return "", fmt.Errorf("parse idp intent info: %w", err)
+	}
+
+	// 0. The external identity is already linked to a Zitadel user (repeat IdP
+	// login). Use that user directly and skip the find-by-email / link / create
+	// path below, which is fragile when the link already exists — e.g. an
+	// incomplete first sign-in (user closed the app before completing their
+	// profile) left a placeholder account with the IdP already linked, and
+	// re-linking or re-creating it would fail.
+	if intentInfo.UserID != "" {
+		log.Info("idp identity already linked to zitadel user", zap.String("user_id", intentInfo.UserID))
+		return intentInfo.UserID, nil
 	}
 
 	// 2. Try to find existing Zitadel user by the IdP email
@@ -215,8 +230,15 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 			if linkErr != nil {
 				return "", fmt.Errorf("link idp to user: %w", linkErr)
 			}
-			// 409 Conflict means it's already linked — that's fine
-			if linkStatus != http.StatusOK && linkStatus != http.StatusCreated && linkStatus != http.StatusConflict {
+			// An already-existing link is success. Zitadel usually returns 409,
+			// but some versions surface "already exists" under a different status
+			// (e.g. 400/412), so inspect the message too rather than trusting 409.
+			switch {
+			case linkStatus == http.StatusOK || linkStatus == http.StatusCreated || linkStatus == http.StatusConflict:
+				// freshly linked, or already linked (409) — ok
+			case containsAny(parseZitadelError(linkResp), "already", "AlreadyExists"):
+				// already linked under a non-409 status — ok
+			default:
 				return "", fmt.Errorf("link idp to user returned status %d: %s", linkStatus, linkResp)
 			}
 
