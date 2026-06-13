@@ -31,6 +31,17 @@ type idpSessionRequest struct {
 	UserID         string `json:"userId,omitempty"` // Zitadel user ID from callback (if user already exists)
 }
 
+// idpSessionResponse mirrors the OTP verify response: the session pair plus a
+// flag telling the frontend the user still has a placeholder name and must
+// complete their profile (via /auth/session/otp/complete-profile) before
+// /auth/finalize. RequiresProfile is true for IdP users whose provider omitted
+// the name (e.g. Apple on repeat authorizations).
+type idpSessionResponse struct {
+	SessionID       string `json:"sessionId"`
+	SessionToken    string `json:"sessionToken"`
+	RequiresProfile bool   `json:"requiresProfile"`
+}
+
 func getIdpID(provider string) string {
 	return client.idpIDs[provider]
 }
@@ -138,7 +149,24 @@ func CreateIdPSessionHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, sessionResponse(zResp))
+	// Best-effort: a user just provisioned from an IdP that omitted the name
+	// (Apple on repeat auth) carries the placeholder marker and should be routed
+	// through profile completion before /auth/finalize — same signal and same
+	// /auth/session/otp/complete-profile endpoint the OTP flow uses. A failed
+	// lookup must never block login: the user keeps the placeholder name and can
+	// edit it from their profile later.
+	var requiresProfile bool
+	if userID != "" {
+		if needs, err := userNeedsProfileCompletion(userID); err == nil {
+			requiresProfile = needs
+		}
+	}
+
+	c.JSON(http.StatusOK, idpSessionResponse{
+		SessionID:       zResp.SessionID,
+		SessionToken:    zResp.SessionToken,
+		RequiresProfile: requiresProfile,
+	})
 }
 
 // resolveOrCreateZitadelUser retrieves the IdP intent info, then either finds
@@ -196,14 +224,22 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 		}
 	}
 
-	// 3. No existing user — create one using the template from the intent
-	// Uses admin PAT since user creation requires management permissions
+	// 3. No existing user — create one using the template from the intent.
+	// Uses admin PAT since user creation requires management permissions.
+	//
+	// Apple only returns the user's name on the FIRST authorization of an Apple
+	// ID against our Services ID; every later sign-in (including any sign-in
+	// after the app account was deleted — Apple keeps the consent server-side)
+	// omits it. Zitadel's /v2/users/human rejects an empty givenName/familyName
+	// (min 1 rune), so we backfill the placeholder marker — same as the OTP
+	// signup path — and let the complete-profile flow collect the real name.
+	addHumanUser := ensureProfileName(log, intentInfo.AddHumanUser)
 	log.Info("creating new zitadel user from IdP intent",
 		zap.String("email", email),
 		zap.String("idp_user_id", intentInfo.IdpInfo.UserID),
-		zap.ByteString("add_human_user", intentInfo.AddHumanUser),
+		zap.ByteString("add_human_user", addHumanUser),
 	)
-	userBody, userStatus, err := zitadelAdminRequest("POST", "/v2/users/human", intentInfo.AddHumanUser)
+	userBody, userStatus, err := zitadelAdminRequest("POST", "/v2/users/human", addHumanUser)
 	if err != nil {
 		return "", fmt.Errorf("create zitadel user: %w", err)
 	}
@@ -220,4 +256,48 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 	}
 
 	return userResp.UserID, nil
+}
+
+// ensureProfileName guarantees the AddHumanUser template carries a non-empty
+// givenName/familyName. Social IdPs (notably Apple) omit the name on repeat
+// authorizations, but Zitadel requires both fields (min 1 rune), so an empty
+// name makes /v2/users/human fail with HTTP 400 and the login surfaces an
+// error. When either is missing we substitute the placeholder marker so the
+// account is created; the user is then routed through profile completion (the
+// marker is detected by userNeedsProfileCompletion) to supply their real name.
+// On any parse/marshal failure the original payload is returned unchanged.
+func ensureProfileName(log *zap.Logger, raw json.RawMessage) json.RawMessage {
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		log.Warn("could not parse AddHumanUser template; sending as-is", zap.Error(err))
+		return raw
+	}
+
+	profile, ok := payload["profile"].(map[string]any)
+	if !ok || profile == nil {
+		profile = map[string]any{}
+		payload["profile"] = profile
+	}
+
+	filled := false
+	if s, _ := profile["givenName"].(string); strings.TrimSpace(s) == "" {
+		profile["givenName"] = placeholderProfileMarker
+		filled = true
+	}
+	if s, _ := profile["familyName"].(string); strings.TrimSpace(s) == "" {
+		profile["familyName"] = placeholderProfileMarker
+		filled = true
+	}
+
+	if !filled {
+		return raw
+	}
+
+	patched, err := json.Marshal(payload)
+	if err != nil {
+		log.Warn("could not re-marshal AddHumanUser template; sending as-is", zap.Error(err))
+		return raw
+	}
+	log.Info("backfilled placeholder name on IdP user creation (provider omitted name)")
+	return patched
 }
