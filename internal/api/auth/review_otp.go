@@ -65,6 +65,25 @@ func IsReviewLogin(loginName string) bool {
 	return isReviewOtpLogin(loginName)
 }
 
+// IsReviewAppleUser reports whether the identity is Apple's App Store review
+// account ("John Apple"/"John Appleseed"). Unlike the Play reviewer, Apple's
+// tester signs in with Sign in with Apple, so there is no fixed login to list in
+// REVIEW_OTP_LOGINS — they get a Hide-My-Email relay address that can differ
+// between review rounds. We therefore match Apple's stable review-account name
+// signature combined with the privaterelay domain, which a real customer is
+// vanishingly unlikely to satisfy. Used to flag their order as a test order so
+// it never reaches the kitchen. TEMPORARY (revert after launch).
+func IsReviewAppleUser(email, firstName, lastName string) bool {
+	if !strings.HasSuffix(strings.ToLower(strings.TrimSpace(email)), "@privaterelay.appleid.com") {
+		return false
+	}
+	if !strings.EqualFold(strings.TrimSpace(firstName), "John") {
+		return false
+	}
+	last := strings.TrimSpace(lastName)
+	return strings.EqualFold(last, "Apple") || strings.EqualFold(last, "Appleseed")
+}
+
 type reviewOtpEntry struct {
 	code     string
 	storedAt time.Time

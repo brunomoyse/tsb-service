@@ -277,6 +277,18 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 		return "", fmt.Errorf("parse user creation response: %w", err)
 	}
 
+	// Zitadel's user query projection updates asynchronously after creation, so
+	// the POST /v2/sessions call that immediately follows can race it and fail
+	// with a spurious NotFound (404, "User could not be found"), surfacing as
+	// "Authentication failed" — this hit an App Store reviewer on a first-time
+	// Apple sign-in. Wait for the new user to be queryable before returning. If
+	// it never shows we proceed anyway: the session attempt is no worse off than
+	// without the wait, and a non-blocking login beats blocking on a slow poll.
+	if err := waitForZitadelUserProjection(userResp.UserID); err != nil {
+		log.Warn("new IdP user not yet visible in query projection; proceeding to session create anyway",
+			zap.String("user_id", userResp.UserID), zap.Error(err))
+	}
+
 	return userResp.UserID, nil
 }
 
