@@ -396,7 +396,11 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
 	}
-	isTestOrder := user != nil && auth.IsReviewLogin(user.Email)
+	// Flag store-review orders: the Play reviewer is a fixed REVIEW_OTP_LOGINS
+	// email; the Apple reviewer signs in with Apple (relay email, no fixed
+	// login) so is matched by their "John Apple" name + privaterelay signature.
+	isTestOrder := user != nil && (auth.IsReviewLogin(user.Email) ||
+		auth.IsReviewAppleUser(user.Email, user.FirstName, user.LastName))
 
 	tempOrder := orderDomain.NewOrder(
 		userUUID,
