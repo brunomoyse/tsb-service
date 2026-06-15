@@ -41,7 +41,12 @@ func Setup(level, format string) {
 		encoder = zapcore.NewConsoleEncoder(cfg)
 	}
 
-	core := zapcore.NewCore(encoder, zapcore.AddSync(os.Stdout), lvl)
+	// Tee stdout with the Sentry bridge so every Error-level log raises an alert
+	// (the bridge is inert until sentry.Init binds a client, i.e. SENTRY_DSN set).
+	core := zapcore.NewTee(
+		zapcore.NewCore(encoder, zapcore.AddSync(os.Stdout), lvl),
+		newSentryCore(),
+	)
 	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	zap.ReplaceGlobals(logger)
 }

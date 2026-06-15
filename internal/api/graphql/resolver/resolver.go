@@ -239,7 +239,9 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 			// because nil Path (e.g. Applebot empty GET) serializes to "".
 			logger.Warn("graphql resolver error (client malformed request)", append(fields, zap.String("query", query))...)
 		default:
-			logger.Error("graphql resolver error", append(fields, zap.String("query", query), zap.Error(e))...)
+			// SkipSentry: this path captures the exception itself below with
+			// richer scope, so the zap→Sentry bridge must not also fire.
+			logger.Error("graphql resolver error", append(fields, zap.String("query", query), zap.Error(e), logging.SkipSentry)...)
 			if hub := sentry.GetHubFromContext(ctx); hub != nil {
 				hub.WithScope(func(scope *sentry.Scope) {
 					scope.SetTag("graphql.operation", opName)
@@ -254,7 +256,8 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 		return err
 	})
 	h.SetRecoverFunc(func(ctx context.Context, err any) error {
-		logging.FromContext(ctx).Error("graphql resolver panic", zap.Any("panic", err))
+		// SkipSentry: the panic is reported via Recover below with full stack.
+		logging.FromContext(ctx).Error("graphql resolver panic", zap.Any("panic", err), logging.SkipSentry)
 		if hub := sentry.GetHubFromContext(ctx); hub != nil {
 			hub.RecoverWithContext(ctx, err)
 		} else {
