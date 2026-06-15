@@ -77,6 +77,8 @@ func StartIdPIntentHandler(c *gin.Context) {
 	}
 
 	if status != http.StatusCreated && status != http.StatusOK {
+		logging.FromContext(c.Request.Context()).Error("zitadel idp intent create returned unexpected status",
+			zap.Int("status", status), zap.ByteString("body", respBody))
 		c.Data(status, "application/json", respBody)
 		return
 	}
@@ -139,6 +141,11 @@ func CreateIdPSessionHandler(c *gin.Context) {
 	}
 
 	if status != http.StatusCreated && status != http.StatusOK {
+		// A non-2xx here blocks login (e.g. the Zitadel projection-lag 404 that
+		// stranded first-time IdP sign-ins). Log at Error so it surfaces in
+		// Sentry instead of silently passing the status to the client.
+		log.Error("zitadel idp session create returned unexpected status",
+			zap.Int("status", status), zap.ByteString("body", respBody))
 		c.Data(status, "application/json", respBody)
 		return
 	}
