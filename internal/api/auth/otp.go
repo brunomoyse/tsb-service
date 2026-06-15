@@ -119,6 +119,16 @@ func RequestOtpHandler(c *gin.Context) {
 			c.JSON(http.StatusOK, sessionResponse{})
 			return
 		}
+		// Same Zitadel CQRS read-after-write race the IdP path guards against:
+		// the POST /v2/sessions below resolves the user from its query projection
+		// (here by loginName), which updates asynchronously after creation. For a
+		// just-provisioned placeholder the session create can race it and fail.
+		// Wait for the user to be queryable first; best-effort (proceed on
+		// timeout). See waitForZitadelUserProjection.
+		if werr := waitForZitadelUserProjection(userID); werr != nil {
+			log.Warn("new placeholder user not yet visible in query projection; proceeding to session create anyway",
+				zap.String("user_id", userID), zap.Error(werr))
+		}
 	}
 
 	// Lazy-enroll the OTP Email factor: existing accounts (and freshly

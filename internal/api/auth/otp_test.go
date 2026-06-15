@@ -92,6 +92,11 @@ func TestRequestOtpHandler_UnknownEmail(t *testing.T) {
 			assert.Equal(t, true, email["isVerified"], "placeholder email must be pre-verified — OTP completion proves control")
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"userId":"placeholder-user"}`))
+		case r.URL.Path == "/v2/users/placeholder-user" && r.Method == "GET":
+			// Projection-readiness probe (waitForZitadelUserProjection) before the
+			// session create — user is queryable.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"-","familyName":"-"}}}}`))
 		case r.URL.Path == "/v2/users/placeholder-user/otp_email" && r.Method == "POST":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"details":{}}`))

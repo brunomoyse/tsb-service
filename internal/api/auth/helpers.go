@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // findZitadelUserByEmail searches for a Zitadel user by email. The lookup
@@ -184,6 +185,43 @@ func createPlaceholderZitadelUser(email string) (string, error) {
 		return "", fmt.Errorf("placeholder user response missing userId")
 	}
 	return resp.UserID, nil
+}
+
+// waitForZitadelUserProjection blocks until a freshly-created Zitadel user is
+// visible to the query side, absorbing Zitadel's CQRS read-after-write lag.
+//
+// Zitadel commits user creation to the event store and returns the new userId
+// immediately, but the `users` query projection that POST /v2/sessions reads to
+// validate `checks.user.userId` updates asynchronously. For a brand-new user the
+// session call can therefore race the projection and fail with a spurious
+// NotFound (HTTP 404, QUERY-Dfbg2 "User could not be found"), which surfaces to
+// the client as "Authentication failed". Polling GET /v2/users/{id} until it
+// returns 200 confirms the exact projection the session check depends on has
+// caught up — observed lag is tens of milliseconds, so a short bounded poll is
+// enough.
+//
+// Best-effort: on timeout it returns an error, but the caller should still
+// proceed — the session attempt is then no worse off than without the wait.
+//
+// Cadence is held in package vars (not consts) so tests can shrink the delay
+// and attempt count; production keeps 10 × 150ms ≈ 1.35s, comfortably above the
+// tens-of-ms lag observed in prod.
+var (
+	userProjectionPollAttempts = 10
+	userProjectionPollDelay    = 150 * time.Millisecond
+)
+
+func waitForZitadelUserProjection(userID string) error {
+	for i := 0; i < userProjectionPollAttempts; i++ {
+		if i > 0 {
+			time.Sleep(userProjectionPollDelay)
+		}
+		_, status, err := zitadelRequest("GET", "/v2/users/"+userID, nil)
+		if err == nil && status == http.StatusOK {
+			return nil
+		}
+	}
+	return fmt.Errorf("user %s not visible in query projection after %d attempts", userID, userProjectionPollAttempts)
 }
 
 // userNeedsProfileCompletion reports whether the Zitadel user still has the
