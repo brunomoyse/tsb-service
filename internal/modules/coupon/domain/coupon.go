@@ -2,11 +2,29 @@ package domain
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
+
+// NormalizeCode canonicalises a coupon code so lookups and uniqueness are
+// case- and whitespace-insensitive (e.g. " summer " and "SUMMER" match).
+func NormalizeCode(code string) string {
+	return strings.ToUpper(strings.TrimSpace(code))
+}
+
+// MinOrderNotMetError signals that the order amount is below the coupon's
+// minimum. It is the one validation failure whose message is safe (and useful)
+// to surface to the customer, since they already hold a valid code.
+type MinOrderNotMetError struct {
+	Required decimal.Decimal
+}
+
+func (e *MinOrderNotMetError) Error() string {
+	return fmt.Sprintf("minimum order amount of %s not met", e.Required.String())
+}
 
 type DiscountType string
 
@@ -85,7 +103,7 @@ func (c *Coupon) Validate(orderAmount decimal.Decimal, userUsageCount int) error
 	}
 
 	if c.MinOrderAmount != nil && orderAmount.LessThan(*c.MinOrderAmount) {
-		return fmt.Errorf("minimum order amount of %s not met", c.MinOrderAmount.String())
+		return &MinOrderNotMetError{Required: *c.MinOrderAmount}
 	}
 
 	return nil

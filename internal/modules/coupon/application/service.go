@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -49,6 +50,13 @@ func (s *couponService) ValidateCoupon(ctx context.Context, code string, orderAm
 	}
 
 	if err := coupon.Validate(orderAmount, userUsageCount); err != nil {
+		// Surface the actionable "minimum order amount not met" message so the
+		// customer knows how to proceed; keep existence/expiry/limit failures
+		// generic to avoid leaking coupon state to enumeration attempts.
+		var minErr *domain.MinOrderNotMetError
+		if errors.As(err, &minErr) {
+			return coupon, decimal.Zero, minErr
+		}
 		return coupon, decimal.Zero, fmt.Errorf("invalid or expired coupon")
 	}
 

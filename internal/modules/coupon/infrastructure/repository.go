@@ -24,7 +24,7 @@ func (r *CouponRepository) FindByCode(ctx context.Context, code string) (*domain
 	var coupon domain.Coupon
 	err := r.pool.ForContext(ctx).GetContext(ctx, &coupon,
 		`SELECT id, code, discount_type, discount_value, min_order_amount, max_uses, max_uses_per_user, used_count, is_active, valid_from, valid_until, created_at
-		 FROM coupons WHERE code = $1`, code)
+		 FROM coupons WHERE code = $1`, domain.NormalizeCode(code))
 	if err != nil {
 		return nil, fmt.Errorf("coupon not found: %w", err)
 	}

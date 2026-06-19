@@ -7,6 +7,7 @@ package resolver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	graphql1 "tsb-service/internal/api/graphql"
@@ -15,8 +16,17 @@ import (
 	"tsb-service/pkg/utils"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 )
+
+// isUniqueViolation reports whether err is a PostgreSQL unique-constraint
+// violation (SQLSTATE 23505), used to turn a duplicate coupon code into a
+// friendly message instead of a raw driver error.
+func isUniqueViolation(err error) bool {
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && pqErr.Code == "23505"
+}
 
 // validateDiscount checks that a (type, value) pair is well-formed: the type
 // must be a known discount type, the value must be positive, and a percentage
@@ -49,7 +59,7 @@ func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateC
 
 	coupon := &couponDomain.Coupon{
 		ID:             uuid.New(),
-		Code:           input.Code,
+		Code:           couponDomain.NormalizeCode(input.Code),
 		DiscountType:   discountType,
 		DiscountValue:  discountValue,
 		IsActive:       input.IsActive,
@@ -68,6 +78,9 @@ func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateC
 	}
 
 	if err := r.CouponService.CreateCoupon(ctx, coupon); err != nil {
+		if isUniqueViolation(err) {
+			return nil, fmt.Errorf("coupon code already exists")
+		}
 		return nil, fmt.Errorf("failed to create coupon: %w", err)
 	}
 
@@ -84,7 +97,7 @@ func (r *mutationResolver) UpdateCoupon(ctx context.Context, id uuid.UUID, input
 	}
 
 	if input.Code != nil {
-		coupon.Code = *input.Code
+		coupon.Code = couponDomain.NormalizeCode(*input.Code)
 	}
 	if input.DiscountType != nil {
 		coupon.DiscountType = couponDomain.DiscountType(strings.ToLower(*input.DiscountType))
@@ -126,6 +139,9 @@ func (r *mutationResolver) UpdateCoupon(ctx context.Context, id uuid.UUID, input
 	}
 
 	if err := r.CouponService.UpdateCoupon(ctx, coupon); err != nil {
+		if isUniqueViolation(err) {
+			return nil, fmt.Errorf("coupon code already exists")
+		}
 		return nil, fmt.Errorf("failed to update coupon: %w", err)
 	}
 

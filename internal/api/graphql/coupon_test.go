@@ -212,6 +212,86 @@ func TestCreateCouponIntegration(t *testing.T) {
 		assert.Contains(t, gqlResp.Errors[0].Message, "percentage discount cannot exceed 100")
 	})
 
+	t.Run("duplicate code returns friendly error", func(t *testing.T) {
+		// TOKYO10 was already created above.
+		_, gqlResp := postGraphQL(t, url, graphqlRequest{
+			Query: createCouponMutation,
+			Variables: map[string]any{
+				"input": map[string]any{
+					"code":          "tokyo10", // normalizes to TOKYO10
+					"discountType":  "FIXED",
+					"discountValue": "5",
+					"isActive":      true,
+				},
+			},
+		}, adminToken)
+
+		require.NotEmpty(t, gqlResp.Errors)
+		assert.Contains(t, gqlResp.Errors[0].Message, "coupon code already exists")
+	})
+
+	t.Run("code is normalized to upper/trimmed on create", func(t *testing.T) {
+		_, gqlResp := postGraphQL(t, url, graphqlRequest{
+			Query: createCouponMutation,
+			Variables: map[string]any{
+				"input": map[string]any{
+					"code":          "  promo5 ",
+					"discountType":  "FIXED",
+					"discountValue": "5",
+					"isActive":      true,
+				},
+			},
+		}, adminToken)
+
+		require.Empty(t, gqlResp.Errors, "unexpected errors: %v", gqlResp.Errors)
+
+		var data struct {
+			CreateCoupon struct {
+				Code string `json:"code"`
+			} `json:"createCoupon"`
+		}
+		require.NoError(t, json.Unmarshal(gqlResp.Data, &data))
+		assert.Equal(t, "PROMO5", data.CreateCoupon.Code)
+	})
+
+	t.Run("switching type to percentage without a value is rejected", func(t *testing.T) {
+		// Create a fixed coupon whose value (150) is invalid as a percentage.
+		_, createResp := postGraphQL(t, url, graphqlRequest{
+			Query: createCouponMutation,
+			Variables: map[string]any{
+				"input": map[string]any{
+					"code":          "BIGFIX",
+					"discountType":  "FIXED",
+					"discountValue": "150",
+					"isActive":      true,
+				},
+			},
+		}, adminToken)
+		require.Empty(t, createResp.Errors)
+
+		var created struct {
+			CreateCoupon struct {
+				ID string `json:"id"`
+			} `json:"createCoupon"`
+		}
+		require.NoError(t, json.Unmarshal(createResp.Data, &created))
+
+		// Flip type to percentage WITHOUT resubmitting the value (150 → 150%).
+		_, gqlResp := postGraphQL(t, url, graphqlRequest{
+			Query: `
+				mutation ($id: ID!, $input: UpdateCouponInput!) {
+					updateCoupon(id: $id, input: $input) { id discountType discountValue }
+				}`,
+			Variables: map[string]any{
+				"id":    created.CreateCoupon.ID,
+				"input": map[string]any{"discountType": "PERCENTAGE"},
+			},
+		}, adminToken)
+
+		require.NotEmpty(t, gqlResp.Errors, "expected validation error on type switch")
+		assert.Contains(t, gqlResp.Errors[0].Message, "percentage discount cannot exceed 100")
+	})
+
 	t.Run("list coupons returns created coupons", func(t *testing.T) {
 		_, gqlResp := postGraphQL(t, url, graphqlRequest{
 			Query: `query { coupons { id code discountType } }`,
