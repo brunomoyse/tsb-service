@@ -18,6 +18,23 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// validateDiscount checks that a (type, value) pair is well-formed: the type
+// must be a known discount type, the value must be positive, and a percentage
+// must not exceed 100. Used by both CreateCoupon and UpdateCoupon so the final
+// persisted pair is always validated regardless of which fields were supplied.
+func validateDiscount(dt couponDomain.DiscountType, dv decimal.Decimal) error {
+	if dt != couponDomain.DiscountTypePercentage && dt != couponDomain.DiscountTypeFixed {
+		return fmt.Errorf("invalid discount type: must be 'percentage' or 'fixed'")
+	}
+	if dv.LessThanOrEqual(decimal.Zero) {
+		return fmt.Errorf("discount value must be positive")
+	}
+	if dt == couponDomain.DiscountTypePercentage && dv.GreaterThan(decimal.NewFromInt(100)) {
+		return fmt.Errorf("percentage discount cannot exceed 100")
+	}
+	return nil
+}
+
 // CreateCoupon is the resolver for the createCoupon field.
 func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateCouponInput) (*model.Coupon, error) {
 	discountValue, err := decimal.NewFromString(input.DiscountValue)
@@ -26,15 +43,8 @@ func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateC
 	}
 
 	discountType := couponDomain.DiscountType(strings.ToLower(input.DiscountType))
-	if discountType != couponDomain.DiscountTypePercentage && discountType != couponDomain.DiscountTypeFixed {
-		return nil, fmt.Errorf("invalid discount type: must be 'percentage' or 'fixed'")
-	}
-
-	if discountValue.LessThanOrEqual(decimal.Zero) {
-		return nil, fmt.Errorf("discount value must be positive")
-	}
-	if discountType == couponDomain.DiscountTypePercentage && discountValue.GreaterThan(decimal.NewFromInt(100)) {
-		return nil, fmt.Errorf("percentage discount cannot exceed 100")
+	if err := validateDiscount(discountType, discountValue); err != nil {
+		return nil, err
 	}
 
 	coupon := &couponDomain.Coupon{
@@ -77,24 +87,20 @@ func (r *mutationResolver) UpdateCoupon(ctx context.Context, id uuid.UUID, input
 		coupon.Code = *input.Code
 	}
 	if input.DiscountType != nil {
-		dt := couponDomain.DiscountType(strings.ToLower(*input.DiscountType))
-		if dt != couponDomain.DiscountTypePercentage && dt != couponDomain.DiscountTypeFixed {
-			return nil, fmt.Errorf("invalid discount type: must be 'percentage' or 'fixed'")
-		}
-		coupon.DiscountType = dt
+		coupon.DiscountType = couponDomain.DiscountType(strings.ToLower(*input.DiscountType))
 	}
 	if input.DiscountValue != nil {
 		dv, err := decimal.NewFromString(*input.DiscountValue)
 		if err != nil {
 			return nil, fmt.Errorf("invalid discount value: %w", err)
 		}
-		if dv.LessThanOrEqual(decimal.Zero) {
-			return nil, fmt.Errorf("discount value must be positive")
-		}
-		if coupon.DiscountType == couponDomain.DiscountTypePercentage && dv.GreaterThan(decimal.NewFromInt(100)) {
-			return nil, fmt.Errorf("percentage discount cannot exceed 100")
-		}
 		coupon.DiscountValue = dv
+	}
+	// Validate the final (type, value) pair regardless of which fields were
+	// supplied — e.g. switching type from 'fixed' to 'percentage' without
+	// resubmitting the value must still be rejected if the value exceeds 100.
+	if err := validateDiscount(coupon.DiscountType, coupon.DiscountValue); err != nil {
+		return nil, err
 	}
 	if input.MinOrderAmount != nil {
 		minAmount, err := decimal.NewFromString(*input.MinOrderAmount)

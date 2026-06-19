@@ -95,8 +95,14 @@ func (c *Coupon) Validate(orderAmount decimal.Decimal, userUsageCount int) error
 func (c *Coupon) CalculateDiscount(orderAmount decimal.Decimal) decimal.Decimal {
 	switch c.DiscountType {
 	case DiscountTypePercentage:
-		// e.g. 10% → orderAmount * 10 / 100
-		return orderAmount.Mul(c.DiscountValue).Div(decimal.NewFromInt(100)).Round(2)
+		// e.g. 10% → orderAmount * 10 / 100. Clamp to the order amount as a
+		// defense-in-depth guard: a misconfigured >100% coupon must never
+		// produce a discount larger than the order itself.
+		discount := orderAmount.Mul(c.DiscountValue).Div(decimal.NewFromInt(100)).Round(2)
+		if discount.GreaterThan(orderAmount) {
+			return orderAmount
+		}
+		return discount
 	case DiscountTypeFixed:
 		// Fixed discount capped at order amount
 		if c.DiscountValue.GreaterThan(orderAmount) {
