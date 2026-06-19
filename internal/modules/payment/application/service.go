@@ -131,6 +131,18 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 		})
 	}
 
+	// Mollie rejects a payment whose line totals don't sum exactly to the
+	// amount. TotalPrice is snapped to 10 cents (clean customer-facing total)
+	// while the lines are built from raw components, so a few cents of rounding
+	// can diverge. Absorb any delta into a correction line.
+	corr, err := roundingCorrectionLine(o.TotalPrice, lines)
+	if err != nil {
+		return nil, err
+	}
+	if corr != nil {
+		lines = append(lines, *corr)
+	}
+
 	appBaseURL := os.Getenv("APP_BASE_URL")
 	if appBaseURL == "" {
 		return nil, fmt.Errorf("APP_BASE_URL is required")
@@ -476,6 +488,36 @@ func mapExternalPayment(external *mollie.Payment, orderID uuid.UUID) (*domain.Mo
 		AmountCaptured:                  amountCaptured,
 		AmountChargedBack:               amountChargedBack,
 		SettlementAmount:                settlementAmount,
+	}, nil
+}
+
+// roundingCorrectionLine returns a Mollie line that absorbs any gap between the
+// charged total and the sum of the existing line totals (as Mollie sees them,
+// i.e. StringFixed(2)), or nil when they already match. Mollie rejects a
+// payment whose line totals don't sum exactly to the amount.
+func roundingCorrectionLine(total decimal.Decimal, lines []mollie.PaymentLines) (*mollie.PaymentLines, error) {
+	var sum decimal.Decimal
+	for _, l := range lines {
+		v, err := decimal.NewFromString(l.TotalAmount.Value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse line amount %q: %w", l.TotalAmount.Value, err)
+		}
+		sum = sum.Add(v)
+	}
+	diff := total.Sub(sum)
+	if diff.IsZero() {
+		return nil, nil
+	}
+	lineType := mollie.SurchargeLine
+	if diff.IsNegative() {
+		lineType = mollie.DiscountProductLine
+	}
+	return &mollie.PaymentLines{
+		Type:        lineType,
+		Description: "Ajustement",
+		Quantity:    1,
+		UnitPrice:   amt(diff),
+		TotalAmount: amt(diff),
 	}, nil
 }
 
