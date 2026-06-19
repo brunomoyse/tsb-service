@@ -12652,7 +12652,7 @@ func (ec *executionContext) unmarshalInputCreateCouponInput(ctx context.Context,
 		switch k {
 		case "code":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("code"))
-			data, err := ec.unmarshalNString2string(ctx, v)
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}

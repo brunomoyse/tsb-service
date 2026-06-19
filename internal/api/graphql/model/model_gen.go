@@ -67,7 +67,8 @@ type CouponValidation struct {
 }
 
 type CreateCouponInput struct {
-	Code           string     `json:"code"`
+	// Optional. When omitted or blank, the server generates a unique code.
+	Code           *string    `json:"code,omitempty"`
 	DiscountType   string     `json:"discountType"`
 	DiscountValue  string     `json:"discountValue"`
 	MinOrderAmount *string    `json:"minOrderAmount,omitempty"`

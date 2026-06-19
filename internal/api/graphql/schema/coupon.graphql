@@ -29,7 +29,8 @@ type CouponValidation {
 }
 
 input CreateCouponInput {
-    code: String!
+    "Optional. When omitted or blank, the server generates a unique code."
+    code: String
     discountType: String!
     discountValue: String!
     minOrderAmount: String

@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -19,8 +20,36 @@ import (
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/timezone"
 
+	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 )
+
+// validateDiscount checks that a (type, value) pair is well-formed: the type
+// must be a known discount type, the value must be positive, and a percentage
+// must not exceed 100. Used by both CreateCoupon and UpdateCoupon so the final
+// persisted pair is always validated regardless of which fields were supplied.
+// Kept here (not in coupon.go) because gqlgen relocates helpers out of resolver
+// files on regeneration.
+func validateDiscount(dt couponDomain.DiscountType, dv decimal.Decimal) error {
+	if dt != couponDomain.DiscountTypePercentage && dt != couponDomain.DiscountTypeFixed {
+		return fmt.Errorf("invalid discount type: must be 'percentage' or 'fixed'")
+	}
+	if dv.LessThanOrEqual(decimal.Zero) {
+		return fmt.Errorf("discount value must be positive")
+	}
+	if dt == couponDomain.DiscountTypePercentage && dv.GreaterThan(decimal.NewFromInt(100)) {
+		return fmt.Errorf("percentage discount cannot exceed 100")
+	}
+	return nil
+}
+
+// isUniqueViolation reports whether err is a PostgreSQL unique-constraint
+// violation (SQLSTATE 23505), used to turn a duplicate coupon code into a
+// friendly message instead of a raw driver error.
+func isUniqueViolation(err error) bool {
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && pqErr.Code == "23505"
+}
 
 // Map applies fn to every element of in, returning a new slice.
 func Map[T any, U any](in []T, fn func(T) U) []U {

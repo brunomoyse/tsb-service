@@ -7,7 +7,6 @@ package resolver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	graphql1 "tsb-service/internal/api/graphql"
@@ -16,34 +15,8 @@ import (
 	"tsb-service/pkg/utils"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 )
-
-// isUniqueViolation reports whether err is a PostgreSQL unique-constraint
-// violation (SQLSTATE 23505), used to turn a duplicate coupon code into a
-// friendly message instead of a raw driver error.
-func isUniqueViolation(err error) bool {
-	var pqErr *pq.Error
-	return errors.As(err, &pqErr) && pqErr.Code == "23505"
-}
-
-// validateDiscount checks that a (type, value) pair is well-formed: the type
-// must be a known discount type, the value must be positive, and a percentage
-// must not exceed 100. Used by both CreateCoupon and UpdateCoupon so the final
-// persisted pair is always validated regardless of which fields were supplied.
-func validateDiscount(dt couponDomain.DiscountType, dv decimal.Decimal) error {
-	if dt != couponDomain.DiscountTypePercentage && dt != couponDomain.DiscountTypeFixed {
-		return fmt.Errorf("invalid discount type: must be 'percentage' or 'fixed'")
-	}
-	if dv.LessThanOrEqual(decimal.Zero) {
-		return fmt.Errorf("discount value must be positive")
-	}
-	if dt == couponDomain.DiscountTypePercentage && dv.GreaterThan(decimal.NewFromInt(100)) {
-		return fmt.Errorf("percentage discount cannot exceed 100")
-	}
-	return nil
-}
 
 // CreateCoupon is the resolver for the createCoupon field.
 func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateCouponInput) (*model.Coupon, error) {
@@ -57,9 +30,14 @@ func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateC
 		return nil, err
 	}
 
+	suppliedCode := ""
+	if input.Code != nil {
+		suppliedCode = couponDomain.NormalizeCode(*input.Code)
+	}
+
 	coupon := &couponDomain.Coupon{
 		ID:             uuid.New(),
-		Code:           couponDomain.NormalizeCode(input.Code),
+		Code:           suppliedCode,
 		DiscountType:   discountType,
 		DiscountValue:  discountValue,
 		IsActive:       input.IsActive,
@@ -77,11 +55,35 @@ func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateC
 		coupon.MinOrderAmount = &minAmount
 	}
 
-	if err := r.CouponService.CreateCoupon(ctx, coupon); err != nil {
-		if isUniqueViolation(err) {
-			return nil, fmt.Errorf("coupon code already exists")
+	if suppliedCode != "" {
+		// Caller chose the code: a collision is a user error.
+		if err := r.CouponService.CreateCoupon(ctx, coupon); err != nil {
+			if isUniqueViolation(err) {
+				return nil, fmt.Errorf("coupon code already exists")
+			}
+			return nil, fmt.Errorf("failed to create coupon: %w", err)
 		}
-		return nil, fmt.Errorf("failed to create coupon: %w", err)
+	} else {
+		// No code supplied: generate a unique one, retrying on the rare collision.
+		const maxAttempts = 5
+		var lastErr error
+		for attempt := 0; attempt < maxAttempts; attempt++ {
+			code, genErr := couponDomain.GenerateCode()
+			if genErr != nil {
+				return nil, fmt.Errorf("failed to generate coupon code: %w", genErr)
+			}
+			coupon.Code = code
+			lastErr = r.CouponService.CreateCoupon(ctx, coupon)
+			if lastErr == nil {
+				break
+			}
+			if !isUniqueViolation(lastErr) {
+				return nil, fmt.Errorf("failed to create coupon: %w", lastErr)
+			}
+		}
+		if lastErr != nil {
+			return nil, fmt.Errorf("failed to generate a unique coupon code, please retry")
+		}
 	}
 
 	gqlCoupon := ToGQLCoupon(coupon)

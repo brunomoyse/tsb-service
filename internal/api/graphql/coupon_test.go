@@ -292,6 +292,29 @@ func TestCreateCouponIntegration(t *testing.T) {
 		assert.Contains(t, gqlResp.Errors[0].Message, "percentage discount cannot exceed 100")
 	})
 
+	t.Run("omitted code is generated server-side", func(t *testing.T) {
+		_, gqlResp := postGraphQL(t, url, graphqlRequest{
+			Query: createCouponMutation,
+			Variables: map[string]any{
+				"input": map[string]any{
+					"discountType":  "PERCENTAGE",
+					"discountValue": "15",
+					"isActive":      true,
+				},
+			},
+		}, adminToken)
+
+		require.Empty(t, gqlResp.Errors, "unexpected errors: %v", gqlResp.Errors)
+
+		var data struct {
+			CreateCoupon struct {
+				Code string `json:"code"`
+			} `json:"createCoupon"`
+		}
+		require.NoError(t, json.Unmarshal(gqlResp.Data, &data))
+		assert.Regexp(t, `^TSB-[2-9A-HJ-NP-Z]{6}$`, data.CreateCoupon.Code)
+	})
+
 	t.Run("list coupons returns created coupons", func(t *testing.T) {
 		_, gqlResp := postGraphQL(t, url, graphqlRequest{
 			Query: `query { coupons { id code discountType } }`,

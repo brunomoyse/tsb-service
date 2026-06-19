@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"crypto/rand"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +14,28 @@ import (
 // case- and whitespace-insensitive (e.g. " summer " and "SUMMER" match).
 func NormalizeCode(code string) string {
 	return strings.ToUpper(strings.TrimSpace(code))
+}
+
+// codeAlphabet excludes visually ambiguous characters (0/O, 1/I) so a printed
+// coupon code is easy to read back and type.
+const codeAlphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+
+// generatedCodeLength is the number of random characters after the prefix.
+const generatedCodeLength = 6
+
+// GenerateCode returns a random, human-readable coupon code (e.g. "TSB-7F3K9Q").
+// Callers should retry on a unique-constraint violation; the alphabet/length
+// give ~10^9 combinations so collisions are rare but possible.
+func GenerateCode() (string, error) {
+	buf := make([]byte, generatedCodeLength)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate coupon code: %w", err)
+	}
+	out := make([]byte, generatedCodeLength)
+	for i, b := range buf {
+		out[i] = codeAlphabet[int(b)%len(codeAlphabet)]
+	}
+	return "TSB-" + string(out), nil
 }
 
 // MinOrderNotMetError signals that the order amount is below the coupon's
