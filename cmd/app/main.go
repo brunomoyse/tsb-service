@@ -188,11 +188,11 @@ func main() {
 	addressService := addressApplication.NewAddressService(addressCacheRepo, googleClient, googleLang)
 	couponService := couponApplication.NewCouponService(couponRepo)
 	notificationService := notificationApplication.NewNotificationService(notificationRepo)
-	orderService := orderApplication.NewOrderService(orderRepo)
+	orderService := orderApplication.NewOrderService(orderRepo, couponService)
 	productService := productApplication.NewProductService(productRepo)
 	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, scheduleOverrideRepo, os.Getenv("APP_ENV") != "production")
 	userService := userApplication.NewUserService(userRepo, zitadelUserFetcher{})
-	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService, couponService)
+	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService)
 
 	// OIDC verifier — validates JWTs via JWKS + resolves Zitadel sub → app user UUID
 	zitadelInternalURL := os.Getenv("ZITADEL_INTERNAL_URL") // Optional: internal Docker URL for OIDC discovery

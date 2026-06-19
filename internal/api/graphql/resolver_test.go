@@ -89,11 +89,11 @@ func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
 	googleClient := (*mockGoogleClient)(nil)
 	addressService := addressApplication.NewAddressService(addressCacheRepo, googleClient, "fr")
 	couponService := couponApplication.NewCouponService(couponRepo)
-	orderService := orderApplication.NewOrderService(orderRepo)
+	orderService := orderApplication.NewOrderService(orderRepo, couponService)
 	productService := productApplication.NewProductService(productRepo)
 	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, scheduleOverrideRepo, true)
 	userService := userApplication.NewUserService(userRepo, nil)
-	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService, couponService)
+	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService)
 
 	// Create resolver
 	return &resolver.Resolver{

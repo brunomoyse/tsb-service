@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap"
 
 	addressDomain "tsb-service/internal/modules/address/domain"
-	couponApplication "tsb-service/internal/modules/coupon/application"
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	"tsb-service/internal/modules/payment/domain"
@@ -46,7 +45,6 @@ type paymentService struct {
 	orderService   orderApplication.OrderService
 	userService    userApplication.UserService
 	productService productApplication.ProductService
-	couponService  couponApplication.CouponService
 }
 
 func NewPaymentService(
@@ -55,7 +53,6 @@ func NewPaymentService(
 	orderService orderApplication.OrderService,
 	userService userApplication.UserService,
 	productService productApplication.ProductService,
-	couponService couponApplication.CouponService,
 ) PaymentService {
 	return &paymentService{
 		repo:           repo,
@@ -63,7 +60,6 @@ func NewPaymentService(
 		orderService:   orderService,
 		userService:    userService,
 		productService: productService,
-		couponService:  couponService,
 	}
 }
 
@@ -368,9 +364,11 @@ func (s *paymentService) HandlePaymentPaid(ctx context.Context, orderID uuid.UUI
 }
 
 // HandlePaymentFailed handles the business logic when a payment is cancelled/failed/expired:
-// updates order status to CANCELLED and rolls back coupon usage. No email is sent —
-// users frequently retry the checkout in a fresh order, and a failure notification on
-// the abandoned attempt would contradict the successful retry.
+// updates order status to CANCELLED. Coupon usage rollback is handled centrally by
+// OrderService.UpdateOrder on the transition into CANCELED (covering cash/admin/POS
+// cancellations too), so it is not repeated here. No email is sent — users frequently
+// retry the checkout in a fresh order, and a failure notification on the abandoned
+// attempt would contradict the successful retry.
 func (s *paymentService) HandlePaymentFailed(ctx context.Context, orderID uuid.UUID) (*orderDomain.Order, error) {
 	canceledStatus := orderDomain.OrderStatusCanceled
 	if err := s.orderService.UpdateOrder(ctx, orderID, &canceledStatus, nil, nil); err != nil {
@@ -382,23 +380,6 @@ func (s *paymentService) HandlePaymentFailed(ctx context.Context, orderID uuid.U
 	if orderErr != nil || order == nil {
 		zap.L().Error("failed to retrieve order after payment failure", zap.String("order_id", orderID.String()), zap.Error(orderErr))
 		return nil, nil
-	}
-
-	// Roll back the coupon usage (idempotent: webhook handler skips duplicate events,
-	// so HandlePaymentFailed runs only on real status transitions).
-	if order.CouponCode != nil && *order.CouponCode != "" {
-		coupon, cErr := s.couponService.GetCouponByCode(ctx, *order.CouponCode)
-		if cErr != nil || coupon == nil {
-			zap.L().Error("failed to fetch coupon for rollback on payment failure",
-				zap.String("order_id", orderID.String()),
-				zap.String("coupon_code", *order.CouponCode),
-				zap.Error(cErr))
-		} else if dErr := s.couponService.DecrementUsageAtomic(ctx, coupon.ID, order.UserID); dErr != nil {
-			zap.L().Error("failed to rollback coupon on payment failure",
-				zap.String("order_id", orderID.String()),
-				zap.String("coupon_code", *order.CouponCode),
-				zap.Error(dErr))
-		}
 	}
 
 	return order, nil

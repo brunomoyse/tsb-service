@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	couponApplication "tsb-service/internal/modules/coupon/application"
 	"tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/logging"
 )
@@ -31,12 +32,14 @@ type OrderService interface {
 }
 
 type orderService struct {
-	repo domain.OrderRepository
+	repo          domain.OrderRepository
+	couponService couponApplication.CouponService
 }
 
-func NewOrderService(repo domain.OrderRepository) OrderService {
+func NewOrderService(repo domain.OrderRepository, couponService couponApplication.CouponService) OrderService {
 	return &orderService{
-		repo: repo,
+		repo:          repo,
+		couponService: couponService,
 	}
 }
 
@@ -94,6 +97,23 @@ func (s *orderService) UpdateOrder(ctx context.Context, orderID uuid.UUID, newSt
 	if order.OrderStatus != oldStatus {
 		if err := s.repo.InsertStatusHistory(ctx, order.ID, order.OrderStatus); err != nil {
 			logging.FromContext(ctx).Error("failed to record status history", zap.String("order_id", order.ID.String()), zap.String("status", string(order.OrderStatus)), zap.Error(err))
+		}
+	}
+
+	// Roll back coupon usage when the order transitions into CANCELED. This is
+	// the single source of cancel-time rollback: it covers cash orders, admin
+	// and POS cancellations, and the payment-failed webhook (which cancels via
+	// this method). The transition guard (oldStatus != CANCELED) makes it
+	// idempotent, so a duplicate cancellation never double-decrements.
+	if s.couponService != nil &&
+		order.OrderStatus == domain.OrderStatusCanceled && oldStatus != domain.OrderStatusCanceled &&
+		order.CouponCode != nil && *order.CouponCode != "" {
+		if coupon, cErr := s.couponService.GetCouponByCode(ctx, *order.CouponCode); cErr != nil || coupon == nil {
+			logging.FromContext(ctx).Error("failed to fetch coupon for rollback on cancellation",
+				zap.String("order_id", order.ID.String()), zap.String("coupon_code", *order.CouponCode), zap.Error(cErr))
+		} else if dErr := s.couponService.DecrementUsageAtomic(ctx, coupon.ID, order.UserID); dErr != nil {
+			logging.FromContext(ctx).Error("failed to roll back coupon on cancellation",
+				zap.String("order_id", order.ID.String()), zap.String("coupon_code", *order.CouponCode), zap.Error(dErr))
 		}
 	}
 
