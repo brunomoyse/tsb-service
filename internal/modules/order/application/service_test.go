@@ -54,6 +54,10 @@ func (f *fakeOrderRepo) UpdateActiveOrdersLanguage(_ context.Context, _ uuid.UUI
 	return nil, nil
 }
 
+func (f *fakeOrderRepo) HasActiveCouponOrder(_ context.Context, _ uuid.UUID) (bool, error) {
+	return false, nil
+}
+
 func (f *fakeOrderRepo) InsertStatusHistory(_ context.Context, _ uuid.UUID, _ domain.OrderStatus) error {
 	return nil
 }

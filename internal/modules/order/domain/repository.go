@@ -33,6 +33,9 @@ type OrderRepository interface {
 	FindFiltered(ctx context.Context, filter OrderHistoryFilter) ([]*Order, *OrderHistorySummary, error)
 	FindByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*OrderProductRaw, error)
 	FindByUserIDs(ctx context.Context, userIDs []string) (map[string][]*Order, error)
+	// HasActiveCouponOrder reports whether the user already has a non-terminal
+	// order holding a coupon (used to enforce one active coupon order at a time).
+	HasActiveCouponOrder(ctx context.Context, userID uuid.UUID) (bool, error)
 	// UpdateActiveOrdersLanguage sets the language on all the user's non-terminal
 	// orders and returns the affected orders (id, user, status, type, language) so
 	// callers can re-push their Live Activities in the new language.

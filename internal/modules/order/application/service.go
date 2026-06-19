@@ -24,6 +24,7 @@ type OrderService interface {
 	BatchGetOrderProductsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.OrderProductRaw, error)
 	BatchGetOrdersByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error)
 	UpdateActiveOrdersLanguage(ctx context.Context, userID uuid.UUID, language string) ([]*domain.Order, error)
+	HasActiveCouponOrder(ctx context.Context, userID uuid.UUID) (bool, error)
 	GetCustomerStats(ctx context.Context, startDate, endDate *time.Time, orderType *string, minOrders *int) ([]*domain.CustomerStatsRow, error)
 	GetOrderHistory(ctx context.Context, filter domain.OrderHistoryFilter) ([]*domain.Order, *domain.OrderHistorySummary, error)
 	// CancelStaleTestOrders auto-cancels store-review test orders older than
@@ -148,6 +149,10 @@ func (s *orderService) BatchGetOrderProductsByOrderIDs(ctx context.Context, orde
 
 func (s *orderService) UpdateActiveOrdersLanguage(ctx context.Context, userID uuid.UUID, language string) ([]*domain.Order, error) {
 	return s.repo.UpdateActiveOrdersLanguage(ctx, userID, language)
+}
+
+func (s *orderService) HasActiveCouponOrder(ctx context.Context, userID uuid.UUID) (bool, error) {
+	return s.repo.HasActiveCouponOrder(ctx, userID)
 }
 
 func (s *orderService) BatchGetOrdersByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error) {

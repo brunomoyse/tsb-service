@@ -346,6 +346,15 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		if err != nil {
 			return nil, fmt.Errorf("invalid coupon: %w", err)
 		}
+		// One coupon at a time: reject if the user already has another
+		// non-terminal order still holding a coupon.
+		hasActive, err := r.OrderService.HasActiveCouponOrder(ctx, userUUID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check active coupon orders: %w", err)
+		}
+		if hasActive {
+			return nil, fmt.Errorf("you already have an active order using a coupon")
+		}
 		couponDiscount = money.RoundToNearest10Cents(cd)
 		couponCode = input.CouponCode
 		validatedCouponID = &coupon.ID

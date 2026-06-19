@@ -223,6 +223,25 @@ func (r *OrderRepository) UpdateActiveOrdersLanguage(ctx context.Context, userID
 	return orders, nil
 }
 
+// HasActiveCouponOrder reports whether the user has a non-terminal order that
+// still holds a coupon. Terminal states (delivered/picked-up/cancelled/failed)
+// no longer hold the coupon, so they don't count.
+func (r *OrderRepository) HasActiveCouponOrder(ctx context.Context, userID uuid.UUID) (bool, error) {
+	const query = `
+		SELECT EXISTS (
+			SELECT 1 FROM orders
+			WHERE user_id = $1
+			  AND coupon_code IS NOT NULL
+			  AND order_status NOT IN ('DELIVERED', 'PICKED_UP', 'CANCELLED', 'FAILED')
+		)
+	`
+	var exists bool
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &exists, query, userID); err != nil {
+		return false, fmt.Errorf("failed to check active coupon order: %w", err)
+	}
+	return exists, nil
+}
+
 // FindByID retrieves an order by its ID.
 func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error) {
 	query := `
