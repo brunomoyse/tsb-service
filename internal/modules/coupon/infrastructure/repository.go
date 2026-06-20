@@ -190,6 +190,32 @@ func (r *CouponRepository) GetUserUsageCount(ctx context.Context, couponID, user
 	return count, nil
 }
 
+func (r *CouponRepository) CountFailedCouponAttemptsToday(ctx context.Context, userID uuid.UUID) (int, error) {
+	var count int
+	err := r.pool.ForContext(ctx).GetContext(ctx, &count,
+		`SELECT count FROM coupon_validation_attempts
+		 WHERE user_id = $1 AND day = (now() AT TIME ZONE 'Europe/Brussels')::date`, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("failed to count coupon attempts: %w", err)
+	}
+	return count, nil
+}
+
+func (r *CouponRepository) RecordFailedCouponAttempt(ctx context.Context, userID uuid.UUID) error {
+	_, err := r.pool.ForContext(ctx).ExecContext(ctx,
+		`INSERT INTO coupon_validation_attempts (user_id, day, count)
+		 VALUES ($1, (now() AT TIME ZONE 'Europe/Brussels')::date, 1)
+		 ON CONFLICT (user_id, day)
+		 DO UPDATE SET count = coupon_validation_attempts.count + 1`, userID)
+	if err != nil {
+		return fmt.Errorf("failed to record coupon attempt: %w", err)
+	}
+	return nil
+}
+
 func (r *CouponRepository) DecrementUserUsageAtomic(ctx context.Context, couponID, userID uuid.UUID) (bool, error) {
 	result, err := r.pool.ForContext(ctx).ExecContext(ctx,
 		`UPDATE coupon_users SET used_count = used_count - 1

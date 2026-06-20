@@ -49,6 +49,18 @@ func (e *MinOrderNotMetError) Error() string {
 	return fmt.Sprintf("minimum order amount of %s not met", e.Required.String())
 }
 
+// MaxFailedCouponAttemptsPerDay caps how many failed coupon validations a single
+// user may make per calendar day, to block brute-force code enumeration.
+const MaxFailedCouponAttemptsPerDay = 5
+
+// DailyAttemptLimitError signals the user has exhausted their daily coupon
+// validation attempts (brute-force guard).
+type DailyAttemptLimitError struct{}
+
+func (e *DailyAttemptLimitError) Error() string {
+	return "too many coupon attempts today, please try again tomorrow"
+}
+
 type DiscountType string
 
 const (

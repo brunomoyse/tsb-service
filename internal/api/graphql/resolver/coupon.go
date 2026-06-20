@@ -177,6 +177,9 @@ func (r *queryResolver) ValidateCoupon(ctx context.Context, code string, orderAm
 
 	_, discount, err := r.CouponService.ValidateCoupon(ctx, code, amount, userUUID)
 	if err != nil {
+		// Every error the service returns here carries a user-safe message:
+		// the generic invalid-coupon text, the min-order message, or the
+		// daily-limit message — so surfacing err.Error() directly is safe.
 		errMsg := err.Error()
 		return &model.CouponValidation{
 			Valid:          false,

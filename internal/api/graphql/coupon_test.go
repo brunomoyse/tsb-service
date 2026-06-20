@@ -341,3 +341,90 @@ func TestCreateCouponIntegration(t *testing.T) {
 		assert.Equal(t, "PERCENTAGE", codes["SUMMER20"])
 	})
 }
+
+// TestValidateCouponDailyLimit verifies the per-user daily brute-force guard:
+// only failed validations count, and the 6th failed attempt in a day is blocked.
+func TestValidateCouponDailyLimit(t *testing.T) {
+	tc := setupTestContext(t)
+	url := tc.Client.URL()
+
+	adminToken, err := testhelpers.GenerateTestAccessToken(tc.Fixtures.AdminUser.ID.String(), true)
+	require.NoError(t, err)
+	regularToken, err := testhelpers.GenerateTestAccessToken(tc.Fixtures.RegularUser.ID.String(), false)
+	require.NoError(t, err)
+
+	// A valid, always-applicable coupon (no minimum) used to prove that
+	// successful validations never count toward the daily limit.
+	_, gqlResp := postGraphQL(t, url, graphqlRequest{
+		Query: `mutation ($input: CreateCouponInput!) { createCoupon(input: $input) { code } }`,
+		Variables: map[string]any{
+			"input": map[string]any{
+				"code":          "DAILYOK",
+				"discountType":  "FIXED",
+				"discountValue": "5",
+				"isActive":      true,
+			},
+		},
+	}, adminToken)
+	require.Empty(t, gqlResp.Errors, "unexpected errors creating coupon: %v", gqlResp.Errors)
+
+	const validateQuery = `
+		query ($code: String!, $orderAmount: String!) {
+			validateCoupon(code: $code, orderAmount: $orderAmount) {
+				valid
+				discountAmount
+				errorMessage
+			}
+		}`
+
+	validate := func(code string) struct {
+		Valid        bool    `json:"valid"`
+		ErrorMessage *string `json:"errorMessage"`
+	} {
+		_, resp := postGraphQL(t, url, graphqlRequest{
+			Query:     validateQuery,
+			Variables: map[string]any{"code": code, "orderAmount": "100"},
+		}, regularToken)
+		require.Empty(t, resp.Errors, "unexpected GraphQL errors: %v", resp.Errors)
+		var data struct {
+			ValidateCoupon struct {
+				Valid        bool    `json:"valid"`
+				ErrorMessage *string `json:"errorMessage"`
+			} `json:"validateCoupon"`
+		}
+		require.NoError(t, json.Unmarshal(resp.Data, &data))
+		return data.ValidateCoupon
+	}
+
+	t.Run("valid codes never count toward the limit", func(t *testing.T) {
+		// Six successful validations — more than the limit — must all pass,
+		// proving successes are not counted.
+		for i := 0; i < 6; i++ {
+			res := validate("DAILYOK")
+			assert.True(t, res.Valid, "valid coupon should validate on attempt %d", i+1)
+		}
+	})
+
+	t.Run("failed attempts are capped at five per day", func(t *testing.T) {
+		// First five failures return the generic invalid-coupon message.
+		for i := 0; i < 5; i++ {
+			res := validate("NOPE-000")
+			assert.False(t, res.Valid, "attempt %d should fail", i+1)
+			require.NotNil(t, res.ErrorMessage)
+			assert.Equal(t, "invalid or expired coupon", *res.ErrorMessage, "attempt %d", i+1)
+		}
+
+		// The sixth failed attempt is blocked by the daily limit.
+		res := validate("NOPE-000")
+		assert.False(t, res.Valid)
+		require.NotNil(t, res.ErrorMessage)
+		assert.Contains(t, *res.ErrorMessage, "too many coupon attempts today")
+	})
+
+	t.Run("limit blocks even a valid code once exhausted", func(t *testing.T) {
+		res := validate("DAILYOK")
+		assert.False(t, res.Valid)
+		require.NotNil(t, res.ErrorMessage)
+		assert.Contains(t, *res.ErrorMessage, "too many coupon attempts today")
+	})
+}

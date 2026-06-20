@@ -22,6 +22,12 @@ type CouponRepository interface {
 	RedeemAtomic(ctx context.Context, couponID, userID uuid.UUID) (bool, error)
 	// GetUserUsageCount returns how many times a specific user has used a coupon.
 	GetUserUsageCount(ctx context.Context, couponID, userID uuid.UUID) (int, error)
+	// CountFailedCouponAttemptsToday returns today's (Europe/Brussels) failed
+	// validation attempts for the user.
+	CountFailedCouponAttemptsToday(ctx context.Context, userID uuid.UUID) (int, error)
+	// RecordFailedCouponAttempt increments today's (Europe/Brussels) failed-attempt
+	// counter for the user.
+	RecordFailedCouponAttempt(ctx context.Context, userID uuid.UUID) error
 	// DecrementUsedCountAtomic rolls back a previous global increment.
 	// Guards against used_count going negative.
 	DecrementUsedCountAtomic(ctx context.Context, id uuid.UUID) (bool, error)

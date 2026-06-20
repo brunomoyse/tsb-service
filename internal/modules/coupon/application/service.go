@@ -39,8 +39,19 @@ func NewCouponService(repo domain.CouponRepository) CouponService {
 }
 
 func (s *couponService) ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal, userID uuid.UUID) (*domain.Coupon, decimal.Decimal, error) {
+	// Daily brute-force guard: block before any lookup once the user has spent
+	// their failed attempts for the day (Europe/Brussels). Fail-open if the
+	// counter read itself errors — never lock a user out on infra failure.
+	if attempts, err := s.repo.CountFailedCouponAttemptsToday(ctx, userID); err != nil {
+		logging.FromContext(ctx).Error("failed to read daily coupon attempts",
+			zap.String("user_id", userID.String()), zap.Error(err))
+	} else if attempts >= domain.MaxFailedCouponAttemptsPerDay {
+		return nil, decimal.Zero, &domain.DailyAttemptLimitError{}
+	}
+
 	coupon, err := s.repo.FindByCode(ctx, code)
 	if err != nil {
+		s.recordFailedAttempt(ctx, userID)
 		return nil, decimal.Zero, fmt.Errorf("invalid or expired coupon")
 	}
 
@@ -53,15 +64,28 @@ func (s *couponService) ValidateCoupon(ctx context.Context, code string, orderAm
 		// Surface the actionable "minimum order amount not met" message so the
 		// customer knows how to proceed; keep existence/expiry/limit failures
 		// generic to avoid leaking coupon state to enumeration attempts.
+		// A valid-but-min-not-met code is not enumeration, so it doesn't count
+		// toward the daily limit; every other failure does.
 		var minErr *domain.MinOrderNotMetError
 		if errors.As(err, &minErr) {
 			return coupon, decimal.Zero, minErr
 		}
+		s.recordFailedAttempt(ctx, userID)
 		return coupon, decimal.Zero, fmt.Errorf("invalid or expired coupon")
 	}
 
 	discount := coupon.CalculateDiscount(orderAmount)
 	return coupon, discount, nil
+}
+
+// recordFailedAttempt increments the user's daily failed-attempt counter,
+// best-effort: a write failure is logged but never propagated, so a counter
+// outage can't break the customer's checkout flow.
+func (s *couponService) recordFailedAttempt(ctx context.Context, userID uuid.UUID) {
+	if err := s.repo.RecordFailedCouponAttempt(ctx, userID); err != nil {
+		logging.FromContext(ctx).Error("failed to record coupon attempt",
+			zap.String("user_id", userID.String()), zap.Error(err))
+	}
 }
 
 func (s *couponService) IncrementUsage(ctx context.Context, id uuid.UUID) error {
