@@ -39,11 +39,32 @@ import (
 
 // CreateOrder is the resolver for the createOrder field.
 func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error) {
+	// 1) Authenticated user (the @auth directive guarantees a non-empty userID).
+	userID := utils.GetUserID(ctx)
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	// Resolve the ordering user up front. It is needed both to flag store-review
+	// orders (Google Play / App Store reviewers place a real order on prod to
+	// validate checkout) and to let those reviewers bypass the opening-hours gate
+	// below so they can complete checkout at any time. Such orders never reach
+	// staff — hidden from the admin/POS lists, no subscription, no push — and
+	// auto-cancel after 10 min. TEMPORARY (revert after launch).
+	user, err := r.UserService.GetUserByID(ctx, userUUID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve user: %w", err)
+	}
+	isTestOrder := user != nil && auth.IsReviewUser(user.Email, user.FirstName, user.LastName)
+
 	// 0) Validate ordering availability and preferred ready time constraints.
 	// allowLunchOnly defaults to true so dev mode does not block testing of
 	// lunch-only items; production paths populate it from the resolved schedule.
+	// Store-review accounts skip the gate entirely so a reviewer can place an
+	// order outside opening hours. TEMPORARY (revert after launch).
 	allowLunchOnly := true
-	if !r.RestaurantService.IsDevMode() {
+	if !r.RestaurantService.IsDevMode() && !isTestOrder {
 		config, overrides, err := r.RestaurantService.GetConfigWithOverrides(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load restaurant config: %w", err)
@@ -67,13 +88,6 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			slotTime = *input.PreferredReadyTime
 		}
 		allowLunchOnly = config.IsLunchOnlyAllowed(slotTime, overrides)
-	}
-
-	// 1) Authenticated user (the @auth directive guarantees a non-empty userID).
-	userID := utils.GetUserID(ctx)
-	userUUID, err := uuid.Parse(userID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
 
 	// 2) Fetch products and build price map
@@ -396,20 +410,6 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			cashPaymentAmount = &parsed
 		}
 	}
-
-	// Resolve the ordering user up front so we can flag store-review orders
-	// (Google Play / App Store reviewers place a real order on prod to validate
-	// checkout). Such orders must never reach staff — hidden from the admin/POS
-	// lists, no subscription, no push — and auto-cancel after 10 min. TEMPORARY.
-	user, err := r.UserService.GetUserByID(ctx, userUUID.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve user: %w", err)
-	}
-	// Flag store-review orders: the Play reviewer is a fixed REVIEW_OTP_LOGINS
-	// email; the Apple reviewer signs in with Apple (relay email, no fixed
-	// login) so is matched by their "John Apple" name + privaterelay signature.
-	isTestOrder := user != nil && (auth.IsReviewLogin(user.Email) ||
-		auth.IsReviewAppleUser(user.Email, user.FirstName, user.LastName))
 
 	tempOrder := orderDomain.NewOrder(
 		userUUID,
