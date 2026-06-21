@@ -91,6 +91,36 @@ func (c *RestaurantConfig) AvailableSlotsToday(now time.Time, overrides map[stri
 	return slots
 }
 
+// reviewSlotCount is how many synthetic review slots to offer (2h of quarters).
+const reviewSlotCount = 8
+
+// ReviewSlotsToday returns synthetic ordering slots for store-review accounts so
+// a reviewer can pick a fixed pickup time even when the restaurant is closed.
+// Slots start at the next quarter-hour after the preparation buffer and run for
+// a short window, ignoring opening hours entirely (CreateOrder skips its
+// availability gate for review users, so these need not align with the
+// schedule). IsLunchOnlyAllowed is true so no product is filtered out in the
+// app. TEMPORARY (revert after launch).
+func (c *RestaurantConfig) ReviewSlotsToday(now time.Time) []TimeSlot {
+	prep := c.PreparationMinutes
+	if prep <= 0 {
+		prep = 30
+	}
+	local := timezone.In(now)
+	start := roundUpToNextQuarter(local.Add(time.Duration(prep) * time.Minute))
+
+	slots := make([]TimeSlot, 0, reviewSlotCount)
+	for i := 0; i < reviewSlotCount; i++ {
+		cur := start.Add(time.Duration(i) * slotStepMinutes * time.Minute)
+		slots = append(slots, TimeSlot{
+			Label:              cur.Format("15:04"),
+			Value:              cur,
+			IsLunchOnlyAllowed: true,
+		})
+	}
+	return slots
+}
+
 // IsLunchOnlyAllowed reports whether the given instant is acceptable for an
 // order line flagged as lunch-only: the instant must fall on a Mon–Fri in
 // Europe/Brussels AND be inside the day's first opening interval (the lunch

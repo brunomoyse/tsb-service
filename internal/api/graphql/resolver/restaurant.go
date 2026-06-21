@@ -10,8 +10,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+	"tsb-service/internal/api/auth"
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/model"
+	"tsb-service/pkg/utils"
 )
 
 // UpdateOrderingEnabled is the resolver for the updateOrderingEnabled field.
@@ -132,6 +134,22 @@ func (r *queryResolver) ScheduleOverrides(ctx context.Context, from time.Time, t
 	return out, nil
 }
 
+// isReviewContextUser reports whether the authenticated caller is a store-review
+// account (Google Play / App Store reviewer). Such accounts are allowed to order
+// outside opening hours so a reviewer can validate checkout at any time. Returns
+// false for anonymous callers. TEMPORARY (revert after launch).
+func (r *Resolver) isReviewContextUser(ctx context.Context) bool {
+	userID := utils.GetUserID(ctx)
+	if userID == "" {
+		return false
+	}
+	user, err := r.UserService.GetUserByID(ctx, userID)
+	if err != nil || user == nil {
+		return false
+	}
+	return auth.IsReviewUser(user.Email, user.FirstName, user.LastName)
+}
+
 // IsCurrentlyOpen is the resolver for the isCurrentlyOpen field.
 func (r *restaurantConfigResolver) IsCurrentlyOpen(ctx context.Context, obj *model.RestaurantConfig) (bool, error) {
 	config, overrides, err := r.RestaurantService.GetConfigWithOverrides(ctx)
@@ -147,7 +165,13 @@ func (r *restaurantConfigResolver) IsOrderingCurrentlyOpen(ctx context.Context, 
 	if err != nil {
 		return false, fmt.Errorf("get restaurant config: %w", err)
 	}
-	return config.IsOrderingCurrentlyOpen(time.Now(), overrides), nil
+	if config.IsOrderingCurrentlyOpen(time.Now(), overrides) {
+		return true, nil
+	}
+	// Store-review accounts may order outside opening hours: reporting ordering
+	// as open surfaces the "ASAP" slot in the customer app so a reviewer can
+	// reach checkout whenever the app is tested. TEMPORARY (revert after launch).
+	return r.isReviewContextUser(ctx), nil
 }
 
 // AvailableSlotsToday is the resolver for the availableSlotsToday field.
@@ -156,7 +180,16 @@ func (r *restaurantConfigResolver) AvailableSlotsToday(ctx context.Context, obj 
 	if err != nil {
 		return nil, fmt.Errorf("get restaurant config: %w", err)
 	}
-	return toGQLTimeSlots(config.AvailableSlotsToday(time.Now(), overrides)), nil
+	now := time.Now()
+	slots := config.AvailableSlotsToday(now, overrides)
+	// When the restaurant is closed (no real slots) a store-review account gets
+	// synthetic slots so a reviewer can pick a fixed pickup time outside opening
+	// hours. Gated on the empty result so normal traffic pays no extra cost.
+	// TEMPORARY (revert after launch).
+	if len(slots) == 0 && r.isReviewContextUser(ctx) {
+		slots = config.ReviewSlotsToday(now)
+	}
+	return toGQLTimeSlots(slots), nil
 }
 
 // NextOpeningAt is the resolver for the nextOpeningAt field.

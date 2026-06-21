@@ -189,6 +189,70 @@ func TestNextOpeningAt_SkipsOverrideClosedDay(t *testing.T) {
 	}
 }
 
+// TestReviewSlotsToday_ProducesSlotsWhenClosed verifies the store-review bypass:
+// even when the real slot list is empty (restaurant closed), ReviewSlotsToday
+// hands a reviewer a window of bookable fixed-time slots. TEMPORARY feature.
+func TestReviewSlotsToday_ProducesSlotsWhenClosed(t *testing.T) {
+	cfg := configWith(t, weeklyHours(t), 30)
+
+	// Tue 2026-04-21 is weekly-closed → no real slots at all.
+	now := at(t, "2026-04-21", "23:30")
+	if got := cfg.AvailableSlotsToday(now, nil); len(got) != 0 {
+		t.Fatalf("precondition: expected no real slots when closed, got %d", len(got))
+	}
+
+	slots := cfg.ReviewSlotsToday(now)
+	if len(slots) != reviewSlotCount {
+		t.Fatalf("expected %d review slots, got %d", reviewSlotCount, len(slots))
+	}
+	// now 23:30 + 30min prep = 00:00 (next day), already on a quarter.
+	if slots[0].Label != "00:00" {
+		t.Errorf("expected first review slot 00:00, got %s", slots[0].Label)
+	}
+	for i := 1; i < len(slots); i++ {
+		if d := slots[i].Value.Sub(slots[i-1].Value); d != slotStepMinutes*time.Minute {
+			t.Errorf("expected %dmin spacing between slots, got %v", slotStepMinutes, d)
+		}
+	}
+	// All flagged lunch-allowed so no product is filtered out in the app.
+	for _, s := range slots {
+		if !s.IsLunchOnlyAllowed {
+			t.Errorf("expected IsLunchOnlyAllowed=true for review slot %s", s.Label)
+		}
+	}
+}
+
+// TestReviewSlotsToday_RoundsUpToNextQuarterAfterPrep checks the first slot
+// honors the preparation buffer and is rounded up to the next quarter-hour,
+// independent of the weekly schedule.
+func TestReviewSlotsToday_RoundsUpToNextQuarterAfterPrep(t *testing.T) {
+	cfg := configWith(t, weeklyHours(t), 30)
+
+	// 14:07 + 30min prep = 14:37 → rounded up to 14:45.
+	slots := cfg.ReviewSlotsToday(at(t, "2026-04-22", "14:07"))
+	if len(slots) == 0 {
+		t.Fatalf("expected review slots")
+	}
+	if slots[0].Label != "14:45" {
+		t.Errorf("expected first review slot 14:45, got %s", slots[0].Label)
+	}
+}
+
+// TestReviewSlotsToday_DefaultsPrepWhenUnset confirms the 30min fallback buffer
+// applies when PreparationMinutes is not configured.
+func TestReviewSlotsToday_DefaultsPrepWhenUnset(t *testing.T) {
+	cfg := configWith(t, weeklyHours(t), 0) // unset → defaults to 30
+
+	// 10:00 + 30min default prep = 10:30.
+	slots := cfg.ReviewSlotsToday(at(t, "2026-04-22", "10:00"))
+	if len(slots) == 0 {
+		t.Fatalf("expected review slots")
+	}
+	if slots[0].Label != "10:30" {
+		t.Errorf("expected first review slot 10:30 with default prep, got %s", slots[0].Label)
+	}
+}
+
 func TestIsOrderingAllowed_OrderingDisabledOverridesEverything(t *testing.T) {
 	cfg := configWith(t, weeklyHours(t), 30)
 	cfg.OrderingEnabled = false

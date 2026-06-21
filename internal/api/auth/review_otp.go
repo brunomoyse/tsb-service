@@ -84,6 +84,15 @@ func IsReviewAppleUser(email, firstName, lastName string) bool {
 	return strings.EqualFold(last, "Apple") || strings.EqualFold(last, "Appleseed")
 }
 
+// IsReviewUser reports whether a resolved app user is a store-review account —
+// either the Google Play reviewer (fixed REVIEW_OTP_LOGINS email) or the Apple
+// "John Apple" reviewer (Hide-My-Email relay). Single source of truth for the
+// two-pronged review detection so order flagging and opening-hours bypass stay
+// in sync. TEMPORARY (revert after launch).
+func IsReviewUser(email, firstName, lastName string) bool {
+	return IsReviewLogin(email) || IsReviewAppleUser(email, firstName, lastName)
+}
+
 type reviewOtpEntry struct {
 	code     string
 	storedAt time.Time
