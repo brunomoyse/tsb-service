@@ -111,7 +111,6 @@ func ConnectDualDatabase() (*DBPool, error) {
 	if err != nil {
 		return nil, err
 	}
-	tunePool(customerDB, getEnvInt("DB_CUSTOMER_MAX_OPEN_CONNS", 15), getEnvInt("DB_CUSTOMER_MAX_IDLE_CONNS", 3))
 
 	// Admin connection (optional — falls back to customer if not set)
 	adminUser := os.Getenv("DB_ADMIN_USERNAME")
@@ -119,10 +118,15 @@ func ConnectDualDatabase() (*DBPool, error) {
 
 	if adminUser == "" {
 		zap.L().Info("DB_ADMIN_USERNAME not set, using single connection for both roles")
-		// Tune the single connection with combined limits
+		// Single shared connection carries both customer and admin load, so tune
+		// it with the combined limits.
 		tunePool(customerDB, getEnvInt("DB_MAX_OPEN_CONNS", 25), getEnvInt("DB_MAX_IDLE_CONNS", 5))
 		return &DBPool{Customer: customerDB, Admin: customerDB}, nil
 	}
+
+	// Dual mode: the customer pool only carries customer load, so tune it
+	// conservatively; the admin pool gets its own limits below.
+	tunePool(customerDB, getEnvInt("DB_CUSTOMER_MAX_OPEN_CONNS", 15), getEnvInt("DB_CUSTOMER_MAX_IDLE_CONNS", 3))
 
 	adminDB, err := connectWithCreds(adminUser, adminPassword, "admin")
 	if err != nil {

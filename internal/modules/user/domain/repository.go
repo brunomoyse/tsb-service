@@ -2,9 +2,16 @@ package domain
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 )
+
+// ErrDuplicateUser is returned by Save when an insert violates a uniqueness
+// constraint (email or zitadel_user_id). It lets the application layer detect a
+// concurrent create-then-create race and recover by re-fetching the existing row
+// without depending on the database driver.
+var ErrDuplicateUser = errors.New("user already exists")
 
 type UserRepository interface {
 	Save(ctx context.Context, u *User) (uuid.UUID, error)

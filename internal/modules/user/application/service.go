@@ -222,6 +222,20 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 	}
 	id, err := s.repo.Save(ctx, &newUser)
 	if err != nil {
+		// A concurrent first login for the same Zitadel sub (two tabs, a retried
+		// request) can race us between the lookups above and this insert, losing
+		// the unique constraint on zitadel_user_id or email. Recover by re-fetching
+		// the row the winner created instead of failing the login.
+		if errors.Is(err, domain.ErrDuplicateUser) {
+			if existing, findErr := s.repo.FindByZitadelID(ctx, zitadelID); findErr == nil {
+				return existing, nil
+			}
+			if email != "" {
+				if existing, findErr := s.repo.FindByEmail(ctx, email); findErr == nil {
+					return existing, nil
+				}
+			}
+		}
 		return nil, fmt.Errorf("failed to create user from Zitadel: %w", err)
 	}
 	newUser.ID = id

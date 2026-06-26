@@ -23,10 +23,14 @@ func (b *Broker) Subscribe(topic string) <-chan any {
 }
 
 func (b *Broker) Publish(topic string, msg any) {
+	// Hold the read lock for the whole loop so Unsubscribe/Shutdown (which take
+	// the write lock to close channels) cannot close a subscriber channel
+	// mid-send — sending on a closed channel panics even inside a select with a
+	// default case. Sends here are non-blocking, so the critical section stays
+	// bounded and other publishers still run concurrently under the read lock.
 	b.mu.RLock()
-	subs := b.topics[topic]
-	b.mu.RUnlock()
-	for _, ch := range subs {
+	defer b.mu.RUnlock()
+	for _, ch := range b.topics[topic] {
 		select {
 		case ch <- msg:
 		default:

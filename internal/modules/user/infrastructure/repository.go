@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"tsb-service/internal/modules/user/domain"
@@ -35,6 +36,10 @@ func (r *UserRepository) Save(ctx context.Context, user *domain.User) (uuid.UUID
 	`
 	var id uuid.UUID
 	if err := r.pool.ForContext(ctx).QueryRowContext(ctx, query, user.FirstName, user.LastName, user.Email, user.PhoneNumber, user.AddressID, user.ZitadelUserID).Scan(&id); err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			return uuid.Nil, fmt.Errorf("%w: %v", domain.ErrDuplicateUser, err)
+		}
 		return uuid.Nil, err
 	}
 	user.ID = id
