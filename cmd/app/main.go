@@ -34,6 +34,7 @@ import (
 
 	couponApplication "tsb-service/internal/modules/coupon/application"
 	couponInfrastructure "tsb-service/internal/modules/coupon/infrastructure"
+	emailModule "tsb-service/internal/modules/email"
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderInfrastructure "tsb-service/internal/modules/order/infrastructure"
 	paymentApplication "tsb-service/internal/modules/payment/application"
@@ -134,6 +135,9 @@ func main() {
 		zap.L().Error("failed to initialize email service", zap.Error(err))
 		os.Exit(1)
 	}
+	// Skip emailing addresses that previously hard-bounced (populated by the
+	// bounce poller below) so we protect our sender reputation / hard-bounce rate.
+	scaleway.SetSuppressionStore(emailModule.NewSuppressionRepository(dbPool))
 
 	mollieTesting := os.Getenv("MOLLIE_TESTING") == "true"
 	var mollieCfg *mollie.Config
@@ -287,6 +291,11 @@ func main() {
 
 	// Gin HTTP setup
 	router := gin.New()
+	// Behind Cloudflare Tunnel: trust CF-Connecting-IP (set by Cloudflare at the
+	// edge, and client-supplied copies are stripped there) instead of the default
+	// of trusting client-supplied X-Forwarded-For. Without this, ClientIP() is
+	// spoofable and per-IP rate limits on auth/OTP endpoints can be bypassed.
+	router.TrustedPlatform = gin.PlatformCloudflare
 	// Order matters: Sentry first (catches panics in every subsequent handler),
 	// then RequestID + Logger + SentryContext (propagates request_id/user_id as Sentry scope tags).
 	router.Use(sentrygin.New(sentrygin.Options{Repanic: true}))
@@ -477,13 +486,42 @@ func main() {
 		}
 	}()
 
+	// Periodically pull hard-bounced / undeliverable recipients from Scaleway TEM
+	// into the suppression list so dispatch() stops emailing them, keeping our
+	// hard-bounce rate down. Runs hourly until shutdown; each run re-scans a wide
+	// fixed window because a bounce flag can land hours after send (delivery
+	// retries) and Suppress is idempotent. No-op for the SMTP backend.
+	bounceCtx, stopBouncePoll := context.WithCancel(context.Background())
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		poll := func() {
+			if err := scaleway.PollHardBounces(bounceCtx, time.Now().Add(-48*time.Hour)); err != nil {
+				zap.L().Warn("failed to poll email hard bounces", zap.Error(err))
+			}
+		}
+		poll() // initial sweep on boot
+		for {
+			select {
+			case <-bounceCtx.Done():
+				return
+			case <-ticker.C:
+				poll()
+			}
+		}
+	}()
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	zap.L().Info("shutting down server")
 	stopPurge()
 	stopSweep()
+	stopBouncePoll()
 	authLimiter.Stop()
+	couponValidateLimiter.Stop()
+	posLimiter.Stop()
+	mollieLimiter.Stop()
 	feedbackLimiter.Stop()
 	broker.Shutdown()
 

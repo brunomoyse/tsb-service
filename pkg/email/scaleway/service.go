@@ -101,6 +101,16 @@ func IsInitialized() bool {
 // set, otherwise Scaleway TEM). Centralized so every Send*Email function flows
 // through one switch point.
 func dispatch(req *temv1alpha1.CreateEmailRequest) error {
+	// Drop recipients on the suppression list (prior hard bounces) to protect our
+	// sender reputation and keep the hard-bounce rate down. Every transactional
+	// email in this app has a single recipient, so a suppressed address means the
+	// whole send is skipped.
+	kept, hasRecipients := filterSuppressedRecipients(req)
+	if !hasRecipients {
+		return nil
+	}
+	req.To = kept
+
 	if smtpHost != "" {
 		return sendViaSMTP(req)
 	}
