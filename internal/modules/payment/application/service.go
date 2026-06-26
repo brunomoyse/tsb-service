@@ -25,9 +25,14 @@ import (
 type PaymentService interface {
 	CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct, u userDomain.User, a *addressDomain.Address, customRedirectURL *string) (*domain.MolliePayment, error)
 	CreateFullRefund(ctx context.Context, externalPaymentID string) error
-	// UpdatePaymentStatus fetches the latest status from Mollie, updates the local DB,
-	// and returns the status update details + associated order ID.
-	UpdatePaymentStatus(ctx context.Context, externalMolliePaymentID string) (*domain.PaymentStatusUpdate, *uuid.UUID, error)
+	// FetchMollieStatus fetches the authoritative payment status from Mollie
+	// without touching the local DB. The webhook handler persists it only after
+	// the order business logic succeeds (see PersistPaymentStatus).
+	FetchMollieStatus(ctx context.Context, externalMolliePaymentID string) (*domain.PaymentStatusUpdate, error)
+	// PersistPaymentStatus writes the fetched status + timestamps to the local DB.
+	PersistPaymentStatus(ctx context.Context, externalMolliePaymentID string, update *domain.PaymentStatusUpdate) error
+	// WithPaymentLock serializes concurrent webhook deliveries for the same payment.
+	WithPaymentLock(ctx context.Context, paymentID string, fn func(context.Context) error) error
 	UpdatePaymentStatusByOrderID(ctx context.Context, orderID uuid.UUID, status string) (*domain.MolliePayment, error)
 	GetPaymentByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error)
 	GetPaymentByExternalID(ctx context.Context, externalMolliePaymentID string) (*domain.MolliePayment, error)
@@ -248,29 +253,38 @@ func (s *paymentService) CreateFullRefund(ctx context.Context, externalPaymentID
 	return nil
 }
 
-// UpdatePaymentStatus fetches the current payment from Mollie, updates the local DB
-// with status + timestamps, and returns the update details + order ID.
-func (s *paymentService) UpdatePaymentStatus(ctx context.Context, externalMolliePaymentID string) (*domain.PaymentStatusUpdate, *uuid.UUID, error) {
+// FetchMollieStatus retrieves the authoritative payment status + timestamps from
+// the Mollie API without writing to the local DB. The webhook handler persists
+// this only after the order business logic succeeds, so a failed delivery is
+// retried by Mollie and re-runs the business logic (the stored status is the
+// commit marker).
+func (s *paymentService) FetchMollieStatus(ctx context.Context, externalMolliePaymentID string) (*domain.PaymentStatusUpdate, error) {
 	_, externalPayment, err := s.mollieClient.Payments.Get(ctx, externalMolliePaymentID, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch payment from Mollie: %w", err)
+		return nil, fmt.Errorf("failed to fetch payment from Mollie: %w", err)
 	}
 
-	update := &domain.PaymentStatusUpdate{
+	return &domain.PaymentStatusUpdate{
 		Status:       domain.PaymentStatus(externalPayment.Status),
 		PaidAt:       externalPayment.PaidAt,
 		AuthorizedAt: externalPayment.AuthorizedAt,
 		CanceledAt:   externalPayment.CanceledAt,
 		ExpiredAt:    externalPayment.ExpiredAt,
 		FailedAt:     externalPayment.FailedAt,
-	}
+	}, nil
+}
 
-	orderID, err := s.repo.RefreshStatus(ctx, externalMolliePaymentID, update)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to update payment status: %w", err)
+// PersistPaymentStatus writes the status + timestamps to the local DB.
+func (s *paymentService) PersistPaymentStatus(ctx context.Context, externalMolliePaymentID string, update *domain.PaymentStatusUpdate) error {
+	if _, err := s.repo.RefreshStatus(ctx, externalMolliePaymentID, update); err != nil {
+		return fmt.Errorf("failed to update payment status: %w", err)
 	}
+	return nil
+}
 
-	return update, orderID, nil
+// WithPaymentLock serializes concurrent webhook deliveries for the same payment.
+func (s *paymentService) WithPaymentLock(ctx context.Context, paymentID string, fn func(context.Context) error) error {
+	return s.repo.WithPaymentLock(ctx, paymentID, fn)
 }
 
 func (s *paymentService) UpdatePaymentStatusByOrderID(ctx context.Context, orderID uuid.UUID, status string) (*domain.MolliePayment, error) {

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 )
 
 type PaymentRepository struct {
@@ -112,12 +113,39 @@ func (r *PaymentRepository) MarkAsRefund(ctx context.Context, externalPaymentID 
 		WHERE mollie_payment_id = $2;
 	`
 
-	_, err := r.pool.ForContext(ctx).ExecContext(ctx, query, refundedAmount, externalPaymentID)
+	res, err := r.pool.ForContext(ctx).ExecContext(ctx, query, refundedAmount, externalPaymentID)
 	if err != nil {
 		return fmt.Errorf("failed to mark payment as refunded: %w", err)
 	}
+	if n, raErr := res.RowsAffected(); raErr == nil && n == 0 {
+		return fmt.Errorf("mark payment as refunded: no payment found for id %s", externalPaymentID)
+	}
 
 	return nil
+}
+
+// WithPaymentLock runs fn while holding a Postgres session-level advisory lock
+// keyed on the payment ID. Concurrent webhook deliveries for the same payment —
+// possibly landing on different replicas — block here until the holder releases,
+// so the webhook critical section runs one at a time per payment. fn's own queries
+// go through the pool as usual; only the serialization is provided here.
+func (r *PaymentRepository) WithPaymentLock(ctx context.Context, paymentID string, fn func(context.Context) error) error {
+	conn, err := r.pool.ForContext(ctx).Connx(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire connection for payment lock: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock(hashtext($1))", paymentID); err != nil {
+		return fmt.Errorf("acquire advisory lock for payment %s: %w", paymentID, err)
+	}
+	defer func() {
+		if _, unlockErr := conn.ExecContext(ctx, "SELECT pg_advisory_unlock(hashtext($1))", paymentID); unlockErr != nil {
+			zap.L().Error("failed to release payment advisory lock", zap.String("payment_id", paymentID), zap.Error(unlockErr))
+		}
+	}()
+
+	return fn(ctx)
 }
 
 // RefreshStatus updates the payment status and all associated timestamps.

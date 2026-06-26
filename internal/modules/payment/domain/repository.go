@@ -16,4 +16,9 @@ type PaymentRepository interface {
 	FindByExternalID(ctx context.Context, externalPaymentID string) (*MolliePayment, error)
 
 	FindByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*MolliePayment, error)
+
+	// WithPaymentLock runs fn while holding a cross-process advisory lock keyed on
+	// the payment ID, serializing concurrent webhook deliveries for the same
+	// payment across all replicas.
+	WithPaymentLock(ctx context.Context, paymentID string, fn func(context.Context) error) error
 }
