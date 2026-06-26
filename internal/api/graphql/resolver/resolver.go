@@ -5,7 +5,6 @@ package resolver
 import (
 	"context"
 	"errors"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -17,7 +16,6 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
 	"github.com/vektah/gqlparser/v2/gqlerror"
 	"go.uber.org/zap"
 
@@ -103,27 +101,11 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 	})
 
 	h.AddTransport(transport.Websocket{
-		Upgrader: websocket.Upgrader{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-			CheckOrigin: func(r *http.Request) bool {
-				origin := strings.TrimRight(strings.ToLower(r.Header.Get("Origin")), "/")
-				// Native apps (Android/iOS) don't send an Origin header — allow empty
-				if origin == "" {
-					return true
-				}
-				for _, allowed := range allowedOrigins {
-					if origin == strings.TrimRight(strings.ToLower(allowed), "/") {
-						return true
-					}
-				}
-				zap.L().Warn("WebSocket origin rejected",
-					zap.String("origin", origin),
-					zap.Strings("allowed", allowedOrigins),
-				)
-				return false
-			},
-		},
+		// gqlgen v0.17.92 dropped the built-in Gorilla Upgrader field in favour of
+		// a pluggable Implementation. We wrap the default Coder implementation with
+		// our own origin allowlist (see originCheckedWebsocket) to preserve the prior
+		// CheckOrigin behaviour.
+		Implementation: originCheckedWebsocket{allowedOrigins: allowedOrigins},
 		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
 			// If auth was already set by HTTP middleware (via cookie), keep it
 			if utils.GetUserID(ctx) != "" {
