@@ -166,15 +166,35 @@ func (r *CouponRepository) RedeemAtomic(ctx context.Context, couponID, userID uu
 	return true, nil
 }
 
-func (r *CouponRepository) DecrementUsedCountAtomic(ctx context.Context, id uuid.UUID) (bool, error) {
-	result, err := r.pool.ForContext(ctx).ExecContext(ctx,
-		`UPDATE coupons SET used_count = used_count - 1
-		 WHERE id = $1 AND used_count > 0`, id)
+// DecrementUsageAtomic rolls back a previous RedeemAtomic by decrementing both
+// the per-user and the global counters inside a single transaction, so the two
+// can never diverge: either both decrements commit or neither does. Each
+// decrement is guarded by `used_count > 0` so a counter can't go negative; a
+// zero-row result (counter already at zero) is not an error.
+func (r *CouponRepository) DecrementUsageAtomic(ctx context.Context, couponID, userID uuid.UUID) error {
+	tx, err := r.pool.ForContext(ctx).BeginTxx(ctx, nil)
 	if err != nil {
-		return false, fmt.Errorf("failed to decrement coupon usage: %w", err)
+		return fmt.Errorf("begin decrement tx: %w", err)
 	}
-	rows, _ := result.RowsAffected()
-	return rows > 0, nil
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE coupon_users SET used_count = used_count - 1
+		 WHERE coupon_id = $1 AND user_id = $2 AND used_count > 0`,
+		couponID, userID); err != nil {
+		return fmt.Errorf("decrement per-user usage: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE coupons SET used_count = used_count - 1
+		 WHERE id = $1 AND used_count > 0`, couponID); err != nil {
+		return fmt.Errorf("decrement global usage: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit decrement: %w", err)
+	}
+	return nil
 }
 
 func (r *CouponRepository) GetUserUsageCount(ctx context.Context, couponID, userID uuid.UUID) (int, error) {
@@ -214,16 +234,4 @@ func (r *CouponRepository) RecordFailedCouponAttempt(ctx context.Context, userID
 		return fmt.Errorf("failed to record coupon attempt: %w", err)
 	}
 	return nil
-}
-
-func (r *CouponRepository) DecrementUserUsageAtomic(ctx context.Context, couponID, userID uuid.UUID) (bool, error) {
-	result, err := r.pool.ForContext(ctx).ExecContext(ctx,
-		`UPDATE coupon_users SET used_count = used_count - 1
-		 WHERE coupon_id = $1 AND user_id = $2 AND used_count > 0`,
-		couponID, userID)
-	if err != nil {
-		return false, fmt.Errorf("failed to decrement user usage: %w", err)
-	}
-	rows, _ := result.RowsAffected()
-	return rows > 0, nil
 }

@@ -452,6 +452,12 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 					zap.Error(rbErr))
 			}
 		}
+		// The partial unique index is the race-proof backstop for the
+		// HasActiveCouponOrder pre-check above: surface the same friendly message
+		// when a concurrent order won the race between the check and this insert.
+		if isActiveCouponOrderConflict(err) {
+			return nil, fmt.Errorf("you already have an active order using a coupon")
+		}
 		return nil, fmt.Errorf("failed to create order: %w", err)
 	}
 

@@ -51,6 +51,16 @@ func isUniqueViolation(err error) bool {
 	return errors.As(err, &pqErr) && pqErr.Code == "23505"
 }
 
+// isActiveCouponOrderConflict reports whether err is the unique violation on the
+// one_active_coupon_order_per_user partial index — the race-proof backstop for
+// the HasActiveCouponOrder pre-check, hit when a concurrent order slips in
+// between the check and the insert.
+func isActiveCouponOrderConflict(err error) bool {
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && pqErr.Code == "23505" &&
+		pqErr.Constraint == "one_active_coupon_order_per_user"
+}
+
 // Map applies fn to every element of in, returning a new slice.
 func Map[T any, U any](in []T, fn func(T) U) []U {
 	out := make([]U, len(in))

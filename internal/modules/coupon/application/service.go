@@ -97,23 +97,13 @@ func (s *couponService) IncrementUsageAtomic(ctx context.Context, id uuid.UUID, 
 }
 
 func (s *couponService) DecrementUsageAtomic(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
-	log := logging.FromContext(ctx)
-
-	if _, err := s.repo.DecrementUserUsageAtomic(ctx, id, userID); err != nil {
-		log.Error("failed to decrement per-user coupon usage",
+	if err := s.repo.DecrementUsageAtomic(ctx, id, userID); err != nil {
+		logging.FromContext(ctx).Error("failed to decrement coupon usage",
 			zap.String("coupon_id", id.String()),
 			zap.String("user_id", userID.String()),
 			zap.Error(err))
-		return fmt.Errorf("failed to decrement per-user coupon usage: %w", err)
+		return fmt.Errorf("failed to decrement coupon usage: %w", err)
 	}
-
-	if _, err := s.repo.DecrementUsedCountAtomic(ctx, id); err != nil {
-		log.Error("failed to decrement global coupon usage",
-			zap.String("coupon_id", id.String()),
-			zap.Error(err))
-		return fmt.Errorf("failed to decrement global coupon usage: %w", err)
-	}
-
 	return nil
 }
 

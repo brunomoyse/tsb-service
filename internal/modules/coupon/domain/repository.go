@@ -28,10 +28,9 @@ type CouponRepository interface {
 	// RecordFailedCouponAttempt increments today's (Europe/Brussels) failed-attempt
 	// counter for the user.
 	RecordFailedCouponAttempt(ctx context.Context, userID uuid.UUID) error
-	// DecrementUsedCountAtomic rolls back a previous global increment.
-	// Guards against used_count going negative.
-	DecrementUsedCountAtomic(ctx context.Context, id uuid.UUID) (bool, error)
-	// DecrementUserUsageAtomic rolls back a previous per-user increment.
-	// Guards against used_count going negative.
-	DecrementUserUsageAtomic(ctx context.Context, couponID, userID uuid.UUID) (bool, error)
+	// DecrementUsageAtomic rolls back a previous RedeemAtomic by decrementing
+	// both the per-user and the global counters in a single transaction, so the
+	// two can never diverge. Each decrement is guarded against going negative;
+	// a counter already at zero is a no-op, not an error.
+	DecrementUsageAtomic(ctx context.Context, couponID, userID uuid.UUID) error
 }
