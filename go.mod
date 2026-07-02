@@ -23,7 +23,7 @@ require (
 	github.com/shopspring/decimal v1.4.0
 	github.com/sideshow/apns2 v0.25.0
 	github.com/stretchr/testify v1.11.1
-	github.com/vektah/gqlparser/v2 v2.5.35
+	github.com/vektah/gqlparser/v2 v2.5.36
 	github.com/zitadel/zitadel-go/v3 v3.29.1
 	go.uber.org/zap v1.28.0
 	golang.org/x/time v0.15.0
