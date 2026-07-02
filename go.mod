@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	firebase.google.com/go/v4 v4.20.0
-	github.com/99designs/gqlgen v0.17.92
+	github.com/99designs/gqlgen v0.17.93
 	github.com/coder/websocket v1.8.15
 	github.com/getsentry/sentry-go v0.47.0
 	github.com/getsentry/sentry-go/gin v0.47.0
@@ -105,7 +105,7 @@ require (
 	github.com/sosodev/duration v1.4.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/urfave/cli/v3 v3.9.0 // indirect
+	github.com/urfave/cli/v3 v3.10.0 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
