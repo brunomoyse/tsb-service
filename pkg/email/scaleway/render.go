@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io"
 	"os"
+	"path"
 	"strings"
 	"time"
 	addressDomain "tsb-service/internal/modules/address/domain"
@@ -59,10 +60,20 @@ type templateExecutor interface {
 // Template loaders
 // --------------------------------------------------------------------------------
 
+// brandFuncs exposes restaurant identity to every email template, so one
+// template set serves any brand ({{restaurantName}} instead of a hardcoded
+// name). Declared as a plain map so both html/template and text/template
+// FuncMap types accept it.
+func brandFuncs() map[string]any {
+	return map[string]any{
+		"restaurantName": func() string { return brandCfg().Name },
+	}
+}
+
 // loadHTMLTemplate loads an HTML template from the embedded HTML FS.
-func loadHTMLTemplate(path string) (templateExecutor, error) {
-	htmlPath := fmt.Sprintf("%s.html", path)
-	tmpl, err := template.ParseFS(htmlEmailFS, htmlPath)
+func loadHTMLTemplate(templatePath string) (templateExecutor, error) {
+	htmlPath := fmt.Sprintf("%s.html", templatePath)
+	tmpl, err := template.New(path.Base(htmlPath)).Funcs(brandFuncs()).ParseFS(htmlEmailFS, htmlPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse HTML template %q: %w", htmlPath, err)
 	}
@@ -70,9 +81,9 @@ func loadHTMLTemplate(path string) (templateExecutor, error) {
 }
 
 // loadTextTemplate loads a plain text template from the embedded text FS.
-func loadTextTemplate(path string) (templateExecutor, error) {
-	textPath := fmt.Sprintf("%s.txt", path)
-	tmpl, err := textTemplate.ParseFS(textEmailFS, textPath)
+func loadTextTemplate(templatePath string) (templateExecutor, error) {
+	textPath := fmt.Sprintf("%s.txt", templatePath)
+	tmpl, err := textTemplate.New(path.Base(textPath)).Funcs(brandFuncs()).ParseFS(textEmailFS, textPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse text template %q: %w", textPath, err)
 	}
@@ -102,7 +113,7 @@ func renderEmail(path string, data any, loader func(string) (templateExecutor, e
 // --------------------------------------------------------------------------------
 
 func logoURL() string {
-	return fmt.Sprintf("%s/images/tsb-black-font-100.png", os.Getenv("APP_BASE_URL"))
+	return os.Getenv("APP_BASE_URL") + brandCfg().LogoPath
 }
 
 // --------------------------------------------------------------------------------

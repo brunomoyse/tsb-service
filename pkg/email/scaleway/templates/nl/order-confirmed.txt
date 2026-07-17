@@ -1,6 +1,6 @@
 Hallo {{.UserName}},
 
-Bedankt voor uw bestelling bij Tokyo Sushi Bar! Wij zijn blij u te melden dat uw bestelling door het restaurant is bevestigd.
+Bedankt voor uw bestelling bij {{restaurantName}}! Wij zijn blij u te melden dat uw bestelling door het restaurant is bevestigd.
 
 {{if .EstimatedReadyTime}}
 {{if eq .OrderType "DELIVERY"}}Uw bestelling wordt geleverd op {{.EstimatedReadyTime}} (geschatte tijd).{{else if eq .OrderType "PICKUP"}}Uw bestelling is beschikbaar voor afhaling op {{.EstimatedReadyTime}} (geschatte tijd).{{end}}
@@ -41,4 +41,4 @@ Als u deze bestelling niet hebt geplaatst, kunt u deze e-mail negeren.
 
 Dit is een geautomatiseerde e-mail — gelieve niet te antwoorden.
 
-© 2026 Tokyo Sushi Bar. Alle rechten voorbehouden.
+© 2026 {{restaurantName}}. Alle rechten voorbehouden.

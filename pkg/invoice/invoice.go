@@ -5,11 +5,13 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/go-pdf/fpdf"
 
+	"tsb-service/pkg/brand"
 	"tsb-service/pkg/timezone"
 )
 
@@ -22,13 +24,21 @@ var dejaVuSansBold []byte
 //go:embed logo.png
 var logoPNG []byte
 
-const (
-	RestaurantName    = "Tokyo Sushi Bar — SRL"
-	RestaurantAddress = "Rue de la Cathédrale 59, 4000 Liège, Belgique"
-	RestaurantCompany = "BE0772.499.585"
-	RestaurantPhone   = "+32 4 222 98 88"
-	RestaurantEmail   = "tokyosushibar888@gmail.com"
-)
+// logoBytes returns the invoice logo: a PNG file from INVOICE_LOGO_PATH when
+// set and readable, otherwise the embedded Tokyo Sushi Bar logo.
+func logoBytes() []byte {
+	if p := os.Getenv("INVOICE_LOGO_PATH"); p != "" {
+		if b, err := os.ReadFile(p); err == nil {
+			return b
+		}
+	}
+	return logoPNG
+}
+
+// cfg returns the restaurant identity printed on invoices.
+func cfg() brand.Config {
+	return brand.Current()
+}
 
 type InvoiceData struct {
 	CustomerName  string
@@ -92,7 +102,7 @@ func formatOrderRef(orderID string, orderDate time.Time) string {
 	if len(id) > 8 {
 		short = id[len(id)-8:]
 	}
-	return fmt.Sprintf("TSB-%d-%s", timezone.In(orderDate).Year(), strings.ToUpper(short))
+	return fmt.Sprintf("%s-%d-%s", cfg().InvoicePrefix, timezone.In(orderDate).Year(), strings.ToUpper(short))
 }
 
 // GeneratePDF generates a PDF invoice and returns the raw bytes.
@@ -115,7 +125,7 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 	// Logo
 	logoSize := 14.0 // mm
 	headerY := pdf.GetY()
-	logoReader := io.NopCloser(bytes.NewReader(logoPNG))
+	logoReader := io.NopCloser(bytes.NewReader(logoBytes()))
 	pdf.RegisterImageOptionsReader("logo", fpdf.ImageOptions{ImageType: "PNG"}, logoReader)
 	pdf.ImageOptions("logo", leftMargin, headerY, logoSize, logoSize, false, fpdf.ImageOptions{}, 0, "")
 
@@ -127,7 +137,7 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 	pdf.SetFont("DejaVu", "B", 18)
 	pdf.SetTextColor(30, 30, 30)
 	nameW := usableW - logoSize - 3 - usableW*0.30
-	pdf.CellFormat(nameW, textH, RestaurantName, "", 0, "L", false, 0, "")
+	pdf.CellFormat(nameW, textH, cfg().LegalName, "", 0, "L", false, 0, "")
 
 	// Invoice title right-aligned
 	pdf.SetFont("DejaVu", "B", 18)
@@ -138,9 +148,9 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 	pdf.SetY(headerY + logoSize + 2)
 	pdf.SetTextColor(100, 100, 100)
 	pdf.SetFont("DejaVu", "", 9)
-	pdf.CellFormat(usableW, 5, RestaurantAddress, "", 1, "L", false, 0, "")
-	pdf.CellFormat(usableW, 5, fmt.Sprintf("%s: %s  |  %s: %s", l.Phone, RestaurantPhone, l.Email, RestaurantEmail), "", 1, "L", false, 0, "")
-	pdf.CellFormat(usableW, 5, fmt.Sprintf("%s: %s", l.CompanyNumber, RestaurantCompany), "", 1, "L", false, 0, "")
+	pdf.CellFormat(usableW, 5, cfg().Address, "", 1, "L", false, 0, "")
+	pdf.CellFormat(usableW, 5, fmt.Sprintf("%s: %s  |  %s: %s", l.Phone, cfg().Phone, l.Email, cfg().Email), "", 1, "L", false, 0, "")
+	pdf.CellFormat(usableW, 5, fmt.Sprintf("%s: %s", l.CompanyNumber, cfg().VAT), "", 1, "L", false, 0, "")
 
 	pdf.Ln(6)
 	pdf.SetDrawColor(220, 220, 220)

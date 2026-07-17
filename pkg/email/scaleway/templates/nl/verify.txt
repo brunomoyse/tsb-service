@@ -1,6 +1,6 @@
 Hallo {{.UserName}},
 
-Bedankt voor uw registratie bij Tokyo Sushi Bar! Wij zijn verheugd u onze verse en smakelijke creaties te laten ontdekken, geïnspireerd door de Japanse traditie.
+Bedankt voor uw registratie bij {{restaurantName}}! Wij zijn verheugd u onze verse en smakelijke creaties te laten ontdekken, geïnspireerd door de Japanse traditie.
 
 Om uw registratie te voltooien en uw account te activeren, bevestigt u uw e-mailadres door op de onderstaande link te klikken:
 
@@ -11,4 +11,4 @@ Wij kijken ernaar uit u onze moderne benadering van traditionele sushi te laten 
 
 Als u dit verzoek niet hebt ingediend, kunt u deze e-mail gewoon negeren.
 
-© 2026 Tokyo Sushi Bar. Alle rechten voorbehouden.
+© 2026 {{restaurantName}}. Alle rechten voorbehouden.

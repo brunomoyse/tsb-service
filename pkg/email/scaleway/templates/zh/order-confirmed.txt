@@ -1,6 +1,6 @@
 您好 {{.UserName}}，
 
-感谢您在 Tokyo Sushi Bar 下单！我们很高兴地通知您，您的订单已由餐厅确认。
+感谢您在 {{restaurantName}} 下单！我们很高兴地通知您，您的订单已由餐厅确认。
 
 {{if .EstimatedReadyTime}}
 {{if eq .OrderType "DELIVERY"}}您的订单将于 {{.EstimatedReadyTime}} 送达（预计时间）。{{else if eq .OrderType "PICKUP"}}您的订单将于 {{.EstimatedReadyTime}} 可自取（预计时间）。{{end}}
@@ -41,4 +41,4 @@
 
 此邮件为系统自动发送，请勿回复。
 
-© 2026 Tokyo Sushi Bar。保留所有权利。
+© 2026 {{restaurantName}}。保留所有权利。

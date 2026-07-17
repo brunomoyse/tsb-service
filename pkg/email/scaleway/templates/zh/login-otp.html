@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>您的登录验证码 | Tokyo Sushi Bar</title>
+    <title>您的登录验证码 | {{restaurantName}}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
@@ -11,26 +11,26 @@
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
     <!-- HEADER -->
     <tr><td style="background-color:#ffffff;padding:24px 36px;text-align:center;border-radius:12px 12px 0 0;">
-        <img src="{{.LogoURL}}" alt="Tokyo Sushi Bar" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
+        <img src="{{.LogoURL}}" alt="{{restaurantName}}" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
     </td></tr>
     <!-- RED ACCENT LINE -->
     <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
     <!-- CONTENT -->
     <tr><td style="background-color:#ffffff;padding:36px;">
         <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">您好 {{.UserName}}，</p>
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">这是您的 <strong>Tokyo Sushi Bar</strong> 登录验证码。请在登录页面输入此验证码以访问您的账户：</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">这是您的 <strong>{{restaurantName}}</strong> 登录验证码。请在登录页面输入此验证码以访问您的账户：</p>
         <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto;">
         <tr><td style="background-color:#F0EBE3;border:1px solid #E5DED4;border-radius:12px;padding:20px 36px;text-align:center;">
             <span style="font-family:'Courier New',monospace;font-size:32px;letter-spacing:8px;font-weight:700;color:#2D2D2D;">{{.Code}}</span>
         </td></tr>
         </table>
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">此验证码仅在几分钟内有效。如果您没有尝试登录，请忽略此邮件 — 您的账户依然安全。</p>
-        <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">期待在 Tokyo Sushi Bar 与您再次相见。<br/>お待ちしております！（我们期待您的光临！）</p>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">期待在 {{restaurantName}} 与您再次相见。<br/>お待ちしております！（我们期待您的光临！）</p>
     </td></tr>
     <!-- FOOTER -->
     <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:0 0 12px 12px;">
         <p style="margin:0;font-size:12px;color:#6B6560;">如果您未请求此邮件，请忽略它。</p>
-        <p style="margin:8px 0 0;font-size:12px;color:#6B6560;">&copy; 2026 Tokyo Sushi Bar。保留所有权利。</p>
+        <p style="margin:8px 0 0;font-size:12px;color:#6B6560;">&copy; 2026 {{restaurantName}}。保留所有权利。</p>
     </td></tr>
 </table>
 </td></tr>

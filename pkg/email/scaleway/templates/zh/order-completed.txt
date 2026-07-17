@@ -1,9 +1,9 @@
 您好 {{.UserName}}，
 
-感谢您选择 Tokyo Sushi Bar！希望您享受了这顿美餐。期待再次为您服务。
+感谢您选择 {{restaurantName}}！希望您享受了这顿美餐。期待再次为您服务。
 
 再次点餐：{{.MenuLink}}
 
 此邮件为系统自动发送，请勿回复。
 
-© 2026 Tokyo Sushi Bar。保留所有权利。
+© 2026 {{restaurantName}}。保留所有权利。

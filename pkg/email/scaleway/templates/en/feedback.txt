@@ -13,4 +13,4 @@ Message:
 
 You can reply directly to the customer at {{.Email}}.
 
-© 2026 Tokyo Sushi Bar. All rights reserved.
+© 2026 {{restaurantName}}. All rights reserved.

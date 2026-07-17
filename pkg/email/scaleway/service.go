@@ -11,7 +11,14 @@ import (
 	temv1alpha1 "github.com/scaleway/scaleway-sdk-go/api/tem/v1alpha1"
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	userDomain "tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/brand"
 )
+
+// brandCfg returns the restaurant identity used in subjects, template bodies
+// and Message-ID headers.
+func brandCfg() brand.Config {
+	return brand.Current()
+}
 
 // temClient is our instance for interacting with Scaleway TEM. nil when SMTP backend is active.
 var temClient *temv1alpha1.API
@@ -123,8 +130,8 @@ func dispatch(req *temv1alpha1.CreateEmailRequest) error {
 // is a synthetic Message-ID that is never sent — clients thread by shared
 // References ancestry, so the root only needs to exist as a reference target.
 func orderThreadHeaders(orderID string) []*temv1alpha1.CreateEmailRequestHeader {
-	root := fmt.Sprintf("<order-thread-%s@tokyosushibarliege.be>", orderID)
-	msgID := fmt.Sprintf("<email-%s-%d@tokyosushibarliege.be>", orderID, time.Now().UnixNano())
+	root := fmt.Sprintf("<order-thread-%s@%s>", orderID, brandCfg().Domain)
+	msgID := fmt.Sprintf("<email-%s-%d@%s>", orderID, time.Now().UnixNano(), brandCfg().Domain)
 	return []*temv1alpha1.CreateEmailRequestHeader{
 		{Key: "Message-ID", Value: msgID},
 		{Key: "In-Reply-To", Value: root},
@@ -217,10 +224,10 @@ func SendWelcomeEmail(user userDomain.User, lang, menuURL string) error {
 	}
 
 	subjects := map[string]string{
-		"en": "Welcome to Tokyo Sushi Bar",
-		"fr": "Bienvenue chez Tokyo Sushi Bar",
-		"zh": "欢迎光临 Tokyo Sushi Bar",
-		"nl": "Welkom bij Tokyo Sushi Bar",
+		"en": "Welcome to " + brandCfg().Name,
+		"fr": "Bienvenue chez " + brandCfg().Name,
+		"zh": "欢迎光临 " + brandCfg().Name,
+		"nl": "Welkom bij " + brandCfg().Name,
 	}
 
 	subject, ok := subjects[lang]
@@ -782,10 +789,10 @@ func SendReengagementEmail(user userDomain.User, lang string) error {
 	}
 
 	subjects := map[string]string{
-		"en": "We miss you at Tokyo Sushi Bar!",
-		"fr": "Vous nous manquez chez Tokyo Sushi Bar !",
-		"zh": "Tokyo Sushi Bar 想念您！",
-		"nl": "Wij missen u bij Tokyo Sushi Bar!",
+		"en": "We miss you at " + brandCfg().Name + "!",
+		"fr": "Vous nous manquez chez " + brandCfg().Name + " !",
+		"zh": brandCfg().Name + " 想念您！",
+		"nl": "Wij missen u bij " + brandCfg().Name + "!",
 	}
 
 	subject, ok := subjects[lang]
@@ -810,7 +817,7 @@ func SendFeedbackEmail(name, email, serviceType, feedbackType, message, lang str
 	newReq := *baseReq
 
 	adminEmail := os.Getenv("FEEDBACK_RECIPIENT_EMAIL")
-	adminName := "Tokyo Sushi Bar Admin"
+	adminName := brandCfg().Name + " Admin"
 	newReq.To = []*temv1alpha1.CreateEmailRequestAddress{
 		{
 			Email: adminEmail,

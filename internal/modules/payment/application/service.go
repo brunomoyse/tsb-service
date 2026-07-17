@@ -19,6 +19,7 @@ import (
 	productDomain "tsb-service/internal/modules/product/domain"
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/brand"
 	es "tsb-service/pkg/email/scaleway"
 )
 
@@ -180,7 +181,7 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 			Value:    o.TotalPrice.StringFixed(2),
 			Currency: "EUR",
 		},
-		Description: "Tokyo Sushi Bar",
+		Description: brand.Current().Name,
 		CancelURL:   cancelURL,
 		RedirectURL: redirectURL,
 		WebhookURL:  webhookURL,

@@ -8,4 +8,4 @@ Voor vragen kunt u rechtstreeks contact opnemen met het restaurant op 04 222 98 
 
 Dit is een geautomatiseerde e-mail — gelieve niet te antwoorden.
 
-© 2026 Tokyo Sushi Bar. Alle rechten voorbehouden.
+© 2026 {{restaurantName}}. Alle rechten voorbehouden.

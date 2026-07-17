@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Confirmed | Tokyo Sushi Bar</title>
+    <title>Order Confirmed | {{restaurantName}}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
@@ -11,14 +11,14 @@
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
     <!-- HEADER -->
     <tr><td style="background-color:#ffffff;padding:24px 36px;text-align:center;border-radius:12px 12px 0 0;">
-        <img src="{{.LogoURL}}" alt="Tokyo Sushi Bar" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
+        <img src="{{.LogoURL}}" alt="{{restaurantName}}" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
     </td></tr>
     <!-- RED ACCENT LINE -->
     <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
     <!-- CONTENT -->
     <tr><td style="background-color:#ffffff;padding:36px;">
         <p style="margin:0 0 16px;font-size:18px;color:#2D2D2D;font-weight:600;">Hello {{.UserName}},</p>
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Thank you for ordering at <strong>Tokyo Sushi Bar</strong>! We are pleased to inform you that your order has been confirmed by the restaurant.</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Thank you for ordering at <strong>{{restaurantName}}</strong>! We are pleased to inform you that your order has been confirmed by the restaurant.</p>
         {{if .EstimatedReadyTime}}
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">
             {{if eq .OrderType "DELIVERY"}}
@@ -100,7 +100,7 @@
     <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:0 0 12px 12px;">
         <p style="margin:0;font-size:12px;color:#6B6560;">If you did not place this order, please disregard this email.</p>
         <p style="margin:8px 0 0;font-size:12px;color:#6B6560;font-style:italic;">This is an automated email — please do not reply.</p>
-        <p style="margin:8px 0 0;font-size:12px;color:#6B6560;">&copy; 2026 Tokyo Sushi Bar. All rights reserved.</p>
+        <p style="margin:8px 0 0;font-size:12px;color:#6B6560;">&copy; 2026 {{restaurantName}}. All rights reserved.</p>
     </td></tr>
 </table>
 </td></tr>

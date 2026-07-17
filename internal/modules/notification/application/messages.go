@@ -7,6 +7,7 @@ import (
 	"time"
 
 	orderDomain "tsb-service/internal/modules/order/domain"
+	"tsb-service/pkg/brand"
 	"tsb-service/pkg/timezone"
 )
 
@@ -26,7 +27,7 @@ func GetOrderStatusNotification(status orderDomain.OrderStatus, language string,
 
 	msg, ok := texts[status]
 	if !ok {
-		return notificationText{Title: "Tokyo Sushi Bar", Body: ""}
+		return notificationText{Title: brand.Current().Name, Body: ""}
 	}
 
 	// Use pickup-specific text if available
@@ -86,7 +87,7 @@ var cancellationReasonBodyFormat = map[string]string{
 // the estimated ready time is updated.
 func GetReadyTimeUpdatedNotification(language string, estimatedReadyTime *time.Time) notificationText {
 	if estimatedReadyTime == nil {
-		return notificationText{Title: "Tokyo Sushi Bar", Body: ""}
+		return notificationText{Title: brand.Current().Name, Body: ""}
 	}
 
 	texts := readyTimeUpdatedTexts[language]

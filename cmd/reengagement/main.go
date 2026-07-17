@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	userDomain "tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/brand"
 	"tsb-service/pkg/db"
 	es "tsb-service/pkg/email/scaleway"
 	"tsb-service/pkg/logging"
@@ -25,6 +26,10 @@ func main() {
 	logFormat := cmp.Or(os.Getenv("LOG_FORMAT"), "text")
 	logging.Setup(logLevel, logFormat)
 	defer logging.Sync()
+
+	// Reload the brand config now that .env values are available (package init
+	// runs before godotenv.Load). Reengagement emails embed the brand name.
+	brand.Load()
 
 	// Connect to database
 	dbConn, err := db.ConnectDatabase()

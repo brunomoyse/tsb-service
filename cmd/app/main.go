@@ -23,23 +23,24 @@ import (
 
 	"tsb-service/internal/api/auth"
 	"tsb-service/internal/api/feedback"
-	images "tsb-service/internal/api/images"
 	"tsb-service/internal/api/graphql/resolver"
+	images "tsb-service/internal/api/images"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
+	"tsb-service/pkg/brand"
+	"tsb-service/pkg/email/scaleway"
 	"tsb-service/pkg/logging"
 	"tsb-service/pkg/pubsub"
 	"tsb-service/pkg/utils"
-	"tsb-service/pkg/email/scaleway"
 
 	couponApplication "tsb-service/internal/modules/coupon/application"
 	couponInfrastructure "tsb-service/internal/modules/coupon/infrastructure"
 	emailModule "tsb-service/internal/modules/email"
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderInfrastructure "tsb-service/internal/modules/order/infrastructure"
+	orderInterfaces "tsb-service/internal/modules/order/interfaces"
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	paymentInfrastructure "tsb-service/internal/modules/payment/infrastructure"
-	orderInterfaces "tsb-service/internal/modules/order/interfaces"
 	paymentInterfaces "tsb-service/internal/modules/payment/interfaces"
 
 	posApplication "tsb-service/internal/modules/pos/application"
@@ -57,8 +58,8 @@ import (
 	restaurantInfrastructure "tsb-service/internal/modules/restaurant/infrastructure"
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/apns"
-	"tsb-service/pkg/fcm"
 	"tsb-service/pkg/db"
+	"tsb-service/pkg/fcm"
 )
 
 func main() {
@@ -77,6 +78,14 @@ func main() {
 	}
 	logging.Setup(logLevel, logFormat)
 	defer logging.Sync()
+
+	// Reload the brand config now that .env values are available (package init
+	// runs before godotenv.Load).
+	brandCfg := brand.Load()
+	zap.L().Info("brand config loaded",
+		zap.String("name", brandCfg.Name),
+		zap.String("domain", brandCfg.Domain),
+	)
 
 	// Sentry error tracking (skipped when SENTRY_DSN is empty, e.g. local dev)
 	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
@@ -200,7 +209,7 @@ func main() {
 
 	// OIDC verifier — validates JWTs via JWKS + resolves Zitadel sub → app user UUID
 	zitadelInternalURL := os.Getenv("ZITADEL_INTERNAL_URL") // Optional: internal Docker URL for OIDC discovery
-	zitadelProjectID := os.Getenv("ZITADEL_PROJECT_ID") // used for project-specific role claim fallback
+	zitadelProjectID := os.Getenv("ZITADEL_PROJECT_ID")     // used for project-specific role claim fallback
 	oidcVerifier, err := middleware.NewOIDCVerifier(context.Background(), zitadelIssuer, zitadelInternalURL, zitadelClientID, zitadelProjectID, userService)
 	if err != nil {
 		zap.L().Error("failed to initialize OIDC verifier", zap.Error(err))
@@ -326,10 +335,10 @@ func main() {
 	})
 
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{appBaseURL, appDashboardURL, "capacitor://localhost", "http://localhost", "https://localhost"},
-		CustomSchemas:    []string{"capacitor://"},
-		AllowMethods:     []string{"HEAD", "GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept-Language"},
+		AllowOrigins:  []string{appBaseURL, appDashboardURL, "capacitor://localhost", "http://localhost", "https://localhost"},
+		CustomSchemas: []string{"capacitor://"},
+		AllowMethods:  []string{"HEAD", "GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:  []string{"Origin", "Content-Type", "Authorization", "Accept-Language"},
 		ExposeHeaders: []string{
 			"Content-Length", "Authorization", "Content-Disposition",
 			"X-Original-Width", "X-Original-Height",

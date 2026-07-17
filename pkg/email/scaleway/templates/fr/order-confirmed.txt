@@ -1,6 +1,6 @@
 Bonjour {{.UserName}},
 
-Merci d'avoir commandé chez Tokyo Sushi Bar ! Nous avons le plaisir de vous informer que votre commande a été confirmée par le restaurant.
+Merci d'avoir commandé chez {{restaurantName}} ! Nous avons le plaisir de vous informer que votre commande a été confirmée par le restaurant.
 
 {{if .EstimatedReadyTime}}
 {{if eq .OrderType "DELIVERY"}}Votre commande sera livrée le {{.EstimatedReadyTime}} (heure estimée).{{else if eq .OrderType "PICKUP"}}Votre commande sera disponible pour retrait le {{.EstimatedReadyTime}} (heure estimée).{{end}}
@@ -41,4 +41,4 @@ Si vous n'avez pas passé cette commande, veuillez ignorer cet e-mail.
 
 Cet e-mail est automatique, merci de ne pas y répondre.
 
-© 2026 Tokyo Sushi Bar. Tous droits réservés.
+© 2026 {{restaurantName}}. Tous droits réservés.

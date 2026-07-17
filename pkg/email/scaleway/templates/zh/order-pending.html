@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>订单已收到 | Tokyo Sushi Bar</title>
+    <title>订单已收到 | {{restaurantName}}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
@@ -11,14 +11,14 @@
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
     <!-- HEADER -->
     <tr><td style="background-color:#ffffff;padding:24px 36px;text-align:center;border-radius:12px 12px 0 0;">
-        <img src="{{.LogoURL}}" alt="Tokyo Sushi Bar" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
+        <img src="{{.LogoURL}}" alt="{{restaurantName}}" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
     </td></tr>
     <!-- RED ACCENT LINE -->
     <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
     <!-- CONTENT -->
     <tr><td style="background-color:#ffffff;padding:36px;">
         <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">您好 {{.UserName}}，</p>
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">感谢您在 <strong>Tokyo Sushi Bar</strong> 下单！我们已收到您的订单，目前正在等待餐厅确认。您将很快收到另一封邮件，确认您的订单以及预计的配送/取餐时间。</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">感谢您在 <strong>{{restaurantName}}</strong> 下单！我们已收到您的订单，目前正在等待餐厅确认。您将很快收到另一封邮件，确认您的订单以及预计的配送/取餐时间。</p>
         <p style="margin:0 0 12px;font-size:16px;font-weight:600;color:#2D2D2D;">订单摘要</p>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 16px;">
             <tr>
@@ -68,7 +68,7 @@
     <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:0 0 12px 12px;">
         <p style="margin:0;font-size:12px;color:#6B6560;">如果您未下此订单，请忽略此邮件。</p>
         <p style="margin:8px 0 0;font-size:12px;color:#6B6560;font-style:italic;">此邮件为系统自动发送，请勿回复。</p>
-        <p style="margin:8px 0 0;font-size:12px;color:#6B6560;">&copy; 2026 Tokyo Sushi Bar。保留所有权利。</p>
+        <p style="margin:8px 0 0;font-size:12px;color:#6B6560;">&copy; 2026 {{restaurantName}}。保留所有权利。</p>
     </td></tr>
 </table>
 </td></tr>
