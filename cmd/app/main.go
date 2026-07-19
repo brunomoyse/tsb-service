@@ -439,8 +439,12 @@ func main() {
 	// Use ReadHeaderTimeout instead of ReadTimeout, and omit WriteTimeout,
 	// because both set deadlines on the underlying net.Conn that persist after
 	// WebSocket hijack — killing long-lived subscription connections.
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 	srv := &http.Server{
-		Addr:              ":8080",
+		Addr:              ":" + port,
 		Handler:           router,
 		ReadHeaderTimeout: 15 * time.Second,
 		IdleTimeout:       60 * time.Second,
@@ -448,7 +452,7 @@ func main() {
 
 	// Graceful shutdown
 	go func() {
-		zap.L().Info("HTTP server listening", zap.String("addr", ":8080"))
+		zap.L().Info("HTTP server listening", zap.String("addr", srv.Addr))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			zap.L().Error("server error", zap.Error(err))
 			os.Exit(1)
