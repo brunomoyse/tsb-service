@@ -17,7 +17,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/nyaruka/phonenumbers v1.8.0
 	github.com/ory/dockertest/v3 v3.12.0
-	github.com/pressly/goose/v3 v3.27.1
+	github.com/pressly/goose/v3 v3.27.2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.36
 	github.com/shopspring/decimal v1.4.0
