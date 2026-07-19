@@ -3,7 +3,7 @@ module tsb-service
 go 1.26
 
 require (
-	firebase.google.com/go/v4 v4.20.0
+	firebase.google.com/go/v4 v4.21.0
 	github.com/99designs/gqlgen v0.17.94
 	github.com/coder/websocket v1.8.15
 	github.com/getsentry/sentry-go v0.48.0
