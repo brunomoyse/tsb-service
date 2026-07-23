@@ -7,7 +7,7 @@ require (
 	github.com/99designs/gqlgen v0.17.94
 	github.com/coder/websocket v1.8.15
 	github.com/getsentry/sentry-go v0.48.0
-	github.com/getsentry/sentry-go/gin v0.47.0
+	github.com/getsentry/sentry-go/gin v0.48.0
 	github.com/gin-contrib/cors v1.7.7
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
