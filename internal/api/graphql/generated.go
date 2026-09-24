@@ -17744,10 +17744,6 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
-func (ec *executionContext) marshalNAddress2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAddress(ctx context.Context, sel ast.SelectionSet, v model.Address) graphql.Marshaler {
-	return ec._Address(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNAddress2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAddress(ctx context.Context, sel ast.SelectionSet, v *model.Address) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -17827,8 +17823,7 @@ func (ec *executionContext) marshalNChoiceTranslation2ᚖtsbᚑserviceᚋinterna
 }
 
 func (ec *executionContext) unmarshalNChoiceTranslationInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐChoiceTranslationInputᚄ(ctx context.Context, v any) ([]*model.ChoiceTranslationInput, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*model.ChoiceTranslationInput, len(vSlice))
 	for i := range vSlice {
@@ -17844,10 +17839,6 @@ func (ec *executionContext) unmarshalNChoiceTranslationInput2ᚕᚖtsbᚑservice
 func (ec *executionContext) unmarshalNChoiceTranslationInput2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐChoiceTranslationInput(ctx context.Context, v any) (*model.ChoiceTranslationInput, error) {
 	res, err := ec.unmarshalInputChoiceTranslationInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNCoupon2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCoupon(ctx context.Context, sel ast.SelectionSet, v model.Coupon) graphql.Marshaler {
-	return ec._Coupon(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNCoupon2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCouponᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Coupon) graphql.Marshaler {
@@ -17886,10 +17877,6 @@ func (ec *executionContext) marshalNCouponStatus2tsbᚑserviceᚋinternalᚋapi�
 	return v
 }
 
-func (ec *executionContext) marshalNCouponValidation2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCouponValidation(ctx context.Context, sel ast.SelectionSet, v model.CouponValidation) graphql.Marshaler {
-	return ec._CouponValidation(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNCouponValidation2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCouponValidation(ctx context.Context, sel ast.SelectionSet, v *model.CouponValidation) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -17911,8 +17898,7 @@ func (ec *executionContext) unmarshalNCreateOrderInput2tsbᚑserviceᚋinternal�
 }
 
 func (ec *executionContext) unmarshalNCreateOrderItemInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCreateOrderItemInputᚄ(ctx context.Context, v any) ([]*model.CreateOrderItemInput, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*model.CreateOrderItemInput, len(vSlice))
 	for i := range vSlice {
@@ -17974,10 +17960,6 @@ func (ec *executionContext) marshalNCustomerStats2ᚖtsbᚑserviceᚋinternalᚋ
 		return graphql.Null
 	}
 	return ec._CustomerStats(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNCustomerStatsResponse2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCustomerStatsResponse(ctx context.Context, sel ast.SelectionSet, v model.CustomerStatsResponse) graphql.Marshaler {
-	return ec._CustomerStatsResponse(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNCustomerStatsResponse2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐCustomerStatsResponse(ctx context.Context, sel ast.SelectionSet, v *model.CustomerStatsResponse) graphql.Marshaler {
@@ -18091,10 +18073,6 @@ func (ec *executionContext) unmarshalNOpeningHoursInput2tsbᚑserviceᚋinternal
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNOrder2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrder(ctx context.Context, sel ast.SelectionSet, v model.Order) graphql.Marshaler {
-	return ec._Order(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNOrder2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Order) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -18124,10 +18102,6 @@ func (ec *executionContext) marshalNOrder2ᚖtsbᚑserviceᚋinternalᚋapiᚋgr
 func (ec *executionContext) unmarshalNOrderExtraInput2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderExtraInput(ctx context.Context, v any) (*model.OrderExtraInput, error) {
 	res, err := ec.unmarshalInputOrderExtraInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNOrderHistoryResponse2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderHistoryResponse(ctx context.Context, sel ast.SelectionSet, v model.OrderHistoryResponse) graphql.Marshaler {
-	return ec._OrderHistoryResponse(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNOrderHistoryResponse2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderHistoryResponse(ctx context.Context, sel ast.SelectionSet, v *model.OrderHistoryResponse) graphql.Marshaler {
@@ -18255,10 +18229,6 @@ func (ec *executionContext) marshalNOrderTypeEnum2tsbᚑserviceᚋinternalᚋapi
 	return v
 }
 
-func (ec *executionContext) marshalNPayment2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐPayment(ctx context.Context, sel ast.SelectionSet, v model.Payment) graphql.Marshaler {
-	return ec._Payment(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNPayment2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐPayment(ctx context.Context, sel ast.SelectionSet, v *model.Payment) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -18267,10 +18237,6 @@ func (ec *executionContext) marshalNPayment2ᚖtsbᚑserviceᚋinternalᚋapiᚋ
 		return graphql.Null
 	}
 	return ec._Payment(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNProduct2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProduct(ctx context.Context, sel ast.SelectionSet, v model.Product) graphql.Marshaler {
-	return ec._Product(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNProduct2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Product) graphql.Marshaler {
@@ -18299,10 +18265,6 @@ func (ec *executionContext) marshalNProduct2ᚖtsbᚑserviceᚋinternalᚋapiᚋ
 	return ec._Product(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNProductCategory2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductCategory(ctx context.Context, sel ast.SelectionSet, v model.ProductCategory) graphql.Marshaler {
-	return ec._ProductCategory(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNProductCategory2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductCategoryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ProductCategory) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -18327,10 +18289,6 @@ func (ec *executionContext) marshalNProductCategory2ᚖtsbᚑserviceᚋinternal�
 		return graphql.Null
 	}
 	return ec._ProductCategory(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNProductChoice2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoice(ctx context.Context, sel ast.SelectionSet, v model.ProductChoice) graphql.Marshaler {
-	return ec._ProductChoice(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNProductChoice2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ProductChoice) graphql.Marshaler {
@@ -18359,10 +18317,6 @@ func (ec *executionContext) marshalNProductChoice2ᚖtsbᚑserviceᚋinternalᚋ
 	return ec._ProductChoice(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNProductChoiceGroup2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceGroup(ctx context.Context, sel ast.SelectionSet, v model.ProductChoiceGroup) graphql.Marshaler {
-	return ec._ProductChoiceGroup(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNProductChoiceGroup2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductChoiceGroupᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ProductChoiceGroup) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -18389,10 +18343,6 @@ func (ec *executionContext) marshalNProductChoiceGroup2ᚖtsbᚑserviceᚋintern
 	return ec._ProductChoiceGroup(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNRestaurantConfig2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐRestaurantConfig(ctx context.Context, sel ast.SelectionSet, v model.RestaurantConfig) graphql.Marshaler {
-	return ec._RestaurantConfig(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNRestaurantConfig2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐRestaurantConfig(ctx context.Context, sel ast.SelectionSet, v *model.RestaurantConfig) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -18401,10 +18351,6 @@ func (ec *executionContext) marshalNRestaurantConfig2ᚖtsbᚑserviceᚋinternal
 		return graphql.Null
 	}
 	return ec._RestaurantConfig(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNScheduleOverride2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐScheduleOverride(ctx context.Context, sel ast.SelectionSet, v model.ScheduleOverride) graphql.Marshaler {
-	return ec._ScheduleOverride(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNScheduleOverride2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐScheduleOverrideᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ScheduleOverride) graphql.Marshaler {
@@ -18507,8 +18453,7 @@ func (ec *executionContext) marshalNTranslation2ᚖtsbᚑserviceᚋinternalᚋap
 }
 
 func (ec *executionContext) unmarshalNTranslationInput2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTranslationInputᚄ(ctx context.Context, v any) ([]*model.TranslationInput, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*model.TranslationInput, len(vSlice))
 	for i := range vSlice {
@@ -18554,10 +18499,6 @@ func (ec *executionContext) unmarshalNUpdateProductInput2tsbᚑserviceᚋinterna
 func (ec *executionContext) unmarshalNUpdateUserInput2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUpdateUserInput(ctx context.Context, v any) (model.UpdateUserInput, error) {
 	res, err := ec.unmarshalInputUpdateUserInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNUser2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v model.User) graphql.Marshaler {
-	return ec._User(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNUser2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v *model.User) graphql.Marshaler {
@@ -18607,8 +18548,7 @@ func (ec *executionContext) marshalN__DirectiveLocation2string(ctx context.Conte
 }
 
 func (ec *executionContext) unmarshalN__DirectiveLocation2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]string, len(vSlice))
 	for i := range vSlice {
@@ -18752,8 +18692,7 @@ func (ec *executionContext) unmarshalOChoiceTranslationInput2ᚕᚖtsbᚑservice
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*model.ChoiceTranslationInput, len(vSlice))
 	for i := range vSlice {
@@ -18770,8 +18709,7 @@ func (ec *executionContext) unmarshalOCreateOrderItemSelectionInput2ᚕᚖtsbᚑ
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*model.CreateOrderItemSelectionInput, len(vSlice))
 	for i := range vSlice {
@@ -18938,8 +18876,7 @@ func (ec *executionContext) unmarshalOOrderExtraInput2ᚕᚖtsbᚑserviceᚋinte
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*model.OrderExtraInput, len(vSlice))
 	for i := range vSlice {
@@ -19013,8 +18950,7 @@ func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]string, len(vSlice))
 	for i := range vSlice {
@@ -19067,8 +19003,7 @@ func (ec *executionContext) unmarshalOTranslationInput2ᚕᚖtsbᚑserviceᚋint
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*model.TranslationInput, len(vSlice))
 	for i := range vSlice {

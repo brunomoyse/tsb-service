@@ -37,7 +37,9 @@ func NewClient() (*Client, error) {
 // Returns ErrTokenInvalid if FCM reports the registration token as invalid/unregistered.
 func (c *Client) SendAlert(registrationToken, title, body string, data map[string]string) error {
 	message := &messaging.Message{
-		Token: registrationToken,
+		// Devices register FCM registration tokens, not Firebase Installation IDs,
+		// so Token (not Fid) is still the right target field.
+		Token: registrationToken, //nolint:staticcheck // SA1019: see comment above
 		Notification: &messaging.Notification{
 			Title: title,
 			Body:  body,
@@ -70,7 +72,7 @@ func (c *Client) SendAlert(registrationToken, title, body string, data map[strin
 // Returns ErrTokenInvalid if FCM reports the registration token as invalid.
 func (c *Client) SendDataMessage(registrationToken string, data map[string]string) error {
 	message := &messaging.Message{
-		Token: registrationToken,
+		Token: registrationToken, //nolint:staticcheck // SA1019: registration token, not an FID (see SendAlert)
 		Data:  data,
 		Android: &messaging.AndroidConfig{
 			Priority: "high",

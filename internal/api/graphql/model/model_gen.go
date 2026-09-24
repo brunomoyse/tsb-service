@@ -496,7 +496,7 @@ func (e *CouponStatus) UnmarshalGQL(v any) error {
 }
 
 func (e CouponStatus) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *CouponStatus) UnmarshalJSON(b []byte) error {
@@ -551,7 +551,7 @@ func (e *OrderTypeEnum) UnmarshalGQL(v any) error {
 }
 
 func (e OrderTypeEnum) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *OrderTypeEnum) UnmarshalJSON(b []byte) error {

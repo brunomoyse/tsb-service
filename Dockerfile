@@ -1,5 +1,5 @@
 # Step 1: Use the official Golang image to create a build stage
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine3.23 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine3.24 AS builder
 
 # Step 2: Set build arguments for cross-compilation
 ARG TARGETOS
