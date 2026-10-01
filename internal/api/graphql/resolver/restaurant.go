@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"time"
 	graphql1 "tsb-service/internal/api/graphql"
+	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/model"
 )
 
@@ -58,7 +59,7 @@ func (r *mutationResolver) UpdateOrderingHours(ctx context.Context, hours model.
 // UpdatePreparationMinutes is the resolver for the updatePreparationMinutes field.
 func (r *mutationResolver) UpdatePreparationMinutes(ctx context.Context, minutes int) (*model.RestaurantConfig, error) {
 	if minutes < 1 || minutes > 240 {
-		return nil, fmt.Errorf("preparation minutes must be between 1 and 240")
+		return nil, apperr.New(apperr.CodeUserError, "preparation minutes must be between 1 and 240")
 	}
 	config, err := r.RestaurantService.UpdatePreparationMinutes(ctx, minutes)
 	if err != nil {
@@ -72,7 +73,7 @@ func (r *mutationResolver) UpdatePreparationMinutes(ctx context.Context, minutes
 // UpsertScheduleOverride is the resolver for the upsertScheduleOverride field.
 func (r *mutationResolver) UpsertScheduleOverride(ctx context.Context, input model.ScheduleOverrideInput) (*model.ScheduleOverride, error) {
 	if !input.Closed && input.Schedule == nil {
-		return nil, fmt.Errorf("schedule is required when override is not closed")
+		return nil, apperr.New(apperr.CodeUserError, "schedule is required when override is not closed")
 	}
 
 	var scheduleJSON json.RawMessage

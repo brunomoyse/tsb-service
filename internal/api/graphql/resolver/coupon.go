@@ -61,7 +61,7 @@ func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateC
 		// Caller chose the code: a collision is a user error.
 		if err := r.CouponService.CreateCoupon(ctx, coupon); err != nil {
 			if isUniqueViolation(err) {
-				return nil, fmt.Errorf("coupon code already exists")
+				return nil, apperr.New(apperr.CodeUserError, "coupon code already exists")
 			}
 			return nil, fmt.Errorf("failed to create coupon: %w", err)
 		}
@@ -144,7 +144,7 @@ func (r *mutationResolver) UpdateCoupon(ctx context.Context, id uuid.UUID, input
 
 	if err := r.CouponService.UpdateCoupon(ctx, coupon); err != nil {
 		if isUniqueViolation(err) {
-			return nil, fmt.Errorf("coupon code already exists")
+			return nil, apperr.New(apperr.CodeUserError, "coupon code already exists")
 		}
 		return nil, fmt.Errorf("failed to update coupon: %w", err)
 	}

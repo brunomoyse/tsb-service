@@ -660,7 +660,7 @@ func (r *mutationResolver) RegisterDeviceToken(ctx context.Context, deviceToken 
 	}
 
 	if platform != "ios" && platform != "android" {
-		return false, fmt.Errorf("platform must be 'ios' or 'android'")
+		return false, apperr.New(apperr.CodeUserError, "platform must be 'ios' or 'android'")
 	}
 
 	role := "user"
@@ -704,7 +704,7 @@ func (r *mutationResolver) RegisterLiveActivityToken(ctx context.Context, orderI
 		return false, fmt.Errorf("failed to load order: %w", err)
 	}
 	if order == nil || order.UserID != uid {
-		return false, fmt.Errorf("order not found")
+		return false, apperr.New(apperr.CodeNotFound, "order not found")
 	}
 
 	if err := r.NotificationService.RegisterLiveActivityToken(ctx, orderID, token); err != nil {

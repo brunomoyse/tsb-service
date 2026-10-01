@@ -194,12 +194,20 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 	}
 }
 
+// internalErrorMessage is what a client sees for a server fault. The real text (SQL errors, provider
+// responses, wrapped causes) stays in the logs and in Sentry only.
+const internalErrorMessage = "Internal server error"
+
 // ErrorPresenter turns a resolver error into the GraphQL response error and logs it.
 //
 // It copies the stable `extensions.code` (and parameters) of apperr errors into the response, logs
 // every GraphQL error to zap (HTTP 200 with `errors` in the body leaves no trace in the access log
 // middleware otherwise) and forwards unexpected ones to Sentry. User-input / auth errors carry a
 // known code (apperr.IsExpected) and are demoted to a warn-level log, not Sentry events.
+//
+// A server fault (an unexpected code, or no code at all) reaches the client with the generic
+// internalErrorMessage only: its own text may hold SQL or provider details. The code and any
+// parameters are kept so clients can still map it.
 func ErrorPresenter(ctx context.Context, e error) *gqlerror.Error {
 	err := gqlgraphql.DefaultErrorPresenter(ctx, e)
 
@@ -253,6 +261,7 @@ func ErrorPresenter(ctx context.Context, e error) *gqlerror.Error {
 		// SkipSentry: this path captures the exception itself below with
 		// richer scope, so the zap→Sentry bridge must not also fire.
 		logger.Error("graphql resolver error", append(fields, zap.String("query", query), zap.Error(e), logging.SkipSentry)...)
+		err.Message = internalErrorMessage
 		if hub := sentry.GetHubFromContext(ctx); hub != nil {
 			hub.WithScope(func(scope *sentry.Scope) {
 				scope.SetTag("graphql.operation", opName)

@@ -84,10 +84,12 @@ func TestCreateOrderErrorCodes(t *testing.T) {
 	})
 
 	t.Run("choice that does not exist is an invalid selection", func(t *testing.T) {
-		_, ext := firstError(t, createOrderInput("PICKUP", []map[string]any{
+		msg, ext := firstError(t, createOrderInput("PICKUP", []map[string]any{
 			{"productId": salmon, "quantity": 1, "choiceId": uuid.New().String()},
 		}, nil))
 		assert.Equal(t, "SELECTION_INVALID", ext["code"])
+		assert.NotContains(t, msg, "sql", "the driver error text must not reach the client")
+		assert.NotContains(t, msg, "no rows")
 	})
 
 	t.Run("delivery below the minimum", func(t *testing.T) {

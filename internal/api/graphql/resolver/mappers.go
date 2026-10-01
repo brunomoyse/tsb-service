@@ -33,13 +33,13 @@ import (
 // files on regeneration.
 func validateDiscount(dt couponDomain.DiscountType, dv decimal.Decimal) error {
 	if dt != couponDomain.DiscountTypePercentage && dt != couponDomain.DiscountTypeFixed {
-		return fmt.Errorf("invalid discount type: must be 'percentage' or 'fixed'")
+		return apperr.New(apperr.CodeUserError, "invalid discount type: must be 'percentage' or 'fixed'")
 	}
 	if dv.LessThanOrEqual(decimal.Zero) {
-		return fmt.Errorf("discount value must be positive")
+		return apperr.New(apperr.CodeUserError, "discount value must be positive")
 	}
 	if dt == couponDomain.DiscountTypePercentage && dv.GreaterThan(decimal.NewFromInt(100)) {
-		return fmt.Errorf("percentage discount cannot exceed 100")
+		return apperr.New(apperr.CodeUserError, "percentage discount cannot exceed 100")
 	}
 	return nil
 }
