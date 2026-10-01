@@ -90,6 +90,10 @@ const (
 	CodeCouponExhausted Code = "COUPON_EXHAUSTED"
 	// CodeCouponReserveFailed: server fault while reserving the coupon.
 	CodeCouponReserveFailed Code = "COUPON_RESERVE_FAILED"
+	// CodeCouponCheckFailed: server fault while checking the coupon (database error, ...). The code
+	// is NOT known to be invalid: clients should offer a retry, not "invalid coupon". Not expected,
+	// so it reaches Sentry. Returned as a GraphQL error by validateCoupon, quoteOrder and createOrder.
+	CodeCouponCheckFailed Code = "COUPON_CHECK_FAILED"
 )
 
 // Payment and persistence (createOrder).

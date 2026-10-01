@@ -49,6 +49,17 @@ func (e *MinOrderNotMetError) Error() string {
 	return fmt.Sprintf("minimum order amount of %s not met", e.Required.String())
 }
 
+// CheckFailedError signals that the coupon could not be checked because of an infrastructure
+// failure (database error, ...). It is NOT a refusal: the code may well be valid, so callers must
+// report a server fault instead of "invalid coupon", and must never show its text to the customer.
+type CheckFailedError struct {
+	Err error
+}
+
+func (e *CheckFailedError) Error() string { return fmt.Sprintf("coupon check failed: %v", e.Err) }
+
+func (e *CheckFailedError) Unwrap() error { return e.Err }
+
 // MaxFailedCouponAttemptsPerDay caps how many failed coupon validations a single
 // user may make per calendar day, to block brute-force code enumeration.
 const MaxFailedCouponAttemptsPerDay = 5

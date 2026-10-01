@@ -7,6 +7,7 @@ package resolver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	graphql1 "tsb-service/internal/api/graphql"
@@ -180,10 +181,19 @@ func (r *queryResolver) ValidateCoupon(ctx context.Context, code string, orderAm
 
 	_, discount, err := r.CouponService.ValidateCoupon(ctx, code, amount, userUUID)
 	if err != nil {
-		// Every error the service returns here carries a user-safe message:
-		// the generic invalid-coupon text, the min-order message, or the
-		// daily-limit message — so surfacing err.Error() directly is safe.
-		errMsg := err.Error()
+		// An infrastructure failure is a server fault, not a refusal: return it as a GraphQL error
+		// (Sentry; the presenter hides the raw text from the client).
+		if checkErr, ok := couponCheckFailure(err); ok {
+			return nil, checkErr
+		}
+		// Only refusals reach this point. The min-order and daily-limit messages are user-safe;
+		// any other refusal gets the fixed generic text, so no raw error text can ever leak here.
+		errMsg := "invalid or expired coupon"
+		var minErr *couponDomain.MinOrderNotMetError
+		var limitErr *couponDomain.DailyAttemptLimitError
+		if errors.As(err, &minErr) || errors.As(err, &limitErr) {
+			errMsg = err.Error()
+		}
 		errCode := string(couponErrorCode(err))
 		return &model.CouponValidation{
 			Valid:          false,

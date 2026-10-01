@@ -642,9 +642,11 @@ func isOrderUpdateTooLate(now time.Time, estimatedReadyTime *time.Time) bool {
 	return now.Sub(*estimatedReadyTime) > lateNotificationThreshold
 }
 
-// couponErrorCode maps what CouponService.ValidateCoupon returns to the stable code the clients
-// translate. Only the two actionable failures are told apart; everything else stays the generic
-// COUPON_INVALID so an enumeration attempt learns nothing about why a code was refused.
+// couponErrorCode maps a REFUSAL returned by CouponService.ValidateCoupon to the stable code the
+// clients translate. Only the two actionable refusals are told apart; every other refusal stays the
+// generic COUPON_INVALID so an enumeration attempt learns nothing about why a code was refused.
+// It must only be given refusals: infrastructure failures (couponDomain.CheckFailedError) are server
+// faults and callers branch on couponCheckFailure before reaching it.
 func couponErrorCode(err error) apperr.Code {
 	var minErr *couponDomain.MinOrderNotMetError
 	var limitErr *couponDomain.DailyAttemptLimitError
@@ -656,4 +658,15 @@ func couponErrorCode(err error) apperr.Code {
 	default:
 		return apperr.CodeCouponInvalid
 	}
+}
+
+// couponCheckFailure returns the server-fault error to report when ValidateCoupon failed because
+// the check itself could not run (database down, ...), and false for an ordinary refusal. The text
+// of the cause stays in the logs / Sentry: the presenter hides it from the client.
+func couponCheckFailure(err error) (*apperr.Error, bool) {
+	var checkErr *couponDomain.CheckFailedError
+	if !errors.As(err, &checkErr) {
+		return nil, false
+	}
+	return apperr.Newf(apperr.CodeCouponCheckFailed, "coupon check failed: %w", checkErr.Err), true
 }

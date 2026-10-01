@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -51,13 +52,18 @@ func (s *couponService) ValidateCoupon(ctx context.Context, code string, orderAm
 
 	coupon, err := s.repo.FindByCode(ctx, code)
 	if err != nil {
+		// Only a missing code is a refusal. Any other error (connection lost, timeout, ...) says
+		// nothing about the code, so it is a server fault and must not burn a daily attempt.
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, decimal.Zero, &domain.CheckFailedError{Err: err}
+		}
 		s.recordFailedAttempt(ctx, userID)
 		return nil, decimal.Zero, fmt.Errorf("invalid or expired coupon")
 	}
 
 	userUsageCount, err := s.repo.GetUserUsageCount(ctx, coupon.ID, userID)
 	if err != nil {
-		return nil, decimal.Zero, fmt.Errorf("failed to check user usage: %w", err)
+		return nil, decimal.Zero, &domain.CheckFailedError{Err: fmt.Errorf("failed to check user usage: %w", err)}
 	}
 
 	if err := coupon.Validate(orderAmount, userUsageCount); err != nil {

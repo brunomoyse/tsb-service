@@ -598,6 +598,11 @@ func (p *orderPricer) priceCoupon(ctx context.Context, res *pricingResult, in pr
 
 	coupon, discount, err := p.coupons.ValidateCoupon(ctx, code, orderAmount, *in.UserID)
 	if err != nil {
+		// A failure to run the check is ours, not the customer's: surface it as a server fault
+		// (createOrder / quoteOrder return it as a GraphQL error), never as "invalid coupon".
+		if checkErr, ok := couponCheckFailure(err); ok {
+			return checkErr
+		}
 		appErr := apperr.Newf(couponErrorCode(err), "invalid coupon: %w", err)
 		var minimum *string
 		var minErr *couponDomain.MinOrderNotMetError

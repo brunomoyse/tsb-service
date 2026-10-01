@@ -64,6 +64,7 @@ func (f fakeAddresses) Resolve(_ context.Context, placeID, _ string) (*addressDo
 // percentage of the amount it is asked about (capped at that amount), with an optional minimum.
 type fakeCoupons struct {
 	calls   int
+	failure error // returned as-is by every ValidateCoupon call, to simulate an outage
 	coupons map[string]fakeCoupon
 }
 
@@ -76,6 +77,9 @@ type fakeCoupon struct {
 
 func (f *fakeCoupons) ValidateCoupon(_ context.Context, code string, amount decimal.Decimal, _ uuid.UUID) (*couponDomain.Coupon, decimal.Decimal, error) {
 	f.calls++
+	if f.failure != nil {
+		return nil, decimal.Zero, f.failure
+	}
 	c, ok := f.coupons[code]
 	if !ok {
 		return nil, decimal.Zero, fmt.Errorf("invalid or expired coupon")
@@ -504,6 +508,26 @@ func TestPricing_CouponRefusals(t *testing.T) {
 	wantCodes(t, active.Issues, apperr.CodeCouponAlreadyActive)
 	if active.Coupon.Valid {
 		t.Error("a coupon blocked by another open order is not valid")
+	}
+}
+
+// A database failure while checking the coupon is OUR fault: it must come back as a server error
+// (COUPON_CHECK_FAILED), not as a "this coupon is invalid" issue the customer would act on.
+func TestPricing_CouponInfrastructureFailureIsAServerFault(t *testing.T) {
+	f := newPricingFixture(t)
+	f.coupons.failure = &couponDomain.CheckFailedError{Err: errors.New("pq: connection refused")}
+	res, err := f.pricer().price(context.Background(), pricingInput{
+		OrderType: orderDomain.OrderTypePickUp, UserID: &f.user, CouponCode: strp("FIVE"), Items: []pricingItem{item(salmonID, 1)},
+	})
+	if err == nil {
+		t.Fatalf("expected a server error, got result %+v", res)
+	}
+	appErr, ok := apperr.From(err)
+	if !ok || appErr.Code != apperr.CodeCouponCheckFailed {
+		t.Fatalf("err = %v, want code COUPON_CHECK_FAILED", err)
+	}
+	if apperr.IsExpected(appErr.Code) {
+		t.Error("COUPON_CHECK_FAILED must not be an expected code: it has to reach Sentry")
 	}
 }
 

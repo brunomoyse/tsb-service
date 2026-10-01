@@ -64,7 +64,7 @@ func TestIsExpected(t *testing.T) {
 	}
 	// Ours: reported.
 	for _, code := range []apperr.Code{
-		apperr.CodePaymentFailed, apperr.CodeOrderCreateFailed, apperr.CodeCouponReserveFailed,
+		apperr.CodePaymentFailed, apperr.CodeOrderCreateFailed, apperr.CodeCouponReserveFailed, apperr.CodeCouponCheckFailed,
 		apperr.CodeAddressUnresolvable, apperr.Code("SOMETHING_NEW"),
 	} {
 		assert.False(t, apperr.IsExpected(code), "%s should be reported", code)
