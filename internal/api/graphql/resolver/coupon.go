@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 	graphql1 "tsb-service/internal/api/graphql"
+	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/model"
 	couponDomain "tsb-service/internal/modules/coupon/domain"
 	"tsb-service/pkg/utils"
@@ -156,7 +157,7 @@ func (r *mutationResolver) UpdateCoupon(ctx context.Context, id uuid.UUID, input
 func (r *queryResolver) ValidateCoupon(ctx context.Context, code string, orderAmount string) (*model.CouponValidation, error) {
 	amount, err := decimal.NewFromString(orderAmount)
 	if err != nil {
-		return nil, fmt.Errorf("invalid order amount: %w", err)
+		return nil, apperr.Newf(apperr.CodeInvalidAmount, "invalid order amount: %w", err)
 	}
 
 	userID := utils.GetUserID(ctx)
@@ -168,10 +169,12 @@ func (r *queryResolver) ValidateCoupon(ctx context.Context, code string, orderAm
 	// Throttle per-user to block brute-force code enumeration.
 	if r.CouponValidateLimiter != nil && !r.CouponValidateLimiter.AllowKey(userID) {
 		errMsg := "too many attempts, please try again in a minute"
+		errCode := string(apperr.CodeCouponRateLimited)
 		return &model.CouponValidation{
 			Valid:          false,
 			DiscountAmount: "0",
 			ErrorMessage:   &errMsg,
+			ErrorCode:      &errCode,
 		}, nil
 	}
 
@@ -181,10 +184,12 @@ func (r *queryResolver) ValidateCoupon(ctx context.Context, code string, orderAm
 		// the generic invalid-coupon text, the min-order message, or the
 		// daily-limit message — so surfacing err.Error() directly is safe.
 		errMsg := err.Error()
+		errCode := string(couponErrorCode(err))
 		return &model.CouponValidation{
 			Valid:          false,
 			DiscountAmount: "0",
 			ErrorMessage:   &errMsg,
+			ErrorCode:      &errCode,
 		}, nil
 	}
 

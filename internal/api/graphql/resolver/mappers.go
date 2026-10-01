@@ -10,6 +10,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/model"
 	addressDomain "tsb-service/internal/modules/address/domain"
 	couponDomain "tsb-service/internal/modules/coupon/domain"
@@ -476,10 +477,16 @@ func derefFloatOrZero(f *float64) float64 {
 	return 0
 }
 
+// slotError is a ready-time / opening-hours rejection: its own SLOT_* (or ORDERING_CLOSED_TODAY)
+// code, tied to the preferredReadyTime input field.
+func slotError(code apperr.Code, message string) error {
+	return apperr.New(code, message).With("field", "preferredReadyTime")
+}
+
 func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.RestaurantConfig, overrides map[string]*restaurantDomain.ScheduleOverride, now time.Time, isOpenNow bool) error {
 	if preferred == nil {
 		if !isOpenNow {
-			return fmt.Errorf("fixed time is required while the restaurant is closed")
+			return slotError(apperr.CodeSlotRequired, "fixed time is required while the restaurant is closed")
 		}
 		return nil
 	}
@@ -488,16 +495,16 @@ func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.R
 	slot := timezone.In(*preferred)
 
 	if slot.Year() != nowLocal.Year() || slot.Month() != nowLocal.Month() || slot.Day() != nowLocal.Day() {
-		return fmt.Errorf("preferred ready time must be on the same day")
+		return slotError(apperr.CodeSlotNotToday, "preferred ready time must be on the same day")
 	}
 
 	prepBuffer := max(time.Duration(config.PreparationMinutes)*time.Minute, 15*time.Minute)
 	if slot.Before(nowLocal.Add(prepBuffer)) {
-		return fmt.Errorf("preferred ready time is no longer available — it is within the minimum preparation window")
+		return slotError(apperr.CodeSlotTooSoon, "preferred ready time is no longer available — it is within the minimum preparation window")
 	}
 
 	if slot.Minute()%15 != 0 || slot.Second() != 0 || slot.Nanosecond() != 0 {
-		return fmt.Errorf("preferred ready time must be aligned to 15-minute slots")
+		return slotError(apperr.CodeSlotMisaligned, "preferred ready time must be aligned to 15-minute slots")
 	}
 
 	// Use ordering hours if set, otherwise fall back to opening hours.
@@ -506,12 +513,12 @@ func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.R
 	// so here we just need the resolved schedule for slot containment.
 	schedule := resolveSchedule(config, overrides, now)
 	if schedule == nil {
-		return fmt.Errorf("ordering is closed today")
+		return slotError(apperr.CodeOrderingClosedToday, "ordering is closed today")
 	}
 
 	slotMins := slot.Hour()*60 + slot.Minute()
 	if !isSlotInAllowedInterval(slotMins, schedule) {
-		return fmt.Errorf("preferred ready time is outside allowed opening slots")
+		return slotError(apperr.CodeSlotOutsideHours, "preferred ready time is outside allowed opening slots")
 	}
 
 	return nil
@@ -633,4 +640,20 @@ func isOrderUpdateTooLate(now time.Time, estimatedReadyTime *time.Time) bool {
 		return false
 	}
 	return now.Sub(*estimatedReadyTime) > lateNotificationThreshold
+}
+
+// couponErrorCode maps what CouponService.ValidateCoupon returns to the stable code the clients
+// translate. Only the two actionable failures are told apart; everything else stays the generic
+// COUPON_INVALID so an enumeration attempt learns nothing about why a code was refused.
+func couponErrorCode(err error) apperr.Code {
+	var minErr *couponDomain.MinOrderNotMetError
+	var limitErr *couponDomain.DailyAttemptLimitError
+	switch {
+	case errors.As(err, &minErr):
+		return apperr.CodeCouponMinOrderNotMet
+	case errors.As(err, &limitErr):
+		return apperr.CodeCouponRateLimited
+	default:
+		return apperr.CodeCouponInvalid
+	}
 }

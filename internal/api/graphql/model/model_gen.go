@@ -61,9 +61,12 @@ type Coupon struct {
 }
 
 type CouponValidation struct {
-	Valid          bool    `json:"valid"`
-	DiscountAmount string  `json:"discountAmount"`
-	ErrorMessage   *string `json:"errorMessage,omitempty"`
+	Valid          bool   `json:"valid"`
+	DiscountAmount string `json:"discountAmount"`
+	// English message, for logs and old clients: show errorCode translated instead.
+	ErrorMessage *string `json:"errorMessage,omitempty"`
+	// Stable code when valid is false: COUPON_INVALID, COUPON_MIN_ORDER_NOT_MET or COUPON_RATE_LIMITED.
+	ErrorCode *string `json:"errorCode,omitempty"`
 }
 
 type CreateCouponInput struct {

@@ -13,6 +13,7 @@ import (
 	"time"
 	"tsb-service/internal/api/auth"
 	graphql1 "tsb-service/internal/api/graphql"
+	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/model"
 	addressDomain "tsb-service/internal/modules/address/domain"
 	notificationApplication "tsb-service/internal/modules/notification/application"
@@ -70,17 +71,14 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			return nil, fmt.Errorf("failed to load restaurant config: %w", err)
 		}
 		if !config.OrderingEnabled {
-			return nil, fmt.Errorf("ordering is currently unavailable")
+			return nil, apperr.New(apperr.CodeOrderingUnavailable, "ordering is currently unavailable")
 		}
 
 		now := time.Now()
 		isOpenNow := config.IsOrderingCurrentlyOpen(now, overrides)
 		if err := validatePreferredReadyTime(input.PreferredReadyTime, config, overrides, now, isOpenNow); err != nil {
-			return nil, &gqlerror.Error{
-				Message:    err.Error(),
-				Path:       graphql.GetPath(ctx),
-				Extensions: map[string]any{"code": "USER_ERROR", "field": "preferredReadyTime"},
-			}
+			// Already an apperr with its SLOT_* / ORDERING_CLOSED_TODAY code and the field.
+			return nil, err
 		}
 
 		slotTime := now
@@ -93,10 +91,10 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	// 2) Fetch products and build price map
 	prodCount := len(input.Items)
 	if prodCount == 0 {
-		return nil, fmt.Errorf("order must contain at least one item")
+		return nil, apperr.New(apperr.CodeOrderEmpty, "order must contain at least one item")
 	}
 	if prodCount > 50 {
-		return nil, fmt.Errorf("order cannot contain more than 50 different items")
+		return nil, apperr.New(apperr.CodeOrderTooManyItems, "order cannot contain more than 50 different items")
 	}
 	ids := make([]string, prodCount)
 	for i, op := range input.Items {
@@ -125,7 +123,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	if !allowLunchOnly {
 		for _, p := range products {
 			if p.IsLunchOnly {
-				return nil, fmt.Errorf("product %q is only available for a weekday lunch slot", productLabel(p.ID))
+				return nil, apperr.Newf(apperr.CodeLunchSlotRequired, "product %q is only available for a weekday lunch slot", productLabel(p.ID)).With("productId", p.ID.String())
 			}
 		}
 	}
@@ -178,11 +176,11 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		pid := op.ProductID
 		basePrice, ok := priceMap[pid]
 		if !ok {
-			return nil, fmt.Errorf("product %s not found", productLabel(pid))
+			return nil, apperr.Newf(apperr.CodeProductNotFound, "product %s not found", productLabel(pid)).With("productId", pid.String())
 		}
 		qty := int64(op.Quantity)
 		if qty <= 0 || qty > 99 {
-			return nil, fmt.Errorf("invalid quantity for %s: must be between 1 and 99", productLabel(pid))
+			return nil, apperr.Newf(apperr.CodeInvalidQuantity, "invalid quantity for %s: must be between 1 and 99", productLabel(pid)).With("productId", pid.String())
 		}
 
 		selectionByChoice := make(map[uuid.UUID]int)
@@ -192,13 +190,13 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		if op.ChoiceID != nil {
 			choice, err := loadChoice(*op.ChoiceID)
 			if err != nil {
-				return nil, fmt.Errorf("failed to retrieve choice %s: %w", op.ChoiceID, err)
+				return nil, choiceLoadError(err, *op.ChoiceID, pid)
 			}
 			if choice == nil {
-				return nil, fmt.Errorf("choice %s not found", op.ChoiceID)
+				return nil, apperr.Newf(apperr.CodeSelectionInvalid, "choice %s not found", op.ChoiceID).With("productId", pid.String())
 			}
 			if choice.ProductID != pid {
-				return nil, fmt.Errorf("choice %s does not belong to product %s", op.ChoiceID, productLabel(pid))
+				return nil, apperr.Newf(apperr.CodeSelectionInvalid, "choice %s does not belong to product %s", op.ChoiceID, productLabel(pid)).With("productId", pid.String())
 			}
 			legacyQty := legacyChoiceQuantity(qty)
 			selectionByChoice[choice.ID] += legacyQty
@@ -209,20 +207,20 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		if op.Selections != nil {
 			for _, selection := range op.Selections {
 				if selection.Quantity <= 0 {
-					return nil, fmt.Errorf("selection quantity must be > 0 for product %s", productLabel(pid))
+					return nil, apperr.Newf(apperr.CodeSelectionInvalid, "selection quantity must be > 0 for product %s", productLabel(pid)).With("productId", pid.String())
 				}
 				choice, err := loadChoice(selection.ChoiceID)
 				if err != nil {
-					return nil, fmt.Errorf("failed to retrieve choice %s: %w", selection.ChoiceID, err)
+					return nil, choiceLoadError(err, selection.ChoiceID, pid)
 				}
 				if choice == nil {
-					return nil, fmt.Errorf("choice %s not found", selection.ChoiceID)
+					return nil, apperr.Newf(apperr.CodeSelectionInvalid, "choice %s not found", selection.ChoiceID).With("productId", pid.String())
 				}
 				if choice.ProductID != pid {
-					return nil, fmt.Errorf("choice %s does not belong to product %s", selection.ChoiceID, productLabel(pid))
+					return nil, apperr.Newf(apperr.CodeSelectionInvalid, "choice %s does not belong to product %s", selection.ChoiceID, productLabel(pid)).With("productId", pid.String())
 				}
 				if choice.ChoiceGroupID != selection.GroupID {
-					return nil, fmt.Errorf("choice %s does not belong to group %s", selection.ChoiceID, selection.GroupID)
+					return nil, apperr.Newf(apperr.CodeSelectionInvalid, "choice %s does not belong to group %s", selection.ChoiceID, selection.GroupID).With("productId", pid.String())
 				}
 				selectionByChoice[selection.ChoiceID] += selection.Quantity
 				selectionGroupByChoice[selection.ChoiceID] = selection.GroupID
@@ -239,14 +237,15 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			minRequired := group.MinSelections * int(qty)
 			maxAllowed := group.MaxSelections * int(qty)
 			if selectedCount < minRequired || selectedCount > maxAllowed {
-				return nil, fmt.Errorf(
+				return nil, apperr.Newf(
+					apperr.CodeSelectionInvalid,
 					"invalid number of selections for group %s on product %s: expected between %d and %d, got %d",
 					group.GetTranslationFor(orderLang),
 					productLabel(pid),
 					minRequired,
 					maxAllowed,
 					selectedCount,
-				)
+				).With("productId", pid.String())
 			}
 		}
 
@@ -270,7 +269,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		// is derived.
 		lineTotal, unitPrice := orderDomain.PriceLine(basePrice, qty, pricedSelections)
 		if lineTotal.LessThan(decimal.Zero) {
-			return nil, fmt.Errorf("invalid price for product %s: price cannot be negative", productLabel(pid))
+			return nil, apperr.Newf(apperr.CodeInvalidPrice, "invalid price for product %s: price cannot be negative", productLabel(pid)).With("productId", pid.String())
 		}
 
 		var choiceID *uuid.UUID
@@ -298,7 +297,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 	// 6) Enforce minimum amounts (pickup has no minimum)
 	if odType == orderDomain.OrderTypeDelivery && total.LessThan(decimal.NewFromInt(25)) {
-		return nil, fmt.Errorf("minimum order amount for delivery is 25")
+		return nil, apperr.New(apperr.CodeDeliveryMinimumNotMet, "minimum order amount for delivery is 25").With("minimum", "25")
 	}
 
 	// 6) Compute delivery fee and build address snapshot
@@ -307,18 +306,18 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 	if odType == orderDomain.OrderTypeDelivery {
 		if input.AddressPlaceID == nil || *input.AddressPlaceID == "" {
-			return nil, fmt.Errorf("addressPlaceId required for delivery")
+			return nil, apperr.New(apperr.CodeAddressRequired, "addressPlaceId required for delivery")
 		}
 
 		addr, err := r.AddressService.Resolve(ctx, *input.AddressPlaceID, "")
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve address: %w", err)
+			return nil, apperr.Newf(apperr.CodeAddressUnresolvable, "failed to resolve address: %w", err)
 		}
 		if addr.Distance >= 9000 {
-			return nil, fmt.Errorf("address too far for delivery")
+			return nil, apperr.New(apperr.CodeDeliveryOutOfZone, "address too far for delivery")
 		}
 		if isExcludedDeliveryPostcode(addr.Postcode) {
-			return nil, fmt.Errorf("address not eligible for delivery: excluded area")
+			return nil, apperr.New(apperr.CodeDeliveryAreaExcluded, "address not eligible for delivery: excluded area")
 		}
 
 		fee = deliveryFeeFromDistance(addr.Distance)
@@ -362,7 +361,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	if input.CouponCode != nil && *input.CouponCode != "" {
 		coupon, cd, err := r.CouponService.ValidateCoupon(ctx, *input.CouponCode, total, userUUID)
 		if err != nil {
-			return nil, fmt.Errorf("invalid coupon: %w", err)
+			return nil, apperr.Newf(couponErrorCode(err), "invalid coupon: %w", err)
 		}
 		// One coupon at a time: reject if the user already has another
 		// non-terminal order still holding a coupon.
@@ -371,7 +370,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			return nil, fmt.Errorf("failed to check active coupon orders: %w", err)
 		}
 		if hasActive {
-			return nil, fmt.Errorf("you already have an active order using a coupon")
+			return nil, apperr.New(apperr.CodeCouponAlreadyActive, "you already have an active order using a coupon")
 		}
 		couponDiscount = money.RoundToNearest10Cents(cd)
 		couponCode = input.CouponCode
@@ -406,10 +405,10 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		if trimmed != "" {
 			parsed, err := decimal.NewFromString(trimmed)
 			if err != nil {
-				return nil, fmt.Errorf("invalid cashPaymentAmount: %w", err)
+				return nil, apperr.Newf(apperr.CodeCashAmountInvalid, "invalid cashPaymentAmount: %w", err)
 			}
 			if parsed.LessThan(decimal.Zero) {
-				return nil, fmt.Errorf("cashPaymentAmount must be non-negative")
+				return nil, apperr.New(apperr.CodeCashAmountInvalid, "cashPaymentAmount must be non-negative")
 			}
 			cashPaymentAmount = &parsed
 		}
@@ -438,10 +437,10 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	if validatedCouponID != nil {
 		ok, err := r.CouponService.IncrementUsageAtomic(ctx, *validatedCouponID, userUUID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to reserve coupon: %w", err)
+			return nil, apperr.Newf(apperr.CodeCouponReserveFailed, "failed to reserve coupon: %w", err)
 		}
 		if !ok {
-			return nil, fmt.Errorf("coupon is no longer valid or usage limit reached")
+			return nil, apperr.New(apperr.CodeCouponExhausted, "coupon is no longer valid or usage limit reached")
 		}
 	}
 
@@ -460,9 +459,9 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		// HasActiveCouponOrder pre-check above: surface the same friendly message
 		// when a concurrent order won the race between the check and this insert.
 		if isActiveCouponOrderConflict(err) {
-			return nil, fmt.Errorf("you already have an active order using a coupon")
+			return nil, apperr.New(apperr.CodeCouponAlreadyActive, "you already have an active order using a coupon")
 		}
-		return nil, fmt.Errorf("failed to create order: %w", err)
+		return nil, apperr.Newf(apperr.CodeOrderCreateFailed, "failed to create order: %w", err)
 	}
 
 	// 9) Enrich each raw item with its product details
@@ -513,7 +512,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 						zap.Error(rbErr))
 				}
 			}
-			return nil, fmt.Errorf("failed to create payment: %w", err)
+			return nil, apperr.Newf(apperr.CodePaymentFailed, "failed to create payment: %w", err)
 		}
 	} else {
 		// If offline payment, send the notification e-mail already

@@ -5,6 +5,7 @@ package resolver
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"go.uber.org/zap"
 
 	"tsb-service/internal/api/graphql"
+	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/directives"
 	addressApplication "tsb-service/internal/modules/address/application"
 	couponApplication "tsb-service/internal/modules/coupon/application"
@@ -175,68 +177,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 	})
 	h.Use(extension.FixedComplexityLimit(100))
 
-	// Log every GraphQL error to zap (HTTP 200 with `errors` in the body leaves
-	// no trace in the access log middleware otherwise) and forward unexpected
-	// ones to Sentry. User-input / auth errors carry a known code in
-	// `extensions.code` and are demoted to a warn-level log, not Sentry events.
-	h.SetErrorPresenter(func(ctx context.Context, e error) *gqlerror.Error {
-		err := gqlgraphql.DefaultErrorPresenter(ctx, e)
-
-		code, _ := err.Extensions["code"].(string)
-		expected := code == "USER_ERROR" || code == "UNAUTHENTICATED" || code == "FORBIDDEN" || code == "NOT_FOUND"
-
-		opCtx := gqlgraphql.GetOperationContext(ctx)
-		var opName, query string
-		if opCtx != nil {
-			opName = opCtx.OperationName
-			query = opCtx.RawQuery
-		}
-		path := err.Path.String()
-
-		fields := []zap.Field{
-			zap.String("operation", opName),
-			zap.String("code", code),
-			zap.String("path", path),
-			zap.String("message", err.Message),
-		}
-		logger := logging.FromContext(ctx)
-		switch {
-		case expected:
-			logger.Warn("graphql user error", fields...)
-		case errors.Is(e, context.Canceled) || strings.Contains(e.Error(), "canceling statement due to user request"):
-			// Client disconnected mid-request; log at Warn and skip Sentry.
-			logger.Warn("graphql resolver error (client disconnect)", append(fields, zap.String("query", query))...)
-		case opCtx == nil || opCtx.Operation == nil:
-			// gqlgen pre-execution rejection: the request was rejected before any
-			// operation was resolved (no operation provided, malformed GET, parse
-			// error, validation failure, persisted-query miss). Reached before any
-			// resolver ran, so it is always client/crawler noise, never a server
-			// fault. The "input:" prefix in the message is gqlerror's default
-			// filename, not the error Path — Path is empty here, which is why the
-			// previous err.Path.String() == "input" check never matched. Skip Sentry.
-		case strings.HasPrefix(e.Error(), "input: "):
-			// gqlgen pre-execution rejection (malformed GET, parse error,
-			// variable coercion, complexity overflow, etc.); client noise, skip Sentry.
-			// Uses strings.HasPrefix instead of err.Path.String() == "input"
-			// because nil Path (e.g. Applebot empty GET) serializes to "".
-			logger.Warn("graphql resolver error (client malformed request)", append(fields, zap.String("query", query))...)
-		default:
-			// SkipSentry: this path captures the exception itself below with
-			// richer scope, so the zap→Sentry bridge must not also fire.
-			logger.Error("graphql resolver error", append(fields, zap.String("query", query), zap.Error(e), logging.SkipSentry)...)
-			if hub := sentry.GetHubFromContext(ctx); hub != nil {
-				hub.WithScope(func(scope *sentry.Scope) {
-					scope.SetTag("graphql.operation", opName)
-					scope.SetTag("graphql.path", path)
-					scope.SetContext("graphql", map[string]any{"query": query})
-					hub.CaptureException(e)
-				})
-			} else {
-				sentry.CaptureException(e)
-			}
-		}
-		return err
-	})
+	h.SetErrorPresenter(ErrorPresenter)
 	h.SetRecoverFunc(func(ctx context.Context, err any) error {
 		// SkipSentry: the panic is reported via Recover below with full stack.
 		logging.FromContext(ctx).Error("graphql resolver panic", zap.Any("panic", err), logging.SkipSentry)
@@ -251,4 +192,77 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 	return func(c *gin.Context) {
 		h.ServeHTTP(c.Writer, c.Request)
 	}
+}
+
+// ErrorPresenter turns a resolver error into the GraphQL response error and logs it.
+//
+// It copies the stable `extensions.code` (and parameters) of apperr errors into the response, logs
+// every GraphQL error to zap (HTTP 200 with `errors` in the body leaves no trace in the access log
+// middleware otherwise) and forwards unexpected ones to Sentry. User-input / auth errors carry a
+// known code (apperr.IsExpected) and are demoted to a warn-level log, not Sentry events.
+func ErrorPresenter(ctx context.Context, e error) *gqlerror.Error {
+	err := gqlgraphql.DefaultErrorPresenter(ctx, e)
+
+	// Typed application errors (apperr) become `extensions.code` + their parameters.
+	if appErr, ok := apperr.From(e); ok {
+		if err.Extensions == nil {
+			err.Extensions = map[string]any{}
+		}
+		maps.Copy(err.Extensions, appErr.Extensions())
+	}
+
+	code, _ := err.Extensions["code"].(string)
+	expected := apperr.IsExpected(apperr.Code(code))
+
+	opCtx := gqlgraphql.GetOperationContext(ctx)
+	var opName, query string
+	if opCtx != nil {
+		opName = opCtx.OperationName
+		query = opCtx.RawQuery
+	}
+	path := err.Path.String()
+
+	fields := []zap.Field{
+		zap.String("operation", opName),
+		zap.String("code", code),
+		zap.String("path", path),
+		zap.String("message", err.Message),
+	}
+	logger := logging.FromContext(ctx)
+	switch {
+	case expected:
+		logger.Warn("graphql user error", fields...)
+	case errors.Is(e, context.Canceled) || strings.Contains(e.Error(), "canceling statement due to user request"):
+		// Client disconnected mid-request; log at Warn and skip Sentry.
+		logger.Warn("graphql resolver error (client disconnect)", append(fields, zap.String("query", query))...)
+	case opCtx == nil || opCtx.Operation == nil:
+		// gqlgen pre-execution rejection: the request was rejected before any
+		// operation was resolved (no operation provided, malformed GET, parse
+		// error, validation failure, persisted-query miss). Reached before any
+		// resolver ran, so it is always client/crawler noise, never a server
+		// fault. The "input:" prefix in the message is gqlerror's default
+		// filename, not the error Path — Path is empty here, which is why the
+		// previous err.Path.String() == "input" check never matched. Skip Sentry.
+	case strings.HasPrefix(e.Error(), "input: "):
+		// gqlgen pre-execution rejection (malformed GET, parse error,
+		// variable coercion, complexity overflow, etc.); client noise, skip Sentry.
+		// Uses strings.HasPrefix instead of err.Path.String() == "input"
+		// because nil Path (e.g. Applebot empty GET) serializes to "".
+		logger.Warn("graphql resolver error (client malformed request)", append(fields, zap.String("query", query))...)
+	default:
+		// SkipSentry: this path captures the exception itself below with
+		// richer scope, so the zap→Sentry bridge must not also fire.
+		logger.Error("graphql resolver error", append(fields, zap.String("query", query), zap.Error(e), logging.SkipSentry)...)
+		if hub := sentry.GetHubFromContext(ctx); hub != nil {
+			hub.WithScope(func(scope *sentry.Scope) {
+				scope.SetTag("graphql.operation", opName)
+				scope.SetTag("graphql.path", path)
+				scope.SetContext("graphql", map[string]any{"query": query})
+				hub.CaptureException(e)
+			})
+		} else {
+			sentry.CaptureException(e)
+		}
+	}
+	return err
 }

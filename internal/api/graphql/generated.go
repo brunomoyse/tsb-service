@@ -94,6 +94,7 @@ type ComplexityRoot struct {
 
 	CouponValidation struct {
 		DiscountAmount func(childComplexity int) int
+		ErrorCode      func(childComplexity int) int
 		ErrorMessage   func(childComplexity int) int
 		Valid          func(childComplexity int) int
 	}
@@ -698,6 +699,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.CouponValidation.DiscountAmount(childComplexity), true
+	case "CouponValidation.errorCode":
+		if e.ComplexityRoot.CouponValidation.ErrorCode == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CouponValidation.ErrorCode(childComplexity), true
 	case "CouponValidation.errorMessage":
 		if e.ComplexityRoot.CouponValidation.ErrorMessage == nil {
 			break
@@ -2519,6 +2526,8 @@ func (ec *executionContext) childFields_CouponValidation(ctx context.Context, fi
 		return ec.fieldContext_CouponValidation_discountAmount(ctx, field)
 	case "errorMessage":
 		return ec.fieldContext_CouponValidation_errorMessage(ctx, field)
+	case "errorCode":
+		return ec.fieldContext_CouponValidation_errorCode(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type CouponValidation", field.Name)
 }
@@ -4568,6 +4577,29 @@ func (ec *executionContext) _CouponValidation_errorMessage(ctx context.Context, 
 	)
 }
 func (ec *executionContext) fieldContext_CouponValidation_errorMessage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CouponValidation", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CouponValidation_errorCode(ctx context.Context, field graphql.CollectedField, obj *model.CouponValidation) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CouponValidation_errorCode(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ErrorCode, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_CouponValidation_errorCode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("CouponValidation", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
@@ -14280,6 +14312,11 @@ func (ec *executionContext) _CouponValidation(ctx context.Context, sel ast.Selec
 			}
 		case "errorMessage":
 			out.Values[i] = ec._CouponValidation_errorMessage(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "errorCode":
+			out.Values[i] = ec._CouponValidation_errorCode(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}

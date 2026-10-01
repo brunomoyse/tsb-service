@@ -7,11 +7,15 @@ package resolver
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	"tsb-service/internal/api/graphql/apperr"
 	notificationApplication "tsb-service/internal/modules/notification/application"
 	orderDomain "tsb-service/internal/modules/order/domain"
 )
@@ -77,4 +81,15 @@ func (r *mutationResolver) repushActivitiesLanguage(orders []*orderDomain.Order,
 			}
 		}
 	}
+}
+
+// choiceLoadError classifies a failed choice lookup in createOrder. A choice that no longer exists
+// (deleted from the menu since the cart was saved) is the customer's stale basket, an invalid
+// selection; any other failure is a server fault. The message is the same either way.
+func choiceLoadError(err error, choiceID, productID uuid.UUID) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return apperr.Newf(apperr.CodeSelectionInvalid, "failed to retrieve choice %s: %w", choiceID, err).
+			With("productId", productID.String())
+	}
+	return fmt.Errorf("failed to retrieve choice %s: %w", choiceID, err)
 }
