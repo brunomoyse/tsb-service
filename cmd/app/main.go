@@ -384,11 +384,17 @@ func main() {
 	// enumeration of coupon codes: ~5 req/min, burst 3.
 	couponValidateLimiter := middleware.NewRateLimiter(5.0/60, 3)
 
+	// Per-IP limit on the public, upstream-costly queries quoteOrder and resolveAddress (each has
+	// its own bucket): 60 req/min sustained with a burst of 30. A debounced basket / address
+	// picker sends a few requests per second at the very most while the customer edits, so real
+	// use never gets close; a scraper or a loop that targets Google Places/Routes does.
+	publicQueryLimiter := middleware.NewRateLimiter(1.0, 30)
+
 	// GraphQL
 	rootResolver := resolver.NewResolver(
 		broker, apnsClient, fcmClient,
 		addressService, couponService, notificationService, orderService, paymentService, productService, restaurantService, userService, posService,
-		couponValidateLimiter,
+		couponValidateLimiter, publicQueryLimiter,
 	)
 	// Payment webhook depends on the resolver to fan out the new-order push
 	// notification once the Mollie payment transitions to paid.

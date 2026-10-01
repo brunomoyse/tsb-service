@@ -34,6 +34,10 @@ func (r *queryResolver) AutocompleteAddresses(ctx context.Context, input string,
 
 // ResolveAddress is the resolver for the resolveAddress field.
 func (r *queryResolver) ResolveAddress(ctx context.Context, placeID string, sessionToken string) (*model.Address, error) {
+	// Public and a cache miss costs a Google Place Details + Routes call: throttle per IP.
+	if err := r.allowPublicQuery(ctx, "resolveAddress"); err != nil {
+		return nil, err
+	}
 	addr, err := r.AddressService.Resolve(ctx, placeID, sessionToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve address: %w", err)

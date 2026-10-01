@@ -96,6 +96,14 @@ const (
 	CodeCouponCheckFailed Code = "COUPON_CHECK_FAILED"
 )
 
+// Abuse protection on public queries.
+const (
+	// CodeRateLimited: too many requests from this IP to a public query (quoteOrder, resolveAddress).
+	// Expected (the caller's doing, no Sentry). Clients should back off and retry; the limit is
+	// generous (60 requests/minute per IP and query) so a debounced UI never reaches it.
+	CodeRateLimited Code = "RATE_LIMITED"
+)
+
 // Payment and persistence (createOrder).
 const (
 	// CodeCashAmountInvalid: the "I will pay with" cash amount is not a non-negative number.
@@ -142,6 +150,7 @@ var expected = map[Code]bool{
 	CodeCouponExhausted:       true,
 	CodeCashAmountInvalid:     true,
 	CodeInvalidAmount:         true,
+	CodeRateLimited:           true,
 }
 
 // IsExpected reports whether the code is a user-side error (warn log, no Sentry event).

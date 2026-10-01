@@ -36,6 +36,8 @@ type (
 	}
 	pricingAddresses interface {
 		Resolve(ctx context.Context, placeID, sessionToken string) (*addressDomain.Address, error)
+		// GetByPlaceID is cache-only (nil, nil on a miss): it never calls Google.
+		GetByPlaceID(ctx context.Context, placeID string) (*addressDomain.Address, error)
 	}
 	pricingCoupons interface {
 		ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal, userID uuid.UUID) (*couponDomain.Coupon, decimal.Decimal, error)
@@ -544,13 +546,32 @@ func (p *orderPricer) priceLine(
 	return nil
 }
 
+// lookupAddress finds the delivery address. A signed-in caller (createOrder, an authenticated quote)
+// gets the full Resolve, which asks Google on a cache miss. An anonymous quote only reads the cache:
+// otherwise anyone could make us pay for Place Details / Routes calls on arbitrary place ids. This
+// is safe for the webshop because the address picker calls resolveAddress first (which fills the
+// cache) and only then quotes with that place id.
+func (p *orderPricer) lookupAddress(ctx context.Context, in pricingInput) (*addressDomain.Address, error) {
+	if in.UserID != nil {
+		return p.addresses.Resolve(ctx, *in.AddressPlaceID, "")
+	}
+	addr, err := p.addresses.GetByPlaceID(ctx, *in.AddressPlaceID)
+	if err != nil {
+		return nil, err
+	}
+	if addr == nil {
+		return nil, errors.New("address not resolved yet: call resolveAddress first")
+	}
+	return addr, nil
+}
+
 // priceDelivery resolves the address, enforces the zone and sets the fee and the address snapshot.
 func (p *orderPricer) priceDelivery(ctx context.Context, res *pricingResult, in pricingInput) error {
 	if in.AddressPlaceID == nil || *in.AddressPlaceID == "" {
 		res.addOrder(apperr.New(apperr.CodeAddressRequired, "addressPlaceId required for delivery"))
 		return nil
 	}
-	addr, err := p.addresses.Resolve(ctx, *in.AddressPlaceID, "")
+	addr, err := p.lookupAddress(ctx, in)
 	if err != nil {
 		res.addOrder(apperr.Newf(apperr.CodeAddressUnresolvable, "failed to resolve address: %w", err))
 		return nil

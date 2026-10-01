@@ -25,6 +25,9 @@ import (
 // user, so an anonymous caller's coupon is reported as "not evaluated" (errorCode UNAUTHENTICATED)
 // rather than checked.
 func (r *Resolver) quoteOrder(ctx context.Context, input model.QuoteOrderInput) (*model.OrderQuote, error) {
+	if err := r.allowPublicQuery(ctx, "quoteOrder"); err != nil {
+		return nil, err
+	}
 	items, err := pricingItemsFromQuote(input.Items)
 	if err != nil {
 		return nil, err

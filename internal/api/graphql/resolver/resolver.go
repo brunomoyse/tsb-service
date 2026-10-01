@@ -54,6 +54,9 @@ type Resolver struct {
 	UserService           userApplication.UserService
 	PosService            *posApplication.Service
 	CouponValidateLimiter *middleware.RateLimiter
+	// PublicQueryLimiter throttles the unauthenticated, upstream-costly queries (quoteOrder,
+	// resolveAddress) per client IP. nil disables it.
+	PublicQueryLimiter *middleware.RateLimiter
 }
 
 // NewResolver constructs the Resolver with required services.
@@ -71,6 +74,7 @@ func NewResolver(
 	userService userApplication.UserService,
 	posService *posApplication.Service,
 	couponValidateLimiter *middleware.RateLimiter,
+	publicQueryLimiter *middleware.RateLimiter,
 ) *Resolver {
 	return &Resolver{
 		Broker:                broker,
@@ -86,7 +90,26 @@ func NewResolver(
 		UserService:           userService,
 		PosService:            posService,
 		CouponValidateLimiter: couponValidateLimiter,
+		PublicQueryLimiter:    publicQueryLimiter,
 	}
+}
+
+// allowPublicQuery applies the per-IP limit of a public query. Each scope (query name) has its own
+// bucket per IP. The IP comes from the HTTP layer (gin's ClientIP, i.e. the CF-Connecting-IP
+// trusted-platform logic the other per-IP limiters use); without one (no HTTP request) nothing is
+// limited rather than lumping every such call into one bucket.
+func (r *Resolver) allowPublicQuery(ctx context.Context, scope string) error {
+	if r.PublicQueryLimiter == nil {
+		return nil
+	}
+	ip := utils.GetClientIP(ctx)
+	if ip == "" {
+		return nil
+	}
+	if !r.PublicQueryLimiter.AllowKey(scope + ":" + ip) {
+		return apperr.New(apperr.CodeRateLimited, "too many requests, please try again in a minute")
+	}
+	return nil
 }
 
 // GraphQLHandler defines the GraphQL endpoint with @auth directive injection
@@ -190,6 +213,8 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 	})
 
 	return func(c *gin.Context) {
+		// Hand the trusted-proxy-aware client IP to the resolvers (per-IP limits on public queries).
+		c.Request = c.Request.WithContext(utils.SetClientIP(c.Request.Context(), c.ClientIP()))
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 }

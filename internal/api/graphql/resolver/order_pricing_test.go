@@ -53,6 +53,11 @@ func (f *fakeCatalog) GetChoiceGroupsByProductID(_ context.Context, id uuid.UUID
 
 type fakeAddresses map[string]*addressDomain.Address
 
+// GetByPlaceID is the cache-only lookup: it answers from the same map (every fake address is "cached").
+func (f fakeAddresses) GetByPlaceID(_ context.Context, placeID string) (*addressDomain.Address, error) {
+	return f[placeID], nil
+}
+
 func (f fakeAddresses) Resolve(_ context.Context, placeID, _ string) (*addressDomain.Address, error) {
 	if a, ok := f[placeID]; ok {
 		return a, nil

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"tsb-service/internal/api/graphql/testhelpers"
+	"tsb-service/internal/shared/middleware"
 )
 
 // quoteOrder prices a basket without saving it, with the same code createOrder prices with. These
@@ -349,4 +350,42 @@ func TestQuoteOrderCoupons(t *testing.T) {
 			`SELECT total_price::text FROM orders WHERE id = $1`, data.CreateOrder.ID).Scan(&stored))
 		assert.Equal(t, "0.00", stored)
 	})
+}
+
+// quoteOrder and resolveAddress are public and (on a cache miss) cost Google calls, so they are
+// throttled per client IP with a RATE_LIMITED code.
+func TestPublicQueriesAreRateLimitedPerIP(t *testing.T) {
+	tc := setupTestContext(t)
+	limiter := middleware.NewRateLimiter(0.0001, 2) // burst of 2, no refill during the test
+	t.Cleanup(limiter.Stop)
+	tc.Resolver.PublicQueryLimiter = limiter
+
+	salmon := tc.Fixtures.SalmonSushi.ID.String()
+	run := func(query string, vars map[string]any) graphqlResponseWithExtensions {
+		return postGraphQLWithExtensions(t, tc.Client.URL(), graphqlRequest{Query: query, Variables: vars}, "")
+	}
+	quote := func() graphqlResponseWithExtensions {
+		return run(quoteOrderQuery, map[string]any{"input": quoteInput("PICKUP", []map[string]any{{"productId": salmon, "quantity": 1}}, nil)})
+	}
+
+	require.Empty(t, quote().Errors)
+	require.Empty(t, quote().Errors)
+	third := quote()
+	require.Len(t, third.Errors, 1)
+	assert.Equal(t, "RATE_LIMITED", third.Errors[0].Extensions["code"])
+	assert.NotContains(t, third.Errors[0].Message, "Internal", "a rate limit is the caller's doing, not a server fault")
+
+	// resolveAddress has its own bucket (empty cache + nil Google client here, so only the error
+	// code matters: the first two calls must reach the service, the third must be refused first).
+	const resolveQuery = `query ($p: String!, $s: String!) { resolveAddress(placeId: $p, sessionToken: $s) { id } }`
+	vars := map[string]any{"p": "nope", "s": "tok"}
+	for i := 0; i < 2; i++ {
+		resp := run(resolveQuery, vars)
+		for _, e := range resp.Errors {
+			assert.NotEqual(t, "RATE_LIMITED", e.Extensions["code"], "call %d must not be limited", i+1)
+		}
+	}
+	resp := run(resolveQuery, vars)
+	require.Len(t, resp.Errors, 1)
+	assert.Equal(t, "RATE_LIMITED", resp.Errors[0].Extensions["code"])
 }

@@ -1,6 +1,7 @@
 package testhelpers
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 
@@ -37,6 +38,11 @@ func NewGraphQLTestClient(r *resolver.Resolver, jwtSecret string) *GraphQLTestCl
 	// Create a simple HTTP handler that wraps the GraphQL server with auth and DataLoaders
 	httpHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
+
+		// Same value the production handler takes from gin's ClientIP (here: the peer address).
+		if host, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+			ctx = utils.SetClientIP(ctx, host)
+		}
 
 		// Attach DataLoaders to context (required for resolvers)
 		ctx = productApplication.AttachDataLoaders(ctx, r.ProductService)

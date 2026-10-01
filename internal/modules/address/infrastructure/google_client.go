@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -127,8 +128,10 @@ func (c *GoogleClient) Autocomplete(ctx context.Context, input, sessionToken, la
 }
 
 func (c *GoogleClient) PlaceDetails(ctx context.Context, placeID, sessionToken, language string) (*domain.AddressCache, error) {
+	// placeID comes straight from the client: escape it as a path segment so it cannot add path
+	// segments or query parameters ("../", "?", "#"); the query values are escaped too.
 	url := fmt.Sprintf("https://places.googleapis.com/v1/places/%s?languageCode=%s&sessionToken=%s",
-		placeID, language, sessionToken)
+		neturl.PathEscape(placeID), neturl.QueryEscape(language), neturl.QueryEscape(sessionToken))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
