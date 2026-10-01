@@ -28,7 +28,6 @@ import (
 	"tsb-service/pkg/apns"
 	es "tsb-service/pkg/email/scaleway"
 	"tsb-service/pkg/fcm"
-	"tsb-service/pkg/money"
 	"tsb-service/pkg/utils"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -59,332 +58,39 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	}
 	isTestOrder := user != nil && auth.IsReviewUser(user.Email, user.FirstName, user.LastName)
 
-	// 0) Validate ordering availability and preferred ready time constraints.
-	// allowLunchOnly defaults to true so dev mode does not block testing of
-	// lunch-only items; production paths populate it from the resolved schedule.
-	// Store-review accounts skip the gate entirely so a reviewer can place an
-	// order outside opening hours. TEMPORARY (revert after launch).
-	allowLunchOnly := true
-	if !r.RestaurantService.IsDevMode() && !isTestOrder {
-		config, overrides, err := r.RestaurantService.GetConfigWithOverrides(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load restaurant config: %w", err)
-		}
-		if !config.OrderingEnabled {
-			return nil, apperr.New(apperr.CodeOrderingUnavailable, "ordering is currently unavailable")
-		}
-
-		now := time.Now()
-		isOpenNow := config.IsOrderingCurrentlyOpen(now, overrides)
-		if err := validatePreferredReadyTime(input.PreferredReadyTime, config, overrides, now, isOpenNow); err != nil {
-			// Already an apperr with its SLOT_* / ORDERING_CLOSED_TODAY code and the field.
-			return nil, err
-		}
-
-		slotTime := now
-		if input.PreferredReadyTime != nil {
-			slotTime = *input.PreferredReadyTime
-		}
-		allowLunchOnly = config.IsLunchOnlyAllowed(slotTime, overrides)
-	}
-
-	// 2) Fetch products and build price map
-	prodCount := len(input.Items)
-	if prodCount == 0 {
-		return nil, apperr.New(apperr.CodeOrderEmpty, "order must contain at least one item")
-	}
-	if prodCount > 50 {
-		return nil, apperr.New(apperr.CodeOrderTooManyItems, "order cannot contain more than 50 different items")
-	}
-	ids := make([]string, prodCount)
-	for i, op := range input.Items {
-		ids[i] = op.ProductID.String()
-	}
-	products, err := r.ProductService.GetProductsByIDs(ctx, ids)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve products: %w", err)
-	}
-	priceMap := make(map[uuid.UUID]decimal.Decimal, len(products))
-	vatCategoryMap := make(map[uuid.UUID]productDomain.VatCategory, len(products))
-	nameMap := make(map[uuid.UUID]string, len(products))
-	for _, p := range products {
-		priceMap[p.ID] = p.Price
-		vatCategoryMap[p.ID] = p.VatCategory
-		nameMap[p.ID] = p.Name
-	}
-	productLabel := func(id uuid.UUID) string {
-		if name, ok := nameMap[id]; ok && name != "" {
-			return name
-		}
-		return id.String()
-	}
-
-	// 3) Reject lunch-only products when the chosen slot is not a weekday lunch slot.
-	if !allowLunchOnly {
-		for _, p := range products {
-			if p.IsLunchOnly {
-				return nil, apperr.Newf(apperr.CodeLunchSlotRequired, "product %q is only available for a weekday lunch slot", productLabel(p.ID)).With("productId", p.ID.String())
-			}
-		}
-	}
-
-	// 4) Determine order type
-	var odType orderDomain.OrderType
-	orderServiceType := productDomain.ServiceTypeTakeaway
-	switch input.OrderType {
-	case model.OrderTypeEnumDelivery:
+	// 0) Validate and price the basket. This is the SAME function quoteOrder runs (see
+	// order_pricing.go), here in fail-fast mode: the first problem becomes the error. Store-review
+	// accounts skip the ordering-hours gate so a reviewer can place an order outside opening hours.
+	// TEMPORARY (revert after launch).
+	odType := orderDomain.OrderTypePickUp
+	if input.OrderType == model.OrderTypeEnumDelivery {
 		odType = orderDomain.OrderTypeDelivery
-		orderServiceType = productDomain.ServiceTypeDelivery
-	default:
-		odType = orderDomain.OrderTypePickUp
 	}
-
+	priced, err := r.orderPricer().price(ctx, pricingInput{
+		UserID:             &userUUID,
+		OrderType:          odType,
+		IsOnlinePayment:    input.IsOnlinePayment,
+		AddressPlaceID:     input.AddressPlaceID,
+		PreferredReadyTime: input.PreferredReadyTime,
+		Items:              pricingItemsFromOrder(input.Items),
+		CouponCode:         input.CouponCode,
+		SkipOrderingGate:   isTestOrder,
+		FailFast:           true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := priced.FirstError(); err != nil {
+		return nil, err
+	}
 	orderLang := utils.GetLang(ctx)
-
-	// 5) Compute line totals and overall total
-	rawItems := make([]orderDomain.OrderProductRaw, 0, prodCount)
-	total := decimal.Zero
-	choiceCache := make(map[uuid.UUID]*productDomain.ProductChoice)
-	groupCache := make(map[uuid.UUID]*productDomain.ProductChoiceGroup)
-	groupsByProductCache := make(map[uuid.UUID][]*productDomain.ProductChoiceGroup)
-	loadChoice := func(id uuid.UUID) (*productDomain.ProductChoice, error) {
-		if choice, ok := choiceCache[id]; ok {
-			return choice, nil
-		}
-		choice, err := r.ProductService.GetChoiceByID(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		choiceCache[id] = choice
-		return choice, nil
-	}
-	loadGroupsByProduct := func(productID uuid.UUID) ([]*productDomain.ProductChoiceGroup, error) {
-		if groups, ok := groupsByProductCache[productID]; ok {
-			return groups, nil
-		}
-		groups, err := r.ProductService.GetChoiceGroupsByProductID(ctx, productID)
-		if err != nil {
-			return nil, err
-		}
-		groupsByProductCache[productID] = groups
-		for _, group := range groups {
-			groupCache[group.ID] = group
-		}
-		return groups, nil
-	}
-	for _, op := range input.Items {
-		pid := op.ProductID
-		basePrice, ok := priceMap[pid]
-		if !ok {
-			return nil, apperr.Newf(apperr.CodeProductNotFound, "product %s not found", productLabel(pid)).With("productId", pid.String())
-		}
-		qty := int64(op.Quantity)
-		if qty <= 0 || qty > 99 {
-			return nil, apperr.Newf(apperr.CodeInvalidQuantity, "invalid quantity for %s: must be between 1 and 99", productLabel(pid)).With("productId", pid.String())
-		}
-
-		selectionByChoice := make(map[uuid.UUID]int)
-		selectionGroupByChoice := make(map[uuid.UUID]uuid.UUID)
-		selectionCountByGroup := make(map[uuid.UUID]int)
-
-		if op.ChoiceID != nil {
-			choice, err := loadChoice(*op.ChoiceID)
-			if err != nil {
-				return nil, choiceLoadError(err, *op.ChoiceID, pid)
-			}
-			if choice == nil {
-				return nil, apperr.Newf(apperr.CodeSelectionInvalid, "choice %s not found", op.ChoiceID).With("productId", pid.String())
-			}
-			if choice.ProductID != pid {
-				return nil, apperr.Newf(apperr.CodeSelectionInvalid, "choice %s does not belong to product %s", op.ChoiceID, productLabel(pid)).With("productId", pid.String())
-			}
-			legacyQty := legacyChoiceQuantity(qty)
-			selectionByChoice[choice.ID] += legacyQty
-			selectionGroupByChoice[choice.ID] = choice.ChoiceGroupID
-			selectionCountByGroup[choice.ChoiceGroupID] += legacyQty
-		}
-
-		if op.Selections != nil {
-			for _, selection := range op.Selections {
-				if selection.Quantity <= 0 {
-					return nil, apperr.Newf(apperr.CodeSelectionInvalid, "selection quantity must be > 0 for product %s", productLabel(pid)).With("productId", pid.String())
-				}
-				choice, err := loadChoice(selection.ChoiceID)
-				if err != nil {
-					return nil, choiceLoadError(err, selection.ChoiceID, pid)
-				}
-				if choice == nil {
-					return nil, apperr.Newf(apperr.CodeSelectionInvalid, "choice %s not found", selection.ChoiceID).With("productId", pid.String())
-				}
-				if choice.ProductID != pid {
-					return nil, apperr.Newf(apperr.CodeSelectionInvalid, "choice %s does not belong to product %s", selection.ChoiceID, productLabel(pid)).With("productId", pid.String())
-				}
-				if choice.ChoiceGroupID != selection.GroupID {
-					return nil, apperr.Newf(apperr.CodeSelectionInvalid, "choice %s does not belong to group %s", selection.ChoiceID, selection.GroupID).With("productId", pid.String())
-				}
-				selectionByChoice[selection.ChoiceID] += selection.Quantity
-				selectionGroupByChoice[selection.ChoiceID] = selection.GroupID
-				selectionCountByGroup[selection.GroupID] += selection.Quantity
-			}
-		}
-
-		groups, err := loadGroupsByProduct(pid)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load choice groups for product %s: %w", productLabel(pid), err)
-		}
-		for _, group := range groups {
-			selectedCount := selectionCountByGroup[group.ID]
-			minRequired := group.MinSelections * int(qty)
-			maxAllowed := group.MaxSelections * int(qty)
-			if selectedCount < minRequired || selectedCount > maxAllowed {
-				return nil, apperr.Newf(
-					apperr.CodeSelectionInvalid,
-					"invalid number of selections for group %s on product %s: expected between %d and %d, got %d",
-					group.GetTranslationFor(orderLang),
-					productLabel(pid),
-					minRequired,
-					maxAllowed,
-					selectedCount,
-				).With("productId", pid.String())
-			}
-		}
-
-		selections := make([]orderDomain.OrderProductSelection, 0, len(selectionByChoice))
-		pricedSelections := make([]orderDomain.PricedSelection, 0, len(selectionByChoice))
-		for choiceIDValue, quantity := range selectionByChoice {
-			choice := choiceCache[choiceIDValue]
-			pricedSelections = append(pricedSelections, orderDomain.PricedSelection{
-				Modifier: choice.PriceModifier,
-				Quantity: quantity,
-			})
-			selections = append(selections, orderDomain.OrderProductSelection{
-				GroupID:  selectionGroupByChoice[choiceIDValue],
-				ChoiceID: choiceIDValue,
-				Quantity: quantity,
-			})
-		}
-
-		// line total = base × qty + Σ(modifier × selection qty); see PriceLine
-		// for why the surcharge is not multiplied by qty again and how unit_price
-		// is derived.
-		lineTotal, unitPrice := orderDomain.PriceLine(basePrice, qty, pricedSelections)
-		if lineTotal.LessThan(decimal.Zero) {
-			return nil, apperr.Newf(apperr.CodeInvalidPrice, "invalid price for product %s: price cannot be negative", productLabel(pid)).With("productId", pid.String())
-		}
-
-		var choiceID *uuid.UUID
-		if len(selectionByChoice) == 1 {
-			for selectedChoiceID, quantity := range selectionByChoice {
-				if quantity == 1 {
-					cid := selectedChoiceID
-					choiceID = &cid
-				}
-			}
-		}
-
-		vatRateApplied := vatCategoryMap[pid].VatRatePercent(orderServiceType)
-		total = total.Add(lineTotal)
-		rawItems = append(rawItems, orderDomain.OrderProductRaw{
-			ProductID:       pid,
-			Quantity:        qty,
-			UnitPrice:       unitPrice,
-			TotalPrice:      lineTotal,
-			VatRateApplied:  decimal.NewFromFloat(vatRateApplied),
-			ProductChoiceID: choiceID,
-			Selections:      selections,
-		})
-	}
-
-	// 6) Enforce minimum amounts (pickup has no minimum)
-	if odType == orderDomain.OrderTypeDelivery && total.LessThan(decimal.NewFromInt(25)) {
-		return nil, apperr.New(apperr.CodeDeliveryMinimumNotMet, "minimum order amount for delivery is 25").With("minimum", "25")
-	}
-
-	// 6) Compute delivery fee and build address snapshot
-	fee := decimal.NewFromInt(0)
-	var addrSnapshot *orderDomain.AddressSnapshot
-
-	if odType == orderDomain.OrderTypeDelivery {
-		if input.AddressPlaceID == nil || *input.AddressPlaceID == "" {
-			return nil, apperr.New(apperr.CodeAddressRequired, "addressPlaceId required for delivery")
-		}
-
-		addr, err := r.AddressService.Resolve(ctx, *input.AddressPlaceID, "")
-		if err != nil {
-			return nil, apperr.Newf(apperr.CodeAddressUnresolvable, "failed to resolve address: %w", err)
-		}
-		if addr.Distance >= 9000 {
-			return nil, apperr.New(apperr.CodeDeliveryOutOfZone, "address too far for delivery")
-		}
-		if isExcludedDeliveryPostcode(addr.Postcode) {
-			return nil, apperr.New(apperr.CodeDeliveryAreaExcluded, "address not eligible for delivery: excluded area")
-		}
-
-		fee = deliveryFeeFromDistance(addr.Distance)
-		total = total.Add(fee)
-
-		addrSnapshot = &orderDomain.AddressSnapshot{
-			StreetName:       &addr.StreetName,
-			HouseNumber:      &addr.HouseNumber,
-			BoxNumber:        addr.BoxNumber,
-			MunicipalityName: &addr.MunicipalityName,
-			Postcode:         &addr.Postcode,
-			Distance:         &addr.Distance,
-			PlaceID:          &addr.PlaceID,
-			Lat:              addr.Lat,
-			Lng:              addr.Lng,
-			IsManual:         false,
-		}
-	}
-
-	// Compute takeaway discount for PICKUP orders (10% on discountable items, only when subtotal ≥ 20€).
-	// The raw 10% is then rounded to 0,10 € so the customer sees a clean
-	// multiple of 10 cents on every surface (cart, receipt, Mollie).
-	takeawayDiscount := decimal.Zero
-	if odType == orderDomain.OrderTypePickUp && total.GreaterThanOrEqual(decimal.NewFromInt(20)) {
-		discountMap := make(map[uuid.UUID]bool, len(products))
-		for _, p := range products {
-			discountMap[p.ID] = p.IsDiscountable
-		}
-		for _, item := range rawItems {
-			if discountMap[item.ProductID] {
-				takeawayDiscount = takeawayDiscount.Add(item.TotalPrice.Mul(decimal.NewFromFloat(0.10)))
-			}
-		}
-		takeawayDiscount = money.RoundToNearest10Cents(takeawayDiscount)
-	}
-
-	// Validate and apply coupon discount (stacks with pickup discount)
-	couponDiscount := decimal.Zero
-	var couponCode *string
-	var validatedCouponID *uuid.UUID
-	if input.CouponCode != nil && *input.CouponCode != "" {
-		coupon, cd, err := r.CouponService.ValidateCoupon(ctx, *input.CouponCode, total, userUUID)
-		if err != nil {
-			return nil, apperr.Newf(couponErrorCode(err), "invalid coupon: %w", err)
-		}
-		// One coupon at a time: reject if the user already has another
-		// non-terminal order still holding a coupon.
-		hasActive, err := r.OrderService.HasActiveCouponOrder(ctx, userUUID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check active coupon orders: %w", err)
-		}
-		if hasActive {
-			return nil, apperr.New(apperr.CodeCouponAlreadyActive, "you already have an active order using a coupon")
-		}
-		couponDiscount = money.RoundToNearest10Cents(cd)
-		couponCode = input.CouponCode
-		validatedCouponID = &coupon.ID
-	}
-
-	// Ensure combined discounts never exceed the order total.
-	totalDiscount := takeawayDiscount.Add(couponDiscount)
-	if totalDiscount.GreaterThan(total) {
-		// Scale both proportionally, then snap to 0,10 €.
-		ratio := total.Div(totalDiscount)
-		takeawayDiscount = money.RoundToNearest10Cents(takeawayDiscount.Mul(ratio))
-		couponDiscount = money.RoundToNearest10Cents(total.Sub(takeawayDiscount))
-	}
+	rawItems := priced.RawItems
+	fee := priced.DeliveryFee
+	addrSnapshot := priced.Address
+	takeawayDiscount := priced.PickupDiscount
+	couponDiscount := priced.CouponDiscount
+	couponCode := priced.CouponCode
+	validatedCouponID := priced.CouponID
 
 	var extras []orderDomain.OrderExtra
 	if input.OrderExtra != nil {
@@ -466,8 +172,8 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 	// 9) Enrich each raw item with its product details
 	//    build a lookup map from product ID → product info
-	prodMap := make(map[uuid.UUID]productDomain.ProductOrderDetails, len(products))
-	for _, p := range products {
+	prodMap := make(map[uuid.UUID]productDomain.ProductOrderDetails, len(priced.Products))
+	for _, p := range priced.Products {
 		prodMap[p.ID] = *p
 	}
 
@@ -1242,6 +948,11 @@ func (r *orderItemResolver) Choice(ctx context.Context, obj *model.OrderItem) (*
 	}
 
 	return ToGQLProductChoice(choice, userLang), nil
+}
+
+// QuoteOrder is the resolver for the quoteOrder field. The work is in order_quote.go.
+func (r *queryResolver) QuoteOrder(ctx context.Context, input model.QuoteOrderInput) (*model.OrderQuote, error) {
+	return r.quoteOrder(ctx, input)
 }
 
 // Orders is the resolver for the orders field.

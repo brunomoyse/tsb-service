@@ -8,7 +8,6 @@ import (
 	"tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/logging"
-	"tsb-service/pkg/money"
 	"tsb-service/pkg/utils"
 
 	"github.com/google/uuid"
@@ -42,31 +41,18 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 
 	// Calculate the total price of the order from order products.
 	if op != nil && len(*op) > 0 {
-		computedTotal := decimal.NewFromInt(0)
+		itemsTotal := decimal.Zero
 		for _, prod := range *op {
-			computedTotal = computedTotal.Add(prod.TotalPrice)
+			itemsTotal = itemsTotal.Add(prod.TotalPrice)
 		}
-
-		// Add delivery fee if applicable.
+		deliveryFee := decimal.Zero
 		if o.DeliveryFee != nil {
-			computedTotal = computedTotal.Add(*o.DeliveryFee)
+			deliveryFee = *o.DeliveryFee
 		}
 
-		// Subtract discounts if applicable.
-		totalDiscount := o.TakeawayDiscount.Add(o.CouponDiscount)
-		if totalDiscount.GreaterThan(decimal.Zero) {
-			computedTotal = computedTotal.Sub(totalDiscount)
-		}
-
-		// Add transaction fee for online payments.
-		if o.TransactionFee.GreaterThan(decimal.Zero) {
-			computedTotal = computedTotal.Add(o.TransactionFee)
-		}
-
-		// Snap the total to 0,10 € — defensive: with rounded discounts and
-		// .x0-priced products this is already a no-op, but it guards future
-		// pricing changes (.x5 unit prices, fractional delivery fees, etc.).
-		o.TotalPrice = money.RoundToNearest10Cents(computedTotal)
+		// Goods + delivery - discounts (never below 0) + the online fee, snapped to 0,10 EUR. The same
+		// function prices the quoteOrder preview, see domain.OrderTotal.
+		o.TotalPrice = domain.OrderTotal(itemsTotal, deliveryFee, o.TakeawayDiscount, o.CouponDiscount, o.TransactionFee)
 	}
 
 	// Insert the order record.

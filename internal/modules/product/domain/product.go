@@ -82,6 +82,8 @@ type ProductOrderDetails struct {
 	IsDiscountable bool            `db:"is_discountable" json:"isDiscountable"`
 	IsLunchOnly    bool            `db:"is_lunch_only" json:"isLunchOnly"`
 	VatCategory    VatCategory     `db:"vat_category" json:"vatCategory"`
+	// IsAvailable is only filled by FindForPricing (the other queries do not select it).
+	IsAvailable bool `db:"is_available" json:"isAvailable"`
 }
 
 func (g *ProductChoiceGroup) GetTranslationFor(locale string) string {

@@ -358,6 +358,40 @@ func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) 
 	return products, nil
 }
 
+// FindForPricing fetches what an order line is priced from (current price, VAT, flags) together with
+// the availability flag, without failing on sold-out products like FindByIDs does. The translation
+// joins are the same as FindByIDs, so a product the order would reject as unknown is unknown here too.
+func (r *ProductRepository) FindForPricing(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error) {
+	lang := utils.GetLang(ctx)
+
+	query := `
+        SELECT
+            p.id,
+            p.code,
+            p.price,
+            p.is_discountable,
+            p.is_lunch_only,
+            p.is_available,
+            p.vat_category,
+            pct.name AS category_name,
+            pt.name  AS name
+        FROM products p
+        LEFT JOIN product_translations pt
+          ON p.id = pt.product_id
+        LEFT JOIN product_category_translations pct
+          ON p.category_id = pct.product_category_id
+        WHERE p.id = ANY($1)
+          AND pt.language = $2
+          AND pct.language = $2
+        ORDER BY p.code;
+    `
+	var products []*domain.ProductOrderDetails
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &products, query, pq.Array(productIDs), lang); err != nil {
+		return nil, err
+	}
+	return products, nil
+}
+
 // FindNamesByIDs fetches product details by IDs without checking availability.
 // Used for invoices where products may have been made unavailable since the order.
 func (r *ProductRepository) FindNamesByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error) {

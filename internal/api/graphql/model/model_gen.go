@@ -232,6 +232,15 @@ type OrderHistorySummary struct {
 	AverageOrder string `json:"averageOrder"`
 }
 
+// An order-level problem. code: ORDERING_UNAVAILABLE, ORDERING_CLOSED_TODAY, SLOT_*, ORDER_EMPTY,
+// ORDER_TOO_MANY_ITEMS, DELIVERY_MINIMUM_NOT_MET, ADDRESS_REQUIRED, ADDRESS_UNRESOLVABLE,
+// DELIVERY_OUT_OF_ZONE, DELIVERY_AREA_EXCLUDED or a COUPON_* code.
+type OrderIssue struct {
+	Code string `json:"code"`
+	// Euros, for DELIVERY_MINIMUM_NOT_MET and COUPON_MIN_ORDER_NOT_MET.
+	Minimum *string `json:"minimum,omitempty"`
+}
+
 type OrderItem struct {
 	Product        *Product              `json:"product"`
 	ProductID      uuid.UUID             `json:"productID"`
@@ -250,6 +259,62 @@ type OrderItemSelection struct {
 	Quantity int                 `json:"quantity"`
 	Group    *ProductChoiceGroup `json:"group"`
 	Choice   *ProductChoice      `json:"choice"`
+}
+
+// A problem with one line. code: PRODUCT_NOT_FOUND, PRODUCT_UNAVAILABLE, INVALID_QUANTITY,
+// SELECTION_INVALID, INVALID_PRICE, LUNCH_SLOT_REQUIRED or PRICE_CHANGED.
+type OrderLineIssue struct {
+	Code string `json:"code"`
+	// Today's price of the product, whenever it exists (PRICE_CHANGED, PRODUCT_UNAVAILABLE...).
+	CurrentPrice *string `json:"currentPrice,omitempty"`
+}
+
+// The price of a basket right now. Money fields are decimal strings ("12.50"); `total` is what the
+// customer would be charged (equal to the createOrder total_price), a multiple of 0,10 EUR and never
+// negative. A basket with any `issues` or line issues cannot be ordered as is.
+type OrderQuote struct {
+	// In the order of the input items.
+	Lines []*OrderQuoteLine `json:"lines"`
+	// Σ lineTotal of the lines that could be priced.
+	Subtotal       string `json:"subtotal"`
+	DeliveryFee    string `json:"deliveryFee"`
+	PickupDiscount string `json:"pickupDiscount"`
+	CouponDiscount string `json:"couponDiscount"`
+	// The online payment surcharge (0 for cash).
+	OnlineFee string `json:"onlineFee"`
+	Total     string `json:"total"`
+	// null when no coupon code was sent.
+	Coupon *OrderQuoteCoupon `json:"coupon,omitempty"`
+	// Order-level problems; every code is in apperr (codes.go).
+	Issues []*OrderIssue `json:"issues"`
+}
+
+type OrderQuoteCoupon struct {
+	Code  string `json:"code"`
+	Valid bool   `json:"valid"`
+	// Why it is not valid: a COUPON_* code, or UNAUTHENTICATED when the caller is not signed in (the coupon was not evaluated).
+	ErrorCode *string `json:"errorCode,omitempty"`
+}
+
+type OrderQuoteLine struct {
+	ProductID uuid.UUID `json:"productId"`
+	Quantity  int       `json:"quantity"`
+	// The selections as priced: the legacy choiceId is folded in, choices that exist carry today's priceModifier.
+	Selections []*OrderQuoteSelection `json:"selections"`
+	// Today's price of the product itself (without choices); null when the product does not exist.
+	ProductPrice *string `json:"productPrice,omitempty"`
+	// lineTotal / quantity rounded to cents (what createOrder stores as unit_price).
+	UnitPrice string `json:"unitPrice"`
+	// base × quantity + Σ choice surcharges (see PriceLine); 0 when the line cannot be priced (missing or sold-out product, bad quantity or selections).
+	LineTotal string            `json:"lineTotal"`
+	Issues    []*OrderLineIssue `json:"issues"`
+}
+
+type OrderQuoteSelection struct {
+	GroupID       uuid.UUID `json:"groupId"`
+	ChoiceID      uuid.UUID `json:"choiceId"`
+	Quantity      int       `json:"quantity"`
+	PriceModifier string    `json:"priceModifier"`
 }
 
 type OrderStatusHistory struct {
@@ -346,6 +411,27 @@ type ProductChoiceGroup struct {
 }
 
 type Query struct {
+}
+
+// Everything createOrder would validate and price, without saving anything: the basket as it would be
+// charged right now. Problems are reported instead of failing on the first one.
+type QuoteOrderInput struct {
+	OrderType          OrderTypeEnum          `json:"orderType"`
+	IsOnlinePayment    bool                   `json:"isOnlinePayment"`
+	AddressPlaceID     *string                `json:"addressPlaceId,omitempty"`
+	PreferredReadyTime *time.Time             `json:"preferredReadyTime,omitempty"`
+	Items              []*QuoteOrderItemInput `json:"items"`
+	// Only evaluated for an authenticated caller.
+	CouponCode *string `json:"couponCode,omitempty"`
+}
+
+type QuoteOrderItemInput struct {
+	ProductID  uuid.UUID                        `json:"productId"`
+	Quantity   int                              `json:"quantity"`
+	ChoiceID   *uuid.UUID                       `json:"choiceId,omitempty"`
+	Selections []*CreateOrderItemSelectionInput `json:"selections,omitempty"`
+	// The line total (decimal string) the client currently displays. When it differs from today's price the line gets a PRICE_CHANGED issue carrying currentPrice.
+	ExpectedLineTotal *string `json:"expectedLineTotal,omitempty"`
 }
 
 type RestaurantConfig struct {

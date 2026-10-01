@@ -1,6 +1,10 @@
 package domain
 
-import "github.com/shopspring/decimal"
+import (
+	"github.com/shopspring/decimal"
+
+	"tsb-service/pkg/money"
+)
 
 // PricedSelection is one selected product choice with its price modifier, as
 // used by PriceLine. Quantity is the TOTAL number of times the choice is
@@ -45,4 +49,23 @@ func PriceLine(base decimal.Decimal, qty int64, selections []PricedSelection) (l
 	}
 	unitPrice = lineTotal.DivRound(decimal.NewFromInt(qty), 2)
 	return lineTotal, unitPrice
+}
+
+// OrderTotal is the amount the customer is charged (orders.total_price, and what Mollie is asked
+// for). It is the ONE place that adds an order up: the order repository stores it and the quote
+// (quoteOrder) shows it, so the two can never drift.
+//
+//	total = round10( max(items + deliveryFee - takeawayDiscount - couponDiscount, 0) + transactionFee )
+//
+// The goods + delivery part is clamped at 0 BEFORE the online fee is added: a coupon that covers the
+// whole basket leaves exactly the fee (or nothing, for cash), never a negative amount. Without the
+// clamp, a coupon snapped up to 0,10 EUR on a basket that is not a multiple of 10 cents stored a
+// total of -0,05 / -0,10 EUR (audit PR 2.1 finding). The result is a multiple of 0,10 EUR
+// (pkg/money.RoundToNearest10Cents).
+func OrderTotal(items, deliveryFee, takeawayDiscount, couponDiscount, transactionFee decimal.Decimal) decimal.Decimal {
+	goodsAndDelivery := items.Add(deliveryFee).Sub(takeawayDiscount).Sub(couponDiscount)
+	if goodsAndDelivery.Sign() < 0 {
+		goodsAndDelivery = decimal.Zero
+	}
+	return money.RoundToNearest10Cents(goodsAndDelivery.Add(transactionFee))
 }

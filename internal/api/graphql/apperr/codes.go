@@ -50,7 +50,7 @@ const (
 	CodeOrderTooManyItems Code = "ORDER_TOO_MANY_ITEMS"
 	// CodeProductNotFound: a product of the basket no longer exists (deleted since the cart was saved).
 	CodeProductNotFound Code = "PRODUCT_NOT_FOUND"
-	// CodeProductUnavailable: reserved for the quote (PR 2.2): the product exists but is sold out.
+	// CodeProductUnavailable: the product exists but is sold out (is_available = false).
 	CodeProductUnavailable Code = "PRODUCT_UNAVAILABLE"
 	// CodeInvalidQuantity: a line quantity outside 1..99.
 	CodeInvalidQuantity Code = "INVALID_QUANTITY"
@@ -59,6 +59,9 @@ const (
 	CodeSelectionInvalid Code = "SELECTION_INVALID"
 	// CodeInvalidPrice: the line would have a negative price.
 	CodeInvalidPrice Code = "INVALID_PRICE"
+	// CodePriceChanged: quoteOrder only. The line total the client showed (`expectedLineTotal`) is no
+	// longer today's price; the line carries `currentPrice`. createOrder never returns it.
+	CodePriceChanged Code = "PRICE_CHANGED"
 )
 
 // Delivery (createOrder).
@@ -123,6 +126,7 @@ var expected = map[Code]bool{
 	CodeInvalidQuantity:       true,
 	CodeSelectionInvalid:      true,
 	CodeInvalidPrice:          true,
+	CodePriceChanged:          true,
 	CodeDeliveryMinimumNotMet: true,
 	CodeAddressRequired:       true,
 	CodeDeliveryOutOfZone:     true,

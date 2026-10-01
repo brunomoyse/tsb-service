@@ -16,6 +16,9 @@ type ProductRepository interface {
 	FindCategoryByID(ctx context.Context, id uuid.UUID) (*Category, error)
 	FindByIDs(ctx context.Context, productIDs []string) ([]*ProductOrderDetails, error)
 	FindNamesByIDs(ctx context.Context, productIDs []string) ([]*ProductOrderDetails, error)
+	// FindForPricing is FindByIDs without the availability error: sold-out products are returned
+	// with IsAvailable=false so the caller (order pricing / quoteOrder) can flag them per line.
+	FindForPricing(ctx context.Context, productIDs []string) ([]*ProductOrderDetails, error)
 
 	FindCategoriesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*Category, error)
 	FindByCategoryIDs(ctx context.Context, categoryIDs []string) (map[string][]*Product, error)
