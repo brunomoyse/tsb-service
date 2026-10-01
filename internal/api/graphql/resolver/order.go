@@ -176,7 +176,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	}
 	for _, op := range input.Items {
 		pid := op.ProductID
-		unitPrice, ok := priceMap[pid]
+		basePrice, ok := priceMap[pid]
 		if !ok {
 			return nil, fmt.Errorf("product %s not found", productLabel(pid))
 		}
@@ -200,9 +200,10 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			if choice.ProductID != pid {
 				return nil, fmt.Errorf("choice %s does not belong to product %s", op.ChoiceID, productLabel(pid))
 			}
-			selectionByChoice[choice.ID]++
+			legacyQty := legacyChoiceQuantity(qty)
+			selectionByChoice[choice.ID] += legacyQty
 			selectionGroupByChoice[choice.ID] = choice.ChoiceGroupID
-			selectionCountByGroup[choice.ChoiceGroupID]++
+			selectionCountByGroup[choice.ChoiceGroupID] += legacyQty
 		}
 
 		if op.Selections != nil {
@@ -250,13 +251,13 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		}
 
 		selections := make([]orderDomain.OrderProductSelection, 0, len(selectionByChoice))
+		pricedSelections := make([]orderDomain.PricedSelection, 0, len(selectionByChoice))
 		for choiceIDValue, quantity := range selectionByChoice {
 			choice := choiceCache[choiceIDValue]
-			modifier := choice.PriceModifier
-			if modifier.Sign() < 0 {
-				modifier = decimal.Zero
-			}
-			unitPrice = unitPrice.Add(modifier.Mul(decimal.NewFromInt(int64(quantity))))
+			pricedSelections = append(pricedSelections, orderDomain.PricedSelection{
+				Modifier: choice.PriceModifier,
+				Quantity: quantity,
+			})
 			selections = append(selections, orderDomain.OrderProductSelection{
 				GroupID:  selectionGroupByChoice[choiceIDValue],
 				ChoiceID: choiceIDValue,
@@ -264,7 +265,11 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			})
 		}
 
-		if unitPrice.LessThan(decimal.Zero) {
+		// line total = base × qty + Σ(modifier × selection qty); see PriceLine
+		// for why the surcharge is not multiplied by qty again and how unit_price
+		// is derived.
+		lineTotal, unitPrice := orderDomain.PriceLine(basePrice, qty, pricedSelections)
+		if lineTotal.LessThan(decimal.Zero) {
 			return nil, fmt.Errorf("invalid price for product %s: price cannot be negative", productLabel(pid))
 		}
 
@@ -278,7 +283,6 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 			}
 		}
 
-		lineTotal := unitPrice.Mul(decimal.NewFromInt(qty))
 		vatRateApplied := vatCategoryMap[pid].VatRatePercent(orderServiceType)
 		total = total.Add(lineTotal)
 		rawItems = append(rawItems, orderDomain.OrderProductRaw{

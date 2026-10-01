@@ -6,6 +6,7 @@ import (
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/shopspring/decimal"
 
+	orderDomain "tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/money"
 )
 
@@ -171,4 +172,29 @@ func TestRoundingCorrectionLineNearFullDiscount(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMollieLineAmounts(t *testing.T) {
+	mk := func(qty int64, unit, total string) orderDomain.OrderProduct {
+		return orderDomain.OrderProduct{
+			Quantity:   qty,
+			UnitPrice:  decimal.RequireFromString(unit),
+			TotalPrice: decimal.RequireFromString(total),
+		}
+	}
+
+	t.Run("keeps quantity and unit price when they multiply back exactly", func(t *testing.T) {
+		desc, qty, unit := mollieLineAmounts("Bowl", mk(2, "13.50", "27.00"))
+		if desc != "Bowl" || qty != 2 || !unit.Equal(decimal.RequireFromString("13.50")) {
+			t.Fatalf("got %q %d %s", desc, qty, unit)
+		}
+	})
+
+	t.Run("falls back to quantity 1 at the line total when the rounded unit price does not multiply back", func(t *testing.T) {
+		// 10.00 × 3 + one 0.50 surcharge = 30.50; unit_price 10.17 × 3 = 30.51.
+		desc, qty, unit := mollieLineAmounts("Bowl", mk(3, "10.17", "30.50"))
+		if desc != "3 × Bowl" || qty != 1 || !unit.Equal(decimal.RequireFromString("30.50")) {
+			t.Fatalf("got %q %d %s", desc, qty, unit)
+		}
+	})
 }
