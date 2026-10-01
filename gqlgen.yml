@@ -229,6 +229,8 @@ models:
         resolver: true
       nextOpeningAt:
         resolver: true
+      policy:
+        resolver: true
 
   User:
     model:

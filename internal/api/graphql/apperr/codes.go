@@ -74,6 +74,8 @@ const (
 	CodeDeliveryOutOfZone Code = "DELIVERY_OUT_OF_ZONE"
 	// CodeDeliveryAreaExcluded: the address is in a postcode we never deliver to.
 	CodeDeliveryAreaExcluded Code = "DELIVERY_AREA_EXCLUDED"
+	// CodeDeliveryUnavailable: this instance is takeaway-only (RESTAURANT_DELIVERY_ENABLED=false).
+	CodeDeliveryUnavailable Code = "DELIVERY_UNAVAILABLE"
 )
 
 // Coupons (createOrder, and `errorCode` of the validateCoupon result).
@@ -143,6 +145,7 @@ var expected = map[Code]bool{
 	CodeAddressRequired:       true,
 	CodeDeliveryOutOfZone:     true,
 	CodeDeliveryAreaExcluded:  true,
+	CodeDeliveryUnavailable:   true,
 	CodeCouponInvalid:         true,
 	CodeCouponMinOrderNotMet:  true,
 	CodeCouponRateLimited:     true,

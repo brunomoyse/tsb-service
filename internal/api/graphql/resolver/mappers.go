@@ -272,6 +272,36 @@ func toGQLRestaurantConfig(c *restaurantDomain.RestaurantConfig) *model.Restaura
 	}
 }
 
+// currentOrderingPolicy is the policy of this instance, the one the order pricer enforces.
+func currentOrderingPolicy() *model.OrderingPolicy {
+	return toGQLOrderingPolicy(restaurantDomain.CurrentPolicy())
+}
+
+// toGQLOrderingPolicy renders the ordering policy: money as decimal strings with cents.
+func toGQLOrderingPolicy(p restaurantDomain.OrderingPolicy) *model.OrderingPolicy {
+	tiers := make([]*model.DeliveryFeeTier, len(p.DeliveryFeeTiers))
+	for i, tier := range p.DeliveryFeeTiers {
+		tiers[i] = &model.DeliveryFeeTier{UpToKm: float64(tier.UpToMeters) / 1000, Fee: fixed2(tier.Fee)}
+	}
+	excluded := p.ExcludedPostcodes
+	if excluded == nil {
+		excluded = []string{}
+	}
+	return &model.OrderingPolicy{
+		DeliveryEnabled:           p.DeliveryEnabled,
+		DeliveryMinimum:           fixed2(p.DeliveryMinimum),
+		DeliveryMaxDistanceKm:     float64(p.DeliveryMaxMeters) / 1000,
+		DeliveryFeeTiers:          tiers,
+		ExcludedPostcodes:         excluded,
+		PickupDiscountRate:        p.PickupDiscountRate.InexactFloat64(),
+		PickupDiscountMinimum:     fixed2(p.PickupDiscountMinimum),
+		OnlinePaymentFee:          fixed2(p.OnlinePaymentFee),
+		TotalRoundingStep:         fixed2(p.TotalRoundingStep),
+		SlotIntervalMinutes:       p.SlotIntervalMinutes,
+		MinimumPreparationMinutes: p.MinimumPreparationMinutes,
+	}
+}
+
 func toGQLScheduleOverride(ov *restaurantDomain.ScheduleOverride) *model.ScheduleOverride {
 	out := &model.ScheduleOverride{
 		Date:      ov.Date,
@@ -405,40 +435,6 @@ func emailContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 30*time.Second)
 }
 
-// excludedDeliveryPostcodes lists postcodes we never deliver to, regardless of distance.
-var excludedDeliveryPostcodes = map[string]bool{
-	"4610": true, // Beyne-Heusay
-}
-
-// isExcludedDeliveryPostcode reports whether the given postcode is excluded from delivery.
-func isExcludedDeliveryPostcode(postcode string) bool {
-	return excludedDeliveryPostcodes[strings.TrimSpace(postcode)]
-}
-
-// deliveryFeeFromDistance computes the delivery fee based on distance in meters.
-func deliveryFeeFromDistance(distance float64) decimal.Decimal {
-	var dFee int64
-	switch {
-	case distance < 3000:
-		dFee = 0
-	case distance < 4000:
-		dFee = 1
-	case distance < 5000:
-		dFee = 2
-	case distance < 6000:
-		dFee = 3
-	case distance < 7000:
-		dFee = 4
-	case distance < 8000:
-		dFee = 5
-	case distance < 9000:
-		dFee = 6
-	default:
-		dFee = 10 // unreachable; order.go rejects distance >= 9000 first
-	}
-	return decimal.NewFromInt(dFee)
-}
-
 // addressFromOrder constructs an addressDomain.Address from an order's denormalized fields.
 func addressFromOrder(o *orderDomain.Order) *addressDomain.Address {
 	if o.StreetName == nil {
@@ -498,12 +494,12 @@ func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.R
 		return slotError(apperr.CodeSlotNotToday, "preferred ready time must be on the same day")
 	}
 
-	prepBuffer := max(time.Duration(config.PreparationMinutes)*time.Minute, 15*time.Minute)
+	prepBuffer := max(time.Duration(config.PreparationMinutes), time.Duration(restaurantDomain.MinimumPreparationMinutes)) * time.Minute
 	if slot.Before(nowLocal.Add(prepBuffer)) {
 		return slotError(apperr.CodeSlotTooSoon, "preferred ready time is no longer available — it is within the minimum preparation window")
 	}
 
-	if slot.Minute()%15 != 0 || slot.Second() != 0 || slot.Nanosecond() != 0 {
+	if slot.Minute()%restaurantDomain.SlotIntervalMinutes != 0 || slot.Second() != 0 || slot.Nanosecond() != 0 {
 		return slotError(apperr.CodeSlotMisaligned, "preferred ready time must be aligned to 15-minute slots")
 	}
 

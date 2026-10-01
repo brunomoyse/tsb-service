@@ -136,6 +136,11 @@ type ComplexityRoot struct {
 		Open        func(childComplexity int) int
 	}
 
+	DeliveryFeeTier struct {
+		Fee    func(childComplexity int) int
+		UpToKm func(childComplexity int) int
+	}
+
 	Mutation struct {
 		CreateCoupon              func(childComplexity int, input model.CreateCouponInput) int
 		CreateOrder               func(childComplexity int, input model.CreateOrderInput) int
@@ -275,6 +280,20 @@ type ComplexityRoot struct {
 		Status    func(childComplexity int) int
 	}
 
+	OrderingPolicy struct {
+		DeliveryEnabled           func(childComplexity int) int
+		DeliveryFeeTiers          func(childComplexity int) int
+		DeliveryMaxDistanceKm     func(childComplexity int) int
+		DeliveryMinimum           func(childComplexity int) int
+		ExcludedPostcodes         func(childComplexity int) int
+		MinimumPreparationMinutes func(childComplexity int) int
+		OnlinePaymentFee          func(childComplexity int) int
+		PickupDiscountMinimum     func(childComplexity int) int
+		PickupDiscountRate        func(childComplexity int) int
+		SlotIntervalMinutes       func(childComplexity int) int
+		TotalRoundingStep         func(childComplexity int) int
+	}
+
 	Payment struct {
 		Amount                          func(childComplexity int) int
 		AmountCaptured                  func(childComplexity int) int
@@ -393,6 +412,7 @@ type ComplexityRoot struct {
 		OpeningHours            func(childComplexity int) int
 		OrderingEnabled         func(childComplexity int) int
 		OrderingHours           func(childComplexity int) int
+		Policy                  func(childComplexity int) int
 		PreparationMinutes      func(childComplexity int) int
 		UpdatedAt               func(childComplexity int) int
 	}
@@ -534,6 +554,7 @@ type RestaurantConfigResolver interface {
 	IsOrderingCurrentlyOpen(ctx context.Context, obj *model.RestaurantConfig) (bool, error)
 	AvailableSlotsToday(ctx context.Context, obj *model.RestaurantConfig) ([]*model.TimeSlot, error)
 	NextOpeningAt(ctx context.Context, obj *model.RestaurantConfig) (*time.Time, error)
+	Policy(ctx context.Context, obj *model.RestaurantConfig) (*model.OrderingPolicy, error)
 }
 type SubscriptionResolver interface {
 	CouponUpdated(ctx context.Context) (<-chan *model.Coupon, error)
@@ -917,6 +938,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.DaySchedule.Open(childComplexity), true
+
+	case "DeliveryFeeTier.fee":
+		if e.ComplexityRoot.DeliveryFeeTier.Fee == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DeliveryFeeTier.Fee(childComplexity), true
+	case "DeliveryFeeTier.upToKm":
+		if e.ComplexityRoot.DeliveryFeeTier.UpToKm == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DeliveryFeeTier.UpToKm(childComplexity), true
 
 	case "Mutation.createCoupon":
 		if e.ComplexityRoot.Mutation.CreateCoupon == nil {
@@ -1651,6 +1685,73 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.OrderStatusHistory.Status(childComplexity), true
 
+	case "OrderingPolicy.deliveryEnabled":
+		if e.ComplexityRoot.OrderingPolicy.DeliveryEnabled == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderingPolicy.DeliveryEnabled(childComplexity), true
+	case "OrderingPolicy.deliveryFeeTiers":
+		if e.ComplexityRoot.OrderingPolicy.DeliveryFeeTiers == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderingPolicy.DeliveryFeeTiers(childComplexity), true
+	case "OrderingPolicy.deliveryMaxDistanceKm":
+		if e.ComplexityRoot.OrderingPolicy.DeliveryMaxDistanceKm == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderingPolicy.DeliveryMaxDistanceKm(childComplexity), true
+	case "OrderingPolicy.deliveryMinimum":
+		if e.ComplexityRoot.OrderingPolicy.DeliveryMinimum == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderingPolicy.DeliveryMinimum(childComplexity), true
+	case "OrderingPolicy.excludedPostcodes":
+		if e.ComplexityRoot.OrderingPolicy.ExcludedPostcodes == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderingPolicy.ExcludedPostcodes(childComplexity), true
+	case "OrderingPolicy.minimumPreparationMinutes":
+		if e.ComplexityRoot.OrderingPolicy.MinimumPreparationMinutes == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderingPolicy.MinimumPreparationMinutes(childComplexity), true
+	case "OrderingPolicy.onlinePaymentFee":
+		if e.ComplexityRoot.OrderingPolicy.OnlinePaymentFee == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderingPolicy.OnlinePaymentFee(childComplexity), true
+	case "OrderingPolicy.pickupDiscountMinimum":
+		if e.ComplexityRoot.OrderingPolicy.PickupDiscountMinimum == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderingPolicy.PickupDiscountMinimum(childComplexity), true
+	case "OrderingPolicy.pickupDiscountRate":
+		if e.ComplexityRoot.OrderingPolicy.PickupDiscountRate == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderingPolicy.PickupDiscountRate(childComplexity), true
+	case "OrderingPolicy.slotIntervalMinutes":
+		if e.ComplexityRoot.OrderingPolicy.SlotIntervalMinutes == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderingPolicy.SlotIntervalMinutes(childComplexity), true
+	case "OrderingPolicy.totalRoundingStep":
+		if e.ComplexityRoot.OrderingPolicy.TotalRoundingStep == nil {
+			break
+		}
+
+		return e.ComplexityRoot.OrderingPolicy.TotalRoundingStep(childComplexity), true
+
 	case "Payment.amount":
 		if e.ComplexityRoot.Payment.Amount == nil {
 			break
@@ -2322,6 +2423,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.RestaurantConfig.OrderingHours(childComplexity), true
+	case "RestaurantConfig.policy":
+		if e.ComplexityRoot.RestaurantConfig.Policy == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RestaurantConfig.Policy(childComplexity), true
 	case "RestaurantConfig.preparationMinutes":
 		if e.ComplexityRoot.RestaurantConfig.PreparationMinutes == nil {
 			break
@@ -2837,6 +2944,16 @@ func (ec *executionContext) childFields_DaySchedule(ctx context.Context, field g
 	return nil, fmt.Errorf("no field named %q was found under type DaySchedule", field.Name)
 }
 
+func (ec *executionContext) childFields_DeliveryFeeTier(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "upToKm":
+		return ec.fieldContext_DeliveryFeeTier_upToKm(ctx, field)
+	case "fee":
+		return ec.fieldContext_DeliveryFeeTier_fee(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type DeliveryFeeTier", field.Name)
+}
+
 func (ec *executionContext) childFields_Order(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "id":
@@ -3059,6 +3176,34 @@ func (ec *executionContext) childFields_OrderStatusHistory(ctx context.Context, 
 	return nil, fmt.Errorf("no field named %q was found under type OrderStatusHistory", field.Name)
 }
 
+func (ec *executionContext) childFields_OrderingPolicy(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "deliveryEnabled":
+		return ec.fieldContext_OrderingPolicy_deliveryEnabled(ctx, field)
+	case "deliveryMinimum":
+		return ec.fieldContext_OrderingPolicy_deliveryMinimum(ctx, field)
+	case "deliveryMaxDistanceKm":
+		return ec.fieldContext_OrderingPolicy_deliveryMaxDistanceKm(ctx, field)
+	case "deliveryFeeTiers":
+		return ec.fieldContext_OrderingPolicy_deliveryFeeTiers(ctx, field)
+	case "excludedPostcodes":
+		return ec.fieldContext_OrderingPolicy_excludedPostcodes(ctx, field)
+	case "pickupDiscountRate":
+		return ec.fieldContext_OrderingPolicy_pickupDiscountRate(ctx, field)
+	case "pickupDiscountMinimum":
+		return ec.fieldContext_OrderingPolicy_pickupDiscountMinimum(ctx, field)
+	case "onlinePaymentFee":
+		return ec.fieldContext_OrderingPolicy_onlinePaymentFee(ctx, field)
+	case "totalRoundingStep":
+		return ec.fieldContext_OrderingPolicy_totalRoundingStep(ctx, field)
+	case "slotIntervalMinutes":
+		return ec.fieldContext_OrderingPolicy_slotIntervalMinutes(ctx, field)
+	case "minimumPreparationMinutes":
+		return ec.fieldContext_OrderingPolicy_minimumPreparationMinutes(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type OrderingPolicy", field.Name)
+}
+
 func (ec *executionContext) childFields_Payment(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "id":
@@ -3251,6 +3396,8 @@ func (ec *executionContext) childFields_RestaurantConfig(ctx context.Context, fi
 		return ec.fieldContext_RestaurantConfig_availableSlotsToday(ctx, field)
 	case "nextOpeningAt":
 		return ec.fieldContext_RestaurantConfig_nextOpeningAt(ctx, field)
+	case "policy":
+		return ec.fieldContext_RestaurantConfig_policy(ctx, field)
 	case "updatedAt":
 		return ec.fieldContext_RestaurantConfig_updatedAt(ctx, field)
 	}
@@ -5508,6 +5655,52 @@ func (ec *executionContext) _DaySchedule_dinnerClose(ctx context.Context, field 
 }
 func (ec *executionContext) fieldContext_DaySchedule_dinnerClose(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("DaySchedule", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _DeliveryFeeTier_upToKm(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryFeeTier) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DeliveryFeeTier_upToKm(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UpToKm, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_DeliveryFeeTier_upToKm(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("DeliveryFeeTier", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _DeliveryFeeTier_fee(ctx context.Context, field graphql.CollectedField, obj *model.DeliveryFeeTier) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DeliveryFeeTier_fee(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Fee, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_DeliveryFeeTier_fee(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("DeliveryFeeTier", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _Mutation_createCoupon(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -8805,6 +8998,268 @@ func (ec *executionContext) fieldContext_OrderStatusHistory_changedAt(_ context.
 	return graphql.NewScalarFieldContext("OrderStatusHistory", field, false, false, errors.New("field of type DateTime does not have child fields"))
 }
 
+func (ec *executionContext) _OrderingPolicy_deliveryEnabled(ctx context.Context, field graphql.CollectedField, obj *model.OrderingPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OrderingPolicy_deliveryEnabled(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DeliveryEnabled, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_OrderingPolicy_deliveryEnabled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OrderingPolicy", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _OrderingPolicy_deliveryMinimum(ctx context.Context, field graphql.CollectedField, obj *model.OrderingPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OrderingPolicy_deliveryMinimum(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DeliveryMinimum, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_OrderingPolicy_deliveryMinimum(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OrderingPolicy", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _OrderingPolicy_deliveryMaxDistanceKm(ctx context.Context, field graphql.CollectedField, obj *model.OrderingPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OrderingPolicy_deliveryMaxDistanceKm(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DeliveryMaxDistanceKm, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_OrderingPolicy_deliveryMaxDistanceKm(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OrderingPolicy", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _OrderingPolicy_deliveryFeeTiers(ctx context.Context, field graphql.CollectedField, obj *model.OrderingPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OrderingPolicy_deliveryFeeTiers(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DeliveryFeeTiers, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.DeliveryFeeTier) graphql.Marshaler {
+			return ec.marshalNDeliveryFeeTier2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐDeliveryFeeTierᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_OrderingPolicy_deliveryFeeTiers(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "OrderingPolicy",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_DeliveryFeeTier(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _OrderingPolicy_excludedPostcodes(ctx context.Context, field graphql.CollectedField, obj *model.OrderingPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OrderingPolicy_excludedPostcodes(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ExcludedPostcodes, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_OrderingPolicy_excludedPostcodes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OrderingPolicy", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _OrderingPolicy_pickupDiscountRate(ctx context.Context, field graphql.CollectedField, obj *model.OrderingPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OrderingPolicy_pickupDiscountRate(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PickupDiscountRate, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_OrderingPolicy_pickupDiscountRate(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OrderingPolicy", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _OrderingPolicy_pickupDiscountMinimum(ctx context.Context, field graphql.CollectedField, obj *model.OrderingPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OrderingPolicy_pickupDiscountMinimum(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PickupDiscountMinimum, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_OrderingPolicy_pickupDiscountMinimum(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OrderingPolicy", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _OrderingPolicy_onlinePaymentFee(ctx context.Context, field graphql.CollectedField, obj *model.OrderingPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OrderingPolicy_onlinePaymentFee(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.OnlinePaymentFee, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_OrderingPolicy_onlinePaymentFee(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OrderingPolicy", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _OrderingPolicy_totalRoundingStep(ctx context.Context, field graphql.CollectedField, obj *model.OrderingPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OrderingPolicy_totalRoundingStep(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TotalRoundingStep, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_OrderingPolicy_totalRoundingStep(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OrderingPolicy", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _OrderingPolicy_slotIntervalMinutes(ctx context.Context, field graphql.CollectedField, obj *model.OrderingPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OrderingPolicy_slotIntervalMinutes(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SlotIntervalMinutes, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_OrderingPolicy_slotIntervalMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OrderingPolicy", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _OrderingPolicy_minimumPreparationMinutes(ctx context.Context, field graphql.CollectedField, obj *model.OrderingPolicy) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_OrderingPolicy_minimumPreparationMinutes(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MinimumPreparationMinutes, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_OrderingPolicy_minimumPreparationMinutes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("OrderingPolicy", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
 func (ec *executionContext) _Payment_id(ctx context.Context, field graphql.CollectedField, obj *model.Payment) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -11773,6 +12228,38 @@ func (ec *executionContext) _RestaurantConfig_nextOpeningAt(ctx context.Context,
 }
 func (ec *executionContext) fieldContext_RestaurantConfig_nextOpeningAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("RestaurantConfig", field, true, true, errors.New("field of type DateTime does not have child fields"))
+}
+
+func (ec *executionContext) _RestaurantConfig_policy(ctx context.Context, field graphql.CollectedField, obj *model.RestaurantConfig) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RestaurantConfig_policy(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.RestaurantConfig().Policy(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.OrderingPolicy) graphql.Marshaler {
+			return ec.marshalNOrderingPolicy2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderingPolicy(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RestaurantConfig_policy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RestaurantConfig",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_OrderingPolicy(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _RestaurantConfig_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.RestaurantConfig) (ret graphql.Marshaler) {
@@ -15763,6 +16250,49 @@ func (ec *executionContext) _DaySchedule(ctx context.Context, sel ast.SelectionS
 	return out
 }
 
+var deliveryFeeTierImplementors = []string{"DeliveryFeeTier"}
+
+func (ec *executionContext) _DeliveryFeeTier(ctx context.Context, sel ast.SelectionSet, obj *model.DeliveryFeeTier) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, deliveryFeeTierImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DeliveryFeeTier")
+		case "upToKm":
+			out.Values[i] = ec._DeliveryFeeTier_upToKm(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fee":
+			out.Values[i] = ec._DeliveryFeeTier_fee(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -17155,6 +17685,94 @@ func (ec *executionContext) _OrderStatusHistory(ctx context.Context, sel ast.Sel
 			}
 		case "changedAt":
 			out.Values[i] = ec._OrderStatusHistory_changedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var orderingPolicyImplementors = []string{"OrderingPolicy"}
+
+func (ec *executionContext) _OrderingPolicy(ctx context.Context, sel ast.SelectionSet, obj *model.OrderingPolicy) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, orderingPolicyImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("OrderingPolicy")
+		case "deliveryEnabled":
+			out.Values[i] = ec._OrderingPolicy_deliveryEnabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deliveryMinimum":
+			out.Values[i] = ec._OrderingPolicy_deliveryMinimum(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deliveryMaxDistanceKm":
+			out.Values[i] = ec._OrderingPolicy_deliveryMaxDistanceKm(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deliveryFeeTiers":
+			out.Values[i] = ec._OrderingPolicy_deliveryFeeTiers(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "excludedPostcodes":
+			out.Values[i] = ec._OrderingPolicy_excludedPostcodes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pickupDiscountRate":
+			out.Values[i] = ec._OrderingPolicy_pickupDiscountRate(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pickupDiscountMinimum":
+			out.Values[i] = ec._OrderingPolicy_pickupDiscountMinimum(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "onlinePaymentFee":
+			out.Values[i] = ec._OrderingPolicy_onlinePaymentFee(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalRoundingStep":
+			out.Values[i] = ec._OrderingPolicy_totalRoundingStep(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "slotIntervalMinutes":
+			out.Values[i] = ec._OrderingPolicy_slotIntervalMinutes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "minimumPreparationMinutes":
+			out.Values[i] = ec._OrderingPolicy_minimumPreparationMinutes(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -18614,6 +19232,44 @@ func (ec *executionContext) _RestaurantConfig(ctx context.Context, sel ast.Selec
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "policy":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._RestaurantConfig_policy(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "updatedAt":
 			out.Values[i] = ec._RestaurantConfig_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -19626,6 +20282,32 @@ func (ec *executionContext) marshalNDateTime2timeᚐTime(ctx context.Context, se
 	return res
 }
 
+func (ec *executionContext) marshalNDeliveryFeeTier2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐDeliveryFeeTierᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.DeliveryFeeTier) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNDeliveryFeeTier2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐDeliveryFeeTier(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNDeliveryFeeTier2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐDeliveryFeeTier(ctx context.Context, sel ast.SelectionSet, v *model.DeliveryFeeTier) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DeliveryFeeTier(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v any) (float64, error) {
 	res, err := graphql.UnmarshalFloatContext(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -19971,6 +20653,16 @@ func (ec *executionContext) marshalNOrderTypeEnum2tsbᚑserviceᚋinternalᚋapi
 	return v
 }
 
+func (ec *executionContext) marshalNOrderingPolicy2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐOrderingPolicy(ctx context.Context, sel ast.SelectionSet, v *model.OrderingPolicy) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._OrderingPolicy(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNPayment2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐPayment(ctx context.Context, sel ast.SelectionSet, v *model.Payment) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -20164,6 +20856,35 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalNTimeSlot2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐTimeSlotᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.TimeSlot) graphql.Marshaler {

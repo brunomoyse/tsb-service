@@ -184,6 +184,11 @@ func (r *restaurantConfigResolver) NextOpeningAt(ctx context.Context, obj *model
 	return config.NextOpeningAt(time.Now(), overrides), nil
 }
 
+// Policy is the resolver for the policy field. It is the same policy the order pricer enforces.
+func (r *restaurantConfigResolver) Policy(ctx context.Context, obj *model.RestaurantConfig) (*model.OrderingPolicy, error) {
+	return currentOrderingPolicy(), nil
+}
+
 // RestaurantConfigUpdated is the resolver for the restaurantConfigUpdated field.
 func (r *subscriptionResolver) RestaurantConfigUpdated(ctx context.Context) (<-chan *model.RestaurantConfig, error) {
 	ch := make(chan *model.RestaurantConfig, 1)
