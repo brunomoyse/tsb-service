@@ -950,6 +950,38 @@ func (r *orderItemResolver) Choice(ctx context.Context, obj *model.OrderItem) (*
 	return ToGQLProductChoice(choice, userLang), nil
 }
 
+// Group is the resolver for the group field.
+func (r *orderItemSelectionResolver) Group(ctx context.Context, obj *model.OrderItemSelection) (*model.ProductChoiceGroup, error) {
+	loader := productApplication.GetChoiceGroupByIDLoader(ctx)
+	if loader == nil {
+		return nil, errors.New("no choice group loader found")
+	}
+	groups, err := loader.Loader.Load(ctx, obj.GroupID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load selection group: %w", err)
+	}
+	if len(groups) == 0 {
+		return nil, fmt.Errorf("selection group %s not found", obj.GroupID)
+	}
+	return ToGQLProductChoiceGroup(groups[0], utils.GetLang(ctx)), nil
+}
+
+// Choice is the resolver for the choice field.
+func (r *orderItemSelectionResolver) Choice(ctx context.Context, obj *model.OrderItemSelection) (*model.ProductChoice, error) {
+	loader := productApplication.GetChoiceByIDLoader(ctx)
+	if loader == nil {
+		return nil, errors.New("no choice loader found")
+	}
+	choices, err := loader.Loader.Load(ctx, obj.ChoiceID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to load selection choice: %w", err)
+	}
+	if len(choices) == 0 {
+		return nil, fmt.Errorf("selection choice %s not found", obj.ChoiceID)
+	}
+	return ToGQLProductChoice(choices[0], utils.GetLang(ctx)), nil
+}
+
 // QuoteOrder is the resolver for the quoteOrder field. The work is in order_quote.go.
 func (r *queryResolver) QuoteOrder(ctx context.Context, input model.QuoteOrderInput) (*model.OrderQuote, error) {
 	return r.quoteOrder(ctx, input)
@@ -1239,7 +1271,13 @@ func (r *Resolver) Order() graphql1.OrderResolver { return &orderResolver{r} }
 // OrderItem returns graphql1.OrderItemResolver implementation.
 func (r *Resolver) OrderItem() graphql1.OrderItemResolver { return &orderItemResolver{r} }
 
+// OrderItemSelection returns graphql1.OrderItemSelectionResolver implementation.
+func (r *Resolver) OrderItemSelection() graphql1.OrderItemSelectionResolver {
+	return &orderItemSelectionResolver{r}
+}
+
 type (
-	orderResolver     struct{ *Resolver }
-	orderItemResolver struct{ *Resolver }
+	orderResolver              struct{ *Resolver }
+	orderItemResolver          struct{ *Resolver }
+	orderItemSelectionResolver struct{ *Resolver }
 )

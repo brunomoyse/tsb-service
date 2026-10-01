@@ -35,6 +35,7 @@ type ResolverRoot interface {
 	Mutation() MutationResolver
 	Order() OrderResolver
 	OrderItem() OrderItemResolver
+	OrderItemSelection() OrderItemSelectionResolver
 	Product() ProductResolver
 	ProductCategory() ProductCategoryResolver
 	ProductChoiceGroup() ProductChoiceGroupResolver
@@ -488,6 +489,10 @@ type OrderItemResolver interface {
 	Product(ctx context.Context, obj *model.OrderItem) (*model.Product, error)
 
 	Choice(ctx context.Context, obj *model.OrderItem) (*model.ProductChoice, error)
+}
+type OrderItemSelectionResolver interface {
+	Group(ctx context.Context, obj *model.OrderItemSelection) (*model.ProductChoiceGroup, error)
+	Choice(ctx context.Context, obj *model.OrderItemSelection) (*model.ProductChoice, error)
 }
 type ProductResolver interface {
 	Category(ctx context.Context, obj *model.Product) (*model.ProductCategory, error)
@@ -8056,7 +8061,7 @@ func (ec *executionContext) _OrderItemSelection_group(ctx context.Context, field
 			return ec.fieldContext_OrderItemSelection_group(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.Group, nil
+			return ec.Resolvers.OrderItemSelection().Group(ctx, obj)
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.ProductChoiceGroup) graphql.Marshaler {
@@ -8070,8 +8075,8 @@ func (ec *executionContext) fieldContext_OrderItemSelection_group(_ context.Cont
 	fc = &graphql.FieldContext{
 		Object:     "OrderItemSelection",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_ProductChoiceGroup(ctx, field)
 		},
@@ -8088,7 +8093,7 @@ func (ec *executionContext) _OrderItemSelection_choice(ctx context.Context, fiel
 			return ec.fieldContext_OrderItemSelection_choice(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.Choice, nil
+			return ec.Resolvers.OrderItemSelection().Choice(ctx, obj)
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.ProductChoice) graphql.Marshaler {
@@ -8102,8 +8107,8 @@ func (ec *executionContext) fieldContext_OrderItemSelection_choice(_ context.Con
 	fc = &graphql.FieldContext{
 		Object:     "OrderItemSelection",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_ProductChoice(ctx, field)
 		},
@@ -16727,28 +16732,94 @@ func (ec *executionContext) _OrderItemSelection(ctx context.Context, sel ast.Sel
 		case "groupId":
 			out.Values[i] = ec._OrderItemSelection_groupId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "choiceId":
 			out.Values[i] = ec._OrderItemSelection_choiceId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "quantity":
 			out.Values[i] = ec._OrderItemSelection_quantity(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "group":
-			out.Values[i] = ec._OrderItemSelection_group(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._OrderItemSelection_group(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "choice":
-			out.Values[i] = ec._OrderItemSelection_choice(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._OrderItemSelection_choice(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

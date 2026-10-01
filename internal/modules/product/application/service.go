@@ -32,6 +32,7 @@ type ProductService interface {
 	GetChoiceGroupsByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoiceGroup, error)
 	GetChoiceGroupByID(ctx context.Context, groupID uuid.UUID) (*domain.ProductChoiceGroup, error)
 	BatchGetChoiceGroupsByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.ProductChoiceGroup, error)
+	BatchGetChoiceGroupsByIDs(ctx context.Context, groupIDs []string) (map[string][]*domain.ProductChoiceGroup, error)
 	CreateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error
 	UpdateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error
 	DeleteChoiceGroup(ctx context.Context, groupID uuid.UUID) error
@@ -39,6 +40,7 @@ type ProductService interface {
 	GetChoicesByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoice, error)
 	GetChoiceByID(ctx context.Context, choiceID uuid.UUID) (*domain.ProductChoice, error)
 	BatchGetChoicesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.ProductChoice, error)
+	BatchGetChoicesByIDs(ctx context.Context, choiceIDs []string) (map[string][]*domain.ProductChoice, error)
 	CreateChoice(ctx context.Context, choice *domain.ProductChoice) error
 	UpdateChoice(ctx context.Context, choice *domain.ProductChoice) error
 	DeleteChoice(ctx context.Context, choiceID uuid.UUID) error
@@ -162,6 +164,14 @@ func (s *productService) GetChoiceGroupByID(ctx context.Context, groupID uuid.UU
 
 func (s *productService) BatchGetChoiceGroupsByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.ProductChoiceGroup, error) {
 	return s.repo.BatchGetChoiceGroupsByProductIDs(ctx, productIDs)
+}
+
+func (s *productService) BatchGetChoiceGroupsByIDs(ctx context.Context, groupIDs []string) (map[string][]*domain.ProductChoiceGroup, error) {
+	return s.repo.BatchGetChoiceGroupsByIDs(ctx, groupIDs)
+}
+
+func (s *productService) BatchGetChoicesByIDs(ctx context.Context, choiceIDs []string) (map[string][]*domain.ProductChoice, error) {
+	return s.repo.BatchGetChoicesByIDs(ctx, choiceIDs)
 }
 
 func (s *productService) CreateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error {

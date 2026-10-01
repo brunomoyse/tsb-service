@@ -1126,6 +1126,34 @@ func (r *ProductRepository) BatchGetChoiceGroupsByProductIDs(ctx context.Context
 	return result, nil
 }
 
+// BatchGetChoiceGroupsByIDs loads choice groups by their own ids (for the
+// OrderItemSelection.group DataLoader). The result is keyed by group id.
+func (r *ProductRepository) BatchGetChoiceGroupsByIDs(ctx context.Context, groupIDs []string) (map[string][]*domain.ProductChoiceGroup, error) {
+	result := make(map[string][]*domain.ProductChoiceGroup, len(groupIDs))
+	if len(groupIDs) == 0 {
+		return result, nil
+	}
+
+	query := `
+		SELECT
+			pcg.id, pcg.product_id, pcg.min_selections, pcg.max_selections, pcg.sort_order,
+			pcgt.locale, pcgt.name
+		FROM product_choice_groups pcg
+		LEFT JOIN product_choice_group_translations pcgt ON pcg.id = pcgt.product_choice_group_id
+		WHERE pcg.id = ANY($1)
+		ORDER BY pcg.sort_order
+	`
+	groups, err := r.queryChoiceGroups(ctx, query, pq.Array(groupIDs))
+	if err != nil {
+		return nil, err
+	}
+	for _, g := range groups {
+		key := g.ID.String()
+		result[key] = append(result[key], g)
+	}
+	return result, nil
+}
+
 func (r *ProductRepository) CreateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error {
 	tx, err := r.pool.ForContext(ctx).BeginTx(ctx, nil)
 	if err != nil {
@@ -1255,6 +1283,34 @@ func (r *ProductRepository) BatchGetChoicesByProductIDs(ctx context.Context, pro
 	result := make(map[string][]*domain.ProductChoice, len(productIDs))
 	for _, c := range choices {
 		key := c.ProductID.String()
+		result[key] = append(result[key], c)
+	}
+	return result, nil
+}
+
+// BatchGetChoicesByIDs loads choices by their own ids (for the
+// OrderItemSelection.choice DataLoader). The result is keyed by choice id.
+func (r *ProductRepository) BatchGetChoicesByIDs(ctx context.Context, choiceIDs []string) (map[string][]*domain.ProductChoice, error) {
+	result := make(map[string][]*domain.ProductChoice, len(choiceIDs))
+	if len(choiceIDs) == 0 {
+		return result, nil
+	}
+
+	query := `
+		SELECT
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
+			pct.locale, pct.name
+		FROM product_choices pc
+		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
+		WHERE pc.id = ANY($1)
+		ORDER BY pc.sort_order
+	`
+	choices, err := r.queryChoices(ctx, query, pq.Array(choiceIDs))
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range choices {
+		key := c.ID.String()
 		result[key] = append(result[key], c)
 	}
 	return result, nil
