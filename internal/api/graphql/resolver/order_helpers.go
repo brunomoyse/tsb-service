@@ -16,6 +16,17 @@ import (
 	orderDomain "tsb-service/internal/modules/order/domain"
 )
 
+// legacyChoiceQuantity is the line-wide selection quantity that the legacy
+// single `choiceId` input stands for. That input means "this choice applies to
+// every unit of the line", i.e. it is equivalent to
+// selections:[{choiceId, quantity: lineQty}]. Selection quantities are
+// line-wide (group min/max are scaled by the line quantity), so the legacy
+// choice has to be scaled the same way to price and validate identically to
+// the selections input.
+func legacyChoiceQuantity(lineQty int64) int {
+	return int(lineQty)
+}
+
 func normalizeOrderLanguage(l string) string {
 	base := strings.ToLower(strings.TrimSpace(l))
 	if i := strings.IndexAny(base, "-_"); i >= 0 {

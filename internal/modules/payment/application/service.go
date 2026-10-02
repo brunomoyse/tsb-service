@@ -79,13 +79,14 @@ func (s *paymentService) CreatePayment(ctx context.Context, o orderDomain.Order,
 			vatRate = decimal.NewFromFloat(productDomain.VatCategory(line.Product.VatCategory).VatRatePercent(serviceType))
 		}
 		vatAmount := vatAmountFromGross(line.TotalPrice, vatRate)
+		description, quantity, unitPrice := mollieLineAmounts(describe(line.Product), line)
 		lines = append(lines, mollie.PaymentLines{
 			Type:         mollie.PhysicalProductLine,
-			Description:  describe(line.Product),
-			Quantity:     int(line.Quantity),
+			Description:  description,
+			Quantity:     quantity,
 			QuantityUnit: "pcs",
 			VATRate:      vatRate.StringFixed(2),
-			UnitPrice:    amt(line.UnitPrice),
+			UnitPrice:    amt(unitPrice),
 			TotalAmount:  amt(line.TotalPrice),
 			VATAmount:    amt(vatAmount),
 		})
@@ -534,6 +535,20 @@ func roundingCorrectionLine(total decimal.Decimal, lines []mollie.PaymentLines) 
 		UnitPrice:   amt(diff),
 		TotalAmount: amt(diff),
 	}, nil
+}
+
+// mollieLineAmounts returns the description, quantity and unit price to send
+// for an order line. Mollie requires unitPrice × quantity == totalAmount.
+// Option surcharges are priced once per line (see orderDomain.PriceLine), so the
+// stored unit_price (rounded to cents) does not always multiply back to
+// total_price. When it doesn't, send the line as quantity 1 at its total, with
+// the real quantity kept in the description, rather than a mismatching line.
+func mollieLineAmounts(description string, line orderDomain.OrderProduct) (string, int, decimal.Decimal) {
+	qty := decimal.NewFromInt(line.Quantity)
+	if line.UnitPrice.Mul(qty).Equal(line.TotalPrice) {
+		return description, int(line.Quantity), line.UnitPrice
+	}
+	return fmt.Sprintf("%d × %s", line.Quantity, description), 1, line.TotalPrice
 }
 
 func amt(d decimal.Decimal) *mollie.Amount {

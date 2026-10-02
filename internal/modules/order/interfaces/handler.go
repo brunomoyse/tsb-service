@@ -129,11 +129,12 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 			}
 		}
 
+		itemName, itemQty, itemUnit := invoiceLineAmounts(name, op.Quantity, op.UnitPrice, op.TotalPrice)
 		items = append(items, invoice.InvoiceItem{
-			Name:      name,
+			Name:      itemName,
 			Code:      prod.Code,
-			Quantity:  op.Quantity,
-			UnitPrice: utils.FormatDecimal(op.UnitPrice),
+			Quantity:  itemQty,
+			UnitPrice: utils.FormatDecimal(itemUnit),
 			LineTotal: utils.FormatDecimal(op.TotalPrice),
 		})
 
@@ -302,4 +303,17 @@ func vatAmountFromGross(gross decimal.Decimal, rate decimal.Decimal) decimal.Dec
 		return decimal.Zero
 	}
 	return gross.Mul(rate).Div(decimal.NewFromInt(100).Add(rate))
+}
+
+// invoiceLineAmounts returns the name, quantity and unit price to print for an order line so
+// that the PDF adds up: unit price × quantity must equal the line total. Option surcharges are
+// priced once per line (see domain.PriceLine), so the stored unit_price (rounded to cents) does
+// not always multiply back to total_price. When it doesn't, print the line as quantity 1 at its
+// total with the real quantity kept in the name ("3 × Bowl"), like the Mollie payment lines do
+// (payment/application mollieLineAmounts).
+func invoiceLineAmounts(name string, quantity int64, unitPrice, totalPrice decimal.Decimal) (string, int64, decimal.Decimal) {
+	if unitPrice.Mul(decimal.NewFromInt(quantity)).Equal(totalPrice) {
+		return name, quantity, unitPrice
+	}
+	return fmt.Sprintf("%d × %s", quantity, name), 1, totalPrice
 }
