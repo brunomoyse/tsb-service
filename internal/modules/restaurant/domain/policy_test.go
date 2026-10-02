@@ -2,10 +2,12 @@ package domain
 
 import (
 	"testing"
+	"time"
 
 	"github.com/shopspring/decimal"
 
 	"tsb-service/pkg/money"
+	"tsb-service/pkg/timezone"
 )
 
 func TestDefaultOrderingPolicy_Values(t *testing.T) {
@@ -96,11 +98,25 @@ func TestOrderingPolicy_RoundingStepMatchesMoney(t *testing.T) {
 	}
 }
 
-// The slot generator and the policy share the interval and the preparation constants.
-func TestOrderingPolicy_SlotRulesAreTheSlotGeneratorsRules(t *testing.T) {
+// Every slot the generator produces is one the policy accepts: on a SlotIntervalMinutes boundary,
+// with no seconds. (createOrder rejects anything else as SLOT_MISALIGNED.)
+func TestOrderingPolicy_GeneratedSlotsAreAligned(t *testing.T) {
 	p := DefaultOrderingPolicy()
-	if p.SlotIntervalMinutes != slotStepMinutes {
-		t.Errorf("slot interval: policy %d, generator %d", p.SlotIntervalMinutes, slotStepMinutes)
+	cfg := configWith(t, weeklyHours(t), 20)
+
+	// A 20 min preparation time and off-grid "now" values: the first slot of each service has to be rounded up.
+	var checked int
+	for _, now := range []time.Time{at(t, "2026-04-22", "10:07"), at(t, "2026-04-23", "11:38"), at(t, "2026-04-24", "17:01")} {
+		for _, s := range append(cfg.AvailableSlotsToday(now, nil), cfg.ReviewSlotsToday(now)...) {
+			local := timezone.In(s.Value)
+			if local.Minute()%p.SlotIntervalMinutes != 0 || local.Second() != 0 || local.Nanosecond() != 0 {
+				t.Errorf("slot %s is not aligned to %d minutes", s.Label, p.SlotIntervalMinutes)
+			}
+			checked++
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no slot was generated, the alignment check proved nothing")
 	}
 	if p.MinimumPreparationMinutes < 0 || p.MinimumPreparationMinutes > DefaultPreparationMinutes {
 		t.Errorf("minimum preparation %d min must not exceed the default %d min", p.MinimumPreparationMinutes, DefaultPreparationMinutes)

@@ -79,7 +79,7 @@ func DefaultOrderingPolicy() OrderingPolicy {
 		PickupDiscountRate:        decimal.New(10, -2),
 		PickupDiscountMinimum:     decimal.NewFromInt(20),
 		OnlinePaymentFee:          decimal.New(30, -2),
-		TotalRoundingStep:         money.RoundingStep,
+		TotalRoundingStep:         money.RoundingStep(),
 		SlotIntervalMinutes:       SlotIntervalMinutes,
 		MinimumPreparationMinutes: MinimumPreparationMinutes,
 	}

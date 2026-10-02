@@ -6,6 +6,7 @@ package resolver
 // back into the pricer fails here.
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -135,5 +136,44 @@ func TestPolicy_DeliveryDisabledRefusesDelivery(t *testing.T) {
 	wantCodes(t, f.price(pricingInput{Items: []pricingItem{item(salmonID, 2)}}).Issues)
 	if restaurantDomain.CurrentPolicy().DeliveryEnabled {
 		t.Error("policy still advertises delivery")
+	}
+}
+
+// On a takeaway-only instance a quote (not fail-fast) reports DELIVERY_UNAVAILABLE and nothing else
+// about delivery: no minimum issue, no address lookup, no fee in the total.
+func TestPolicy_DeliveryDisabledQuoteDoesNotPriceDelivery(t *testing.T) {
+	t.Cleanup(func() { brand.Load() })
+	t.Setenv("RESTAURANT_DELIVERY_ENABLED", "false")
+	brand.Load()
+
+	f := newPricingFixture(t)
+	for _, c := range []struct {
+		name  string
+		items []pricingItem
+	}{
+		{"below the delivery minimum", []pricingItem{item(teaID, 1)}},
+		{"above the delivery minimum", []pricingItem{item(salmonID, 4)}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			spy := &spyAddresses{cached: map[string]*addressDomain.Address{"far-ish": {PlaceID: "far-ish", Postcode: "4020", Distance: 6000}}}
+			p := f.pricer()
+			p.addresses = spy
+			res, err := p.price(context.Background(), pricingInput{
+				OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: strp("far-ish"),
+				UserID: &f.user, Items: c.items, FailFast: false,
+			})
+			if err != nil {
+				t.Fatalf("price: %v", err)
+			}
+			wantCodes(t, res.Issues, apperr.CodeDeliveryUnavailable)
+			wantMoney(t, "delivery fee", res.DeliveryFee, "0")
+			if res.Address != nil {
+				t.Errorf("no address snapshot expected, got %+v", res.Address)
+			}
+			if spy.cacheCalls != 0 || spy.resolveCalls != 0 {
+				t.Errorf("address looked up (cache %d, resolve %d) although delivery is unavailable", spy.cacheCalls, spy.resolveCalls)
+			}
+			wantMoney(t, "total is the goods only", res.Total, res.Subtotal.String())
+		})
 	}
 }

@@ -15,9 +15,11 @@ import (
 type spyAddresses struct {
 	cached       map[string]*addressDomain.Address
 	resolveCalls int
+	cacheCalls   int
 }
 
 func (s *spyAddresses) GetByPlaceID(_ context.Context, placeID string) (*addressDomain.Address, error) {
+	s.cacheCalls++
 	return s.cached[placeID], nil
 }
 

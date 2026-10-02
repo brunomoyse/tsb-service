@@ -292,14 +292,19 @@ func (p *orderPricer) price(ctx context.Context, in pricingInput) (*pricingResul
 	// RestaurantConfig.policy field serves (see restaurantDomain.OrderingPolicy).
 	policy := restaurantDomain.CurrentPolicy()
 
-	// 3) A takeaway-only instance refuses delivery; the minimum applies to the goods (pickup has none).
+	// 3) A takeaway-only instance refuses delivery, and nothing else about delivery is priced: no
+	// minimum check, no address resolution (it may call an external service), no fee. The quote
+	// then carries DELIVERY_UNAVAILABLE alone. Otherwise the minimum applies to the goods
+	// (pickup has none).
+	deliveryRefused := false
 	if in.OrderType == orderDomain.OrderTypeDelivery && !policy.DeliveryEnabled {
 		res.addOrder(apperr.New(apperr.CodeDeliveryUnavailable, "delivery is not available"))
 		if res.stop(in) {
 			return res, nil
 		}
+		deliveryRefused = true
 	}
-	if in.OrderType == orderDomain.OrderTypeDelivery && res.Subtotal.LessThan(policy.DeliveryMinimum) {
+	if in.OrderType == orderDomain.OrderTypeDelivery && !deliveryRefused && res.Subtotal.LessThan(policy.DeliveryMinimum) {
 		minimum := policy.DeliveryMinimum.String()
 		issue := res.addOrder(apperr.Newf(apperr.CodeDeliveryMinimumNotMet, "minimum order amount for delivery is %s", minimum).With("minimum", minimum))
 		issue.Minimum = &minimum
@@ -309,7 +314,7 @@ func (p *orderPricer) price(ctx context.Context, in pricingInput) (*pricingResul
 	}
 
 	// 4) Delivery fee and the address snapshot.
-	if in.OrderType == orderDomain.OrderTypeDelivery {
+	if in.OrderType == orderDomain.OrderTypeDelivery && !deliveryRefused {
 		if err := p.priceDelivery(ctx, res, in, policy); err != nil {
 			return nil, err
 		}

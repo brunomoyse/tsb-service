@@ -500,7 +500,7 @@ func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.R
 	}
 
 	if slot.Minute()%restaurantDomain.SlotIntervalMinutes != 0 || slot.Second() != 0 || slot.Nanosecond() != 0 {
-		return slotError(apperr.CodeSlotMisaligned, "preferred ready time must be aligned to 15-minute slots")
+		return slotError(apperr.CodeSlotMisaligned, fmt.Sprintf("preferred ready time must be aligned to %d-minute slots", restaurantDomain.SlotIntervalMinutes))
 	}
 
 	// Use ordering hours if set, otherwise fall back to opening hours.
