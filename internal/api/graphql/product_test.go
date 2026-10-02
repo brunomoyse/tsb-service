@@ -341,6 +341,81 @@ func TestProductCategory(t *testing.T) {
 	})
 }
 
+// TestProductCategoryBySlug tests the productCategoryBySlug query: one category by slug, only its
+// own products, null for an unknown slug.
+func TestProductCategoryBySlug(t *testing.T) {
+	ctx := setupTestContext(t)
+
+	type category struct {
+		ID       string
+		Name     string
+		Slug     string
+		Products []struct {
+			ID   string
+			Name string
+			Slug string
+		}
+	}
+	const query = `
+		query($slug: String!) {
+			productCategoryBySlug(slug: $slug) {
+				id
+				name
+				slug
+				products { id name slug }
+			}
+		}
+	`
+
+	t.Run("Returns the category with only its own products", func(t *testing.T) {
+		c := client.New(ctx.Client.Handler())
+		var resp struct{ ProductCategoryBySlug *category }
+
+		c.MustPost(query, &resp,
+			client.Var("slug", ctx.Fixtures.SushiCategory.Slug),
+			client.AddHeader("Accept-Language", "en"),
+		)
+
+		require.NotNil(t, resp.ProductCategoryBySlug)
+		assert.Equal(t, ctx.Fixtures.SushiCategory.ID.String(), resp.ProductCategoryBySlug.ID)
+		assert.Equal(t, ctx.Fixtures.SushiCategory.Slug, resp.ProductCategoryBySlug.Slug)
+		assert.Equal(t, "Sushi", resp.ProductCategoryBySlug.Name)
+
+		// Exactly the Sushi products (two fixtures), none from the Drinks or Desserts categories.
+		var slugs []string
+		for _, p := range resp.ProductCategoryBySlug.Products {
+			slugs = append(slugs, p.Slug)
+		}
+		assert.ElementsMatch(t, []string{"salmon-sushi", "tuna-sushi"}, slugs)
+	})
+
+	t.Run("Another slug gives the other category", func(t *testing.T) {
+		c := client.New(ctx.Client.Handler())
+		var resp struct{ ProductCategoryBySlug *category }
+
+		c.MustPost(query, &resp,
+			client.Var("slug", ctx.Fixtures.DrinksCategory.Slug),
+			client.AddHeader("Accept-Language", "en"),
+		)
+
+		require.NotNil(t, resp.ProductCategoryBySlug)
+		assert.Equal(t, "Drinks", resp.ProductCategoryBySlug.Name)
+		for _, p := range resp.ProductCategoryBySlug.Products {
+			assert.Equal(t, "green-tea", p.Slug)
+		}
+	})
+
+	t.Run("Unknown slug is null, not an error", func(t *testing.T) {
+		c := client.New(ctx.Client.Handler())
+		var resp struct{ ProductCategoryBySlug *category }
+
+		err := c.Post(query, &resp, client.Var("slug", "no-such-category"))
+
+		require.NoError(t, err)
+		assert.Nil(t, resp.ProductCategoryBySlug)
+	})
+}
+
 // TestCreateProduct tests the createProduct mutation (admin only)
 func TestCreateProduct(t *testing.T) {
 	ctx := setupTestContext(t)

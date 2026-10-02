@@ -2,6 +2,8 @@ package application
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"github.com/shopspring/decimal"
 	"tsb-service/internal/modules/product/domain"
 
@@ -20,6 +22,7 @@ type ProductService interface {
 	GetProductsForPricing(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error)
 	GetCategories(ctx context.Context) ([]*domain.Category, error)
 	GetCategory(ctx context.Context, id uuid.UUID) (*domain.Category, error)
+	GetCategoryBySlug(ctx context.Context, slug string) (*domain.Category, error)
 	UpdateProduct(ctx context.Context, product *domain.Product) error
 
 	BatchGetCategoriesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Category, error)
@@ -128,6 +131,15 @@ func (s *productService) GetCategories(ctx context.Context) ([]*domain.Category,
 
 func (s *productService) GetCategory(ctx context.Context, id uuid.UUID) (*domain.Category, error) {
 	return s.repo.FindCategoryByID(ctx, id)
+}
+
+// GetCategoryBySlug retrieves one category by its slug; (nil, nil) when there is none.
+func (s *productService) GetCategoryBySlug(ctx context.Context, slug string) (*domain.Category, error) {
+	c, err := s.repo.FindCategoryBySlug(ctx, slug)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return c, err
 }
 
 func (s *productService) BatchGetCategoriesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*domain.Category, error) {
