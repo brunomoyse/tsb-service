@@ -7,9 +7,11 @@ package resolver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	graphql1 "tsb-service/internal/api/graphql"
+	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/model"
 	couponDomain "tsb-service/internal/modules/coupon/domain"
 	"tsb-service/pkg/utils"
@@ -59,7 +61,7 @@ func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateC
 		// Caller chose the code: a collision is a user error.
 		if err := r.CouponService.CreateCoupon(ctx, coupon); err != nil {
 			if isUniqueViolation(err) {
-				return nil, fmt.Errorf("coupon code already exists")
+				return nil, apperr.New(apperr.CodeUserError, "coupon code already exists")
 			}
 			return nil, fmt.Errorf("failed to create coupon: %w", err)
 		}
@@ -142,7 +144,7 @@ func (r *mutationResolver) UpdateCoupon(ctx context.Context, id uuid.UUID, input
 
 	if err := r.CouponService.UpdateCoupon(ctx, coupon); err != nil {
 		if isUniqueViolation(err) {
-			return nil, fmt.Errorf("coupon code already exists")
+			return nil, apperr.New(apperr.CodeUserError, "coupon code already exists")
 		}
 		return nil, fmt.Errorf("failed to update coupon: %w", err)
 	}
@@ -156,7 +158,7 @@ func (r *mutationResolver) UpdateCoupon(ctx context.Context, id uuid.UUID, input
 func (r *queryResolver) ValidateCoupon(ctx context.Context, code string, orderAmount string) (*model.CouponValidation, error) {
 	amount, err := decimal.NewFromString(orderAmount)
 	if err != nil {
-		return nil, fmt.Errorf("invalid order amount: %w", err)
+		return nil, apperr.Newf(apperr.CodeInvalidAmount, "invalid order amount: %w", err)
 	}
 
 	userID := utils.GetUserID(ctx)
@@ -168,23 +170,36 @@ func (r *queryResolver) ValidateCoupon(ctx context.Context, code string, orderAm
 	// Throttle per-user to block brute-force code enumeration.
 	if r.CouponValidateLimiter != nil && !r.CouponValidateLimiter.AllowKey(userID) {
 		errMsg := "too many attempts, please try again in a minute"
+		errCode := string(apperr.CodeCouponRateLimited)
 		return &model.CouponValidation{
 			Valid:          false,
 			DiscountAmount: "0",
 			ErrorMessage:   &errMsg,
+			ErrorCode:      &errCode,
 		}, nil
 	}
 
 	_, discount, err := r.CouponService.ValidateCoupon(ctx, code, amount, userUUID)
 	if err != nil {
-		// Every error the service returns here carries a user-safe message:
-		// the generic invalid-coupon text, the min-order message, or the
-		// daily-limit message — so surfacing err.Error() directly is safe.
-		errMsg := err.Error()
+		// An infrastructure failure is a server fault, not a refusal: return it as a GraphQL error
+		// (Sentry; the presenter hides the raw text from the client).
+		if checkErr, ok := couponCheckFailure(err); ok {
+			return nil, checkErr
+		}
+		// Only refusals reach this point. The min-order and daily-limit messages are user-safe;
+		// any other refusal gets the fixed generic text, so no raw error text can ever leak here.
+		errMsg := "invalid or expired coupon"
+		var minErr *couponDomain.MinOrderNotMetError
+		var limitErr *couponDomain.DailyAttemptLimitError
+		if errors.As(err, &minErr) || errors.As(err, &limitErr) {
+			errMsg = err.Error()
+		}
+		errCode := string(couponErrorCode(err))
 		return &model.CouponValidation{
 			Valid:          false,
 			DiscountAmount: "0",
 			ErrorMessage:   &errMsg,
+			ErrorCode:      &errCode,
 		}, nil
 	}
 

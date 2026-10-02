@@ -2,6 +2,7 @@ package graphql_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
@@ -116,7 +117,7 @@ func (m *mockGoogleClient) Autocomplete(ctx context.Context, input, sessionToken
 }
 
 func (m *mockGoogleClient) PlaceDetails(ctx context.Context, placeID, sessionToken, language string) (*addressDomain.AddressCache, error) {
-	return nil, nil
+	return nil, errors.New("mock google client: no place details")
 }
 
 func (m *mockGoogleClient) ComputeRoute(ctx context.Context, destLat, destLng float64) (int, int, error) {

@@ -143,7 +143,103 @@ type OrderHistoryResponse {
     summary: OrderHistorySummary!
 }
 
+"""
+Everything createOrder would validate and price, without saving anything: the basket as it would be
+charged right now. Problems are reported instead of failing on the first one.
+"""
+input QuoteOrderInput {
+    orderType: OrderTypeEnum!
+    isOnlinePayment: Boolean!
+    addressPlaceId: String
+    preferredReadyTime: DateTime
+    items: [QuoteOrderItemInput!]!
+    "Only evaluated for an authenticated caller."
+    couponCode: String
+}
+
+input QuoteOrderItemInput {
+    productId: ID!
+    quantity: Int!
+    choiceId: ID
+    selections: [CreateOrderItemSelectionInput!]
+    "The line total (decimal string) the client currently displays. When it differs from today's price the line gets a PRICE_CHANGED issue carrying currentPrice."
+    expectedLineTotal: String
+}
+
+"""
+The price of a basket right now. Money fields are decimal strings ("12.50"); `total` is what the
+customer would be charged (equal to the createOrder total_price), a multiple of 0,10 EUR and never
+negative. A basket with any `issues` or line issues cannot be ordered as is.
+"""
+type OrderQuote {
+    "In the order of the input items."
+    lines: [OrderQuoteLine!]!
+    "Σ lineTotal of the lines that could be priced."
+    subtotal: String!
+    deliveryFee: String!
+    pickupDiscount: String!
+    couponDiscount: String!
+    "The online payment surcharge (0 for cash)."
+    onlineFee: String!
+    total: String!
+    "null when no coupon code was sent."
+    coupon: OrderQuoteCoupon
+    "Order-level problems; every code is in apperr (codes.go)."
+    issues: [OrderIssue!]!
+}
+
+type OrderQuoteLine {
+    productId: ID!
+    quantity: Int!
+    "The selections as priced: the legacy choiceId is folded in, choices that exist carry today's priceModifier."
+    selections: [OrderQuoteSelection!]!
+    "Today's price of the product itself (without choices); null when the product does not exist."
+    productPrice: String
+    "lineTotal / quantity rounded to cents (what createOrder stores as unit_price)."
+    unitPrice: String!
+    "base × quantity + Σ choice surcharges (see PriceLine); 0 when the line cannot be priced (missing or sold-out product, bad quantity or selections)."
+    lineTotal: String!
+    issues: [OrderLineIssue!]!
+}
+
+type OrderQuoteSelection {
+    groupId: ID!
+    choiceId: ID!
+    quantity: Int!
+    priceModifier: String!
+}
+
+"""
+A problem with one line. code: PRODUCT_NOT_FOUND, PRODUCT_UNAVAILABLE, INVALID_QUANTITY,
+SELECTION_INVALID, INVALID_PRICE, LUNCH_SLOT_REQUIRED or PRICE_CHANGED.
+"""
+type OrderLineIssue {
+    code: String!
+    "Today's price of the product, whenever it exists (PRICE_CHANGED, PRODUCT_UNAVAILABLE...)."
+    currentPrice: String
+}
+
+"""
+An order-level problem. code: ORDERING_UNAVAILABLE, ORDERING_CLOSED_TODAY, SLOT_*, ORDER_EMPTY,
+ORDER_TOO_MANY_ITEMS, DELIVERY_MINIMUM_NOT_MET, ADDRESS_REQUIRED, ADDRESS_UNRESOLVABLE,
+DELIVERY_OUT_OF_ZONE, DELIVERY_AREA_EXCLUDED or a COUPON_* code.
+"""
+type OrderIssue {
+    code: String!
+    "Euros, for DELIVERY_MINIMUM_NOT_MET and COUPON_MIN_ORDER_NOT_MET."
+    minimum: String
+}
+
+type OrderQuoteCoupon {
+    code: String!
+    valid: Boolean!
+    "Why it is not valid: a COUPON_* code, or UNAUTHENTICATED when the caller is not signed in (the coupon was not evaluated)."
+    errorCode: String
+}
+
 extend type Query {
+    "Public: the basket can be priced before signing in. A coupon is only evaluated when authenticated."
+    quoteOrder(input: QuoteOrderInput!): OrderQuote!
     orders: [Order!]! @staff
     order(id: ID!): Order! @staff
     customerOrders(userId: ID!, first: Int = 20, page: Int = 1): [Order!]! @admin

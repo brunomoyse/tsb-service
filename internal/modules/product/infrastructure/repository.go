@@ -358,6 +358,40 @@ func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) 
 	return products, nil
 }
 
+// FindForPricing fetches what an order line is priced from (current price, VAT, flags) together with
+// the availability flag, without failing on sold-out products like FindByIDs does. The translation
+// joins are the same as FindByIDs, so a product the order would reject as unknown is unknown here too.
+func (r *ProductRepository) FindForPricing(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error) {
+	lang := utils.GetLang(ctx)
+
+	query := `
+        SELECT
+            p.id,
+            p.code,
+            p.price,
+            p.is_discountable,
+            p.is_lunch_only,
+            p.is_available,
+            p.vat_category,
+            pct.name AS category_name,
+            pt.name  AS name
+        FROM products p
+        LEFT JOIN product_translations pt
+          ON p.id = pt.product_id
+        LEFT JOIN product_category_translations pct
+          ON p.category_id = pct.product_category_id
+        WHERE p.id = ANY($1)
+          AND pt.language = $2
+          AND pct.language = $2
+        ORDER BY p.code;
+    `
+	var products []*domain.ProductOrderDetails
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &products, query, pq.Array(productIDs), lang); err != nil {
+		return nil, err
+	}
+	return products, nil
+}
+
 // FindNamesByIDs fetches product details by IDs without checking availability.
 // Used for invoices where products may have been made unavailable since the order.
 func (r *ProductRepository) FindNamesByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error) {
@@ -1092,6 +1126,34 @@ func (r *ProductRepository) BatchGetChoiceGroupsByProductIDs(ctx context.Context
 	return result, nil
 }
 
+// BatchGetChoiceGroupsByIDs loads choice groups by their own ids (for the
+// OrderItemSelection.group DataLoader). The result is keyed by group id.
+func (r *ProductRepository) BatchGetChoiceGroupsByIDs(ctx context.Context, groupIDs []string) (map[string][]*domain.ProductChoiceGroup, error) {
+	result := make(map[string][]*domain.ProductChoiceGroup, len(groupIDs))
+	if len(groupIDs) == 0 {
+		return result, nil
+	}
+
+	query := `
+		SELECT
+			pcg.id, pcg.product_id, pcg.min_selections, pcg.max_selections, pcg.sort_order,
+			pcgt.locale, pcgt.name
+		FROM product_choice_groups pcg
+		LEFT JOIN product_choice_group_translations pcgt ON pcg.id = pcgt.product_choice_group_id
+		WHERE pcg.id = ANY($1)
+		ORDER BY pcg.sort_order
+	`
+	groups, err := r.queryChoiceGroups(ctx, query, pq.Array(groupIDs))
+	if err != nil {
+		return nil, err
+	}
+	for _, g := range groups {
+		key := g.ID.String()
+		result[key] = append(result[key], g)
+	}
+	return result, nil
+}
+
 func (r *ProductRepository) CreateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error {
 	tx, err := r.pool.ForContext(ctx).BeginTx(ctx, nil)
 	if err != nil {
@@ -1221,6 +1283,34 @@ func (r *ProductRepository) BatchGetChoicesByProductIDs(ctx context.Context, pro
 	result := make(map[string][]*domain.ProductChoice, len(productIDs))
 	for _, c := range choices {
 		key := c.ProductID.String()
+		result[key] = append(result[key], c)
+	}
+	return result, nil
+}
+
+// BatchGetChoicesByIDs loads choices by their own ids (for the
+// OrderItemSelection.choice DataLoader). The result is keyed by choice id.
+func (r *ProductRepository) BatchGetChoicesByIDs(ctx context.Context, choiceIDs []string) (map[string][]*domain.ProductChoice, error) {
+	result := make(map[string][]*domain.ProductChoice, len(choiceIDs))
+	if len(choiceIDs) == 0 {
+		return result, nil
+	}
+
+	query := `
+		SELECT
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
+			pct.locale, pct.name
+		FROM product_choices pc
+		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
+		WHERE pc.id = ANY($1)
+		ORDER BY pc.sort_order
+	`
+	choices, err := r.queryChoices(ctx, query, pq.Array(choiceIDs))
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range choices {
+		key := c.ID.String()
 		result[key] = append(result[key], c)
 	}
 	return result, nil

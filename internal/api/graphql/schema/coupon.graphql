@@ -25,7 +25,10 @@ type Coupon {
 type CouponValidation {
     valid: Boolean!
     discountAmount: String!
+    "English message, for logs and old clients: show errorCode translated instead."
     errorMessage: String
+    "Stable code when valid is false: COUPON_INVALID, COUPON_MIN_ORDER_NOT_MET or COUPON_RATE_LIMITED."
+    errorCode: String
 }
 
 input CreateCouponInput {

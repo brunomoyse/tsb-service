@@ -18,6 +18,8 @@ const (
 	productTranslation        contextKey = "productTranslation"
 	productChoiceLoaderKey    contextKey = "productChoiceLoader"
 	productChoiceGroupLoaderKey contextKey = "productChoiceGroupLoader"
+	choiceByIDLoaderKey         contextKey = "choiceByIDLoader"
+	choiceGroupByIDLoaderKey    contextKey = "choiceGroupByIDLoader"
 )
 
 type ProductCategoryLoader struct {
@@ -48,6 +50,16 @@ type ProductChoiceGroupLoader struct {
 	Loader *db.TypedLoader[*domain.ProductChoiceGroup]
 }
 
+// ChoiceByIDLoader batches choice lookups by choice id (order item selections).
+type ChoiceByIDLoader struct {
+	Loader *db.TypedLoader[*domain.ProductChoice]
+}
+
+// ChoiceGroupByIDLoader batches choice group lookups by group id.
+type ChoiceGroupByIDLoader struct {
+	Loader *db.TypedLoader[*domain.ProductChoiceGroup]
+}
+
 // AttachDataLoaders attaches all necessary DataLoaders for products to the context.
 func AttachDataLoaders(ctx context.Context, ps ProductService) context.Context {
 	ctx = context.WithValue(ctx, productCategoryLoaderKey, NewProductCategoryLoader(ps))
@@ -57,6 +69,8 @@ func AttachDataLoaders(ctx context.Context, ps ProductService) context.Context {
 	ctx = context.WithValue(ctx, productTranslation, NewProductTranslation(ps))
 	ctx = context.WithValue(ctx, productChoiceLoaderKey, NewProductChoiceLoader(ps))
 	ctx = context.WithValue(ctx, productChoiceGroupLoaderKey, NewProductChoiceGroupLoader(ps))
+	ctx = context.WithValue(ctx, choiceByIDLoaderKey, NewChoiceByIDLoader(ps))
+	ctx = context.WithValue(ctx, choiceGroupByIDLoaderKey, NewChoiceGroupByIDLoader(ps))
 	return ctx
 }
 
@@ -196,6 +210,48 @@ func GetProductChoiceLoader(ctx context.Context) *ProductChoiceLoader {
 // GetProductChoiceGroupLoader reads the loader from context.
 func GetProductChoiceGroupLoader(ctx context.Context) *ProductChoiceGroupLoader {
 	loader, ok := ctx.Value(productChoiceGroupLoaderKey).(*ProductChoiceGroupLoader)
+	if !ok {
+		return nil
+	}
+	return loader
+}
+
+// NewChoiceByIDLoader creates a choice-id -> choice loader.
+func NewChoiceByIDLoader(ps ProductService) *ChoiceByIDLoader {
+	return &ChoiceByIDLoader{
+		Loader: db.NewTypedLoader[*domain.ProductChoice](
+			func(ctx context.Context, choiceIDs []string) (map[string][]*domain.ProductChoice, error) {
+				return ps.BatchGetChoicesByIDs(ctx, choiceIDs)
+			},
+			"failed to fetch product choices",
+		),
+	}
+}
+
+// NewChoiceGroupByIDLoader creates a group-id -> choice group loader.
+func NewChoiceGroupByIDLoader(ps ProductService) *ChoiceGroupByIDLoader {
+	return &ChoiceGroupByIDLoader{
+		Loader: db.NewTypedLoader[*domain.ProductChoiceGroup](
+			func(ctx context.Context, groupIDs []string) (map[string][]*domain.ProductChoiceGroup, error) {
+				return ps.BatchGetChoiceGroupsByIDs(ctx, groupIDs)
+			},
+			"failed to fetch product choice groups",
+		),
+	}
+}
+
+// GetChoiceByIDLoader reads the loader from context.
+func GetChoiceByIDLoader(ctx context.Context) *ChoiceByIDLoader {
+	loader, ok := ctx.Value(choiceByIDLoaderKey).(*ChoiceByIDLoader)
+	if !ok {
+		return nil
+	}
+	return loader
+}
+
+// GetChoiceGroupByIDLoader reads the loader from context.
+func GetChoiceGroupByIDLoader(ctx context.Context) *ChoiceGroupByIDLoader {
+	loader, ok := ctx.Value(choiceGroupByIDLoaderKey).(*ChoiceGroupByIDLoader)
 	if !ok {
 		return nil
 	}

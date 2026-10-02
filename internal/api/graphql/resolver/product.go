@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strings"
 	graphql1 "tsb-service/internal/api/graphql"
+	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/model"
 	productApplication "tsb-service/internal/modules/product/application"
 	"tsb-service/internal/modules/product/domain"
@@ -171,13 +172,13 @@ func (r *mutationResolver) CreateProductChoiceGroup(ctx context.Context, input m
 	userLang := utils.GetLang(ctx)
 
 	if input.MinSelections < 0 {
-		return nil, fmt.Errorf("min selections must be >= 0")
+		return nil, apperr.New(apperr.CodeUserError, "min selections must be >= 0")
 	}
 	if input.MaxSelections < 1 {
-		return nil, fmt.Errorf("max selections must be >= 1")
+		return nil, apperr.New(apperr.CodeUserError, "max selections must be >= 1")
 	}
 	if input.MinSelections > input.MaxSelections {
-		return nil, fmt.Errorf("min selections cannot be greater than max selections")
+		return nil, apperr.New(apperr.CodeUserError, "min selections cannot be greater than max selections")
 	}
 
 	translations := make([]domain.ChoiceTranslation, len(input.Translations))
@@ -220,13 +221,13 @@ func (r *mutationResolver) UpdateProductChoiceGroup(ctx context.Context, id uuid
 		group.MaxSelections = *input.MaxSelections
 	}
 	if group.MinSelections < 0 {
-		return nil, fmt.Errorf("min selections must be >= 0")
+		return nil, apperr.New(apperr.CodeUserError, "min selections must be >= 0")
 	}
 	if group.MaxSelections < 1 {
-		return nil, fmt.Errorf("max selections must be >= 1")
+		return nil, apperr.New(apperr.CodeUserError, "max selections must be >= 1")
 	}
 	if group.MinSelections > group.MaxSelections {
-		return nil, fmt.Errorf("min selections cannot be greater than max selections")
+		return nil, apperr.New(apperr.CodeUserError, "min selections cannot be greater than max selections")
 	}
 
 	if input.SortOrder != nil {
@@ -268,7 +269,7 @@ func (r *mutationResolver) CreateProductChoice(ctx context.Context, input model.
 		return nil, fmt.Errorf("invalid price modifier format: %w", err)
 	}
 	if priceMod.Sign() < 0 {
-		return nil, fmt.Errorf("price modifier must be zero or positive")
+		return nil, apperr.New(apperr.CodeUserError, "price modifier must be zero or positive")
 	}
 
 	translations := make([]domain.ChoiceTranslation, len(input.Translations))
@@ -312,7 +313,7 @@ func (r *mutationResolver) CreateProductChoice(ctx context.Context, input model.
 			group = groups[0]
 		}
 	} else {
-		return nil, fmt.Errorf("either choiceGroupId or productId is required")
+		return nil, apperr.New(apperr.CodeUserError, "either choiceGroupId or productId is required")
 	}
 
 	choice := &domain.ProductChoice{
@@ -347,7 +348,7 @@ func (r *mutationResolver) UpdateProductChoice(ctx context.Context, id uuid.UUID
 			return nil, fmt.Errorf("invalid price modifier format: %w", err)
 		}
 		if priceMod.Sign() < 0 {
-			return nil, fmt.Errorf("price modifier must be zero or positive")
+			return nil, apperr.New(apperr.CodeUserError, "price modifier must be zero or positive")
 		}
 		choice.PriceModifier = priceMod
 	}

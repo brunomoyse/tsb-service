@@ -24,6 +24,18 @@ const UserIDKey contextKey = "userID"
 const IsAdminKey contextKey = "isAdmin"
 const ZitadelSubKey contextKey = "zitadelSub"
 const TokenExpiryKey contextKey = "tokenExpiry"
+const ClientIPKey contextKey = "clientIP"
+
+// SetClientIP stores the caller's IP (as resolved by the HTTP layer's trusted-proxy logic).
+func SetClientIP(ctx context.Context, ip string) context.Context {
+	return context.WithValue(ctx, ClientIPKey, ip)
+}
+
+// GetClientIP returns the caller's IP, or "" when the request did not come through the HTTP layer.
+func GetClientIP(ctx context.Context) string {
+	ip, _ := ctx.Value(ClientIPKey).(string)
+	return ip
+}
 
 // SetLang stores the language in the context.
 func SetLang(ctx context.Context, lang string) context.Context {

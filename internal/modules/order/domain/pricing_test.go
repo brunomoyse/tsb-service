@@ -114,3 +114,35 @@ func TestPriceLine_OrderTotalIsSumOfLineTotals(t *testing.T) {
 		t.Errorf("sum = %s, want 57.50", got)
 	}
 }
+
+// TestOrderTotal pins how an order is added up (orders.total_price). The coupon-covers-the-basket
+// rows are the regression for the negative totals (-0.05 / -0.10 EUR) the repository used to store.
+func TestOrderTotal(t *testing.T) {
+	tests := []struct {
+		name                                               string
+		items, fee, takeaway, coupon, transactionFee, want string
+	}{
+		{"plain cash order", "18.50", "0", "0", "0", "0", "18.50"},
+		{"online fee on top", "18.50", "0", "0", "0", "0.30", "18.80"},
+		{"delivery fee and discounts", "40.00", "3", "0", "5.00", "0.30", "38.30"},
+		{"pickup discount + coupon", "40.00", "0", "4.00", "5.00", "0.30", "31.30"},
+		{"snapped to 10 cents (.x5 goes up)", "24.15", "0", "0", "0", "0", "24.20"},
+		// A coupon that covers the whole basket is snapped up to 0,10 EUR: 12.95 basket, 13.00 coupon.
+		{"coupon covers a .x5 basket, cash: free, never negative", "12.95", "0", "0", "13.00", "0", "0.00"},
+		{"coupon covers a .x4 basket, cash", "12.94", "0", "0", "12.90", "0", "0.00"},
+		{"coupon covers the basket, online: exactly the fee", "12.95", "0", "0", "13.00", "0.30", "0.30"},
+		{"discounts far above the basket", "8.00", "0", "2.00", "20.00", "0.30", "0.30"},
+		{"coupon covers goods and delivery", "30.00", "3.00", "0", "33.00", "0", "0.00"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := OrderTotal(d(tt.items), d(tt.fee), d(tt.takeaway), d(tt.coupon), d(tt.transactionFee))
+			if !got.Equal(d(tt.want)) {
+				t.Errorf("OrderTotal = %s, want %s", got, tt.want)
+			}
+			if got.Sign() < 0 {
+				t.Errorf("OrderTotal must never be negative, got %s", got)
+			}
+		})
+	}
+}

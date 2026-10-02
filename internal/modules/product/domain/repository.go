@@ -16,6 +16,9 @@ type ProductRepository interface {
 	FindCategoryByID(ctx context.Context, id uuid.UUID) (*Category, error)
 	FindByIDs(ctx context.Context, productIDs []string) ([]*ProductOrderDetails, error)
 	FindNamesByIDs(ctx context.Context, productIDs []string) ([]*ProductOrderDetails, error)
+	// FindForPricing is FindByIDs without the availability error: sold-out products are returned
+	// with IsAvailable=false so the caller (order pricing / quoteOrder) can flag them per line.
+	FindForPricing(ctx context.Context, productIDs []string) ([]*ProductOrderDetails, error)
 
 	FindCategoriesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*Category, error)
 	FindByCategoryIDs(ctx context.Context, categoryIDs []string) (map[string][]*Product, error)
@@ -27,6 +30,8 @@ type ProductRepository interface {
 	FindChoiceGroupsByProductID(ctx context.Context, productID uuid.UUID) ([]*ProductChoiceGroup, error)
 	FindChoiceGroupByID(ctx context.Context, groupID uuid.UUID) (*ProductChoiceGroup, error)
 	BatchGetChoiceGroupsByProductIDs(ctx context.Context, productIDs []string) (map[string][]*ProductChoiceGroup, error)
+	// BatchGetChoiceGroupsByIDs keys the result by group id (one-element slices).
+	BatchGetChoiceGroupsByIDs(ctx context.Context, groupIDs []string) (map[string][]*ProductChoiceGroup, error)
 	CreateChoiceGroup(ctx context.Context, group *ProductChoiceGroup) error
 	UpdateChoiceGroup(ctx context.Context, group *ProductChoiceGroup) error
 	DeleteChoiceGroup(ctx context.Context, groupID uuid.UUID) error
@@ -34,6 +39,8 @@ type ProductRepository interface {
 	FindChoicesByProductID(ctx context.Context, productID uuid.UUID) ([]*ProductChoice, error)
 	FindChoiceByID(ctx context.Context, choiceID uuid.UUID) (*ProductChoice, error)
 	BatchGetChoicesByProductIDs(ctx context.Context, productIDs []string) (map[string][]*ProductChoice, error)
+	// BatchGetChoicesByIDs keys the result by choice id (one-element slices).
+	BatchGetChoicesByIDs(ctx context.Context, choiceIDs []string) (map[string][]*ProductChoice, error)
 	CreateChoice(ctx context.Context, choice *ProductChoice) error
 	UpdateChoice(ctx context.Context, choice *ProductChoice) error
 	DeleteChoice(ctx context.Context, choiceID uuid.UUID) error
