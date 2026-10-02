@@ -45,6 +45,7 @@ type TestUser struct {
 // TestProductCategory represents a test product category
 type TestProductCategory struct {
 	ID             uuid.UUID
+	Slug           string
 	Order          int
 	NameEN         string
 	NameNL         string
@@ -242,6 +243,7 @@ func createTestProductCategory(t *testing.T, ctx context.Context, db *sqlx.DB, o
 
 	return &TestProductCategory{
 		ID:             categoryID,
+		Slug:           categorySlug,
 		Order:          order,
 		NameEN:         nameEN,
 		NameNL:         nameNL,

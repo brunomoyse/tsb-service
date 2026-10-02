@@ -193,6 +193,14 @@ type DayScheduleInput struct {
 	DinnerClose *string `json:"dinnerClose,omitempty"`
 }
 
+// One step of the delivery fee grid: an address closer than upToKm (and not closer than the previous
+// tier's upToKm) pays fee.
+type DeliveryFeeTier struct {
+	UpToKm float64 `json:"upToKm"`
+	// Decimal string with cents, e.g. "1.00".
+	Fee string `json:"fee"`
+}
+
 type Mutation struct {
 }
 
@@ -234,7 +242,7 @@ type OrderHistorySummary struct {
 
 // An order-level problem. code: ORDERING_UNAVAILABLE, ORDERING_CLOSED_TODAY, SLOT_*, ORDER_EMPTY,
 // ORDER_TOO_MANY_ITEMS, DELIVERY_MINIMUM_NOT_MET, ADDRESS_REQUIRED, ADDRESS_UNRESOLVABLE,
-// DELIVERY_OUT_OF_ZONE, DELIVERY_AREA_EXCLUDED or a COUPON_* code.
+// DELIVERY_OUT_OF_ZONE, DELIVERY_AREA_EXCLUDED, DELIVERY_UNAVAILABLE or a COUPON_* code.
 type OrderIssue struct {
 	Code string `json:"code"`
 	// Euros, for DELIVERY_MINIMUM_NOT_MET and COUPON_MIN_ORDER_NOT_MET.
@@ -321,6 +329,34 @@ type OrderStatusHistory struct {
 	ID        uuid.UUID          `json:"id"`
 	Status    domain.OrderStatus `json:"status"`
 	ChangedAt time.Time          `json:"changedAt"`
+}
+
+// The ordering rules the backend enforces when pricing a basket (quoteOrder / createOrder), read-only
+// and public. Money is a decimal string with cents ("25.00"); a client should display these values
+// instead of duplicating them.
+type OrderingPolicy struct {
+	// False for a takeaway-only instance: delivery orders are refused (DELIVERY_UNAVAILABLE).
+	DeliveryEnabled bool `json:"deliveryEnabled"`
+	// Minimum basket for delivery (goods only, before the fee), e.g. "25.00".
+	DeliveryMinimum string `json:"deliveryMinimum"`
+	// Addresses at or beyond this distance are out of zone.
+	DeliveryMaxDistanceKm float64 `json:"deliveryMaxDistanceKm"`
+	// Delivery fee by distance, ascending by upToKm; the last upToKm equals deliveryMaxDistanceKm.
+	DeliveryFeeTiers []*DeliveryFeeTier `json:"deliveryFeeTiers"`
+	// Postcodes never delivered to, whatever the distance.
+	ExcludedPostcodes []string `json:"excludedPostcodes"`
+	// Share of the discountable products' total taken off a pickup order (0.10 = 10 %). Which products are discountable is Product.isDiscountable.
+	PickupDiscountRate float64 `json:"pickupDiscountRate"`
+	// Minimum pickup basket (goods + delivery fee) for the discount, e.g. "20.00".
+	PickupDiscountMinimum string `json:"pickupDiscountMinimum"`
+	// Added to the total of an online payment, e.g. "0.30".
+	OnlinePaymentFee string `json:"onlinePaymentFee"`
+	// Every total is rounded to a multiple of this amount, e.g. "0.10".
+	TotalRoundingStep string `json:"totalRoundingStep"`
+	// Ready-time slots are generated on, and must be aligned to, this many minutes.
+	SlotIntervalMinutes int `json:"slotIntervalMinutes"`
+	// Floor under preparationMinutes when a ready time is validated: max(preparationMinutes, this).
+	MinimumPreparationMinutes int `json:"minimumPreparationMinutes"`
 }
 
 type Payment struct {
@@ -435,15 +471,16 @@ type QuoteOrderItemInput struct {
 }
 
 type RestaurantConfig struct {
-	OrderingEnabled         bool        `json:"orderingEnabled"`
-	OpeningHours            any         `json:"openingHours"`
-	OrderingHours           any         `json:"orderingHours,omitempty"`
-	PreparationMinutes      int         `json:"preparationMinutes"`
-	IsCurrentlyOpen         bool        `json:"isCurrentlyOpen"`
-	IsOrderingCurrentlyOpen bool        `json:"isOrderingCurrentlyOpen"`
-	AvailableSlotsToday     []*TimeSlot `json:"availableSlotsToday"`
-	NextOpeningAt           *time.Time  `json:"nextOpeningAt,omitempty"`
-	UpdatedAt               time.Time   `json:"updatedAt"`
+	OrderingEnabled         bool            `json:"orderingEnabled"`
+	OpeningHours            any             `json:"openingHours"`
+	OrderingHours           any             `json:"orderingHours,omitempty"`
+	PreparationMinutes      int             `json:"preparationMinutes"`
+	IsCurrentlyOpen         bool            `json:"isCurrentlyOpen"`
+	IsOrderingCurrentlyOpen bool            `json:"isOrderingCurrentlyOpen"`
+	AvailableSlotsToday     []*TimeSlot     `json:"availableSlotsToday"`
+	NextOpeningAt           *time.Time      `json:"nextOpeningAt,omitempty"`
+	Policy                  *OrderingPolicy `json:"policy"`
+	UpdatedAt               time.Time       `json:"updatedAt"`
 }
 
 type ScheduleOverride struct {

@@ -73,11 +73,6 @@ func (r *Resolver) orderPricer() *orderPricer {
 const (
 	maxOrderLines = 50
 	maxLineQty    = 99
-	// The delivery minimum (EUR, goods only, before the fee) and the radius (meters).
-	deliveryMinimumEUR = 25
-	deliveryMaxMeters  = 9000
-	// Pickup discount: from this basket amount (goods + fee) up, 10 % of the discountable lines.
-	pickupDiscountThresholdEUR = 20
 )
 
 type pricingSelection struct {
@@ -293,10 +288,25 @@ func (p *orderPricer) price(ctx context.Context, in pricingInput) (*pricingResul
 		}
 	}
 
-	// 3) The delivery minimum applies to the goods (pickup has none).
-	if in.OrderType == orderDomain.OrderTypeDelivery && res.Subtotal.LessThan(decimal.NewFromInt(deliveryMinimumEUR)) {
-		minimum := fmt.Sprint(deliveryMinimumEUR)
-		issue := res.addOrder(apperr.New(apperr.CodeDeliveryMinimumNotMet, "minimum order amount for delivery is 25").With("minimum", minimum))
+	// The numbers and rules below come from the ordering policy, which is also what the public
+	// RestaurantConfig.policy field serves (see restaurantDomain.OrderingPolicy).
+	policy := restaurantDomain.CurrentPolicy()
+
+	// 3) A takeaway-only instance refuses delivery, and nothing else about delivery is priced: no
+	// minimum check, no address resolution (it may call an external service), no fee. The quote
+	// then carries DELIVERY_UNAVAILABLE alone. Otherwise the minimum applies to the goods
+	// (pickup has none).
+	deliveryRefused := false
+	if in.OrderType == orderDomain.OrderTypeDelivery && !policy.DeliveryEnabled {
+		res.addOrder(apperr.New(apperr.CodeDeliveryUnavailable, "delivery is not available"))
+		if res.stop(in) {
+			return res, nil
+		}
+		deliveryRefused = true
+	}
+	if in.OrderType == orderDomain.OrderTypeDelivery && !deliveryRefused && res.Subtotal.LessThan(policy.DeliveryMinimum) {
+		minimum := policy.DeliveryMinimum.String()
+		issue := res.addOrder(apperr.Newf(apperr.CodeDeliveryMinimumNotMet, "minimum order amount for delivery is %s", minimum).With("minimum", minimum))
 		issue.Minimum = &minimum
 		if res.stop(in) {
 			return res, nil
@@ -304,8 +314,8 @@ func (p *orderPricer) price(ctx context.Context, in pricingInput) (*pricingResul
 	}
 
 	// 4) Delivery fee and the address snapshot.
-	if in.OrderType == orderDomain.OrderTypeDelivery {
-		if err := p.priceDelivery(ctx, res, in); err != nil {
+	if in.OrderType == orderDomain.OrderTypeDelivery && !deliveryRefused {
+		if err := p.priceDelivery(ctx, res, in, policy); err != nil {
 			return nil, err
 		}
 		if res.stop(in) {
@@ -316,10 +326,10 @@ func (p *orderPricer) price(ctx context.Context, in pricingInput) (*pricingResul
 
 	// 5) Pickup discount: 10 % of the discountable lines, only from a 20 EUR basket (goods + fee),
 	// snapped to 0,10 EUR so every surface (cart, receipt, Mollie) shows a clean multiple of 10 cents.
-	if in.OrderType == orderDomain.OrderTypePickUp && goodsAndFee.GreaterThanOrEqual(decimal.NewFromInt(pickupDiscountThresholdEUR)) {
+	if in.OrderType == orderDomain.OrderTypePickUp && goodsAndFee.GreaterThanOrEqual(policy.PickupDiscountMinimum) {
 		for _, raw := range res.RawItems {
 			if prod := res.ProductsByID[raw.ProductID]; prod != nil && prod.IsDiscountable {
-				res.PickupDiscount = res.PickupDiscount.Add(raw.TotalPrice.Mul(decimal.NewFromFloat(0.10)))
+				res.PickupDiscount = res.PickupDiscount.Add(raw.TotalPrice.Mul(policy.PickupDiscountRate))
 			}
 		}
 		res.PickupDiscount = money.RoundToNearest10Cents(res.PickupDiscount)
@@ -345,7 +355,7 @@ func (p *orderPricer) price(ctx context.Context, in pricingInput) (*pricingResul
 
 	// 8) The online fee and the total, added up by the same function the order repository stores.
 	if in.IsOnlinePayment {
-		res.OnlineFee = orderDomain.TransactionFee
+		res.OnlineFee = policy.OnlinePaymentFee
 	}
 	res.Total = orderDomain.OrderTotal(res.Subtotal, res.DeliveryFee, res.PickupDiscount, res.CouponDiscount, res.OnlineFee)
 	return res, nil
@@ -566,7 +576,7 @@ func (p *orderPricer) lookupAddress(ctx context.Context, in pricingInput) (*addr
 }
 
 // priceDelivery resolves the address, enforces the zone and sets the fee and the address snapshot.
-func (p *orderPricer) priceDelivery(ctx context.Context, res *pricingResult, in pricingInput) error {
+func (p *orderPricer) priceDelivery(ctx context.Context, res *pricingResult, in pricingInput, policy restaurantDomain.OrderingPolicy) error {
 	if in.AddressPlaceID == nil || *in.AddressPlaceID == "" {
 		res.addOrder(apperr.New(apperr.CodeAddressRequired, "addressPlaceId required for delivery"))
 		return nil
@@ -576,15 +586,16 @@ func (p *orderPricer) priceDelivery(ctx context.Context, res *pricingResult, in 
 		res.addOrder(apperr.Newf(apperr.CodeAddressUnresolvable, "failed to resolve address: %w", err))
 		return nil
 	}
-	if addr.Distance >= deliveryMaxMeters {
+	fee, inZone := policy.DeliveryFee(addr.Distance)
+	if !inZone {
 		res.addOrder(apperr.New(apperr.CodeDeliveryOutOfZone, "address too far for delivery"))
 		return nil
 	}
-	if isExcludedDeliveryPostcode(addr.Postcode) {
+	if policy.IsPostcodeExcluded(addr.Postcode) {
 		res.addOrder(apperr.New(apperr.CodeDeliveryAreaExcluded, "address not eligible for delivery: excluded area"))
 		return nil
 	}
-	res.DeliveryFee = deliveryFeeFromDistance(addr.Distance)
+	res.DeliveryFee = fee
 	res.Address = &orderDomain.AddressSnapshot{
 		StreetName:       &addr.StreetName,
 		HouseNumber:      &addr.HouseNumber,

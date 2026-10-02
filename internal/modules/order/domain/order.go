@@ -4,6 +4,8 @@ import (
 	"cmp"
 	"encoding/json"
 	"time"
+
+	restaurantDomain "tsb-service/internal/modules/restaurant/domain"
 	"tsb-service/pkg/types"
 
 	"github.com/google/uuid"
@@ -39,7 +41,8 @@ const (
 )
 
 // TransactionFee is charged on online (Mollie) payments to cover PSP costs.
-var TransactionFee = decimal.NewFromFloatWithExponent(0.30, -2)
+// It is the ordering policy's online payment fee (restaurant domain).
+var TransactionFee = restaurantDomain.DefaultOrderingPolicy().OnlinePaymentFee
 
 type Order struct {
 	ID                 uuid.UUID          `db:"id" json:"id"`

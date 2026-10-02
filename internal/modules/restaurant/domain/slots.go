@@ -15,7 +15,7 @@ type TimeSlot struct {
 	IsLunchOnlyAllowed bool      // true iff this slot is in the day's first interval AND falls on a Mon–Fri (Brussels)
 }
 
-const slotStepMinutes = 15
+const slotStepMinutes = SlotIntervalMinutes
 
 // AvailableSlotsToday returns all ordering slots that are still bookable
 // for the current local day, honoring overrides, ordering hours (or opening
@@ -44,7 +44,7 @@ func (c *RestaurantConfig) AvailableSlotsToday(now time.Time, overrides map[stri
 	local := timezone.In(now)
 	prep := c.PreparationMinutes
 	if prep <= 0 {
-		prep = 30
+		prep = DefaultPreparationMinutes
 	}
 	minAllowed := roundUpToNextQuarter(local.Add(time.Duration(prep) * time.Minute))
 
@@ -104,7 +104,7 @@ const reviewSlotCount = 8
 func (c *RestaurantConfig) ReviewSlotsToday(now time.Time) []TimeSlot {
 	prep := c.PreparationMinutes
 	if prep <= 0 {
-		prep = 30
+		prep = DefaultPreparationMinutes
 	}
 	local := timezone.In(now)
 	start := roundUpToNextQuarter(local.Add(time.Duration(prep) * time.Minute))

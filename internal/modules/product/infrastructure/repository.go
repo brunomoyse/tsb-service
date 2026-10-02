@@ -533,9 +533,20 @@ func (r *ProductRepository) FindAllCategories(ctx context.Context) ([]*domain.Ca
 	return categories, nil
 }
 
-// FindCategoryByID retrieves a category by its ID.
+// FindCategoryByID retrieves a category by its ID. sql.ErrNoRows when there is none.
 func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) (*domain.Category, error) {
-	const query = `
+	return r.findCategory(ctx, "FindCategoryByID", "c.id", id)
+}
+
+// FindCategoryBySlug retrieves a category by its (unique) slug. sql.ErrNoRows when there is none.
+func (r *ProductRepository) FindCategoryBySlug(ctx context.Context, slug string) (*domain.Category, error) {
+	return r.findCategory(ctx, "FindCategoryBySlug", "c.slug", slug)
+}
+
+// findCategory loads one category with its translations, matched on a column of product_categories
+// (column is a literal from the callers above, never user input).
+func (r *ProductRepository) findCategory(ctx context.Context, op, column string, value any) (*domain.Category, error) {
+	query := `
         SELECT
             c.id,
             c.order,
@@ -545,16 +556,17 @@ func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) 
         FROM product_categories c
         LEFT JOIN product_category_translations t
           ON c.id = t.product_category_id
-        WHERE c.id = $1;
+        WHERE ` + column + ` = $1;
     `
-	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query, id)
+	key := zap.Any("key", value)
+	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query, value)
 	if err != nil {
-		logging.FromContext(ctx).Error("FindCategoryByID: query failed", zap.String("category_id", id.String()), zap.Error(err))
+		logging.FromContext(ctx).Error(op+": query failed", key, zap.Error(err))
 		return nil, err
 	}
 	defer func() {
 		if cerr := rows.Close(); cerr != nil {
-			logging.FromContext(ctx).Warn("FindCategoryByID: error closing rows", zap.String("category_id", id.String()), zap.Error(cerr))
+			logging.FromContext(ctx).Warn(op+": error closing rows", key, zap.Error(cerr))
 		}
 	}()
 
@@ -572,7 +584,7 @@ func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) 
 	for rows.Next() {
 		var cr categoryRow
 		if err := rows.StructScan(&cr); err != nil {
-			logging.FromContext(ctx).Error("FindCategoryByID: row scan error", zap.String("category_id", id.String()), zap.Error(err))
+			logging.FromContext(ctx).Error(op+": row scan error", key, zap.Error(err))
 			return nil, err
 		}
 
@@ -597,7 +609,7 @@ func (r *ProductRepository) FindCategoryByID(ctx context.Context, id uuid.UUID) 
 	}
 
 	if err := rows.Err(); err != nil {
-		logging.FromContext(ctx).Error("FindCategoryByID: row iteration error", zap.String("category_id", id.String()), zap.Error(err))
+		logging.FromContext(ctx).Error(op+": row iteration error", key, zap.Error(err))
 		return nil, err
 	}
 

@@ -8,6 +8,15 @@ package money
 
 import "github.com/shopspring/decimal"
 
+// roundingStepCents is the step RoundToNearest10Cents rounds to (0,10 EUR), in cents.
+const roundingStepCents = 10
+
+// RoundingStep returns the step RoundToNearest10Cents rounds to (0,10 EUR). It is exposed to
+// clients through the ordering policy (RestaurantConfig.policy.totalRoundingStep).
+func RoundingStep() decimal.Decimal {
+	return decimal.New(roundingStepCents, -2)
+}
+
 // RoundToNearest10Cents rounds d to the nearest 0,10 €. Inputs whose last
 // cent digit is 0 stay unchanged. Digits 1–4 round down, digits 5–9 round up
 // (so the 5-cent tie is always resolved in favour of the restaurant).
@@ -23,14 +32,14 @@ func RoundToNearest10Cents(d decimal.Decimal) decimal.Decimal {
 		cents = -cents
 	}
 
-	last := cents % 10
+	last := cents % roundingStepCents
 	switch {
 	case last == 0:
-		// already on .x0
-	case last <= 4:
+		// already on a multiple of the step
+	case last*2 < roundingStepCents:
 		cents -= last
 	default:
-		cents += 10 - last
+		cents += roundingStepCents - last
 	}
 
 	if negative {

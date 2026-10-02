@@ -159,6 +159,8 @@ extend type Query {
 
     productCategory(id: ID!): ProductCategory!
     productCategories: [ProductCategory!]!
+    # One category by its slug (e.g. "extras"), with only its own products; null when no category has that slug.
+    productCategoryBySlug(slug: String!): ProductCategory
 }
 
 extend type Mutation {

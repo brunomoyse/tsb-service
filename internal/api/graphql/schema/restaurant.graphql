@@ -19,6 +19,46 @@ type ScheduleOverride {
     updatedAt: DateTime!
 }
 
+"""
+One step of the delivery fee grid: an address closer than upToKm (and not closer than the previous
+tier's upToKm) pays fee.
+"""
+type DeliveryFeeTier {
+    upToKm: Float!
+    "Decimal string with cents, e.g. \"1.00\"."
+    fee: String!
+}
+
+"""
+The ordering rules the backend enforces when pricing a basket (quoteOrder / createOrder), read-only
+and public. Money is a decimal string with cents ("25.00"); a client should display these values
+instead of duplicating them.
+"""
+type OrderingPolicy {
+    "False for a takeaway-only instance: delivery orders are refused (DELIVERY_UNAVAILABLE)."
+    deliveryEnabled: Boolean!
+    "Minimum basket for delivery (goods only, before the fee), e.g. \"25.00\"."
+    deliveryMinimum: String!
+    "Addresses at or beyond this distance are out of zone."
+    deliveryMaxDistanceKm: Float!
+    "Delivery fee by distance, ascending by upToKm; the last upToKm equals deliveryMaxDistanceKm."
+    deliveryFeeTiers: [DeliveryFeeTier!]!
+    "Postcodes never delivered to, whatever the distance."
+    excludedPostcodes: [String!]!
+    "Share of the discountable products' total taken off a pickup order (0.10 = 10 %). Which products are discountable is Product.isDiscountable."
+    pickupDiscountRate: Float!
+    "Minimum pickup basket (goods + delivery fee) for the discount, e.g. \"20.00\"."
+    pickupDiscountMinimum: String!
+    "Added to the total of an online payment, e.g. \"0.30\"."
+    onlinePaymentFee: String!
+    "Every total is rounded to a multiple of this amount, e.g. \"0.10\"."
+    totalRoundingStep: String!
+    "Ready-time slots are generated on, and must be aligned to, this many minutes."
+    slotIntervalMinutes: Int!
+    "Floor under preparationMinutes when a ready time is validated: max(preparationMinutes, this)."
+    minimumPreparationMinutes: Int!
+}
+
 type RestaurantConfig {
     orderingEnabled: Boolean!
     openingHours: JSON!
@@ -28,6 +68,7 @@ type RestaurantConfig {
     isOrderingCurrentlyOpen: Boolean!
     availableSlotsToday: [TimeSlot!]!
     nextOpeningAt: DateTime
+    policy: OrderingPolicy!
     updatedAt: DateTime!
 }
 

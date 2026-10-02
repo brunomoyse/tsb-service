@@ -622,6 +622,20 @@ func (r *queryResolver) ProductCategories(ctx context.Context) ([]*model.Product
 	return categories, nil
 }
 
+// ProductCategoryBySlug is the resolver for the productCategoryBySlug field. An unknown slug is not
+// an error: the result is null. The category's products come from the same field resolver (and
+// loader) as productCategories, so only this category's products are fetched.
+func (r *queryResolver) ProductCategoryBySlug(ctx context.Context, slug string) (*model.ProductCategory, error) {
+	c, err := r.ProductService.GetCategoryBySlug(ctx, slug)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get category: %w", err)
+	}
+	if c == nil {
+		return nil, nil
+	}
+	return ToGQLProductCategory(c, utils.GetLang(ctx)), nil
+}
+
 // ProductUpdated is the resolver for the productUpdated field.
 func (r *subscriptionResolver) ProductUpdated(ctx context.Context) (<-chan *model.Product, error) {
 	ch := make(chan *model.Product, 1)

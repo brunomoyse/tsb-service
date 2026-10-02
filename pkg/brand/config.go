@@ -7,6 +7,7 @@ package brand
 import (
 	"cmp"
 	"os"
+	"strconv"
 )
 
 type Config struct {
@@ -32,6 +33,9 @@ type Config struct {
 	// InvoicePrefix is the short code prefixing human-readable invoice
 	// references (e.g. "TSB" in "TSB-2026-1A2B3C4D").
 	InvoicePrefix string
+	// DeliveryEnabled is false for a takeaway-only instance (RESTAURANT_DELIVERY_ENABLED=false):
+	// delivery orders are refused and the ordering policy advertises it to the clients.
+	DeliveryEnabled bool
 }
 
 // current is initialized at package init so tests and callers always see a
@@ -62,5 +66,16 @@ func NewFromEnv() Config {
 		Domain:        cmp.Or(os.Getenv("RESTAURANT_DOMAIN"), "tokyosushibarliege.be"),
 		LogoPath:      cmp.Or(os.Getenv("RESTAURANT_LOGO_PATH"), "/images/tsb-black-font-100.png"),
 		InvoicePrefix: cmp.Or(os.Getenv("RESTAURANT_INVOICE_PREFIX"), "TSB"),
+
+		DeliveryEnabled: boolFromEnv("RESTAURANT_DELIVERY_ENABLED", true),
 	}
+}
+
+// boolFromEnv reads a boolean env var; unset or unparsable falls back to def.
+func boolFromEnv(key string, def bool) bool {
+	v, err := strconv.ParseBool(os.Getenv(key))
+	if err != nil {
+		return def
+	}
+	return v
 }
