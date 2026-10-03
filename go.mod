@@ -20,6 +20,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.12.3
+	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/nyaruka/phonenumbers v1.8.1
 	github.com/ory/dockertest/v3 v3.12.0
 	github.com/pressly/goose/v3 v3.28.0
@@ -91,6 +92,7 @@ require (
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
+	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/s2a-go v0.1.10 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.22 // indirect
@@ -129,6 +131,8 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
+	github.com/segmentio/asm v1.2.1 // indirect
+	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/sethvargo/go-retry v0.4.0 // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect
 	github.com/sosodev/duration v1.4.0 // indirect
@@ -137,6 +141,7 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.2 // indirect
 	github.com/urfave/cli/v3 v3.11.0 // indirect
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/zitadel/oidc/v3 v3.51.3 // indirect
 	github.com/zitadel/schema v1.3.2 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.9.1 // indirect
