@@ -148,3 +148,27 @@ func TestIndexMatchesRank(t *testing.T) {
 		}
 	}
 }
+
+func TestRankChineseIgnoresSpaces(t *testing.T) {
+	cs := []Candidate{
+		{ID: "dragon", Primary: []string{"龙卷三文鱼", "Dragon Rolls saumon"}},
+		{ID: "box", Primary: []string{"卷寿司套餐", "Maki box"}},
+	}
+	for _, tt := range []struct {
+		query string
+		exact string
+	}{
+		{"龙卷 三文鱼", "dragon"},
+		{" 龙 卷 三 文 鱼 ", "dragon"},
+		{"卷寿司 套餐", "box"},
+	} {
+		rs := Rank(tt.query, cs, 0)
+		if len(rs) == 0 || rs[0].ID != tt.exact || !rs[0].Exact {
+			t.Errorf("Rank(%q) = %+v, want %s exact first", tt.query, rs, tt.exact)
+		}
+	}
+	// Latin words keep their spaces: "maki box" is exact, "makibox" is not.
+	if rs := Rank("makibox", cs, 0); len(rs) > 0 && rs[0].Exact {
+		t.Errorf("makibox matched exactly: %+v", rs)
+	}
+}

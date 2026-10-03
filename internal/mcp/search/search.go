@@ -84,11 +84,13 @@ type field struct {
 	norm  string
 	words []string
 	runes int
+	// compact is norm without spaces, for Chinese queries.
+	compact string
 }
 
 func prepareField(s string) field {
 	n := Normalize(s)
-	return field{raw: s, norm: n, words: strings.Fields(n), runes: utf8.RuneCountInString(n)}
+	return field{raw: s, norm: n, words: strings.Fields(n), runes: utf8.RuneCountInString(n), compact: strings.ReplaceAll(n, " ", "")}
 }
 
 // pair is a (name, category) pair, normalized without spaces.
@@ -142,6 +144,11 @@ func (ix *Index) Rank(query string, limit int) []Result {
 	qTokens := strings.Fields(q)
 	qRunes := utf8.RuneCountInString(q)
 	qSplit := []rune(strings.ReplaceAll(q, " ", ""))
+	// Chinese has no spaces between words: 龙卷 三文鱼 is 龙卷三文鱼.
+	qCompact := ""
+	if hasHan(qSplit) {
+		qCompact = string(qSplit)
+	}
 
 	var out []*prepared
 	var res []Result
@@ -149,7 +156,11 @@ func (ix *Index) Rank(query string, limit int) []Result {
 		c := &ix.cs[i]
 		best, matched := 0, ""
 		for _, f := range c.primary {
-			if s := scoreField(q, qRunes, qTokens, f); s > best {
+			s := scoreField(q, qRunes, qTokens, f)
+			if qCompact != "" && f.compact == qCompact {
+				s = ScoreExact
+			}
+			if s > best {
 				best, matched = s, f.raw
 			}
 		}

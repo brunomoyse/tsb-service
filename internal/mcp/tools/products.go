@@ -148,7 +148,7 @@ func searchNote(matches []search.Result, labelOf func(id string) string) string 
 	case exact == 1:
 		return fmt.Sprintf("Exactly one product is named by the query: %s. The other results only partly match.", labelOf(exactID))
 	case len(matches) == 1:
-		return fmt.Sprintf("One product partly matches: %s. Make sure it is what the owner meant.", labelOf(matches[0].ID))
+		return fmt.Sprintf("Only one product matches, partly: %s. Act on it if it is clearly what the owner named; ask only if the owner may mean something else.", labelOf(matches[0].ID))
 	case exact > 1:
 		return fmt.Sprintf("%d products have exactly this name, in different categories, and %d match in all. A product is identified by its category and name: unless the owner already said which one, ask them, listing the candidates by category + name, before changing anything.", exact, len(matches))
 	default:

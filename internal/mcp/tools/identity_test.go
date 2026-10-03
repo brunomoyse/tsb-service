@@ -53,7 +53,7 @@ func (h *harness) search(query string, limit int) searchResult {
 const (
 	noteAsk   = "ask them"
 	noteOne   = "Exactly one product"
-	notePart  = "One product partly matches"
+	notePart  = "Only one product matches, partly"
 	allResult = 50
 )
 
@@ -134,6 +134,12 @@ func TestSearchRealMenuAmbiguity(t *testing.T) {
 		{name: "exact name, related products partly match", query: "鳗鱼卷", exact: []string{"特色卷 鳗鱼卷"}, include: []string{"卷寿司 鳗鱼"}, note: noteOne},
 		{name: "platter", query: "三文鱼拼盘", exact: []string{"拼盘套餐 三文鱼拼盘"}, note: noteOne},
 
+		// Chinese has no word spaces: a space inside a name changes nothing.
+		{name: "space inside a zh name", query: "龙卷 三文鱼", exact: []string{"特色卷 龙卷三文鱼"}, note: noteOne},
+		{name: "spaces inside a zh name, five categories", query: "三文鱼 牛油果", exact: salmonAvocado, note: noteAsk},
+		{name: "space inside a zh name with its category", query: "春卷 三文鱼 牛油果", exact: []string{"春卷 三文鱼牛油果"}, note: noteOne},
+		{name: "zh category with a space inside", query: "夏威夷 鱼生饭 三文鱼", exact: []string{"夏威夷鱼生饭 三文鱼"}, note: noteOne},
+
 		// Nothing.
 		{name: "no match", query: "披萨", note: ""},
 	}
@@ -197,7 +203,7 @@ func TestSearchRealMenuEveryProductByCategoryAndName(t *testing.T) {
 	ix := tools.NewProductIndex(catalogue)
 	var checked atomic.Int64
 	t.Cleanup(func() {
-		if n := checked.Load(); n < 1800 {
+		if n := checked.Load(); n < 1900 {
 			t.Errorf("only %d queries checked", n)
 		}
 	})
@@ -215,6 +221,8 @@ func TestSearchRealMenuEveryProductByCategoryAndName(t *testing.T) {
 				name(p, "zh") + " " + cat(p, "fr"),
 				cat(p, "zh") + " " + name(p, "fr"),
 				strings.ToUpper(cat(p, "fr")) + " " + strings.ToLower(name(p, "fr")),
+				// A space inside the Chinese name, as a model may write it.
+				cat(p, "zh") + " " + spaced(name(p, "zh")),
 			}
 			if p.Code != nil {
 				queries = append(queries, *p.Code)
@@ -333,4 +341,14 @@ func TestSearchNoteLimitDoesNotHideAmbiguity(t *testing.T) {
 	if len(r.ids) != 3 || r.matchCount < 15 || !strings.Contains(r.note, fmt.Sprintf("%d products match", r.matchCount)) {
 		t.Errorf("limit 3: %d results, match_count %d, note %q", len(r.ids), r.matchCount, r.note)
 	}
+}
+
+// spaced puts a space after the second character of a Chinese name of
+// four characters or more: 龙卷三文鱼 becomes 龙卷 三文鱼.
+func spaced(s string) string {
+	r := []rune(s)
+	if len(r) < 4 {
+		return s
+	}
+	return string(r[:2]) + " " + string(r[2:])
 }
