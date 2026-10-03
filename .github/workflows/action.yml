@@ -132,9 +132,12 @@ jobs:
             export SOPS_AGE_KEY_FILE=/opt/tokyosushi/.config/sops/age/keys.txt
             cd /opt/tokyosushi/tsb-infra
             git pull --ff-only
-            # tsb-mcp ships from this repo; pin it only once the chart declares it.
+            # tsb-mcp ships from this repo. --reuse-values ignores new chart
+            # defaults, so pin it only once the release really deploys it (after a
+            # one-off --reset-then-reuse-values upgrade); otherwise the --set would
+            # create a half-defined app and fail the atomic upgrade.
             MCP_SET=""
-            if grep -q '^  tsb-mcp:' charts/tokyosushi-apps/values.yaml; then MCP_SET="--set apps.tsb-mcp.image.tag=${TAG}"; fi
+            if sudo kubectl get deployment tsb-mcp -n tokyosushi >/dev/null 2>&1; then MCP_SET="--set apps.tsb-mcp.image.tag=${TAG}"; fi
             sops -d "secrets/${APP}.secret.enc.yaml" | sudo kubectl apply -n tokyosushi -f -
             sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
               --namespace tokyosushi \
@@ -167,8 +170,9 @@ jobs:
           script: |
             set -euo pipefail
             cd /opt/tokyosushi/tsb-infra
+            # Same tsb-mcp gate as the deploy job.
             MCP_SET=""
-            if grep -q '^  tsb-mcp:' charts/tokyosushi-apps/values.yaml; then MCP_SET="--set apps.tsb-mcp.image.tag=${TAG}"; fi
+            if sudo kubectl get deployment tsb-mcp -n tokyosushi >/dev/null 2>&1; then MCP_SET="--set apps.tsb-mcp.image.tag=${TAG}"; fi
             # Roll back DB migrations first (using current container), before swapping image
             for i in $(seq 1 "${MIGRATIONS_DOWN:-0}"); do
               sudo kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=down

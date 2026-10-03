@@ -154,7 +154,8 @@ Suggested agent flow:
   - one replica (SQLite) and the Recreate strategy;
   - a PVC mounted on `/data`;
   - ports 8080 (MCP) and 8081 (internal), both ClusterIP only.
-- **Deploy pin:** the tsb-service deploy job pins `apps.tsb-mcp.image.tag` to the release tag once the chart declares the app.
+- **First rollout:** CI upgrades with `--reuse-values`, which ignores new chart defaults, so the app only appears after a one-off `helm upgrade ... --reset-then-reuse-values --atomic` on the VPS (see the Helm notes in tsb-infra). Apply the Terraform secret `tsb-mcp-zitadel` first.
+- **Deploy pin:** once the `tsb-mcp` Deployment exists, the tsb-service deploy and rollback jobs pin `apps.tsb-mcp.image.tag` to the release tag. Before that they leave it alone.
 - **Rollback limit:** rolling back to a release older than tsb-mcp fails, because that image tag does not exist.
 - **Secrets:** the Zitadel credentials and both bearer tokens come from the `tsb-mcp-zitadel` Kubernetes secret, managed by Terraform (`terraform/zitadel-mcp.tf`). The agent service reads `MCP_AUTH_TOKEN` and `INTERNAL_API_TOKEN` from the same secret.
 
