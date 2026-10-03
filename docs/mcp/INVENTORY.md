@@ -43,6 +43,8 @@ Directive legend: `public` (no auth), `@auth` (any user), `@admin` (admin role),
 | /products inline toggle (`pages/products.vue:732`) | Show / hide on the menu | `updateProduct(id, {isVisible})` @admin | same. Making a product visible requires ≥3 translations (`internal/modules/product/domain/product.go:105`). | **low** | `set_product_visibility` |
 | /products dialog (`components/ProductDialog.vue`) | Change price | `updateProduct(id, {price})` @admin | pubsub, audit | **sensitive** | `propose_price_change` |
 | /products dialog | Edit name/description per language, category, code, piece count, halal/spicy/vegetarian/lunch-only/discountable flags | `updateProduct(id, {...})` @admin (field is `categoryID`, not `categoryId`) | pubsub, audit. A French name change regenerates the slug (public URL). | **sensitive** | `propose_product_update` |
+| /products dialog | Change VAT category (`food`, `beverage`, `zero_rated`, `out_of_scope`) | `updateProduct(id, {vatCategory})` @admin | pubsub, audit. Changes the VAT applied to future orders. | **sensitive** (pending your confirmation) | `propose_vat_category_change` |
+| /products dialog | Set / replace product image | multipart `updateProduct(id, {image, removeBackground})` @admin | Upload to the file service (`FILE_SERVICE_URL`). An upload failure is only logged upstream, so the MCP re-checks the result. | **sensitive** (pending your confirmation) | `propose_product_image` (takes an `image_url`) |
 | /products dialog | Create product (without image) | `createProduct(input)` @admin | audit only, no pubsub (backend gap) | **sensitive** | `propose_product_creation` |
 | /products dialog (`ProductDialog.vue:744-849`) | Create / update choice group (min/max selections, names, order) | `createProductChoiceGroup`, `updateProductChoiceGroup` @admin | DB + audit, no pubsub | **sensitive** | `propose_choice_group_change` |
 | /products dialog | Create / update choice (price modifier, names, order) | `createProductChoice`, `updateProductChoice` @admin | DB + audit, no pubsub | **sensitive** | `propose_choice_change` |
@@ -68,8 +70,7 @@ Directive legend: `public` (no auth), `@auth` (any user), `@admin` (admin role),
 | /orders (`useOrderActions.ts:28`) | Mark as paid | `updatePaymentStatus(orderId, status)` @staff | Order/payment write |
 | customer apps | Create order, quote order | `createOrder` @auth, `quoteOrder` | Order write / not a dashboard action |
 | /orders | Print kitchen / client tickets | Sunmi native Capacitor plugin, no API | Not reachable from a server |
-| /products dialog | Product image upload, background-removal preview | multipart `createProduct`/`updateProduct` with `image`, REST `POST /images/preview` | **Flag.** Needs binary input from chat. The file service upload failure is only logged upstream. Excluded until decided. |
-| /products dialog | Change VAT category | `updateProduct(id, {vatCategory})` | **Flag.** Fiscal/accounting impact |
+| /products dialog | Background-removal preview | REST `POST /images/preview` | Preview only. Use `remove_background` on `propose_product_image` instead. |
 | app start (`composables/usePushNotifications.ts`) | Register / unregister push device | `registerDeviceToken`, `unregisterDeviceToken` @auth | Device/account |
 | /settings > Security (`components/SecuritySettings.vue`) | TOTP status, enroll, verify, remove | REST `GET /auth/mfa`, `POST /auth/mfa/totp`, `/verify`, `/remove` | Credentials |
 | /auth/login, /auth/callback | Login, OTP, TOTP, finalize, token exchange, `me` admin gate | REST `/auth/*`, `query me` | Credentials |
@@ -79,11 +80,11 @@ Directive legend: `public` (no auth), `@auth` (any user), `@admin` (admin role),
 
 ## 4. Gaps: not cleanly possible through the API (decisions needed)
 
-1. **`set_product_availability(until)`.** The backend has no "sold out until" field. The only option without backend changes is an MCP-side scheduler: a SQLite job that, at `until`, re-reads the product and sets `isAvailable=true` if it is still unavailable because of us.
+1. **Availability `until`: dropped (decided).** TSB has no notion of stock. The MCP only switches a product off or on when asked, never automatically. `set_product_availability` has no `until` parameter.
 2. **Closure with `reopen_at`.** `orderingEnabled` has no reopen time, and `isCurrentlyOpen` / `nextOpeningAt` ignore it. Options:
    - **(a)** `updateOrderingEnabled(false)` plus an MCP-scheduled reopen. This is not visible in the dashboard as "reopens at X".
    - **(b)** A schedule override for the affected date(s): `closed: true` for whole days, or `closed: false` with the remaining hours for "close at 15:00, back at 18:00". This is native and visible in /settings, lapses by itself, and makes `nextOpeningAt` correct. It has day granularity, and the override replaces both opening and ordering hours for that day.
-   - **(c)** Both: (b) when `reopen_at` is on a later day or at a clean time boundary, (a) for "pause right now".
+   - **(c)** Both. **Decided.** (a) for "pause now" with no reopen time; (b) when `reopen_at` (and an optional start time) is given. No scheduler.
 3. **Not exposed upstream:**
    - product delete (hide instead);
    - coupon delete (deactivate instead);
@@ -91,7 +92,7 @@ Directive legend: `public` (no auth), `@auth` (any user), `@admin` (admin role),
    - any bulk mutation. Bulk tools would loop over single mutations: always sensitive, and not atomic.
 4. **Delivery settings are code constants** (`internal/modules/restaurant/domain/policy.go`): minimum order, radius, fees, pickup discount. Only `RESTAURANT_DELIVERY_ENABLED` is configurable, through the environment. There is no tool for them.
 5. **Schedule override date pitfall.** The backend converts the `DateTime` to UTC before writing a `DATE` column. The dashboard sends local midnight, which lands on the previous UTC day. Before relying on either convention, the MCP will check how existing rows are stored and then send `YYYY-MM-DDT00:00:00Z`.
-6. **Daily revenue.** There is no dedicated stats query. `orderHistory` for a single day gives `totalOrders` / `totalRevenue` with CANCELLED and FAILED excluded. The open question is whether unpaid PENDING orders should count.
+6. **Daily revenue.** There is no dedicated stats query. `orderHistory` for a single day gives `totalOrders` / `totalRevenue` with CANCELLED and FAILED excluded. **Decided:** PENDING orders do not count.
 7. **Side observation, not in scope.** The dashboard `products` query does not select `choiceGroups`, but `components/ProductDialog.vue:587` builds the edit form from `product.choiceGroups`.
 
 ## 5. Service account (preview for step 2)
@@ -110,6 +111,6 @@ What the machine user needs:
 
 **Blocker.** On first request, the backend JIT-provisions a `users` row with `email=''` (`internal/modules/user/application/service.go:157-243`). `email` is UNIQUE, so if any blank-email row already exists the insert fails and every MCP request returns 401. Even when the insert succeeds, a blank email makes the backend call the Zitadel user API on every request. Options:
 - **(a)** A one-off data seed: insert the `users` row for the machine user's `zitadel_user_id` with a placeholder email such as `mcp-bot@tokyosushibarliege.invalid`.
-- **(b)** A small backend change to handle machine users.
+- **(b)** A small backend change to handle machine users. **Decided: (b)**, done in this branch.
 
 **Audit trail.** All MCP mutations will appear in `staff_audit_log` with `actor_kind = admin` and the machine user's id. That is in addition to the MCP's own SQLite audit log, which keeps the before/after state and `request_context`.
