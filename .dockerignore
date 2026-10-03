@@ -1,0 +1,14 @@
+# Keep local secrets, VCS data and stray build outputs out of the build context.
+.git
+.github
+.claude
+.env
+.env.*
+!.env.example
+main
+tsb-service
+tsb-migrate
+*.db
+*.test
+coverage.out
+docs
