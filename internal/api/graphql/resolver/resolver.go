@@ -261,7 +261,12 @@ func ErrorPresenter(ctx context.Context, e error) *gqlerror.Error {
 	code, _ := err.Extensions["code"].(string)
 	expected := apperr.IsExpected(apperr.Code(code))
 
-	opCtx := gqlgraphql.GetOperationContext(ctx)
+	// GetOperationContext panics when there is none, which is the case for
+	// errors raised before an operation exists (unreadable or malformed body).
+	var opCtx *gqlgraphql.OperationContext
+	if gqlgraphql.HasOperationContext(ctx) {
+		opCtx = gqlgraphql.GetOperationContext(ctx)
+	}
 	var opName, query string
 	if opCtx != nil {
 		opName = opCtx.OperationName
