@@ -8,10 +8,9 @@ import (
 	"github.com/vektah/gqlparser/v2/gqlerror"
 )
 
-// Staff is an alias for Admin: with the POS device principal collapsed to
-// admin scope, every staff-level operation is admin-only. Kept as a separate
-// directive so the schema can express intent ("any staff member") without
-// pinning callers to admin Zitadel JWTs in the future.
+// Staff admits admins and POS devices. It guards the shop-floor surface the
+// POS handheld needs (orders, order updates, payment status, coupons); every
+// other privileged operation stays @admin, which POS devices cannot pass.
 func Staff(ctx context.Context, obj any, next graphql.Resolver) (any, error) {
 	userID := utils.GetUserID(ctx)
 	if userID == "" {
@@ -25,7 +24,7 @@ func Staff(ctx context.Context, obj any, next graphql.Resolver) (any, error) {
 		return nil, err
 	}
 
-	if !utils.GetIsAdmin(ctx) {
+	if !utils.GetIsStaff(ctx) {
 		return nil, &gqlerror.Error{
 			Message:    "FORBIDDEN: staff role required",
 			Path:       graphql.GetPath(ctx),

@@ -225,6 +225,10 @@ type verifyOtpResponse struct {
 	SessionID       string `json:"sessionId"`
 	SessionToken    string `json:"sessionToken"`
 	RequiresProfile bool   `json:"requiresProfile"`
+	// RequiresTotp tells the dashboard to ask for the authenticator code
+	// before finalize. Customer apps ignore it (finalize only enforces TOTP
+	// for admin clients).
+	RequiresTotp bool `json:"requiresTotp"`
 }
 
 // VerifyOtpHandler updates the Zitadel session with the user-supplied OTP
@@ -297,10 +301,18 @@ func VerifyOtpHandler(c *gin.Context) {
 	// user that still needs first/last name. If either lookup fails the user
 	// can still log in — they keep the placeholder profile and can edit it
 	// from /me later. We don't want this check to block authentication.
-	var requiresProfile bool
-	if userID, err := lookupSessionUserID(req.SessionID); err == nil {
-		if needs, err := userNeedsProfileCompletion(userID); err == nil {
+	//
+	// Same best-effort rule for requiresTotp: it only drives the login UI;
+	// FinalizeOIDCHandler enforces the TOTP check for staff logins.
+	var requiresProfile, requiresTotp bool
+	if factors, err := fetchSessionFactors(req.SessionID); err == nil {
+		if needs, err := userNeedsProfileCompletion(factors.UserID); err == nil {
 			requiresProfile = needs
+		}
+		if !factors.TOTPVerified {
+			if hasTOTP, err := userHasTOTP(factors.UserID); err == nil {
+				requiresTotp = hasTOTP
+			}
 		}
 	}
 
@@ -310,6 +322,7 @@ func VerifyOtpHandler(c *gin.Context) {
 		SessionID:       req.SessionID,
 		SessionToken:    zResp.SessionToken,
 		RequiresProfile: requiresProfile,
+		RequiresTotp:    requiresTotp,
 	}
 	verifyGate.cache(entry, req.Code, resp)
 	c.JSON(http.StatusOK, resp)

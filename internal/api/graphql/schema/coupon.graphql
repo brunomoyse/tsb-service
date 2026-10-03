@@ -63,7 +63,7 @@ extend type Query {
 }
 
 extend type Mutation {
-    createCoupon(input: CreateCouponInput!): Coupon! @admin
+    createCoupon(input: CreateCouponInput!): Coupon! @staff
     updateCoupon(id: ID!, input: UpdateCouponInput!): Coupon! @admin
 }
 

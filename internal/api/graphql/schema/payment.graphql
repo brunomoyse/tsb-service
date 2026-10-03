@@ -33,5 +33,5 @@ type Payment {
 }
 
 extend type Mutation {
-    updatePaymentStatus(orderId: ID!, status: String!): Payment! @admin
+    updatePaymentStatus(orderId: ID!, status: String!): Payment! @staff
 }

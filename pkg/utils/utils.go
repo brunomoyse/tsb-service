@@ -22,6 +22,7 @@ type contextKey string
 const LangKey contextKey = "lang"
 const UserIDKey contextKey = "userID"
 const IsAdminKey contextKey = "isAdmin"
+const IsPOSKey contextKey = "isPOS"
 const ZitadelSubKey contextKey = "zitadelSub"
 const TokenExpiryKey contextKey = "tokenExpiry"
 const ClientIPKey contextKey = "clientIP"
@@ -79,6 +80,23 @@ func SetIsAdmin(ctx context.Context, isAdmin bool) context.Context {
 func GetIsAdmin(ctx context.Context) bool {
 	isAdmin, _ := ctx.Value(IsAdminKey).(bool)
 	return isAdmin
+}
+
+// SetIsPOS marks the caller as a POS device principal (app-signed JWT from
+// /pos/auth/device-login). POS devices are staff but NOT admins: they only
+// reach the @staff surface the shop floor needs.
+func SetIsPOS(ctx context.Context, isPOS bool) context.Context {
+	return context.WithValue(ctx, IsPOSKey, isPOS)
+}
+
+func GetIsPOS(ctx context.Context) bool {
+	isPOS, _ := ctx.Value(IsPOSKey).(bool)
+	return isPOS
+}
+
+// GetIsStaff reports whether the caller is an admin or a POS device.
+func GetIsStaff(ctx context.Context) bool {
+	return GetIsAdmin(ctx) || GetIsPOS(ctx)
 }
 
 // SetTokenExpiry stores the JWT exp claim (UTC) in the context. Zero means

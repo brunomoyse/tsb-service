@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -231,6 +232,10 @@ func TestVerifyOtpHandler_Success(t *testing.T) {
 			// Existing user — real first name, no profile completion needed.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"Alice","familyName":"Wonderland"}}}}`))
+		case strings.HasSuffix(r.URL.Path, "/authentication_methods") && r.Method == "GET":
+			// No TOTP enrolled: no requiresTotp step.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"authMethodTypes":["AUTHENTICATION_METHOD_TYPE_OTP_EMAIL"]}`))
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -267,6 +272,10 @@ func TestVerifyOtpHandler_PlaceholderUser(t *testing.T) {
 			// Placeholder marker still in place — frontend must capture name.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"-","familyName":"-"}}}}`))
+		case strings.HasSuffix(r.URL.Path, "/authentication_methods") && r.Method == "GET":
+			// No TOTP enrolled: no requiresTotp step.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"authMethodTypes":["AUTHENTICATION_METHOD_TYPE_OTP_EMAIL"]}`))
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -378,6 +387,10 @@ func TestVerifyOtpHandler_DuplicateSubmitReturnsCachedResponse(t *testing.T) {
 			atomic.AddInt32(&getUserHits, 1)
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"Alice","familyName":"Wonderland"}}}}`))
+		case strings.HasSuffix(r.URL.Path, "/authentication_methods") && r.Method == "GET":
+			// No TOTP enrolled: no requiresTotp step.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"authMethodTypes":["AUTHENTICATION_METHOD_TYPE_OTP_EMAIL"]}`))
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -419,6 +432,10 @@ func TestVerifyOtpHandler_ConcurrentSubmitsAreSerialized(t *testing.T) {
 		case r.URL.Path == "/v2/users/user-conc" && r.Method == "GET":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"Bob","familyName":"Builder"}}}}`))
+		case strings.HasSuffix(r.URL.Path, "/authentication_methods") && r.Method == "GET":
+			// No TOTP enrolled: no requiresTotp step.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"authMethodTypes":["AUTHENTICATION_METHOD_TYPE_OTP_EMAIL"]}`))
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -468,6 +485,10 @@ func TestVerifyOtpHandler_DifferentCodeBypassesCache(t *testing.T) {
 		case r.URL.Path == "/v2/users/user-mix" && r.Method == "GET":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"Carol","familyName":"Danvers"}}}}`))
+		case strings.HasSuffix(r.URL.Path, "/authentication_methods") && r.Method == "GET":
+			// No TOTP enrolled: no requiresTotp step.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"authMethodTypes":["AUTHENTICATION_METHOD_TYPE_OTP_EMAIL"]}`))
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}

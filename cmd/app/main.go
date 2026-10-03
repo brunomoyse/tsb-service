@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	_ "time/tzdata"
@@ -27,6 +28,7 @@ import (
 	images "tsb-service/internal/api/images"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
+	"tsb-service/internal/shared/audit"
 	"tsb-service/pkg/brand"
 	"tsb-service/pkg/email/scaleway"
 	"tsb-service/pkg/logging"
@@ -215,6 +217,11 @@ func main() {
 		zap.L().Error("failed to initialize OIDC verifier", zap.Error(err))
 		os.Exit(1)
 	}
+	// Admin role is only honored on tokens issued to these OIDC clients (the
+	// dashboard). All apps share one Zitadel project, so this stops a token
+	// minted for the customer site from carrying admin scope.
+	adminClientIDs := strings.Split(os.Getenv("ZITADEL_ADMIN_CLIENT_IDS"), ",")
+	oidcVerifier.SetAdminClientIDs(adminClientIDs)
 	zap.L().Info("OIDC verifier initialized", zap.String("issuer", zitadelIssuer))
 
 	// POS (shop-floor handheld) auth module — single trusted device, HMAC-only.
@@ -249,6 +256,7 @@ func main() {
 		AppBaseURL:         os.Getenv("APP_BASE_URL"),
 		IdPGoogleID:        os.Getenv("ZITADEL_IDP_GOOGLE_ID"),
 		IdPAppleID:         os.Getenv("ZITADEL_IDP_APPLE_ID"),
+		AdminClientIDs:     adminClientIDs,
 	})
 
 	// APNs client for iOS push notifications (optional — non-fatal if not configured)
@@ -399,7 +407,12 @@ func main() {
 	// Payment webhook depends on the resolver to fan out the new-order push
 	// notification once the Mollie payment transitions to paid.
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, broker, rootResolver)
-	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL, "capacitor://localhost", "https://localhost"}, oidcVerifier)
+	auditRecorder := audit.NewRecorder(dbPool.Admin)
+	auth.SetAuditFunc(func(c *gin.Context, action string, success bool) {
+		ctx := utils.SetClientIP(c.Request.Context(), c.ClientIP())
+		auditRecorder.Record(ctx, audit.Entry{Action: action, Success: success})
+	})
+	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL, "capacitor://localhost", "https://localhost"}, oidcVerifier, auditRecorder)
 	optionalAuth := oidcVerifier.OptionalAuthMiddleware()
 
 	api.POST("/graphql", optionalAuth, graphqlHandler)
@@ -415,6 +428,7 @@ func main() {
 	// Store-review OTP retrieval (Google Play / App Store reviewers, no mailbox).
 	// Disabled unless REVIEW_OTP_KEY + REVIEW_OTP_LOGINS are set.
 	api.GET("/auth/review/last-otp", authLimiter.Middleware(), auth.ReviewLastOtpHandler)
+	api.POST("/auth/session/totp/verify", authLimiter.Middleware(), auth.VerifyTotpHandler)
 	api.POST("/auth/finalize", authLimiter.Middleware(), auth.FinalizeOIDCHandler)
 	api.POST("/auth/authorize-proxy", authLimiter.Middleware(), auth.AuthorizeProxyHandler)
 	api.POST("/auth/token-exchange", authLimiter.Middleware(), auth.TokenExchangeHandler)
@@ -435,6 +449,11 @@ func main() {
 	api.POST("/payments/webhook", mollieLimiter.Middleware(), paymentHandler.UpdatePaymentStatusHandler)
 
 	strictAuth := oidcVerifier.StrictAuthMiddleware()
+	// Staff second factor (TOTP) self-service, admins only (checked in handlers).
+	api.GET("/auth/mfa", strictAuth, auth.MFAStatusHandler)
+	api.POST("/auth/mfa/totp", authLimiter.Middleware(), strictAuth, auth.StartTOTPHandler)
+	api.POST("/auth/mfa/totp/verify", authLimiter.Middleware(), strictAuth, auth.ConfirmTOTPHandler)
+	api.POST("/auth/mfa/totp/remove", authLimiter.Middleware(), strictAuth, auth.RemoveTOTPHandler)
 	api.POST("/images/preview", strictAuth, images.PreviewHandler)
 	api.GET("/orders/:id/invoice", strictAuth, orderHandler.DownloadInvoice)
 

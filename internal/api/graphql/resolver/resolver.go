@@ -32,6 +32,7 @@ import (
 	productApplication "tsb-service/internal/modules/product/application"
 	restaurantApplication "tsb-service/internal/modules/restaurant/application"
 	userApplication "tsb-service/internal/modules/user/application"
+	"tsb-service/internal/shared/audit"
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/apns"
 	"tsb-service/pkg/fcm"
@@ -113,7 +114,7 @@ func (r *Resolver) allowPublicQuery(ctx context.Context, scope string) error {
 }
 
 // GraphQLHandler defines the GraphQL endpoint with @auth directive injection
-func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *middleware.OIDCVerifier) gin.HandlerFunc {
+func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *middleware.OIDCVerifier, auditRecorder *audit.Recorder) gin.HandlerFunc {
 	cfg := graphql.Config{Resolvers: resolver}
 	cfg.Directives.Auth = directives.Auth
 	cfg.Directives.Admin = directives.Admin
@@ -163,6 +164,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 					ctx = utils.SetUserID(ctx, appID)
 				}
 				ctx = utils.SetIsAdmin(ctx, isAdmin)
+				ctx = utils.SetIsPOS(ctx, isPOS)
 				ctx = utils.SetTokenExpiry(ctx, exp)
 				// Bind the WebSocket context lifetime to the access token.
 				// When exp hits, ctx.Done() fires, every in-flight subscription
@@ -199,6 +201,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 		Cache: lru.New[string](50),
 	})
 	h.Use(extension.FixedComplexityLimit(100))
+	h.Use(audit.GraphQLExtension{Recorder: auditRecorder})
 
 	h.SetErrorPresenter(ErrorPresenter)
 	h.SetRecoverFunc(func(ctx context.Context, err any) error {

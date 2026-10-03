@@ -26,7 +26,7 @@ type DBPool struct {
 // in the context. Admin callers (Zitadel admins and POS devices) get the Admin
 // pool — both need privileged access. Regular customers use the Customer pool.
 func (p *DBPool) ForContext(ctx context.Context) *sqlx.DB {
-	if utils.GetIsAdmin(ctx) {
+	if utils.GetIsStaff(ctx) {
 		return p.Admin
 	}
 	return p.Customer
