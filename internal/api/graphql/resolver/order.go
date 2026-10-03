@@ -311,7 +311,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 			}
 
 			// 2) fetch all products in one go
-			prodDetailsSlice, err := r.ProductService.GetProductsByIDs(ctx, ids)
+			prodDetailsSlice, err := r.ProductService.GetProductNamesForInvoice(ctx, ids)
 			if err != nil {
 				zap.L().Error("failed to retrieve products", zap.String("order_id", o.ID.String()), zap.Error(err))
 				return

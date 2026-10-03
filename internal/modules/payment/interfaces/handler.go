@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"tsb-service/internal/api/graphql/resolver"
@@ -136,6 +137,7 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 				// subscription publish, no push. It will auto-cancel after 10 min.
 				// TEMPORARY (revert after launch).
 				log.Info("webhook: store-review test order paid — suppressing publish/push", zap.String("order_id", order.ID.String()))
+				h.sendConfirmation(adminCtx, orderID)
 			default:
 				gqlOrder := resolver.ToGQLOrder(order)
 				// First time the dashboard sees this online-payment order — publish
@@ -149,6 +151,7 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 				if h.notifier != nil {
 					h.notifier.SendNewOrderPush(order)
 				}
+				h.sendConfirmation(adminCtx, orderID)
 			}
 		case paymentDomain.PaymentStatusCanceled, paymentDomain.PaymentStatusFailed, paymentDomain.PaymentStatusExpired:
 			order, handleErr := h.service.HandlePaymentFailed(adminCtx, orderID)
@@ -182,5 +185,13 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 	}); lockErr != nil {
 		log.Error("webhook: failed to acquire payment lock", zap.String("payment_id", paymentID), zap.Error(lockErr))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "temporary failure"})
+	}
+}
+
+// sendConfirmation emails the customer once the paid status is committed. A failure is
+// only logged: the webhook still answers 200 so Mollie's retry does not resend it.
+func (h *PaymentHandler) sendConfirmation(ctx context.Context, orderID uuid.UUID) {
+	if err := h.service.SendPaidOrderConfirmation(ctx, orderID); err != nil {
+		logging.FromContext(ctx).Error("webhook: failed to send order confirmation", zap.String("order_id", orderID.String()), zap.Error(err))
 	}
 }

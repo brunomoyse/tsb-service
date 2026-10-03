@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
@@ -42,9 +43,11 @@ type PaymentService interface {
 	UpdatePaymentStatusByOrderID(ctx context.Context, orderID uuid.UUID, status string) (*domain.MolliePayment, error)
 	GetPaymentByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error)
 	GetPaymentByExternalID(ctx context.Context, externalMolliePaymentID string) (*domain.MolliePayment, error)
-	// HandlePaymentPaid processes a paid payment: verifies amount, enriches order, sends email.
+	// HandlePaymentPaid processes a paid payment: refunds a cancelled order, logs an amount mismatch.
 	// Returns the domain order for the caller to publish to PubSub (avoids circular import with resolver).
 	HandlePaymentPaid(ctx context.Context, orderID uuid.UUID) (*orderDomain.Order, error)
+	// SendPaidOrderConfirmation emails the customer after the paid status is persisted.
+	SendPaidOrderConfirmation(ctx context.Context, orderID uuid.UUID) error
 	HandlePaymentFailed(ctx context.Context, orderID uuid.UUID) (*orderDomain.Order, error)
 
 	BatchGetPaymentsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.MolliePayment, error)
@@ -357,7 +360,8 @@ func (s *paymentService) BatchGetPaymentsByOrderIDs(ctx context.Context, orderID
 }
 
 // HandlePaymentPaid handles the business logic when a payment is confirmed as paid:
-// verifies amount, fetches order/products/user, sends confirmation email.
+// refunds a cancelled order, logs an amount mismatch. It sends nothing: the confirmation
+// email is SendPaidOrderConfirmation, called after the paid status is persisted.
 // Returns the order so the caller can publish to PubSub (avoids circular import with resolver).
 func (s *paymentService) HandlePaymentPaid(ctx context.Context, orderID uuid.UUID) (*orderDomain.Order, error) {
 	order, orderProducts, err := s.orderService.GetOrderByID(ctx, orderID)
@@ -387,15 +391,39 @@ func (s *paymentService) HandlePaymentPaid(ctx context.Context, orderID uuid.UUI
 		)
 	}
 
-	// Load product details
+	return order, nil
+}
+
+// SendPaidOrderConfirmation emails the customer that their paid order is awaiting
+// validation (respecting NotifyOrderUpdates). The webhook calls it only after the paid
+// status is persisted, so a Mollie retry never sends it twice. The error is for logging.
+func (s *paymentService) SendPaidOrderConfirmation(ctx context.Context, orderID uuid.UUID) error {
+	order, orderProducts, err := s.orderService.GetOrderByID(ctx, orderID)
+	if err != nil || order == nil {
+		return fmt.Errorf("failed to retrieve order: %w", err)
+	}
+	if orderProducts == nil {
+		return fmt.Errorf("no order products found for order %s", orderID)
+	}
+
+	u, err := s.userService.GetUserByID(ctx, order.UserID.String())
+	if err != nil || u == nil {
+		return fmt.Errorf("failed to retrieve user: %w", err)
+	}
+	if !u.NotifyOrderUpdates {
+		return nil
+	}
+
 	productIDs := make([]string, len(*orderProducts))
 	for i, op := range *orderProducts {
 		productIDs[i] = op.ProductID.String()
 	}
 
-	products, err := s.productService.GetProductsByIDs(ctx, productIDs)
+	// Names only, whatever the availability now: a product that sold out after the customer paid
+	// must not prevent the confirmation.
+	products, err := s.productService.GetProductNamesForInvoice(ctx, productIDs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve products: %w", err)
+		return fmt.Errorf("failed to retrieve products: %w", err)
 	}
 
 	productMap := make(map[uuid.UUID]productDomain.ProductOrderDetails, len(products))
@@ -407,7 +435,7 @@ func (s *paymentService) HandlePaymentPaid(ctx context.Context, orderID uuid.UUI
 	for i, op := range *orderProducts {
 		prod, ok := productMap[op.ProductID]
 		if !ok {
-			return nil, fmt.Errorf("product %s not found", op.ProductID)
+			return fmt.Errorf("product %s not found", op.ProductID)
 		}
 		orderProductsResponse[i] = orderDomain.OrderProduct{
 			Product: orderDomain.Product{
@@ -424,19 +452,10 @@ func (s *paymentService) HandlePaymentPaid(ctx context.Context, orderID uuid.UUI
 		}
 	}
 
-	u, err := s.userService.GetUserByID(ctx, order.UserID.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve user: %w", err)
+	if err := es.SendOrderPendingEmail(*u, order.Language, *order, orderProductsResponse); err != nil {
+		return fmt.Errorf("failed to send order pending email: %w", err)
 	}
-
-	// Send confirmation email (respect user's order-updates preference)
-	if u.NotifyOrderUpdates {
-		if emailErr := es.SendOrderPendingEmail(*u, order.Language, *order, orderProductsResponse); emailErr != nil {
-			zap.L().Error("failed to send order pending email", zap.String("order_id", orderID.String()), zap.Error(emailErr))
-		}
-	}
-
-	return order, nil
+	return nil
 }
 
 // refundPaidCancelledOrder refunds a payment that Mollie reports as paid for
@@ -633,10 +652,18 @@ func amt(d decimal.Decimal) *mollie.Amount {
 }
 
 func describe(p orderDomain.Product) string {
+	label := strings.TrimSpace(p.CategoryName + " " + p.Name)
 	if p.Code != nil && *p.Code != "" {
-		return fmt.Sprintf("%s ‒ %s %s", *p.Code, p.CategoryName, p.Name)
+		if label == "" {
+			return *p.Code
+		}
+		return fmt.Sprintf("%s ‒ %s", *p.Code, label)
 	}
-	return fmt.Sprintf("%s %s", p.CategoryName, p.Name)
+	if label == "" {
+		// Mollie rejects a blank line description, which would fail the whole payment.
+		return p.ID.String()
+	}
+	return label
 }
 
 func serviceTypeFromOrderType(orderType orderDomain.OrderType) productDomain.ServiceType {
