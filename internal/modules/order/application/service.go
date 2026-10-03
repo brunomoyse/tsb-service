@@ -102,37 +102,51 @@ func (s *orderService) UpdateOrder(ctx context.Context, orderID uuid.UUID, newSt
 	}
 
 	// Roll back coupon usage when the order transitions into CANCELED. This is
-	// the single source of cancel-time rollback: it covers cash orders, admin
-	// and POS cancellations, and the payment-failed webhook (which cancels via
-	// this method). The transition guard (oldStatus != CANCELED) makes it
-	// idempotent, so a duplicate cancellation never double-decrements.
-	if s.couponService != nil &&
-		order.OrderStatus == domain.OrderStatusCanceled && oldStatus != domain.OrderStatusCanceled &&
-		order.CouponCode != nil && *order.CouponCode != "" {
-		if coupon, cErr := s.couponService.GetCouponByCode(ctx, *order.CouponCode); cErr != nil || coupon == nil {
-			logging.FromContext(ctx).Error("failed to fetch coupon for rollback on cancellation",
-				zap.String("order_id", order.ID.String()), zap.String("coupon_code", *order.CouponCode), zap.Error(cErr))
-		} else if dErr := s.couponService.DecrementUsageAtomic(ctx, coupon.ID, order.UserID); dErr != nil {
-			logging.FromContext(ctx).Error("failed to roll back coupon on cancellation",
-				zap.String("order_id", order.ID.String()), zap.String("coupon_code", *order.CouponCode), zap.Error(dErr))
-		}
+	// the cancel-time rollback for cash orders, admin and POS cancellations,
+	// and the payment-failed webhook (which cancels via this method); the
+	// stale test-order sweeper uses the same helper. The transition guard
+	// (oldStatus != CANCELED) makes it idempotent, so a duplicate
+	// cancellation never double-decrements.
+	if order.OrderStatus == domain.OrderStatusCanceled && oldStatus != domain.OrderStatusCanceled {
+		s.rollbackCoupon(ctx, order.ID, order.UserID, order.CouponCode)
 	}
 
 	return nil
 }
 
+// rollbackCoupon gives back the coupon usage of a cancelled order. Failures
+// are logged, never returned: the cancellation itself already happened.
+func (s *orderService) rollbackCoupon(ctx context.Context, orderID, userID uuid.UUID, couponCode *string) {
+	if s.couponService == nil || couponCode == nil || *couponCode == "" {
+		return
+	}
+	coupon, err := s.couponService.GetCouponByCode(ctx, *couponCode)
+	if err != nil || coupon == nil {
+		logging.FromContext(ctx).Error("failed to fetch coupon for rollback on cancellation",
+			zap.String("order_id", orderID.String()), zap.String("coupon_code", *couponCode), zap.Error(err))
+		return
+	}
+	if err := s.couponService.DecrementUsageAtomic(ctx, coupon.ID, userID); err != nil {
+		logging.FromContext(ctx).Error("failed to roll back coupon on cancellation",
+			zap.String("order_id", orderID.String()), zap.String("coupon_code", *couponCode), zap.Error(err))
+	}
+}
+
 func (s *orderService) CancelStaleTestOrders(ctx context.Context, olderThan time.Duration) (int, error) {
-	ids, err := s.repo.CancelStaleTestOrders(ctx, olderThan)
+	refs, err := s.repo.CancelStaleTestOrders(ctx, olderThan)
 	if err != nil {
 		return 0, err
 	}
-	for _, id := range ids {
-		if err := s.repo.InsertStatusHistory(ctx, id, domain.OrderStatusCanceled); err != nil {
+	for _, ref := range refs {
+		if err := s.repo.InsertStatusHistory(ctx, ref.ID, domain.OrderStatusCanceled); err != nil {
 			logging.FromContext(ctx).Warn("failed to record auto-cancel status history",
-				zap.String("order_id", id.String()), zap.Error(err))
+				zap.String("order_id", ref.ID.String()), zap.Error(err))
 		}
+		// The bulk UPDATE only returns orders that were not yet terminal, so
+		// each coupon is given back exactly once.
+		s.rollbackCoupon(ctx, ref.ID, ref.UserID, ref.CouponCode)
 	}
-	return len(ids), nil
+	return len(refs), nil
 }
 
 func (s *orderService) GetOrderByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error) {

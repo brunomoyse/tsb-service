@@ -42,9 +42,17 @@ type OrderRepository interface {
 	UpdateActiveOrdersLanguage(ctx context.Context, userID uuid.UUID, language string) ([]*Order, error)
 	InsertStatusHistory(ctx context.Context, orderID uuid.UUID, status OrderStatus) error
 	// CancelStaleTestOrders cancels store-review test orders older than olderThan
-	// that are not already terminal, returning the affected order IDs. TEMPORARY.
-	CancelStaleTestOrders(ctx context.Context, olderThan time.Duration) ([]uuid.UUID, error)
+	// that are not already terminal, returning the affected orders. TEMPORARY.
+	CancelStaleTestOrders(ctx context.Context, olderThan time.Duration) ([]CancelledOrderRef, error)
 	FindStatusHistoryByOrderID(ctx context.Context, orderID uuid.UUID) ([]*OrderStatusHistory, error)
 	DeleteOrder(ctx context.Context, orderID uuid.UUID) error
 	GetCustomerStats(ctx context.Context, startDate, endDate *time.Time, orderType *string, minOrders *int) ([]*CustomerStatsRow, error)
+}
+
+// CancelledOrderRef identifies an order cancelled in bulk, with what the
+// caller needs to roll back its coupon usage.
+type CancelledOrderRef struct {
+	ID         uuid.UUID `db:"id"`
+	UserID     uuid.UUID `db:"user_id"`
+	CouponCode *string   `db:"coupon_code"`
 }

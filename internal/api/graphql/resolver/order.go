@@ -56,7 +56,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve user: %w", err)
 	}
-	isTestOrder := user != nil && auth.IsReviewUser(user.Email, user.FirstName, user.LastName)
+	isTestOrder := user != nil && auth.IsReviewUser(user.ZitadelUserID)
 
 	// 0) Validate and price the basket. This is the SAME function quoteOrder runs (see
 	// order_pricing.go), here in fail-fast mode: the first problem becomes the error. Store-review

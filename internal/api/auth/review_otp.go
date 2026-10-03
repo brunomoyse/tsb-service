@@ -23,6 +23,9 @@ import (
  *   REVIEW_OTP_LOGINS  comma-separated loginNames treated as review accounts
  *   REVIEW_OTP_KEY     shared secret guarding ReviewLastOtpHandler (unset = 404)
  *
+ * The order-side privileges (ordering outside opening hours, hidden test
+ * orders) are granted separately by REVIEW_ZITADEL_SUBS, see IsReviewUser.
+ *
  * Unset in production-for-real → this whole feature is inert.
  */
 
@@ -65,32 +68,43 @@ func IsReviewLogin(loginName string) bool {
 	return isReviewOtpLogin(loginName)
 }
 
-// IsReviewAppleUser reports whether the identity is Apple's App Store review
-// account ("John Apple"/"John Appleseed"). Unlike the Play reviewer, Apple's
-// tester signs in with Sign in with Apple, so there is no fixed login to list in
-// REVIEW_OTP_LOGINS — they get a Hide-My-Email relay address that can differ
-// between review rounds. We therefore match Apple's stable review-account name
-// signature combined with the privaterelay domain, which a real customer is
-// vanishingly unlikely to satisfy. Used to flag their order as a test order so
-// it never reaches the kitchen. TEMPORARY (revert after launch).
-func IsReviewAppleUser(email, firstName, lastName string) bool {
-	if !strings.HasSuffix(strings.ToLower(strings.TrimSpace(email)), "@privaterelay.appleid.com") {
-		return false
+var (
+	reviewSubsMu  sync.Mutex
+	reviewSubsRaw string
+	reviewSubs    map[string]struct{}
+)
+
+// parseReviewSubs splits a comma-separated list of Zitadel user ids.
+func parseReviewSubs(raw string) map[string]struct{} {
+	subs := make(map[string]struct{})
+	for _, s := range strings.Split(raw, ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			subs[s] = struct{}{}
+		}
 	}
-	if !strings.EqualFold(strings.TrimSpace(firstName), "John") {
-		return false
-	}
-	last := strings.TrimSpace(lastName)
-	return strings.EqualFold(last, "Apple") || strings.EqualFold(last, "Appleseed")
+	return subs
 }
 
-// IsReviewUser reports whether a resolved app user is a store-review account —
-// either the Google Play reviewer (fixed REVIEW_OTP_LOGINS email) or the Apple
-// "John Apple" reviewer (Hide-My-Email relay). Single source of truth for the
-// two-pronged review detection so order flagging and opening-hours bypass stay
-// in sync. TEMPORARY (revert after launch).
-func IsReviewUser(email, firstName, lastName string) bool {
-	return IsReviewLogin(email) || IsReviewAppleUser(email, firstName, lastName)
+// IsReviewUser reports whether a resolved app user is a store-review account
+// (Google Play or App Store reviewer), identified by its Zitadel user id in
+// REVIEW_ZITADEL_SUBS. Review accounts may order outside opening hours, and
+// their orders are hidden from staff and auto-cancelled.
+//
+// The decision is bound to the Zitadel sub on purpose: name and email on the
+// app user row are editable by the customer through updateMe, so they can
+// never grant this privilege. TEMPORARY (revert after launch).
+func IsReviewUser(zitadelSub *string) bool {
+	if zitadelSub == nil || *zitadelSub == "" {
+		return false
+	}
+	raw := os.Getenv("REVIEW_ZITADEL_SUBS")
+	reviewSubsMu.Lock()
+	defer reviewSubsMu.Unlock()
+	if reviewSubs == nil || raw != reviewSubsRaw {
+		reviewSubsRaw, reviewSubs = raw, parseReviewSubs(raw)
+	}
+	_, ok := reviewSubs[*zitadelSub]
+	return ok
 }
 
 type reviewOtpEntry struct {

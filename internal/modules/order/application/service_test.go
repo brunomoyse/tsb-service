@@ -15,8 +15,9 @@ import (
 // fakeOrderRepo implements domain.OrderRepository. Only FindByID/Update/
 // InsertStatusHistory carry behaviour for these tests; the rest are stubs.
 type fakeOrderRepo struct {
-	order        *domain.Order
-	updatedOrder *domain.Order
+	order           *domain.Order
+	updatedOrder    *domain.Order
+	staleTestOrders []domain.CancelledOrderRef
 }
 
 func (f *fakeOrderRepo) Save(_ context.Context, o *domain.Order, op *[]domain.OrderProductRaw) (*domain.Order, *[]domain.OrderProductRaw, error) {
@@ -62,8 +63,8 @@ func (f *fakeOrderRepo) InsertStatusHistory(_ context.Context, _ uuid.UUID, _ do
 	return nil
 }
 
-func (f *fakeOrderRepo) CancelStaleTestOrders(_ context.Context, _ time.Duration) ([]uuid.UUID, error) {
-	return nil, nil
+func (f *fakeOrderRepo) CancelStaleTestOrders(_ context.Context, _ time.Duration) ([]domain.CancelledOrderRef, error) {
+	return f.staleTestOrders, nil
 }
 
 func (f *fakeOrderRepo) FindStatusHistoryByOrderID(_ context.Context, _ uuid.UUID) ([]*domain.OrderStatusHistory, error) {
@@ -164,4 +165,24 @@ func TestUpdateOrderCouponRollback(t *testing.T) {
 			t.Fatalf("expected no rollback without a coupon, got %d", len(coupons.decrementCalls))
 		}
 	})
+}
+
+func TestCancelStaleTestOrdersRollsBackCoupons(t *testing.T) {
+	couponID := uuid.New()
+	withCoupon := domain.CancelledOrderRef{ID: uuid.New(), UserID: uuid.New(), CouponCode: strPtr("TOKYO10")}
+	withoutCoupon := domain.CancelledOrderRef{ID: uuid.New(), UserID: uuid.New()}
+	repo := &fakeOrderRepo{staleTestOrders: []domain.CancelledOrderRef{withCoupon, withoutCoupon}}
+	coupons := &fakeCouponService{coupon: &couponDomain.Coupon{ID: couponID}}
+	svc := NewOrderService(repo, coupons)
+
+	n, err := svc.CancelStaleTestOrders(context.Background(), 10*time.Minute)
+	if err != nil {
+		t.Fatalf("CancelStaleTestOrders: %v", err)
+	}
+	if n != 2 {
+		t.Fatalf("cancelled = %d, want 2", n)
+	}
+	if len(coupons.decrementCalls) != 1 || coupons.decrementCalls[0] != [2]uuid.UUID{couponID, withCoupon.UserID} {
+		t.Fatalf("rollbacks = %v, want one for the coupon order", coupons.decrementCalls)
+	}
 }

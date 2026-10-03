@@ -23,5 +23,5 @@ func (r *Resolver) isReviewContextUser(ctx context.Context) bool {
 	if err != nil || user == nil {
 		return false
 	}
-	return auth.IsReviewUser(user.Email, user.FirstName, user.LastName)
+	return auth.IsReviewUser(user.ZitadelUserID)
 }
