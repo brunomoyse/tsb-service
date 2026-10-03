@@ -111,7 +111,7 @@ func fetchSessionFactors(sessionID string) (sessionFactors, error) {
 		return sessionFactors{}, fmt.Errorf("session has no user")
 	}
 	return sessionFactors{
-		UserID:       resp.Session.Factors.User.ID,
+		UserID:           resp.Session.Factors.User.ID,
 		TOTPVerified:     resp.Session.Factors.TOTP.VerifiedAt != "",
 		OTPEmailVerified: resp.Session.Factors.OTPEmail.VerifiedAt != "",
 		IntentVerified:   resp.Session.Factors.Intent.VerifiedAt != "",
