@@ -156,7 +156,7 @@ func (r *UserRepository) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs [
     `
 
 	type userRow struct {
-		OrderID     string `db:"order_id"`
+		OrderID string `db:"order_id"`
 		domain.User
 	}
 

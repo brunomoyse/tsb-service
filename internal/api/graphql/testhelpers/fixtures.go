@@ -44,37 +44,37 @@ type TestUser struct {
 
 // TestProductCategory represents a test product category
 type TestProductCategory struct {
-	ID             uuid.UUID
-	Slug           string
-	Order          int
-	NameEN         string
-	NameNL         string
-	NameFR         string
-	DescriptionEN  string
-	DescriptionNL  string
-	DescriptionFR  string
-}
-
-// TestProduct represents a test product
-type TestProduct struct {
 	ID            uuid.UUID
-	CategoryID    uuid.UUID
-	Price         float64
-	IsVisible     bool
-	IsAvailable   bool
-	Code          string
 	Slug          string
-	IsHalal       bool
-	IsVegetarian       bool
-	IsSpicy       bool
-	PieceCount    *int
-	IsDiscountable bool
+	Order         int
 	NameEN        string
 	NameNL        string
 	NameFR        string
 	DescriptionEN string
 	DescriptionNL string
 	DescriptionFR string
+}
+
+// TestProduct represents a test product
+type TestProduct struct {
+	ID             uuid.UUID
+	CategoryID     uuid.UUID
+	Price          float64
+	IsVisible      bool
+	IsAvailable    bool
+	Code           string
+	Slug           string
+	IsHalal        bool
+	IsVegetarian   bool
+	IsSpicy        bool
+	PieceCount     *int
+	IsDiscountable bool
+	NameEN         string
+	NameNL         string
+	NameFR         string
+	DescriptionEN  string
+	DescriptionNL  string
+	DescriptionFR  string
 }
 
 // TestOrder represents a test order
@@ -108,7 +108,7 @@ func SeedTestData(t *testing.T, db *sqlx.DB) *TestFixtures {
 		Code:           "SUSHI-SALMON",
 		Slug:           "salmon-sushi",
 		IsHalal:        false,
-		IsVegetarian:        false,
+		IsVegetarian:   false,
 		PieceCount:     &pieces8,
 		IsDiscountable: true,
 		NameEN:         "Salmon Sushi",
@@ -128,7 +128,7 @@ func SeedTestData(t *testing.T, db *sqlx.DB) *TestFixtures {
 		Code:           "SUSHI-TUNA",
 		Slug:           "tuna-sushi",
 		IsHalal:        false,
-		IsVegetarian:        false,
+		IsVegetarian:   false,
 		PieceCount:     &pieces6,
 		IsDiscountable: true,
 		NameEN:         "Tuna Sushi",
@@ -147,7 +147,7 @@ func SeedTestData(t *testing.T, db *sqlx.DB) *TestFixtures {
 		Code:           "DRINK-TEA",
 		Slug:           "green-tea",
 		IsHalal:        true,
-		IsVegetarian:        true,
+		IsVegetarian:   true,
 		PieceCount:     nil,
 		IsDiscountable: false,
 		NameEN:         "Green Tea",
@@ -166,7 +166,7 @@ func SeedTestData(t *testing.T, db *sqlx.DB) *TestFixtures {
 		Code:           "DESSERT-MOCHI",
 		Slug:           "mochi-ice-cream",
 		IsHalal:        false,
-		IsVegetarian:        false,
+		IsVegetarian:   false,
 		PieceCount:     nil,
 		IsDiscountable: false,
 		NameEN:         "Mochi Ice Cream",
@@ -242,15 +242,15 @@ func createTestProductCategory(t *testing.T, ctx context.Context, db *sqlx.DB, o
 	}
 
 	return &TestProductCategory{
-		ID:             categoryID,
-		Slug:           categorySlug,
-		Order:          order,
-		NameEN:         nameEN,
-		NameNL:         nameNL,
-		NameFR:         nameFR,
-		DescriptionEN:  descEN,
-		DescriptionNL:  descNL,
-		DescriptionFR:  descFR,
+		ID:            categoryID,
+		Slug:          categorySlug,
+		Order:         order,
+		NameEN:        nameEN,
+		NameNL:        nameNL,
+		NameFR:        nameFR,
+		DescriptionEN: descEN,
+		DescriptionNL: descNL,
+		DescriptionFR: descFR,
 	}
 }
 
@@ -296,4 +296,3 @@ func createTestProduct(t *testing.T, ctx context.Context, db *sqlx.DB, product T
 
 	return &product
 }
-

@@ -48,7 +48,7 @@ func (c *Client) SendAlert(registrationToken, title, body string, data map[strin
 		Android: &messaging.AndroidConfig{
 			Priority: "high",
 			Notification: &messaging.AndroidNotification{
-				Sound:       "default",
+				Sound:     "default",
 				ChannelID: "orders",
 			},
 		},

@@ -31,21 +31,21 @@ type Product struct {
 
 // ProductChoice represents a selectable option for a product.
 type ProductChoice struct {
-    ID            uuid.UUID           `db:"id" json:"id"`
-    ProductID     uuid.UUID           `db:"product_id" json:"productId"`
-    ChoiceGroupID uuid.UUID           `db:"choice_group_id" json:"choiceGroupId"`
-    PriceModifier decimal.Decimal     `db:"price_modifier" json:"priceModifier"`
-    SortOrder     int                 `db:"sort_order" json:"sortOrder"`
-    Translations  []ChoiceTranslation `json:"translations"`
+	ID            uuid.UUID           `db:"id" json:"id"`
+	ProductID     uuid.UUID           `db:"product_id" json:"productId"`
+	ChoiceGroupID uuid.UUID           `db:"choice_group_id" json:"choiceGroupId"`
+	PriceModifier decimal.Decimal     `db:"price_modifier" json:"priceModifier"`
+	SortOrder     int                 `db:"sort_order" json:"sortOrder"`
+	Translations  []ChoiceTranslation `json:"translations"`
 }
 
 type ProductChoiceGroup struct {
-    ID            uuid.UUID           `db:"id" json:"id"`
-    ProductID     uuid.UUID           `db:"product_id" json:"productId"`
-    MinSelections int                 `db:"min_selections" json:"minSelections"`
-    MaxSelections int                 `db:"max_selections" json:"maxSelections"`
-    SortOrder     int                 `db:"sort_order" json:"sortOrder"`
-    Translations  []ChoiceTranslation `json:"translations"`
+	ID            uuid.UUID           `db:"id" json:"id"`
+	ProductID     uuid.UUID           `db:"product_id" json:"productId"`
+	MinSelections int                 `db:"min_selections" json:"minSelections"`
+	MaxSelections int                 `db:"max_selections" json:"maxSelections"`
+	SortOrder     int                 `db:"sort_order" json:"sortOrder"`
+	Translations  []ChoiceTranslation `json:"translations"`
 }
 
 type ChoiceTranslation struct {
@@ -87,19 +87,19 @@ type ProductOrderDetails struct {
 }
 
 func (g *ProductChoiceGroup) GetTranslationFor(locale string) string {
-    for _, candidate := range translationFallbackOrder(locale) {
-        for i := range g.Translations {
-            if g.Translations[i].Locale == candidate && g.Translations[i].Name != "" {
-                return g.Translations[i].Name
-            }
-        }
-    }
-    for i := range g.Translations {
-        if g.Translations[i].Name != "" {
-            return g.Translations[i].Name
-        }
-    }
-    return ""
+	for _, candidate := range translationFallbackOrder(locale) {
+		for i := range g.Translations {
+			if g.Translations[i].Locale == candidate && g.Translations[i].Name != "" {
+				return g.Translations[i].Name
+			}
+		}
+	}
+	for i := range g.Translations {
+		if g.Translations[i].Name != "" {
+			return g.Translations[i].Name
+		}
+	}
+	return ""
 }
 
 func NewProduct(price decimal.Decimal, categoryID uuid.UUID, isVisible bool, isAvailable bool, vatCategory VatCategory, translations []Translation) (*Product, error) {

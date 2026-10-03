@@ -23,9 +23,9 @@ import (
 // --- Mock UserService ---
 
 type mockUserService struct {
-	getUserByIDFn   func(ctx context.Context, id string) (*domain.User, error)
+	getUserByIDFn    func(ctx context.Context, id string) (*domain.User, error)
 	getUserByEmailFn func(ctx context.Context, email string) (*domain.User, error)
-	updateMeFn      func(ctx context.Context, userID string, firstName, lastName, email, phoneNumber, addressID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error)
+	updateMeFn       func(ctx context.Context, userID string, firstName, lastName, email, phoneNumber, addressID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error)
 }
 
 func (m *mockUserService) GetUserByID(ctx context.Context, id string) (*domain.User, error) {

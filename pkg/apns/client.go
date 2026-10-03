@@ -196,4 +196,3 @@ func (c *Client) SendLiveActivity(pushToken string, contentState map[string]any,
 	}
 	return nil
 }
-

@@ -164,15 +164,15 @@ func TestProduct(t *testing.T) {
 
 		var resp struct {
 			Product struct {
-				ID          string
-				Name        string
-				Description string
-				Price       string // Price is returned as string from numeric DB type
-				Slug        string
-				IsHalal     bool
-				IsVegetarian     bool
-				IsSpicy     bool
-				PieceCount  *int
+				ID           string
+				Name         string
+				Description  string
+				Price        string // Price is returned as string from numeric DB type
+				Slug         string
+				IsHalal      bool
+				IsVegetarian bool
+				IsSpicy      bool
+				PieceCount   *int
 			}
 		}
 
@@ -200,7 +200,7 @@ func TestProduct(t *testing.T) {
 		// Verify product details
 		assert.Equal(t, ctx.Fixtures.SalmonSushi.ID.String(), resp.Product.ID)
 		assert.Contains(t, []string{"Salmon Sushi", "Sushi au Saumon", "Zalm Sushi"}, resp.Product.Name) // Could be any language
-		assert.Contains(t, []string{"12.5", "12.50"}, resp.Product.Price) // Price format may vary
+		assert.Contains(t, []string{"12.5", "12.50"}, resp.Product.Price)                                // Price format may vary
 		assert.Equal(t, "salmon-sushi", resp.Product.Slug)
 		assert.False(t, resp.Product.IsHalal)
 		assert.False(t, resp.Product.IsVegetarian)

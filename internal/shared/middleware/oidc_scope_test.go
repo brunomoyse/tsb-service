@@ -52,7 +52,7 @@ type stubAppJWT struct{ deviceID uuid.UUID }
 func (s stubAppJWT) VerifyAccessToken(context.Context, string) (uuid.UUID, error) {
 	return s.deviceID, nil
 }
-func (s stubAppJWT) AccessTokenExpiry(string) time.Time          { return time.Time{} }
+func (s stubAppJWT) AccessTokenExpiry(string) time.Time { return time.Time{} }
 
 func TestPOSTokenGetsStaffScopeNotAdmin(t *testing.T) {
 	deviceID := uuid.New()

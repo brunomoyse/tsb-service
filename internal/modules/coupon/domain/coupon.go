@@ -90,18 +90,18 @@ const (
 )
 
 type Coupon struct {
-	ID             uuid.UUID       `db:"id"`
-	Code           string          `db:"code"`
-	DiscountType   DiscountType    `db:"discount_type"`
-	DiscountValue  decimal.Decimal `db:"discount_value"`
+	ID             uuid.UUID        `db:"id"`
+	Code           string           `db:"code"`
+	DiscountType   DiscountType     `db:"discount_type"`
+	DiscountValue  decimal.Decimal  `db:"discount_value"`
 	MinOrderAmount *decimal.Decimal `db:"min_order_amount"`
-	MaxUses        *int            `db:"max_uses"`
-	MaxUsesPerUser *int            `db:"max_uses_per_user"`
-	UsedCount      int             `db:"used_count"`
-	IsActive       bool            `db:"is_active"`
-	ValidFrom      *time.Time      `db:"valid_from"`
-	ValidUntil     *time.Time      `db:"valid_until"`
-	CreatedAt      time.Time       `db:"created_at"`
+	MaxUses        *int             `db:"max_uses"`
+	MaxUsesPerUser *int             `db:"max_uses_per_user"`
+	UsedCount      int              `db:"used_count"`
+	IsActive       bool             `db:"is_active"`
+	ValidFrom      *time.Time       `db:"valid_from"`
+	ValidUntil     *time.Time       `db:"valid_until"`
+	CreatedAt      time.Time        `db:"created_at"`
 }
 
 // Status returns the effective status of the coupon, combining the admin

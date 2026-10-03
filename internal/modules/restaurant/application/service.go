@@ -25,9 +25,9 @@ type RestaurantService interface {
 }
 
 type restaurantService struct {
-	repo          domain.RestaurantRepository
-	overrideRepo  domain.ScheduleOverrideRepository
-	devMode       bool
+	repo              domain.RestaurantRepository
+	overrideRepo      domain.ScheduleOverrideRepository
+	devMode           bool
 	overrideLookahead time.Duration
 }
 

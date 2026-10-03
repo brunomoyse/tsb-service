@@ -11,12 +11,12 @@ import (
 type contextKey string
 
 const (
-	productCategoryLoaderKey  contextKey = "productCategoryLoader"
-	categoryProductLoaderKey  contextKey = "categoryProductLoader"
-	orderItemProductLoaderKey contextKey = "orderItemProductLoader"
-	categoryTranslation       contextKey = "categoryTranslation"
-	productTranslation        contextKey = "productTranslation"
-	productChoiceLoaderKey    contextKey = "productChoiceLoader"
+	productCategoryLoaderKey    contextKey = "productCategoryLoader"
+	categoryProductLoaderKey    contextKey = "categoryProductLoader"
+	orderItemProductLoaderKey   contextKey = "orderItemProductLoader"
+	categoryTranslation         contextKey = "categoryTranslation"
+	productTranslation          contextKey = "productTranslation"
+	productChoiceLoaderKey      contextKey = "productChoiceLoader"
 	productChoiceGroupLoaderKey contextKey = "productChoiceGroupLoader"
 	choiceByIDLoaderKey         contextKey = "choiceByIDLoader"
 	choiceGroupByIDLoaderKey    contextKey = "choiceGroupByIDLoader"

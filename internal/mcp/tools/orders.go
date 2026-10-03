@@ -183,10 +183,10 @@ func registerOrders(s *mcp.Server, d *Deps) {
 		// ProductLabels name the product as category + name, like
 		// ProductOut.Labels.
 		ProductLabels map[string]string `json:"product_labels,omitempty" jsonschema:"category + name per language; use it to name the product"`
-		Quantity   int      `json:"quantity"`
-		UnitCents  int64    `json:"unit_cents"`
-		TotalCents int64    `json:"total_cents"`
-		Options    []string `json:"options"`
+		Quantity      int               `json:"quantity"`
+		UnitCents     int64             `json:"unit_cents"`
+		TotalCents    int64             `json:"total_cents"`
+		Options       []string          `json:"options"`
 	}
 	type HistoryOut struct {
 		Status string `json:"status"`
