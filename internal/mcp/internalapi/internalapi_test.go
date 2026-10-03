@@ -95,7 +95,7 @@ func TestApply(t *testing.T) {
 
 	code, body := e.do("GET", "/internal/changes/"+id, token, "")
 	if code != 200 || body["status"] != "pending" || !strings.Contains(body["summary"].(string), "4.50 EUR -> 5.00 EUR") ||
-		body["summary_zh"] != "「三文鱼卷」价格：4.50 欧元 → 5.00 欧元" {
+		body["summary_zh"] != "「三文鱼卷」（卷）价格：4.50 欧元 → 5.00 欧元" {
 		t.Fatalf("get: %d %v", code, body)
 	}
 

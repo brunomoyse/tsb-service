@@ -103,11 +103,11 @@ func (s *Server) seed() {
 	}
 	s.Products = []*upstream.Product{
 		{ID: "p-maki-saumon", Code: ptr("M1"), Slug: "maki-saumon", Name: "Maki saumon", Price: "4.5", VatCategory: "food", PieceCount: ptr(6),
-			IsAvailable: true, IsVisible: true, IsDiscountable: true, Category: upstream.CategoryRef{ID: "cat-maki", Name: "Makis"}, Translations: tr("Maki saumon", "Salmon maki", "三文鱼卷")},
+			IsAvailable: true, IsVisible: true, IsDiscountable: true, Category: s.categoryRef("cat-maki"), Translations: tr("Maki saumon", "Salmon maki", "三文鱼卷")},
 		{ID: "p-sashimi-saumon", Code: ptr("S1"), Slug: "sashimi-saumon", Name: "Sashimi saumon", Price: "12", VatCategory: "food",
-			IsAvailable: true, IsVisible: true, IsDiscountable: true, Category: upstream.CategoryRef{ID: "cat-sashimi", Name: "Sashimis"}, Translations: tr("Sashimi saumon", "Salmon sashimi", "三文鱼刺身")},
+			IsAvailable: true, IsVisible: true, IsDiscountable: true, Category: s.categoryRef("cat-sashimi"), Translations: tr("Sashimi saumon", "Salmon sashimi", "三文鱼刺身")},
 		{ID: "p-maki-box", Code: ptr("B1"), Slug: "maki-box", Name: "Maki box", Price: "13.9", VatCategory: "food",
-			IsAvailable: true, IsVisible: true, Category: upstream.CategoryRef{ID: "cat-box", Name: "Boxes"}, Translations: tr("Maki box", "Maki box", "卷寿司套餐"),
+			IsAvailable: true, IsVisible: true, Category: s.categoryRef("cat-box"), Translations: tr("Maki box", "Maki box", "卷寿司套餐"),
 			ChoiceGroups: []upstream.ChoiceGroup{{ID: "g-sauce", MinSelections: 1, MaxSelections: 1, SortOrder: 0, Name: "Sauce",
 				Translations: []upstream.ChoiceTranslation{{Locale: "fr", Name: "Sauce"}, {Locale: "zh", Name: "酱汁"}},
 				Choices: []upstream.Choice{
@@ -115,7 +115,7 @@ func (s *Server) seed() {
 					{ID: "c-spicy", ChoiceGroupID: "g-sauce", PriceModifier: "0.5", SortOrder: 1, Name: "Mayo épicée", Translations: []upstream.ChoiceTranslation{{Locale: "fr", Name: "Mayo épicée"}}},
 				}}}},
 		{ID: "p-creme", Slug: "creme-brulee", Name: "Crème brûlée", Price: "5", VatCategory: "food",
-			IsAvailable: false, IsVisible: true, Category: upstream.CategoryRef{ID: "cat-box", Name: "Boxes"}, Translations: tr("Crème brûlée", "Creme brulee", "焦糖布丁")},
+			IsAvailable: false, IsVisible: true, Category: s.categoryRef("cat-box"), Translations: tr("Crème brûlée", "Creme brulee", "焦糖布丁")},
 	}
 	s.Opening = upstream.Week{
 		"tuesday":   {Open: "11:30", Close: "14:30", DinnerOpen: "18:00", DinnerClose: "22:00"},
@@ -373,7 +373,7 @@ func (s *Server) dispatch(req request, upload []byte) (any, error) {
 		return s.updateProduct(v, upload)
 	case "McpCreateProduct":
 		in := decode[upstream.CreateProductInput](v["input"])
-		cat := upstream.CategoryRef{ID: in.CategoryID}
+		cat := s.categoryRef(in.CategoryID)
 		for _, c := range s.Categories {
 			if c.ID == in.CategoryID {
 				cat.Name = c.Name
@@ -563,7 +563,7 @@ func (s *Server) updateProduct(v map[string]any, upload []byte) (any, error) {
 		found := false
 		for _, c := range s.Categories {
 			if c.ID == *in.CategoryID {
-				p.Category = upstream.CategoryRef{ID: c.ID, Name: c.Name}
+				p.Category = s.categoryRef(c.ID)
 				found = true
 			}
 		}
@@ -726,4 +726,15 @@ func mustJSON(v any) []byte {
 func mustDate(key string) time.Time {
 	t, _ := time.Parse(time.DateOnly, key)
 	return t
+}
+
+// categoryRef is the category as embedded in a product.
+func (s *Server) categoryRef(id string) upstream.CategoryRef {
+	ref := upstream.CategoryRef{ID: id}
+	for _, c := range s.Categories {
+		if c.ID == id {
+			ref.Name, ref.Translations = c.Name, c.Translations
+		}
+	}
+	return ref
 }

@@ -39,8 +39,27 @@ func quoteOrNoneZh(s string) string {
 	return quoteZh(s)
 }
 
-// productLabelZh renders a product by its Chinese name, e.g. 「三文鱼卷」.
-func productLabelZh(p *upstream.Product) string { return quoteZh(p.NameIn("zh")) }
+// productLabelZh renders a product by its Chinese name and category, e.g.
+// 「三文鱼」（刺身）.
+func productLabelZh(p *upstream.Product) string {
+	label := quoteZh(p.NameIn("zh"))
+	if c := categoryRefZh(p.Category); c != "" {
+		label += "（" + c + "）"
+	}
+	return label
+}
+
+// categoryRefZh is the Chinese name of a product's category, or its French
+// name. Chinese product names repeat across categories (「三文鱼」 is a
+// maki and a sashimi), so labels carry the category.
+func categoryRefZh(c upstream.CategoryRef) string {
+	for _, t := range c.Translations {
+		if t.Language == "zh" && t.Name != "" {
+			return t.Name
+		}
+	}
+	return c.Name
+}
 
 // nameZh returns the Chinese entry of a name map, or fallback.
 func nameZh(names map[string]string, fallback string) string {

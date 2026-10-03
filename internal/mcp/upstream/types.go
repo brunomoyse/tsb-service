@@ -43,8 +43,9 @@ type ChoiceGroup struct {
 
 // CategoryRef is the category embedded in a product.
 type CategoryRef struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	Translations []Translation `json:"translations"`
 }
 
 // Category is a product category.

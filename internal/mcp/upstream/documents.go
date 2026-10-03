@@ -153,7 +153,7 @@ const productFragment = `
 fragment McpProductFields on Product {
   id code slug name description price vatCategory pieceCount
   isAvailable isVisible isDiscountable isHalal isLunchOnly isSpicy isVegetarian
-  category { id name }
+  category { id name translations { language name } }
   translations { language name description }
   choiceGroups {
     id minSelections maxSelections sortOrder name translations { locale name }

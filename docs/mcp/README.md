@@ -125,7 +125,7 @@ A successful response is `200` with the change:
 
 ```json
 {"change_id":"chg_…","tool":"propose_price_change","kind":"product.price","status":"applied",
- "summary":"\"Maki box\" (卷寿司套餐): price 13.90 EUR -> 14.50 EUR","summary_zh":"「卷寿司套餐」价格：13.90 欧元 → 14.50 欧元","entity_type":"product","entity_id":"…",
+ "summary":"\"Maki box\" (卷寿司套餐): price 13.90 EUR -> 14.50 EUR","summary_zh":"「卷寿司套餐」（套餐）价格：13.90 欧元 → 14.50 欧元","entity_type":"product","entity_id":"…",
  "created_at":"2026-10-03T13:00:00+02:00","expires_at":"2026-10-03T13:10:00+02:00","decided_at":"…","is_undo":false}
 ```
 
