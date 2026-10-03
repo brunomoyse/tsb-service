@@ -134,6 +134,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Production must not boot with controls that fail open when unset: an
+	// empty admin client allowlist honors the admin role from every client,
+	// and an empty Turnstile secret skips the feedback captcha.
+	if os.Getenv("APP_ENV") == "production" {
+		for _, name := range []string{"ZITADEL_ADMIN_CLIENT_IDS", "TURNSTILE_SECRET_KEY"} {
+			if strings.TrimSpace(os.Getenv(name)) == "" {
+				zap.L().Error(name + " is required when APP_ENV=production")
+				os.Exit(1)
+			}
+		}
+		if len(os.Getenv("POS_JWT_SECRET")) < 32 {
+			// Not fatal yet: production does not set it today. Each replica
+			// then signs POS tokens with its own ephemeral key.
+			zap.L().Error("POS_JWT_SECRET should be set (32+ bytes) in production; POS tokens use a per-replica ephemeral key")
+		}
+	}
+
 	// OIDC env vars (verifier created after userService for user lookup)
 	zitadelIssuer := os.Getenv("ZITADEL_ISSUER")
 	zitadelClientID := os.Getenv("ZITADEL_CLIENT_ID")
