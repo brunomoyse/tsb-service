@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -56,7 +57,7 @@ func findZitadelUserByEmail(email string) (string, error) {
 // factor is already there. Both shapes are treated as success. Any other
 // failure is returned so the caller can decide whether to abort.
 func ensureZitadelOtpEmail(userID string) error {
-	respBody, status, err := zitadelRequest("POST", "/v2/users/"+userID+"/otp_email", map[string]any{})
+	respBody, status, err := zitadelRequest("POST", "/v2/users/"+url.PathEscape(userID)+"/otp_email", map[string]any{})
 	if err != nil {
 		return fmt.Errorf("enroll otp email: %w", err)
 	}
@@ -91,7 +92,7 @@ func containsAny(s string, subs ...string) bool {
 // when JWT access tokens don't include profile claims (which is the case for
 // locally-validated Zitadel JWTs — see zitadel-go SDK oauth.WithJWT).
 func GetZitadelUserInfo(_ context.Context, userID string) (email, givenName, familyName string, err error) {
-	respBody, status, err := zitadelRequest("GET", "/v2/users/"+userID, nil)
+	respBody, status, err := zitadelRequest("GET", "/v2/users/"+url.PathEscape(userID), nil)
 	if err != nil {
 		return "", "", "", fmt.Errorf("fetch user: %w", err)
 	}
@@ -153,7 +154,7 @@ func parseZitadelUserInfo(body []byte) (email, givenName, familyName string, err
 // permission). A 404 is treated as success, so the call is idempotent and safe
 // to retry after a partial failure.
 func DeleteZitadelUser(_ context.Context, userID string) error {
-	respBody, status, err := zitadelAdminRequest("DELETE", "/v2/users/"+userID, nil)
+	respBody, status, err := zitadelAdminRequest("DELETE", "/v2/users/"+url.PathEscape(userID), nil)
 	if err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}
@@ -241,7 +242,7 @@ func waitForZitadelUserProjection(userID string) error {
 		if i > 0 {
 			time.Sleep(userProjectionPollDelay)
 		}
-		_, status, err := zitadelRequest("GET", "/v2/users/"+userID, nil)
+		_, status, err := zitadelRequest("GET", "/v2/users/"+url.PathEscape(userID), nil)
 		if err == nil && status == http.StatusOK {
 			return nil
 		}
@@ -262,7 +263,7 @@ func userNeedsProfileCompletion(userID string) (bool, error) {
 
 // fetchUserProfileNames returns a human user's given and family name.
 func fetchUserProfileNames(userID string) (givenName, familyName string, err error) {
-	respBody, status, err := zitadelRequest("GET", "/v2/users/"+userID, nil)
+	respBody, status, err := zitadelRequest("GET", "/v2/users/"+url.PathEscape(userID), nil)
 	if err != nil {
 		return "", "", fmt.Errorf("fetch user: %w", err)
 	}
@@ -298,7 +299,7 @@ func updateZitadelUserProfile(userID, firstName, lastName string) error {
 		},
 	}
 
-	respBody, status, err := zitadelAdminRequest("PUT", "/v2/users/human/"+userID, body)
+	respBody, status, err := zitadelAdminRequest("PUT", "/v2/users/human/"+url.PathEscape(userID), body)
 	if err != nil {
 		return fmt.Errorf("update profile: %w", err)
 	}

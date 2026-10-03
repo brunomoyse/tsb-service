@@ -94,7 +94,7 @@ func FinalizeOIDCHandler(c *gin.Context) {
 		},
 	}
 
-	respBody, status, err := zitadelRequest("POST", "/v2/oidc/auth_requests/"+req.AuthRequestID, body)
+	respBody, status, err := zitadelRequest("POST", "/v2/oidc/auth_requests/"+url.PathEscape(req.AuthRequestID), body)
 	if err != nil {
 		logging.FromContext(c.Request.Context()).Error("zitadel oidc finalize failed", zap.Error(err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": "authentication service unavailable"})

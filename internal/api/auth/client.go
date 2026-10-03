@@ -90,6 +90,11 @@ func Init(cfg Config) {
 	client = &zitadelClient{
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
+			// Never follow redirects: they would replay the service/admin PAT
+			// in the Authorization header to whatever host Zitadel points at.
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 		},
 		baseURL:        baseURL,
 		externalHost:   externalHost,
