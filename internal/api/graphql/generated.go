@@ -5746,11 +5746,11 @@ func (ec *executionContext) _Mutation_createCoupon(ctx context.Context, field gr
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.Directives.Admin == nil {
+				if ec.Directives.Staff == nil {
 					var zeroVal *model.Coupon
-					return zeroVal, errors.New("directive admin is not implemented")
+					return zeroVal, errors.New("directive staff is not implemented")
 				}
-				return ec.Directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Staff(ctx, nil, directive0)
 			}
 
 			next = directive1
@@ -6202,11 +6202,11 @@ func (ec *executionContext) _Mutation_updatePaymentStatus(ctx context.Context, f
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
-				if ec.Directives.Admin == nil {
+				if ec.Directives.Staff == nil {
 					var zeroVal *model.Payment
-					return zeroVal, errors.New("directive admin is not implemented")
+					return zeroVal, errors.New("directive staff is not implemented")
 				}
-				return ec.Directives.Admin(ctx, nil, directive0)
+				return ec.Directives.Staff(ctx, nil, directive0)
 			}
 
 			next = directive1

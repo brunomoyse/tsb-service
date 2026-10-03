@@ -30,6 +30,7 @@ func NewGraphQLTestClient(r *resolver.Resolver, jwtSecret string) *GraphQLTestCl
 	cfg := graphql.Config{Resolvers: r}
 	cfg.Directives.Auth = directives.Auth
 	cfg.Directives.Admin = directives.Admin
+	cfg.Directives.Staff = directives.Staff
 
 	srv := handler.NewDefaultServer(graphql.NewExecutableSchema(cfg))
 	// Same presenter as production, so tests see the real extensions.code values.

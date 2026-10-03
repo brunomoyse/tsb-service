@@ -68,6 +68,21 @@ func FinalizeOIDCHandler(c *gin.Context) {
 		return
 	}
 
+	// Staff logins (admin clients) must pass TOTP when the user enrolled it.
+	// The login UI asks for it, but the check has to live here: Zitadel does
+	// not apply login policies to the Session API, so a client could otherwise
+	// skip the second step and call finalize directly.
+	mfaErr, err := checkStaffMFA(req.AuthRequestID, req.SessionID)
+	if err != nil {
+		logging.FromContext(c.Request.Context()).Error("staff mfa check failed", zap.Error(err))
+		c.JSON(http.StatusBadGateway, gin.H{"error": "authentication service unavailable"})
+		return
+	}
+	if mfaErr != "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": mfaErr})
+		return
+	}
+
 	// Finalize the OIDC auth request by linking it to the session
 	// Zitadel v2 API: POST /v2/oidc/auth_requests/{authRequestId}
 	body := map[string]any{

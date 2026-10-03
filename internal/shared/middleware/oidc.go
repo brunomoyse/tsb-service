@@ -47,8 +47,8 @@ type UserLookup interface {
 // AppJWTVerifier is a secondary verifier for tsb-service-signed JWTs issued by
 // the POS /auth/device-login endpoint. It lets the shop-floor device hit
 // GraphQL with an app token instead of a Zitadel JWT — see internal/modules/pos.
-// POS tokens always grant admin scope; the device IS trusted (you control the
-// APK and the secret baked into it).
+// POS tokens grant staff scope (utils.SetIsPOS), never admin: the device only
+// reaches the @staff operations the shop floor needs.
 type AppJWTVerifier interface {
 	VerifyAccessToken(token string) (deviceID uuid.UUID, err error)
 	// AccessTokenExpiry parses the token's exp claim without re-verifying
@@ -64,6 +64,12 @@ type OIDCVerifier struct {
 	userLookup UserLookup
 	appJWT     AppJWTVerifier // optional
 	projectID  string         // Zitadel project ID for project-specific role claim fallback
+	// adminClientIDs restricts which OIDC clients may carry the admin role.
+	// All apps share one Zitadel project, so without this a token minted for
+	// the customer site would also be admin for anyone holding the role.
+	// Empty = legacy behavior (any client), kept so a missing env var does not
+	// lock admins out.
+	adminClientIDs map[string]bool
 }
 
 // NewOIDCVerifier initializes the Zitadel Go SDK authorizer for local JWT validation.
@@ -122,6 +128,54 @@ func NewOIDCVerifier(ctx context.Context, issuerURL, internalURL, clientID, proj
 	return &OIDCVerifier{authorizer: authZ, userLookup: userLookup, projectID: projectID}, nil
 }
 
+// SetAdminClientIDs restricts the admin role to tokens issued to these OIDC
+// client IDs (the dashboard). Blank entries are ignored.
+func (v *OIDCVerifier) SetAdminClientIDs(ids []string) {
+	v.adminClientIDs = make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if id = strings.TrimSpace(id); id != "" {
+			v.adminClientIDs[id] = true
+		}
+	}
+	if len(v.adminClientIDs) == 0 {
+		v.adminClientIDs = nil
+		zap.L().Warn("ZITADEL_ADMIN_CLIENT_IDS is empty: the admin role is honored on tokens from every client")
+	}
+}
+
+// isAdmin reports whether a verified Zitadel token grants admin scope: the
+// admin project role AND, when an allowlist is configured, a token issued to
+// an admin client.
+func (v *OIDCVerifier) isAdmin(authCtx *oauth.IntrospectionContext) bool {
+	// Try the generic claim first (works with introspection), then fall back
+	// to the project-specific claim path (works with JWT access tokens where
+	// the role is under urn:zitadel:iam:org:project:{projectID}:roles).
+	hasRole := authCtx.IsGrantedRole("admin")
+	if !hasRole && v.projectID != "" {
+		hasRole = authCtx.IsGrantedRoleInProject(v.projectID, "admin", "")
+	}
+	return hasRole && v.clientMayBeAdmin(authCtx.Claims)
+}
+
+// clientMayBeAdmin reports whether the token's OIDC client is allowed to carry
+// admin scope. Always true when no allowlist is configured.
+func (v *OIDCVerifier) clientMayBeAdmin(claims map[string]any) bool {
+	if v.adminClientIDs == nil {
+		return true
+	}
+	return v.adminClientIDs[tokenClientID(claims)]
+}
+
+// tokenClientID returns the OIDC client a Zitadel access token was issued to.
+// Zitadel JWT access tokens carry it as client_id; azp is the standard OIDC
+// name and is checked as a fallback.
+func tokenClientID(claims map[string]any) string {
+	if id := claimString(claims, "client_id"); id != "" {
+		return id
+	}
+	return claimString(claims, "azp")
+}
+
 // SetAppJWTVerifier registers the optional POS JWT verifier. Call this after
 // constructing the POS service so StrictAuth / OptionalAuth fall back to it
 // when a bearer token is not a valid Zitadel JWT.
@@ -130,8 +184,8 @@ func (v *OIDCVerifier) SetAppJWTVerifier(appJWT AppJWTVerifier) {
 }
 
 // tryVerifyAppJWT attempts to validate a POS-issued HS256 token. Returns true
-// on success and populates the device principal in the Gin context with admin
-// scope so the same GraphQL surface used by Zitadel admins is reachable.
+// on success and populates the device principal in the Gin context with staff
+// (POS) scope.
 func (v *OIDCVerifier) tryVerifyAppJWT(c *gin.Context, tokenStr string) bool {
 	if v.appJWT == nil {
 		return false
@@ -143,7 +197,8 @@ func (v *OIDCVerifier) tryVerifyAppJWT(c *gin.Context, tokenStr string) bool {
 	}
 	zap.L().Debug("app JWT verified", zap.String("deviceID", deviceID.String()))
 	ctx := utils.SetUserID(c.Request.Context(), deviceID.String())
-	ctx = utils.SetIsAdmin(ctx, true)
+	ctx = utils.SetIsAdmin(ctx, false)
+	ctx = utils.SetIsPOS(ctx, true)
 	ctx = utils.SetTokenExpiry(ctx, v.appJWT.AccessTokenExpiry(tokenStr))
 	c.Request = c.Request.WithContext(ctx)
 	c.Set(string(utils.UserIDKey), deviceID.String())
@@ -203,13 +258,7 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 		return false
 	}
 
-	// Try the generic claim first (works with introspection), then fall back
-	// to the project-specific claim path (works with JWT access tokens where
-	// the role is under urn:zitadel:iam:org:project:{projectID}:roles).
-	isAdmin := authCtx.IsGrantedRole("admin")
-	if !isAdmin && v.projectID != "" {
-		isAdmin = authCtx.IsGrantedRoleInProject(v.projectID, "admin", "")
-	}
+	isAdmin := v.isAdmin(authCtx)
 
 	// Profile claims — the zitadel-go SDK's local JWT path only populates
 	// sub/aud/iss on IntrospectionContext; everything else (including email/
@@ -282,7 +331,8 @@ func (v *OIDCVerifier) OptionalAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// VerifyToken verifies a raw JWT string and returns the subject plus admin flag.
+// VerifyToken verifies a raw JWT string and returns the subject plus admin flag
+// (always false for POS tokens: check isPOS for staff scope).
 // Used by the GraphQL WebSocket InitFunc. Tries Zitadel first, then falls back
 // to the POS app JWT verifier. Returns the raw Zitadel sub for Zitadel tokens,
 // or the device UUID for POS tokens (in which case isPOS=true and the caller
@@ -296,10 +346,7 @@ func (v *OIDCVerifier) OptionalAuthMiddleware() gin.HandlerFunc {
 func (v *OIDCVerifier) VerifyToken(ctx context.Context, tokenStr string) (subject string, isAdmin, isPOS bool, exp time.Time, err error) {
 	authCtx, zitadelErr := v.authorizer.CheckAuthorization(ctx, "Bearer "+tokenStr)
 	if zitadelErr == nil {
-		admin := authCtx.IsGrantedRole("admin")
-		if !admin && v.projectID != "" {
-			admin = authCtx.IsGrantedRoleInProject(v.projectID, "admin", "")
-		}
+		admin := v.isAdmin(authCtx)
 		var tokenExp time.Time
 		if expRaw, ok := authCtx.Claims["exp"].(float64); ok {
 			tokenExp = time.Unix(int64(expRaw), 0).UTC()
@@ -308,7 +355,7 @@ func (v *OIDCVerifier) VerifyToken(ctx context.Context, tokenStr string) (subjec
 	}
 	if v.appJWT != nil {
 		if deviceID, appErr := v.appJWT.VerifyAccessToken(tokenStr); appErr == nil {
-			return deviceID.String(), true, true, v.appJWT.AccessTokenExpiry(tokenStr), nil
+			return deviceID.String(), false, true, v.appJWT.AccessTokenExpiry(tokenStr), nil
 		}
 	}
 	return "", false, false, time.Time{}, zitadelErr

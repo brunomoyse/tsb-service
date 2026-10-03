@@ -13,15 +13,19 @@ import (
 // zitadelClient holds pre-resolved configuration for Zitadel API calls.
 // Initialized once at startup via Init(), eliminating per-request os.Getenv calls.
 type zitadelClient struct {
-	httpClient    *http.Client
-	baseURL       string // Internal Docker URL if set, otherwise external issuer URL
-	externalHost  string // External hostname for Host header (empty if no internal URL)
-	issuerURL     string // External issuer URL (for token endpoint)
-	servicePAT    string
-	adminPAT      string // Falls back to servicePAT if empty
-	appBaseURL    string
-	allowedClients map[string]bool // Whitelisted OIDC client IDs
+	httpClient     *http.Client
+	baseURL        string // Internal Docker URL if set, otherwise external issuer URL
+	externalHost   string // External hostname for Host header (empty if no internal URL)
+	issuerURL      string // External issuer URL (for token endpoint)
+	servicePAT     string
+	adminPAT       string // Falls back to servicePAT if empty
+	appBaseURL     string
+	allowedClients map[string]bool   // Whitelisted OIDC client IDs
 	idpIDs         map[string]string // provider name → Zitadel IdP ID
+	// adminClients are the OIDC clients that grant admin scope (the
+	// dashboard). Logins finalized for them must pass the user's TOTP when
+	// one is enrolled. Empty = no admin client configured.
+	adminClients map[string]bool
 }
 
 // client is the package-level Zitadel client, initialized via Init().
@@ -29,15 +33,16 @@ var client *zitadelClient
 
 // Config holds the environment variables needed to initialize the auth package.
 type Config struct {
-	ZitadelIssuer      string // ZITADEL_ISSUER (required)
-	ZitadelInternalURL string // ZITADEL_INTERNAL_URL (optional, Docker)
-	ZitadelClientID    string // ZITADEL_CLIENT_ID (required)
-	NativeClientID     string // ZITADEL_NATIVE_CLIENT_ID (optional, Capacitor)
-	ServicePAT         string // ZITADEL_SERVICE_PAT (required)
-	AdminPAT           string // ZITADEL_ADMIN_PAT (optional, falls back to ServicePAT)
-	AppBaseURL         string // APP_BASE_URL
-	IdPGoogleID        string // ZITADEL_IDP_GOOGLE_ID
-	IdPAppleID         string // ZITADEL_IDP_APPLE_ID
+	ZitadelIssuer      string   // ZITADEL_ISSUER (required)
+	ZitadelInternalURL string   // ZITADEL_INTERNAL_URL (optional, Docker)
+	ZitadelClientID    string   // ZITADEL_CLIENT_ID (required)
+	NativeClientID     string   // ZITADEL_NATIVE_CLIENT_ID (optional, Capacitor)
+	ServicePAT         string   // ZITADEL_SERVICE_PAT (required)
+	AdminPAT           string   // ZITADEL_ADMIN_PAT (optional, falls back to ServicePAT)
+	AppBaseURL         string   // APP_BASE_URL
+	IdPGoogleID        string   // ZITADEL_IDP_GOOGLE_ID
+	IdPAppleID         string   // ZITADEL_IDP_APPLE_ID
+	AdminClientIDs     []string // ZITADEL_ADMIN_CLIENT_IDS (dashboard clients)
 }
 
 // Init initializes the auth package with the given configuration.
@@ -75,6 +80,13 @@ func Init(cfg Config) {
 		idpIDs["apple"] = cfg.IdPAppleID
 	}
 
+	adminClients := make(map[string]bool)
+	for _, id := range cfg.AdminClientIDs {
+		if id = strings.TrimSpace(id); id != "" {
+			adminClients[id] = true
+		}
+	}
+
 	client = &zitadelClient{
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
@@ -87,6 +99,7 @@ func Init(cfg Config) {
 		appBaseURL:     cfg.AppBaseURL,
 		allowedClients: allowed,
 		idpIDs:         idpIDs,
+		adminClients:   adminClients,
 	}
 }
 
