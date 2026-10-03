@@ -6,3 +6,10 @@
 /app
 main
 tsb-service
+
+# tsb-mcp
+/bin/
+.env.mcp
+*.db
+*.db-shm
+*.db-wal

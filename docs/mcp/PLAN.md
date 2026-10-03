@@ -1,6 +1,6 @@
 # TSB MCP server: implementation plan (step 2)
 
-This plan builds on `docs/mcp/INVENTORY.md`. Nothing is built until you approve it.
+This plan builds on `docs/mcp/INVENTORY.md`. It was approved and implemented on 2026-10-03; the "As built" section at the end lists where the implementation differs.
 
 ## Where it lives
 
@@ -241,3 +241,13 @@ Logging uses `log/slog`, as the brief asks. That differs from tsb-service, which
 2. **Deployment:** the brief asks for plain manifests in `deploy/k8s/tsb-mcp/`, but prod apps are deployed through the Helm chart in `tsb-infra/charts/tokyosushi-apps`. Do you want plain manifests only (as asked), or also a chart entry later?
 3. **CI:** should tsb-service's image workflow also build `Dockerfile.mcp`? Each build costs Actions minutes.
 4. **Customer stats:** aggregates only (totals, new vs returning, top order counts with no names). OK?
+
+## As built (differences from the plan above)
+
+- **Deployment:** Helm instead of plain manifests. Production apps are all deployed through `tsb-infra/charts/tokyosushi-apps`, so tsb-mcp is declared there (`apps.tsb-mcp`, PVC, a second port, Recreate strategy) to keep a single source of truth. There is no `deploy/k8s/` in this repo.
+- **Secrets:** Terraform generates the Zitadel machine user and both bearer tokens (`tsb-infra/terraform/zitadel-mcp.tf`, secret `tsb-mcp-zitadel`). No SOPS file is needed.
+- **Image upload re-check dropped:** tsb-service exposes no way to read back whether an upload reached the file service. The summary instead states that the previous photo cannot be restored.
+- **Actions layer:** the change logic lives in `internal/mcp/actions`, shared by the tools and the internal API. `internal/mcp/changes` is storage only.
+- **Makefile targets** are prefixed `mcp-` (`mcp-build`, `mcp-test`, `mcp-lint`, `mcp-run`) so they don't clash with the backend's.
+- **Internal API:** returns `422 rejected` when a stored change has become invalid (e.g. the product was deleted).
+- **Customer stats:** include customer names (decision: names are wanted for stats) but never phone numbers or emails.
