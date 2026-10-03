@@ -54,6 +54,9 @@ import (
 
 	addressApplication "tsb-service/internal/modules/address/application"
 	addressInfrastructure "tsb-service/internal/modules/address/infrastructure"
+	assistantApplication "tsb-service/internal/modules/assistant/application"
+	assistantDomain "tsb-service/internal/modules/assistant/domain"
+	assistantInfrastructure "tsb-service/internal/modules/assistant/infrastructure"
 	notificationApplication "tsb-service/internal/modules/notification/application"
 	notificationInfrastructure "tsb-service/internal/modules/notification/infrastructure"
 	restaurantApplication "tsb-service/internal/modules/restaurant/application"
@@ -404,6 +407,25 @@ func main() {
 		addressService, couponService, notificationService, orderService, paymentService, productService, restaurantService, userService, posService,
 		couponValidateLimiter, publicQueryLimiter,
 	)
+	// WeChat assistant (tsb-agent): connection status and QR login for the
+	// dashboard, and an email to the owner when the WeChat session expires.
+	// Disabled unless ASSISTANT_AGENT_URL is set.
+	var assistantClient assistantDomain.AgentClient
+	if agentURL := os.Getenv("ASSISTANT_AGENT_URL"); agentURL != "" {
+		assistantClient = assistantInfrastructure.NewAgentClient(agentURL, os.Getenv("ASSISTANT_ADMIN_TOKEN"), nil)
+	}
+	alertEmail := os.Getenv("ASSISTANT_ALERT_EMAIL")
+	assistantService := assistantApplication.NewService(assistantClient, broker, func(_ context.Context, expiredAt time.Time) error {
+		if alertEmail == "" {
+			zap.L().Warn("ASSISTANT_ALERT_EMAIL is not set: the assistant expiry is not emailed")
+			return nil
+		}
+		return scaleway.SendAssistantDisconnectedEmail(alertEmail, appDashboardURL+"/zh/assistant", expiredAt)
+	}, time.Now)
+	rootResolver.AssistantService = assistantService
+	assistantCtx, stopAssistantWatch := context.WithCancel(context.Background())
+	go assistantService.Watch(assistantCtx, time.Minute)
+
 	// Payment webhook depends on the resolver to fan out the new-order push
 	// notification once the Mollie payment transitions to paid.
 	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, broker, rootResolver)
@@ -556,6 +578,7 @@ func main() {
 	stopPurge()
 	stopSweep()
 	stopBouncePoll()
+	stopAssistantWatch()
 	authLimiter.Stop()
 	couponValidateLimiter.Stop()
 	posLimiter.Stop()

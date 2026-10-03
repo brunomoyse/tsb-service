@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/model"
 	couponDomain "tsb-service/internal/modules/coupon/domain"
@@ -261,14 +260,3 @@ func (r *subscriptionResolver) CouponUpdated(ctx context.Context) (<-chan *model
 
 	return ch, nil
 }
-
-// Mutation returns graphql1.MutationResolver implementation.
-func (r *Resolver) Mutation() graphql1.MutationResolver { return &mutationResolver{r} }
-
-// Subscription returns graphql1.SubscriptionResolver implementation.
-func (r *Resolver) Subscription() graphql1.SubscriptionResolver { return &subscriptionResolver{r} }
-
-type (
-	mutationResolver     struct{ *Resolver }
-	subscriptionResolver struct{ *Resolver }
-)

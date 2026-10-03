@@ -24,6 +24,7 @@ import (
 	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/directives"
 	addressApplication "tsb-service/internal/modules/address/application"
+	assistantApplication "tsb-service/internal/modules/assistant/application"
 	couponApplication "tsb-service/internal/modules/coupon/application"
 	notificationApplication "tsb-service/internal/modules/notification/application"
 	orderApplication "tsb-service/internal/modules/order/application"
@@ -42,18 +43,21 @@ import (
 )
 
 type Resolver struct {
-	Broker                *pubsub.Broker
-	APNsClient            *apns.Client // nil if APNs not configured
-	FCMClient             *fcm.Client  // nil if FCM not configured
-	AddressService        addressApplication.AddressService
-	CouponService         couponApplication.CouponService
-	NotificationService   notificationApplication.NotificationService
-	OrderService          orderApplication.OrderService
-	PaymentService        paymentApplication.PaymentService
-	ProductService        productApplication.ProductService
-	RestaurantService     restaurantApplication.RestaurantService
-	UserService           userApplication.UserService
-	PosService            *posApplication.Service
+	Broker              *pubsub.Broker
+	APNsClient          *apns.Client // nil if APNs not configured
+	FCMClient           *fcm.Client  // nil if FCM not configured
+	AddressService      addressApplication.AddressService
+	CouponService       couponApplication.CouponService
+	NotificationService notificationApplication.NotificationService
+	OrderService        orderApplication.OrderService
+	PaymentService      paymentApplication.PaymentService
+	ProductService      productApplication.ProductService
+	RestaurantService   restaurantApplication.RestaurantService
+	UserService         userApplication.UserService
+	PosService          *posApplication.Service
+	// AssistantService proxies the WeChat assistant's connection; nil or
+	// disabled when no assistant is configured. Set after NewResolver.
+	AssistantService      *assistantApplication.Service
 	CouponValidateLimiter *middleware.RateLimiter
 	// PublicQueryLimiter throttles the unauthenticated, upstream-costly queries (quoteOrder,
 	// resolveAddress) per client IP. nil disables it.

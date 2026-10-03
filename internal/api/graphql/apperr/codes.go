@@ -118,6 +118,14 @@ const (
 	CodeInvalidAmount Code = "INVALID_AMOUNT"
 )
 
+// WeChat assistant (dashboard).
+const (
+	// CodeAssistantDisabled: no assistant is configured on this server.
+	CodeAssistantDisabled Code = "ASSISTANT_DISABLED"
+	// CodeAssistantUnavailable: the assistant service did not answer.
+	CodeAssistantUnavailable Code = "ASSISTANT_UNAVAILABLE"
+)
+
 // expected lists the codes that are the customer's / the world's doing rather than ours: they are
 // logged as warnings and never sent to Sentry. Everything else is a server fault.
 var expected = map[Code]bool{
@@ -154,6 +162,7 @@ var expected = map[Code]bool{
 	CodeCashAmountInvalid:     true,
 	CodeInvalidAmount:         true,
 	CodeRateLimited:           true,
+	CodeAssistantDisabled:     true,
 }
 
 // IsExpected reports whether the code is a user-side error (warn log, no Sentry event).

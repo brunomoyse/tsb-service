@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信助手已断开 | {{restaurantName}}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,'PingFang SC','Microsoft YaHei',sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
+<tr><td align="center" style="padding:40px 16px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+    <!-- HEADER -->
+    <tr><td style="background-color:#ffffff;padding:24px 36px;text-align:center;border-radius:12px 12px 0 0;">
+        <img src="{{.LogoURL}}" alt="{{restaurantName}}" width="56" height="56" style="display:block;margin:0 auto;border-radius:8px;" />
+    </td></tr>
+    <!-- RED ACCENT LINE -->
+    <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
+    <!-- CONTENT -->
+    <tr><td style="background-color:#ffffff;padding:36px;">
+        <p style="margin:0 0 16px;font-size:18px;color:#2D2D2D;font-weight:600;">微信助手已断开</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">微信助手的登录已于 {{.ExpiredAt}} 失效。重新连接之前，助手收不到你的微信消息。</p>
+        <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#2D2D2D;">请打开管理后台的「微信助手」页面，点击「重新连接」，然后用微信扫码确认。</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+        <tr><td style="background-color:#C41E24;border-radius:8px;">
+            <a href="{{.DashboardLink}}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">重新连接</a>
+        </td></tr>
+        </table>
+        <p style="margin:0;font-size:12px;line-height:1.6;color:#6B6560;">如果按钮无法打开，请复制这个链接到浏览器：<br><a href="{{.DashboardLink}}" style="color:#C41E24;word-break:break-all;">{{.DashboardLink}}</a></p>
+    </td></tr>
+    <!-- FOOTER -->
+    <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:0 0 12px 12px;">
+        <p style="margin:0;font-size:12px;color:#6B6560;">&copy; 2026 {{restaurantName}}</p>
+    </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

@@ -34,6 +34,23 @@ type AddressSuggestion struct {
 	SecondaryText string `json:"secondaryText"`
 }
 
+type AssistantConnection struct {
+	Enabled         bool                     `json:"enabled"`
+	State           AssistantConnectionState `json:"state"`
+	Account         *string                  `json:"account,omitempty"`
+	Since           *time.Time               `json:"since,omitempty"`
+	ExpiredAt       *time.Time               `json:"expiredAt,omitempty"`
+	EverConnected   bool                     `json:"everConnected"`
+	LoginInProgress bool                     `json:"loginInProgress"`
+}
+
+type AssistantLogin struct {
+	ID        string               `json:"id"`
+	Status    AssistantLoginStatus `json:"status"`
+	QRContent string               `json:"qrContent"`
+	ExpiresAt time.Time            `json:"expiresAt"`
+}
+
 type ChoiceTranslation struct {
 	Locale string `json:"locale"`
 	Name   string `json:"name"`
@@ -576,6 +593,130 @@ type UpdateUserInput struct {
 	AddressPlaceID     *string `json:"addressPlaceId,omitempty"`
 	NotifyMarketing    *bool   `json:"notifyMarketing,omitempty"`
 	NotifyOrderUpdates *bool   `json:"notifyOrderUpdates,omitempty"`
+}
+
+type AssistantConnectionState string
+
+const (
+	AssistantConnectionStateConnected    AssistantConnectionState = "CONNECTED"
+	AssistantConnectionStateDisconnected AssistantConnectionState = "DISCONNECTED"
+	AssistantConnectionStateExpired      AssistantConnectionState = "EXPIRED"
+	AssistantConnectionStateUnavailable  AssistantConnectionState = "UNAVAILABLE"
+)
+
+var AllAssistantConnectionState = []AssistantConnectionState{
+	AssistantConnectionStateConnected,
+	AssistantConnectionStateDisconnected,
+	AssistantConnectionStateExpired,
+	AssistantConnectionStateUnavailable,
+}
+
+func (e AssistantConnectionState) IsValid() bool {
+	switch e {
+	case AssistantConnectionStateConnected, AssistantConnectionStateDisconnected, AssistantConnectionStateExpired, AssistantConnectionStateUnavailable:
+		return true
+	}
+	return false
+}
+
+func (e AssistantConnectionState) String() string {
+	return string(e)
+}
+
+func (e *AssistantConnectionState) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = AssistantConnectionState(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid AssistantConnectionState", str)
+	}
+	return nil
+}
+
+func (e AssistantConnectionState) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *AssistantConnectionState) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e AssistantConnectionState) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type AssistantLoginStatus string
+
+const (
+	AssistantLoginStatusWait                AssistantLoginStatus = "WAIT"
+	AssistantLoginStatusScanned             AssistantLoginStatus = "SCANNED"
+	AssistantLoginStatusConfirmed           AssistantLoginStatus = "CONFIRMED"
+	AssistantLoginStatusExpired             AssistantLoginStatus = "EXPIRED"
+	AssistantLoginStatusRefusedOtherAccount AssistantLoginStatus = "REFUSED_OTHER_ACCOUNT"
+	AssistantLoginStatusFailed              AssistantLoginStatus = "FAILED"
+	AssistantLoginStatusCancelled           AssistantLoginStatus = "CANCELLED"
+)
+
+var AllAssistantLoginStatus = []AssistantLoginStatus{
+	AssistantLoginStatusWait,
+	AssistantLoginStatusScanned,
+	AssistantLoginStatusConfirmed,
+	AssistantLoginStatusExpired,
+	AssistantLoginStatusRefusedOtherAccount,
+	AssistantLoginStatusFailed,
+	AssistantLoginStatusCancelled,
+}
+
+func (e AssistantLoginStatus) IsValid() bool {
+	switch e {
+	case AssistantLoginStatusWait, AssistantLoginStatusScanned, AssistantLoginStatusConfirmed, AssistantLoginStatusExpired, AssistantLoginStatusRefusedOtherAccount, AssistantLoginStatusFailed, AssistantLoginStatusCancelled:
+		return true
+	}
+	return false
+}
+
+func (e AssistantLoginStatus) String() string {
+	return string(e)
+}
+
+func (e *AssistantLoginStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = AssistantLoginStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid AssistantLoginStatus", str)
+	}
+	return nil
+}
+
+func (e AssistantLoginStatus) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *AssistantLoginStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e AssistantLoginStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }
 
 type CouponStatus string

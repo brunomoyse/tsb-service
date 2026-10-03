@@ -697,3 +697,16 @@ func renderFeedbackEmailText(path, name, email, serviceType, feedbackType, messa
 	data := prepareFeedbackData(name, email, serviceType, feedbackType, message, lang)
 	return renderEmail(path, data, loadTextTemplate)
 }
+
+func prepareAssistantDisconnectedData(dashboardLink string, expiredAt time.Time) any {
+	local := timezone.In(expiredAt)
+	return struct {
+		DashboardLink string
+		ExpiredAt     string
+		LogoURL       string
+	}{
+		DashboardLink: dashboardLink,
+		ExpiredAt:     fmt.Sprintf("%d月%d日 %s", int(local.Month()), local.Day(), local.Format("15:04")),
+		LogoURL:       logoURL(),
+	}
+}

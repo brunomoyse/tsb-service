@@ -849,3 +849,32 @@ func SendFeedbackEmail(name, email, serviceType, feedbackType, message, lang str
 	logger.Debugf("Feedback email sent to admin from %s", email)
 	return nil
 }
+
+// SendAssistantDisconnectedEmail tells the owner that the WeChat assistant's
+// session expired and links to the dashboard page that reconnects it. The
+// owner reads Chinese, so the email is Chinese only.
+func SendAssistantDisconnectedEmail(to, dashboardLink string, expiredAt time.Time) error {
+	newReq := *baseReq
+	name := brandCfg().Name
+	newReq.To = []*temv1alpha1.CreateEmailRequestAddress{{Email: to, Name: &name}}
+
+	data := prepareAssistantDisconnectedData(dashboardLink, expiredAt)
+	path := "templates/zh/assistant-disconnected"
+	htmlContent, err := renderEmail(path, data, loadHTMLTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+	plainTextContent, err := renderEmail(path, data, loadTextTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to render email template: %w", err)
+	}
+
+	newReq.Subject = "微信助手已断开，请重新连接"
+	newReq.HTML = htmlContent
+	newReq.Text = plainTextContent
+	if err := dispatch(&newReq); err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+	logger.Debugf("Assistant disconnected email sent")
+	return nil
+}

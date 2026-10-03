@@ -1,0 +1,60 @@
+# WeChat assistant (tsb-agent): its WeChat connection and the QR login that
+# (re)connects it. The assistant runs as a separate service; these fields
+# proxy its admin API.
+
+enum AssistantConnectionState {
+    CONNECTED
+    DISCONNECTED
+    # The WeChat session ended (iLink session expired): scan a new QR code.
+    EXPIRED
+    # The assistant service did not answer.
+    UNAVAILABLE
+}
+
+type AssistantConnection {
+    # False when no assistant is configured on this server.
+    enabled: Boolean!
+    state: AssistantConnectionState!
+    # The WeChat account (iLink user id) that owns the assistant.
+    account: String
+    since: DateTime
+    expiredAt: DateTime
+    # True once a WeChat account has been connected.
+    everConnected: Boolean!
+    loginInProgress: Boolean!
+}
+
+enum AssistantLoginStatus {
+    WAIT
+    SCANNED
+    CONFIRMED
+    EXPIRED
+    # Confirmed by a WeChat account other than the owner's. Start again with
+    # replaceOwner to hand the assistant to that account.
+    REFUSED_OTHER_ACCOUNT
+    FAILED
+    CANCELLED
+}
+
+type AssistantLogin {
+    id: String!
+    status: AssistantLoginStatus!
+    # Text to encode as a QR code (a WeChat link). It changes when an expired
+    # QR code is renewed.
+    qrContent: String!
+    expiresAt: DateTime!
+}
+
+extend type Query {
+    assistantConnection: AssistantConnection! @admin
+    assistantLogin(id: String!): AssistantLogin! @admin
+}
+
+extend type Mutation {
+    startAssistantLogin(replaceOwner: Boolean): AssistantLogin! @admin
+    disconnectAssistant: AssistantConnection! @admin
+}
+
+extend type Subscription {
+    assistantConnectionUpdated: AssistantConnection! @admin
+}
