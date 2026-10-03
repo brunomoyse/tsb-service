@@ -64,22 +64,22 @@ func choiceNames(ts []upstream.ChoiceTranslation) map[string]string {
 
 // mergeNames applies changes onto current names and returns the upstream
 // translation list plus a description of the differences.
-func mergeNames(cur, changes map[string]string) ([]upstream.ChoiceTranslation, []string, error) {
+func mergeNames(cur, changes map[string]string) ([]upstream.ChoiceTranslation, lines, error) {
 	merged := maps.Clone(cur)
 	if merged == nil {
 		merged = map[string]string{}
 	}
-	var diffs []string
+	var diffs lines
 	for _, l := range slices.Sorted(maps.Keys(changes)) {
 		if err := validLanguage(l); err != nil {
-			return nil, nil, err
+			return nil, lines{}, err
 		}
 		n := strings.TrimSpace(changes[l])
 		if n == "" {
-			return nil, nil, Userf("The %s name cannot be empty.", l)
+			return nil, lines{}, Userf("The %s name cannot be empty.", l)
 		}
 		if merged[l] != n {
-			diffs = append(diffs, fmt.Sprintf("name (%s): %q -> %q", l, merged[l], n))
+			diffs.add(fmt.Sprintf("name (%s): %q -> %q", l, merged[l], n), langZh[l]+"名称："+quoteOrNoneZh(merged[l])+arrowZh+quoteZh(n))
 			merged[l] = n
 		}
 	}
@@ -121,9 +121,9 @@ func choiceGroupUpsert() handler {
 		Risk: RiskSensitive,
 		Prepare: func(ctx context.Context, env *Env, p *ChoiceGroupParams) (*prepared, error) {
 			var (
-				prod  *upstream.Product
-				cur   groupState
-				label string
+				prod           *upstream.Product
+				cur            groupState
+				label, labelZh string
 			)
 			if p.GroupID != "" {
 				var g *upstream.ChoiceGroup
@@ -134,6 +134,7 @@ func choiceGroupUpsert() handler {
 				}
 				cur = groupState{Exists: true, Names: choiceNames(g.Translations), MinSelections: g.MinSelections, MaxSelections: g.MaxSelections, SortOrder: g.SortOrder}
 				label = fmt.Sprintf("%s, choice group %q", ProductLabel(prod), g.Name)
+				labelZh = productLabelZh(prod) + "的选项组" + choiceLabelZh(g.Translations, g.Name)
 			} else {
 				var err error
 				prod, err = getProduct(ctx, env, p.ProductID)
@@ -145,6 +146,7 @@ func choiceGroupUpsert() handler {
 				}
 				cur = groupState{MinSelections: 1, MaxSelections: 1, SortOrder: len(prod.ChoiceGroups)}
 				label = fmt.Sprintf("%s, new choice group", ProductLabel(prod))
+				labelZh = productLabelZh(prod) + "的新选项组"
 				if p.SortOrder == nil {
 					p.SortOrder = &cur.SortOrder
 				}
@@ -164,25 +166,27 @@ func choiceGroupUpsert() handler {
 				return nil, Userf("Selections must satisfy 0 <= min <= max and max >= 1 (got min %d, max %d).", minSel, maxSel)
 			}
 			if minSel != cur.MinSelections || !cur.Exists {
-				diffs = append(diffs, fmt.Sprintf("min selections: %d -> %d", cur.MinSelections, minSel))
+				diffs.add(fmt.Sprintf("min selections: %d -> %d", cur.MinSelections, minSel), fmt.Sprintf("最少选择：%d%s%d", cur.MinSelections, arrowZh, minSel))
 			}
 			if maxSel != cur.MaxSelections || !cur.Exists {
-				diffs = append(diffs, fmt.Sprintf("max selections: %d -> %d", cur.MaxSelections, maxSel))
+				diffs.add(fmt.Sprintf("max selections: %d -> %d", cur.MaxSelections, maxSel), fmt.Sprintf("最多选择：%d%s%d", cur.MaxSelections, arrowZh, maxSel))
 			}
 			if cur.Exists && p.SortOrder != nil && *p.SortOrder != cur.SortOrder {
-				diffs = append(diffs, fmt.Sprintf("position: %d -> %d", cur.SortOrder, *p.SortOrder))
+				diffs.add(fmt.Sprintf("position: %d -> %d", cur.SortOrder, *p.SortOrder), fmt.Sprintf("排序位置：%d%s%d", cur.SortOrder, arrowZh, *p.SortOrder))
 			}
 			entityID := p.GroupID
 			if entityID == "" {
 				entityID = "new:" + prod.ID
 			}
 			pr := &prepared{EntityType: "choice_group", EntityID: entityID, Before: cur}
-			if cur.Exists && len(diffs) == 0 {
+			if cur.Exists && diffs.empty() {
 				pr.NoOp = true
 				pr.Summary = label + " already has these settings. Nothing changed."
+				pr.SummaryZh = labelZh + "已经是这些设置，无需更改。"
 				return pr, nil
 			}
-			pr.Summary = label + ": " + strings.Join(diffs, "; ")
+			pr.Summary = label + ": " + diffs.enJoined()
+			pr.SummaryZh = labelZh + "：" + diffs.zhJoined()
 			return pr, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p ChoiceGroupParams, _ []byte) (any, error) {
@@ -267,12 +271,15 @@ func choiceGroupDelete() handler {
 				return nil, err
 			}
 			names := make([]string, 0, len(g.Choices))
+			namesZh := make([]string, 0, len(g.Choices))
 			for _, c := range g.Choices {
 				names = append(names, c.Name)
+				namesZh = append(namesZh, nameZh(choiceNames(c.Translations), c.Name))
 			}
 			return &prepared{EntityType: "choice_group", EntityID: g.ID,
-				Before:  groupState{Exists: true, Names: choiceNames(g.Translations), MinSelections: g.MinSelections, MaxSelections: g.MaxSelections, SortOrder: g.SortOrder},
-				Summary: fmt.Sprintf("%s: delete choice group %q and its %d choices (%s). This cannot be undone.", ProductLabel(prod), g.Name, len(g.Choices), strings.Join(names, ", "))}, nil
+				Before:    groupState{Exists: true, Names: choiceNames(g.Translations), MinSelections: g.MinSelections, MaxSelections: g.MaxSelections, SortOrder: g.SortOrder},
+				Summary:   fmt.Sprintf("%s: delete choice group %q and its %d choices (%s). This cannot be undone.", ProductLabel(prod), g.Name, len(g.Choices), strings.Join(names, ", ")),
+				SummaryZh: fmt.Sprintf("%s：删除选项组%s及其 %d 个选项（%s）。此操作无法撤销。", productLabelZh(prod), choiceLabelZh(g.Translations, g.Name), len(g.Choices), strings.Join(namesZh, "、"))}, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p ChoiceGroupRef, _ []byte) (any, error) {
 			return map[string]bool{"deleted": true}, env.Up.DeleteChoiceGroup(ctx, p.GroupID)
@@ -305,8 +312,8 @@ func choiceUpsert() handler {
 		Risk: RiskSensitive,
 		Prepare: func(ctx context.Context, env *Env, p *ChoiceParams) (*prepared, error) {
 			var (
-				cur   choiceState
-				label string
+				cur            choiceState
+				label, labelZh string
 			)
 			if p.ChoiceID != "" {
 				prod, _, c, err := findChoice(ctx, env, p.ChoiceID)
@@ -315,6 +322,7 @@ func choiceUpsert() handler {
 				}
 				cur = choiceState{Exists: true, Names: choiceNames(c.Translations), PriceModifierCents: money.MustCents(c.PriceModifier), SortOrder: c.SortOrder}
 				label = fmt.Sprintf("%s, choice %q", ProductLabel(prod), c.Name)
+				labelZh = productLabelZh(prod) + "的选项" + choiceLabelZh(c.Translations, c.Name)
 			} else {
 				prod, g, err := findGroup(ctx, env, p.GroupID)
 				if err != nil {
@@ -325,6 +333,7 @@ func choiceUpsert() handler {
 				}
 				cur = choiceState{SortOrder: len(g.Choices)}
 				label = fmt.Sprintf("%s, group %q, new choice", ProductLabel(prod), g.Name)
+				labelZh = productLabelZh(prod) + "的选项组" + choiceLabelZh(g.Translations, g.Name) + "中的新选项"
 				if p.SortOrder == nil {
 					p.SortOrder = &cur.SortOrder
 				}
@@ -348,23 +357,25 @@ func choiceUpsert() handler {
 					}
 				}
 				if v != cur.PriceModifierCents || !cur.Exists {
-					diffs = append(diffs, fmt.Sprintf("surcharge: %s -> %s", money.Format(cur.PriceModifierCents), money.Format(v)))
+					diffs.add(fmt.Sprintf("surcharge: %s -> %s", money.Format(cur.PriceModifierCents), money.Format(v)), "加价："+moneyZh(cur.PriceModifierCents)+arrowZh+moneyZh(v))
 				}
 			}
 			if cur.Exists && p.SortOrder != nil && *p.SortOrder != cur.SortOrder {
-				diffs = append(diffs, fmt.Sprintf("position: %d -> %d", cur.SortOrder, *p.SortOrder))
+				diffs.add(fmt.Sprintf("position: %d -> %d", cur.SortOrder, *p.SortOrder), fmt.Sprintf("排序位置：%d%s%d", cur.SortOrder, arrowZh, *p.SortOrder))
 			}
 			entityID := p.ChoiceID
 			if entityID == "" {
 				entityID = "new:" + p.GroupID
 			}
 			pr := &prepared{EntityType: "choice", EntityID: entityID, Before: cur}
-			if cur.Exists && len(diffs) == 0 {
+			if cur.Exists && diffs.empty() {
 				pr.NoOp = true
 				pr.Summary = label + " already has these settings. Nothing changed."
+				pr.SummaryZh = labelZh + "已经是这些设置，无需更改。"
 				return pr, nil
 			}
-			pr.Summary = label + ": " + strings.Join(diffs, "; ")
+			pr.Summary = label + ": " + diffs.enJoined()
+			pr.SummaryZh = labelZh + "：" + diffs.zhJoined()
 			return pr, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p ChoiceParams, _ []byte) (any, error) {
@@ -453,8 +464,9 @@ func choiceDelete() handler {
 				return nil, err
 			}
 			return &prepared{EntityType: "choice", EntityID: c.ID,
-				Before:  choiceState{Exists: true, Names: choiceNames(c.Translations), PriceModifierCents: money.MustCents(c.PriceModifier), SortOrder: c.SortOrder},
-				Summary: fmt.Sprintf("%s: delete choice %q from group %q. This cannot be undone.", ProductLabel(prod), c.Name, g.Name)}, nil
+				Before:    choiceState{Exists: true, Names: choiceNames(c.Translations), PriceModifierCents: money.MustCents(c.PriceModifier), SortOrder: c.SortOrder},
+				Summary:   fmt.Sprintf("%s: delete choice %q from group %q. This cannot be undone.", ProductLabel(prod), c.Name, g.Name),
+				SummaryZh: fmt.Sprintf("%s：从选项组%s中删除选项%s。此操作无法撤销。", productLabelZh(prod), choiceLabelZh(g.Translations, g.Name), choiceLabelZh(c.Translations, c.Name))}, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p ChoiceRef, _ []byte) (any, error) {
 			return map[string]bool{"deleted": true}, env.Up.DeleteChoice(ctx, p.ChoiceID)

@@ -49,6 +49,7 @@ type Change struct {
 	BeforeHash     string          `json:"-"`
 	Blob           []byte          `json:"-"`
 	Summary        string          `json:"summary"`
+	SummaryZh      string          `json:"summary_zh"`
 	RequestContext string          `json:"request_context,omitempty"`
 	Status         Status          `json:"status"`
 	UndoOf         *int64          `json:"undo_of,omitempty"`
@@ -72,6 +73,7 @@ type AuditEntry struct {
 	Before         json.RawMessage `json:"before,omitempty"`
 	After          json.RawMessage `json:"after,omitempty"`
 	Summary        string          `json:"summary"`
+	SummaryZh      string          `json:"summary_zh"`
 	RequestContext string          `json:"request_context,omitempty"`
 	Outcome        string          `json:"outcome"`
 	Error          string          `json:"error,omitempty"`
@@ -96,6 +98,7 @@ CREATE TABLE IF NOT EXISTS changes (
   before_hash     TEXT NOT NULL,
   blob            BLOB,
   summary         TEXT NOT NULL,
+  summary_zh      TEXT NOT NULL DEFAULT '',
   request_context TEXT NOT NULL DEFAULT '',
   status          TEXT NOT NULL,
   undo_of         INTEGER,
@@ -119,6 +122,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
   before_state    TEXT,
   after_state     TEXT,
   summary         TEXT NOT NULL,
+  summary_zh      TEXT NOT NULL DEFAULT '',
   request_context TEXT NOT NULL DEFAULT '',
   outcome         TEXT NOT NULL,
   error           TEXT NOT NULL DEFAULT '',
@@ -144,7 +148,33 @@ func Open(path string) (*Store, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate sqlite: %w", err)
 	}
+	if err := addColumns(db); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("migrate sqlite: %w", err)
+	}
 	return &Store{db: db}, nil
+}
+
+// addedColumns are columns added after the first release. CREATE TABLE IF NOT
+// EXISTS leaves existing tables unchanged, so they are added here.
+var addedColumns = []struct{ table, column, def string }{
+	{"changes", "summary_zh", "TEXT NOT NULL DEFAULT ''"},
+	{"audit_log", "summary_zh", "TEXT NOT NULL DEFAULT ''"},
+}
+
+func addColumns(db *sql.DB) error {
+	for _, c := range addedColumns {
+		var n int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, c.table, c.column).Scan(&n); err != nil {
+			return err
+		}
+		if n == 0 {
+			if _, err := db.Exec("ALTER TABLE " + c.table + " ADD COLUMN " + c.column + " " + c.def); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // Close closes the database.
@@ -171,10 +201,10 @@ func nullJSON(b json.RawMessage) any {
 func (s *Store) CreateChange(ctx context.Context, c *Change) error {
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO changes (id, tool, kind, entity_type, entity_id, params, before_state, before_hash, blob,
-		                     summary, request_context, status, undo_of, created_at, expires_at)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		                     summary, summary_zh, request_context, status, undo_of, created_at, expires_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.ID, c.Tool, c.Kind, c.EntityType, c.EntityID, string(c.Params), string(c.Before), c.BeforeHash, c.Blob,
-		c.Summary, c.RequestContext, string(c.Status), c.UndoOf, ts(c.CreatedAt), ts(c.ExpiresAt))
+		c.Summary, c.SummaryZh, c.RequestContext, string(c.Status), c.UndoOf, ts(c.CreatedAt), ts(c.ExpiresAt))
 	if err != nil {
 		return fmt.Errorf("insert change: %w", err)
 	}
@@ -184,7 +214,7 @@ func (s *Store) CreateChange(ctx context.Context, c *Change) error {
 // GetChange loads a change by id.
 func (s *Store) GetChange(ctx context.Context, id string) (*Change, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, tool, kind, entity_type, entity_id, params, before_state, before_hash, blob, summary,
+		SELECT id, tool, kind, entity_type, entity_id, params, before_state, before_hash, blob, summary, summary_zh,
 		       request_context, status, undo_of, created_at, expires_at, decided_at, error
 		FROM changes WHERE id = ?`, id)
 	var (
@@ -195,7 +225,7 @@ func (s *Store) GetChange(ctx context.Context, id string) (*Change, error) {
 		undoOf                sql.NullInt64
 	)
 	err := row.Scan(&c.ID, &c.Tool, &c.Kind, &c.EntityType, &c.EntityID, &params, &before, &c.BeforeHash, &c.Blob,
-		&c.Summary, &c.RequestContext, &status, &undoOf, &created, &exps, &decided, &c.Error)
+		&c.Summary, &c.SummaryZh, &c.RequestContext, &status, &undoOf, &created, &exps, &decided, &c.Error)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -232,10 +262,10 @@ func (s *Store) TransitionChange(ctx context.Context, id string, from, to Status
 func (s *Store) AppendAudit(ctx context.Context, e *AuditEntry) (int64, error) {
 	res, err := s.db.ExecContext(ctx, `
 		INSERT INTO audit_log (at, source, change_id, kind, risk, entity_type, entity_id, params, before_state,
-		                       after_state, summary, request_context, outcome, error, undo_of)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		                       after_state, summary, summary_zh, request_context, outcome, error, undo_of)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		ts(e.At), e.Source, e.ChangeID, e.Kind, e.Risk, e.EntityType, e.EntityID, nullJSON(e.Params), nullJSON(e.Before),
-		nullJSON(e.After), e.Summary, e.RequestContext, e.Outcome, e.Error, e.UndoOf)
+		nullJSON(e.After), e.Summary, e.SummaryZh, e.RequestContext, e.Outcome, e.Error, e.UndoOf)
 	if err != nil {
 		return 0, fmt.Errorf("append audit: %w", err)
 	}
@@ -257,7 +287,7 @@ func (s *Store) MarkUndone(ctx context.Context, auditID, undoneBy int64) error {
 }
 
 const auditColumns = `id, at, source, change_id, kind, risk, entity_type, entity_id, params, before_state, after_state,
-	summary, request_context, outcome, error, undo_of, undone_by`
+	summary, summary_zh, request_context, outcome, error, undo_of, undone_by`
 
 func scanAudit(rows interface{ Scan(...any) error }) (*AuditEntry, error) {
 	var (
@@ -267,7 +297,7 @@ func scanAudit(rows interface{ Scan(...any) error }) (*AuditEntry, error) {
 		undoOf, undoneBy      sql.NullInt64
 	)
 	if err := rows.Scan(&e.ID, &at, &e.Source, &e.ChangeID, &e.Kind, &e.Risk, &e.EntityType, &e.EntityID, &params, &before, &after,
-		&e.Summary, &e.RequestContext, &e.Outcome, &e.Error, &undoOf, &undoneBy); err != nil {
+		&e.Summary, &e.SummaryZh, &e.RequestContext, &e.Outcome, &e.Error, &undoOf, &undoneBy); err != nil {
 		return nil, err
 	}
 	e.At = parseTS(at)

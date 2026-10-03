@@ -14,9 +14,10 @@ Design notes:
 - **Same API as the dashboard.** tsb-mcp only talks to tsb-service over HTTP. Every backend side effect keeps happening: live dashboard updates through pubsub, `staff_audit_log` rows (operation names `Mcp*`), and file service uploads. A guard test (`internal/mcp/architecture_test.go`) fails if MCP code imports the backend's modules or database.
 - **Orders are read-only.** No tool can create, change, cancel or refund an order. `TestNoOrderWrites` checks the GraphQL document registry. The tool list test checks the names.
 - **Sensitive changes are two-step.**
-  - A `propose_*` tool only stores a pending change. It returns `{change_id, summary, expires_at}`.
+  - A `propose_*` tool only stores a pending change. It returns `{change_id, summary, summary_zh, expires_at}`.
   - The agent shows the summary to the owner, and on "yes" calls the internal API. No MCP tool can apply a change.
   - Before applying, the current state is read again. If it changed since the proposal (for example, someone edited it in the dashboard), the apply is refused with a conflict.
+- **Summaries in English and Chinese.** Every proposal, applied change, audit entry and undo carries `summary` (English, for the model) and `summary_zh` (Chinese, for the owner). Both are built in code from fixed templates (`internal/mcp/actions/zh.go`), never by a model, so the owner confirms exactly what will be applied. Names use the Chinese translation and fall back to the French name.
 - **Low-risk changes apply immediately.** Availability, visibility, preparation time and coupon deactivation are applied at once and audited. A repeated identical call is a no-op.
 
 See `INVENTORY.md` for every dashboard action and its risk class, and `PLAN.md` for the design.
@@ -124,7 +125,7 @@ A successful response is `200` with the change:
 
 ```json
 {"change_id":"chg_…","tool":"propose_price_change","kind":"product.price","status":"applied",
- "summary":"\"Maki box\" (卷寿司套餐): price 13.90 EUR -> 14.50 EUR","entity_type":"product","entity_id":"…",
+ "summary":"\"Maki box\" (卷寿司套餐): price 13.90 EUR -> 14.50 EUR","summary_zh":"「卷寿司套餐」价格：13.90 欧元 → 14.50 欧元","entity_type":"product","entity_id":"…",
  "created_at":"2026-10-03T13:00:00+02:00","expires_at":"2026-10-03T13:10:00+02:00","decided_at":"…","is_undo":false}
 ```
 
@@ -142,7 +143,7 @@ Errors return `{"error": "<sentence for the owner>", "code": "...", "change": {.
 
 Suggested agent flow:
 
-1. Call the `propose_*` tool and show `summary` to the owner (translated).
+1. Call the `propose_*` tool and show `summary_zh` to the owner as is (do not let the model rephrase it).
 2. Keep `change_id` with the conversation.
 3. On "yes", call `POST /apply`; on "no", call `POST /reject`.
 4. On `409 conflict` or `410 expired`, propose again.

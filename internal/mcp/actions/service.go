@@ -94,6 +94,7 @@ type prepared struct {
 	EntityID   string
 	Before     any
 	Summary    string
+	SummaryZh  string
 	NoOp       bool
 }
 
@@ -196,6 +197,7 @@ type Proposal struct {
 	ChangeID  string `json:"change_id,omitempty"`
 	Status    string `json:"status"`
 	Summary   string `json:"summary"`
+	SummaryZh string `json:"summary_zh"`
 	ExpiresAt string `json:"expires_at,omitempty"`
 	NoOp      bool   `json:"no_op,omitempty"`
 }
@@ -205,11 +207,16 @@ type Result struct {
 	Applied    bool            `json:"applied"`
 	NoOp       bool            `json:"no_op"`
 	Summary    string          `json:"summary"`
+	SummaryZh  string          `json:"summary_zh"`
 	EntityType string          `json:"entity_type"`
 	EntityID   string          `json:"entity_id"`
 	Before     json.RawMessage `json:"before,omitempty"`
 	After      json.RawMessage `json:"after,omitempty"`
 	AuditID    int64           `json:"audit_id,omitempty"`
+}
+
+func proposalOf(c *changes.Change, loc *time.Location) *Proposal {
+	return &Proposal{ChangeID: c.ID, Status: string(c.Status), Summary: c.Summary, SummaryZh: c.SummaryZh, ExpiresAt: c.ExpiresAt.In(loc).Format(time.RFC3339)}
 }
 
 func newID() string {
@@ -255,7 +262,7 @@ func (s *Service) Propose(ctx context.Context, tool, kind string, params any, bl
 		return nil, err
 	}
 	if pr.NoOp {
-		return &Proposal{Status: "no_op", Summary: pr.Summary, NoOp: true}, nil
+		return &Proposal{Status: "no_op", Summary: pr.Summary, SummaryZh: pr.SummaryZh, NoOp: true}, nil
 	}
 	before, err := marshal(pr.Before)
 	if err != nil {
@@ -264,7 +271,7 @@ func (s *Service) Propose(ctx context.Context, tool, kind string, params any, bl
 	now := s.env.Now().UTC()
 	c := &changes.Change{
 		ID: newID(), Tool: tool, Kind: kind, EntityType: pr.EntityType, EntityID: pr.EntityID,
-		Params: norm, Before: before, BeforeHash: hashOf(before), Blob: blob, Summary: pr.Summary,
+		Params: norm, Before: before, BeforeHash: hashOf(before), Blob: blob, Summary: pr.Summary, SummaryZh: pr.SummaryZh,
 		RequestContext: requestContext, Status: changes.StatusPending, UndoOf: undoOf,
 		CreatedAt: now, ExpiresAt: now.Add(s.ttl),
 	}
@@ -272,7 +279,7 @@ func (s *Service) Propose(ctx context.Context, tool, kind string, params any, bl
 		return nil, err
 	}
 	s.log.Info("change proposed", "change_id", c.ID, "kind", kind, "entity_id", c.EntityID)
-	return &Proposal{ChangeID: c.ID, Status: string(c.Status), Summary: c.Summary, ExpiresAt: c.ExpiresAt.In(s.env.Loc).Format(time.RFC3339)}, nil
+	return proposalOf(c, s.env.Loc), nil
 }
 
 // ApplyNow applies a low-risk action immediately (or an undo of a low-risk
@@ -301,7 +308,7 @@ func (s *Service) ApplyNow(ctx context.Context, source, kind string, params any,
 	if err != nil {
 		return nil, err
 	}
-	res := &Result{Summary: pr.Summary, EntityType: pr.EntityType, EntityID: pr.EntityID, Before: before}
+	res := &Result{Summary: pr.Summary, SummaryZh: pr.SummaryZh, EntityType: pr.EntityType, EntityID: pr.EntityID, Before: before}
 	if pr.NoOp {
 		res.NoOp = true
 		return res, nil
@@ -315,7 +322,7 @@ func (s *Service) ApplyNow(ctx context.Context, source, kind string, params any,
 	after, _ := marshal(afterV)
 	entry := &changes.AuditEntry{
 		At: s.env.Now().UTC(), Source: source, Kind: kind, Risk: string(risk), EntityType: pr.EntityType, EntityID: pr.EntityID,
-		Params: norm, Before: before, After: after, Summary: pr.Summary, RequestContext: requestContext, Outcome: changes.OutcomeApplied, UndoOf: undoOf,
+		Params: norm, Before: before, After: after, Summary: pr.Summary, SummaryZh: pr.SummaryZh, RequestContext: requestContext, Outcome: changes.OutcomeApplied, UndoOf: undoOf,
 	}
 	if execErr != nil {
 		entry.Outcome, entry.Error, entry.After = changes.OutcomeFailed, execErr.Error(), nil
@@ -363,7 +370,7 @@ func (s *Service) auditDecision(ctx context.Context, source string, c *changes.C
 	id, err := s.store.AppendAudit(ctx, &changes.AuditEntry{
 		At: s.env.Now().UTC(), Source: source, ChangeID: c.ID, Kind: c.Kind, Risk: string(s.RiskOf(c.Kind)),
 		EntityType: c.EntityType, EntityID: c.EntityID, Params: c.Params, Before: c.Before, After: after,
-		Summary: c.Summary, RequestContext: rc, Outcome: outcome, Error: errMsg, UndoOf: c.UndoOf,
+		Summary: c.Summary, SummaryZh: c.SummaryZh, RequestContext: rc, Outcome: outcome, Error: errMsg, UndoOf: c.UndoOf,
 	})
 	if err != nil {
 		s.log.Error("audit write failed", "error", err, "change_id", c.ID)
@@ -469,8 +476,10 @@ func (s *Service) Reject(ctx context.Context, id, requestContext string) (*chang
 type UndoResult struct {
 	Mode       string    `json:"mode"` // "applied", "pending" or "no_op"
 	Undone     string    `json:"undone_summary"`
+	UndoneZh   string    `json:"undone_summary_zh"`
 	UndoneAt   string    `json:"undone_change_at"`
 	Summary    string    `json:"summary"`
+	SummaryZh  string    `json:"summary_zh"`
 	Applied    *Result   `json:"applied,omitempty"`
 	Proposal   *Proposal `json:"proposal,omitempty"`
 	UndoneRisk string    `json:"undone_risk"`
@@ -501,7 +510,7 @@ func (s *Service) Undo(ctx context.Context, requestContext string) (*UndoResult,
 		}
 		return nil, fmt.Errorf("compute undo: %w", err)
 	}
-	out := &UndoResult{Undone: entry.Summary, UndoneAt: entry.At.In(s.env.Loc).Format(time.RFC3339), UndoneRisk: entry.Risk}
+	out := &UndoResult{Undone: entry.Summary, UndoneZh: entry.SummaryZh, UndoneAt: entry.At.In(s.env.Loc).Format(time.RFC3339), UndoneRisk: entry.Risk}
 
 	if Risk(entry.Risk) == RiskLow {
 		res, err := s.ApplyNow(ctx, "undo_last_change", invKind, invParams, requestContext, &entry.ID)
@@ -509,10 +518,10 @@ func (s *Service) Undo(ctx context.Context, requestContext string) (*UndoResult,
 			return nil, err
 		}
 		if res.NoOp {
-			out.Mode, out.Summary = "no_op", "Nothing to undo: "+res.Summary
+			out.Mode, out.Summary, out.SummaryZh = "no_op", "Nothing to undo: "+res.Summary, "无需撤销："+res.SummaryZh
 			return out, nil
 		}
-		out.Mode, out.Applied, out.Summary = "applied", res, "Undone: "+res.Summary
+		out.Mode, out.Applied, out.Summary, out.SummaryZh = "applied", res, "Undone: "+res.Summary, "已撤销："+res.SummaryZh
 		return out, nil
 	}
 
@@ -520,8 +529,9 @@ func (s *Service) Undo(ctx context.Context, requestContext string) (*UndoResult,
 		c, err := s.GetChange(ctx, existing)
 		if err == nil {
 			out.Mode = "pending"
-			out.Proposal = &Proposal{ChangeID: c.ID, Status: string(c.Status), Summary: c.Summary, ExpiresAt: c.ExpiresAt.In(s.env.Loc).Format(time.RFC3339)}
+			out.Proposal = proposalOf(c, s.env.Loc)
 			out.Summary = "An undo is already waiting for confirmation: " + c.Summary
+			out.SummaryZh = "已有撤销操作等待确认：" + c.SummaryZh
 			return out, nil
 		}
 	}
@@ -530,10 +540,10 @@ func (s *Service) Undo(ctx context.Context, requestContext string) (*UndoResult,
 		return nil, err
 	}
 	if p.NoOp {
-		out.Mode, out.Summary = "no_op", "Nothing to undo: "+p.Summary
+		out.Mode, out.Summary, out.SummaryZh = "no_op", "Nothing to undo: "+p.Summary, "无需撤销："+p.SummaryZh
 		return out, nil
 	}
-	out.Mode, out.Proposal, out.Summary = "pending", p, "Undo needs confirmation: "+p.Summary
+	out.Mode, out.Proposal, out.Summary, out.SummaryZh = "pending", p, "Undo needs confirmation: "+p.Summary, "撤销需要确认："+p.SummaryZh
 	return out, nil
 }
 

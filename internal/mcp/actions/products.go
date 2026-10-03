@@ -89,7 +89,7 @@ type toggleBefore struct {
 	Value bool `json:"value"`
 }
 
-func productToggle(kind, field string, get func(*upstream.Product) bool, word func(bool) string, set func(*upstream.UpdateProductInput, bool)) handler {
+func productToggle(kind, field string, get func(*upstream.Product) bool, word, wordZh func(bool) string, set func(*upstream.UpdateProductInput, bool)) handler {
 	return spec[ProductToggleParams, toggleBefore]{
 		Kind: kind,
 		Risk: RiskLow,
@@ -103,9 +103,11 @@ func productToggle(kind, field string, get func(*upstream.Product) bool, word fu
 			if cur == p.Value {
 				pr.NoOp = true
 				pr.Summary = fmt.Sprintf("%s is already %s. Nothing changed.", ProductLabel(prod), word(cur))
+				pr.SummaryZh = fmt.Sprintf("%s已经是%s状态，无需更改。", productLabelZh(prod), wordZh(cur))
 				return pr, nil
 			}
 			pr.Summary = fmt.Sprintf("%s: %s -> %s", ProductLabel(prod), word(cur), word(p.Value))
+			pr.SummaryZh = productLabelZh(prod) + "：" + wordZh(cur) + arrowZh + wordZh(p.Value)
 			return pr, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p ProductToggleParams, _ []byte) (any, error) {
@@ -156,7 +158,8 @@ func bulkAvailability() handler {
 			seen := map[string]bool{}
 			before := map[string]bool{}
 			var kept []BulkAvailabilityItem
-			var lines, unchanged []string
+			var changed lines
+			var unchanged, unchangedZh []string
 			for _, it := range p.Items {
 				if seen[it.ProductID] {
 					continue
@@ -168,22 +171,27 @@ func bulkAvailability() handler {
 				}
 				if prod.IsAvailable == it.Available {
 					unchanged = append(unchanged, ProductLabel(prod))
+					unchangedZh = append(unchangedZh, productLabelZh(prod))
 					continue
 				}
 				kept = append(kept, it)
 				before[it.ProductID] = prod.IsAvailable
-				lines = append(lines, fmt.Sprintf("%s: %s -> %s", ProductLabel(prod), availWord(prod.IsAvailable), availWord(it.Available)))
+				changed.add(fmt.Sprintf("%s: %s -> %s", ProductLabel(prod), availWord(prod.IsAvailable), availWord(it.Available)),
+					productLabelZh(prod)+"："+availZh(prod.IsAvailable)+arrowZh+availZh(it.Available))
 			}
 			p.Items = kept
 			pr := &prepared{EntityType: "products", EntityID: strings.Join(slices.Sorted(maps.Keys(before)), ","), Before: before}
 			if len(kept) == 0 {
 				pr.NoOp = true
 				pr.Summary = "All selected products are already in the requested state. Nothing changed."
+				pr.SummaryZh = "所选商品都已是目标状态，无需更改。"
 				return pr, nil
 			}
-			pr.Summary = fmt.Sprintf("%d products: %s", len(kept), strings.Join(lines, "; "))
+			pr.Summary = fmt.Sprintf("%d products: %s", len(kept), changed.enJoined())
+			pr.SummaryZh = fmt.Sprintf("%d 个商品：%s", len(kept), changed.zhJoined())
 			if len(unchanged) > 0 {
 				pr.Summary += fmt.Sprintf(" (already in that state: %s)", strings.Join(unchanged, ", "))
+				pr.SummaryZh += "（已是该状态：" + strings.Join(unchangedZh, "、") + "）"
 			}
 			return pr, nil
 		},
@@ -247,9 +255,11 @@ func priceChange() handler {
 			if cur == p.NewPriceCents {
 				pr.NoOp = true
 				pr.Summary = fmt.Sprintf("%s already costs %s. Nothing changed.", ProductLabel(prod), money.Format(cur))
+				pr.SummaryZh = fmt.Sprintf("%s的价格已经是 %s，无需更改。", productLabelZh(prod), moneyZh(cur))
 				return pr, nil
 			}
 			pr.Summary = fmt.Sprintf("%s: price %s -> %s", ProductLabel(prod), money.Format(cur), money.Format(p.NewPriceCents))
+			pr.SummaryZh = productLabelZh(prod) + "价格：" + moneyZh(cur) + arrowZh + moneyZh(p.NewPriceCents)
 			return pr, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p PriceParams, _ []byte) (any, error) {
@@ -294,9 +304,11 @@ func vatChange() handler {
 			if prod.VatCategory == p.VatCategory {
 				pr.NoOp = true
 				pr.Summary = fmt.Sprintf("%s already has VAT category %s. Nothing changed.", ProductLabel(prod), p.VatCategory)
+				pr.SummaryZh = fmt.Sprintf("%s的增值税类别已经是%s，无需更改。", productLabelZh(prod), vatLabelZh(p.VatCategory))
 				return pr, nil
 			}
 			pr.Summary = fmt.Sprintf("%s: VAT category %s -> %s", ProductLabel(prod), prod.VatCategory, p.VatCategory)
+			pr.SummaryZh = productLabelZh(prod) + "增值税类别：" + vatLabelZh(prod.VatCategory) + arrowZh + vatLabelZh(p.VatCategory)
 			return pr, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p VATParams, _ []byte) (any, error) {
@@ -365,17 +377,18 @@ func validLanguage(lang string) error {
 	return nil
 }
 
-func categoryName(ctx context.Context, env *Env, id string) (string, error) {
+// categoryName returns a category's French and Chinese names.
+func categoryName(ctx context.Context, env *Env, id string) (string, string, error) {
 	cats, err := env.Up.Categories(ctx)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	for _, c := range cats {
-		if c.ID == id {
-			return c.Name, nil
+	for i := range cats {
+		if cats[i].ID == id {
+			return cats[i].Name, categoryNameZh(&cats[i]), nil
 		}
 	}
-	return "", Userf("No category with id %q. Use list_categories to find the id.", id)
+	return "", "", Userf("No category with id %q. Use list_categories to find the id.", id)
 }
 
 func productUpdate() handler {
@@ -388,7 +401,7 @@ func productUpdate() handler {
 				return nil, err
 			}
 			cur := detailsOf(prod)
-			var diffs []string
+			var diffs lines
 			for _, lang := range slices.Sorted(maps.Keys(p.Names)) {
 				if err := validLanguage(lang); err != nil {
 					return nil, err
@@ -399,7 +412,8 @@ func productUpdate() handler {
 				}
 				p.Names[lang] = n
 				if cur.Names[lang] != n {
-					diffs = append(diffs, fmt.Sprintf("name (%s): %q -> %q", lang, cur.Names[lang], n))
+					diffs.add(fmt.Sprintf("name (%s): %q -> %q", lang, cur.Names[lang], n),
+						langZh[lang]+"名称："+quoteOrNoneZh(cur.Names[lang])+arrowZh+quoteZh(n))
 				} else {
 					delete(p.Names, lang)
 				}
@@ -411,7 +425,7 @@ func productUpdate() handler {
 				d := strings.TrimSpace(p.Descriptions[lang])
 				p.Descriptions[lang] = d
 				if cur.Descriptions[lang] != d {
-					diffs = append(diffs, fmt.Sprintf("description (%s) changed", lang))
+					diffs.add(fmt.Sprintf("description (%s) changed", lang), langZh[lang]+"描述已修改")
 				} else {
 					delete(p.Descriptions, lang)
 				}
@@ -420,11 +434,15 @@ func productUpdate() handler {
 				if *p.CategoryID == cur.CategoryID {
 					p.CategoryID = nil
 				} else {
-					name, err := categoryName(ctx, env, *p.CategoryID)
+					name, nameZh, err := categoryName(ctx, env, *p.CategoryID)
 					if err != nil {
 						return nil, err
 					}
-					diffs = append(diffs, fmt.Sprintf("category: %s -> %s", prod.Category.Name, name))
+					_, curZh, err := categoryName(ctx, env, cur.CategoryID)
+					if err != nil {
+						curZh = prod.Category.Name
+					}
+					diffs.add(fmt.Sprintf("category: %s -> %s", prod.Category.Name, name), "分类："+curZh+arrowZh+nameZh)
 				}
 			}
 			if p.Code != nil {
@@ -433,7 +451,7 @@ func productUpdate() handler {
 					p.Code = nil
 				} else {
 					p.Code = &c
-					diffs = append(diffs, fmt.Sprintf("code: %q -> %q", cur.Code, c))
+					diffs.add(fmt.Sprintf("code: %q -> %q", cur.Code, c), "编号："+quoteOrNoneZh(cur.Code)+arrowZh+quoteZh(c))
 				}
 			}
 			if p.PieceCount != nil {
@@ -443,14 +461,15 @@ func productUpdate() handler {
 				if cur.PieceCount != nil && *cur.PieceCount == *p.PieceCount {
 					p.PieceCount = nil
 				} else {
-					old := "none"
+					old, oldZh := "none", "无"
 					if cur.PieceCount != nil {
 						old = fmt.Sprint(*cur.PieceCount)
+						oldZh = old
 					}
-					diffs = append(diffs, fmt.Sprintf("piece count: %s -> %d", old, *p.PieceCount))
+					diffs.add(fmt.Sprintf("piece count: %s -> %d", old, *p.PieceCount), fmt.Sprintf("件数：%s%s%d", oldZh, arrowZh, *p.PieceCount))
 				}
 			}
-			flag := func(name string, want **bool, cur bool) {
+			flag := func(name, nameZh string, want **bool, cur bool) {
 				if *want == nil {
 					return
 				}
@@ -458,21 +477,23 @@ func productUpdate() handler {
 					*want = nil
 					return
 				}
-				diffs = append(diffs, fmt.Sprintf("%s: %s -> %s", name, yesNo(cur), yesNo(**want)))
+				diffs.add(fmt.Sprintf("%s: %s -> %s", name, yesNo(cur), yesNo(**want)), nameZh+"："+yesNoZh(cur)+arrowZh+yesNoZh(**want))
 			}
-			flag("halal", &p.IsHalal, cur.IsHalal)
-			flag("spicy", &p.IsSpicy, cur.IsSpicy)
-			flag("vegetarian", &p.IsVegetarian, cur.IsVegetarian)
-			flag("lunch only", &p.IsLunchOnly, cur.IsLunchOnly)
-			flag("discountable", &p.IsDiscountable, cur.IsDiscountable)
+			flag("halal", "清真", &p.IsHalal, cur.IsHalal)
+			flag("spicy", "辣", &p.IsSpicy, cur.IsSpicy)
+			flag("vegetarian", "素食", &p.IsVegetarian, cur.IsVegetarian)
+			flag("lunch only", "仅限午餐", &p.IsLunchOnly, cur.IsLunchOnly)
+			flag("discountable", "可打折", &p.IsDiscountable, cur.IsDiscountable)
 
 			pr := &prepared{EntityType: "product", EntityID: prod.ID, Before: cur}
-			if len(diffs) == 0 {
+			if diffs.empty() {
 				pr.NoOp = true
 				pr.Summary = fmt.Sprintf("%s already has these details. Nothing changed.", ProductLabel(prod))
+				pr.SummaryZh = productLabelZh(prod) + "已经是这些信息，无需更改。"
 				return pr, nil
 			}
-			pr.Summary = fmt.Sprintf("%s: %s", ProductLabel(prod), strings.Join(diffs, "; "))
+			pr.Summary = fmt.Sprintf("%s: %s", ProductLabel(prod), diffs.enJoined())
+			pr.SummaryZh = productLabelZh(prod) + "：" + diffs.zhJoined()
 			return pr, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p ProductUpdateParams, _ []byte) (any, error) {
@@ -623,7 +644,7 @@ func productCreate() handler {
 			if p.PieceCount != nil && *p.PieceCount < 0 {
 				return nil, Userf("piece_count cannot be negative.")
 			}
-			catName, err := categoryName(ctx, env, p.CategoryID)
+			catName, catNameZh, err := categoryName(ctx, env, p.CategoryID)
 			if err != nil {
 				return nil, err
 			}
@@ -640,7 +661,8 @@ func productCreate() handler {
 			if zh := p.Names["zh"]; zh != "" {
 				summary = fmt.Sprintf("New product %q (%s) in %s at %s, %s, %s", p.Names["fr"], zh, catName, money.Format(p.PriceCents), availWord(p.Available), visWord(p.Visible))
 			}
-			return &prepared{EntityType: "product", EntityID: "new", Before: createBefore{CategoryID: p.CategoryID}, Summary: summary}, nil
+			summaryZh := fmt.Sprintf("新商品%s，分类%s，价格 %s，%s，%s", quoteZh(nameZh(p.Names, p.Names["fr"])), catNameZh, moneyZh(p.PriceCents), availZh(p.Available), visZh(p.Visible))
+			return &prepared{EntityType: "product", EntityID: "new", Before: createBefore{CategoryID: p.CategoryID}, Summary: summary, SummaryZh: summaryZh}, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p ProductCreateParams, _ []byte) (any, error) {
 			in := upstream.CreateProductInput{CategoryID: p.CategoryID, Code: p.Code, PieceCount: p.PieceCount, Price: money.FromCents(p.PriceCents), VatCategory: p.VatCategory,
@@ -701,7 +723,8 @@ func productImage() handler {
 				bg = ", background removed"
 			}
 			return &prepared{EntityType: "product", EntityID: prod.ID, Before: imageBefore{ProductID: prod.ID},
-				Summary: fmt.Sprintf("%s: new photo (%s, %d KB%s). The previous photo cannot be restored afterwards.", ProductLabel(prod), p.ContentType, (p.SizeBytes+1023)/1024, bg)}, nil
+				Summary:   fmt.Sprintf("%s: new photo (%s, %d KB%s). The previous photo cannot be restored afterwards.", ProductLabel(prod), p.ContentType, (p.SizeBytes+1023)/1024, bg),
+				SummaryZh: productLabelZh(prod) + "：更换新照片，之后无法恢复原照片。"}, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p ImageParams, blob []byte) (any, error) {
 			if len(blob) == 0 {

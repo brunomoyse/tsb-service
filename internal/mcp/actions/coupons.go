@@ -163,16 +163,17 @@ func couponCreate() handler {
 					}
 				}
 			}
-			code := p.Code
+			code, codeZh := p.Code, p.Code
 			if code == "" {
-				code = "(generated code)"
+				code, codeZh = "(generated code)", "（自动生成）"
 			}
 			state := "inactive"
 			if p.Active {
 				state = "active"
 			}
 			return &prepared{EntityType: "coupon", EntityID: "new", Before: map[string]any{},
-				Summary: fmt.Sprintf("New coupon %s: %s%s, %s", code, p.Discount, couponDetails(p.MinOrderCents, p.MaxUses, p.MaxUsesPerUser, p.ValidFrom, p.ValidUntil, env.Loc), state)}, nil
+				Summary:   fmt.Sprintf("New coupon %s: %s%s, %s", code, p.Discount, couponDetails(p.MinOrderCents, p.MaxUses, p.MaxUsesPerUser, p.ValidFrom, p.ValidUntil, env.Loc), state),
+				SummaryZh: fmt.Sprintf("新优惠码 %s：%s%s，%s", codeZh, couponValueZh(p.Discount), couponDetailsZh(p.MinOrderCents, p.MaxUses, p.MaxUsesPerUser, p.ValidFrom, p.ValidUntil, env.Loc), activeZh(p.Active))}, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p CouponCreateParams, _ []byte) (any, error) {
 			typ, val := p.Discount.upstream()
@@ -260,7 +261,7 @@ func couponUpdate() handler {
 				return nil, err
 			}
 			cur := termsOf(c)
-			var diffs []string
+			var diffs lines
 			if p.Code != nil {
 				code := strings.ToUpper(strings.TrimSpace(*p.Code))
 				if !couponCodeRe.MatchString(code) {
@@ -270,7 +271,7 @@ func couponUpdate() handler {
 					p.Code = nil
 				} else {
 					p.Code = &code
-					diffs = append(diffs, fmt.Sprintf("code: %s -> %s", cur.Code, code))
+					diffs.add(fmt.Sprintf("code: %s -> %s", cur.Code, code), "优惠码："+cur.Code+arrowZh+code)
 				}
 			}
 			if p.Discount != nil {
@@ -280,7 +281,7 @@ func couponUpdate() handler {
 				if *p.Discount == cur.Discount {
 					p.Discount = nil
 				} else {
-					diffs = append(diffs, fmt.Sprintf("discount: %s -> %s", cur.Discount, *p.Discount))
+					diffs.add(fmt.Sprintf("discount: %s -> %s", cur.Discount, *p.Discount), "折扣："+couponValueZh(cur.Discount)+arrowZh+couponValueZh(*p.Discount))
 				}
 			}
 			if err := validateLimits(p.MinOrderCents, p.MaxUses, p.MaxUsesPerUser, nil, nil); err != nil {
@@ -290,14 +291,15 @@ func couponUpdate() handler {
 				if cur.MinOrderCents != nil && *cur.MinOrderCents == *p.MinOrderCents {
 					p.MinOrderCents = nil
 				} else {
-					old := "none"
+					old, oldZh := "none", "无"
 					if cur.MinOrderCents != nil {
 						old = money.Format(*cur.MinOrderCents)
+						oldZh = moneyZh(*cur.MinOrderCents)
 					}
-					diffs = append(diffs, fmt.Sprintf("minimum order: %s -> %s", old, money.Format(*p.MinOrderCents)))
+					diffs.add(fmt.Sprintf("minimum order: %s -> %s", old, money.Format(*p.MinOrderCents)), "最低消费："+oldZh+arrowZh+moneyZh(*p.MinOrderCents))
 				}
 			}
-			intField := func(name string, want **int, cur *int) {
+			intField := func(name, nameZh string, want **int, cur *int) {
 				if *want == nil {
 					return
 				}
@@ -305,11 +307,11 @@ func couponUpdate() handler {
 					*want = nil
 					return
 				}
-				diffs = append(diffs, fmt.Sprintf("%s: %s -> %d", name, fmtIntPtr(cur), **want))
+				diffs.add(fmt.Sprintf("%s: %s -> %d", name, fmtIntPtr(cur), **want), fmt.Sprintf("%s：%s%s%d", nameZh, intPtrZh(cur), arrowZh, **want))
 			}
-			intField("max uses", &p.MaxUses, cur.MaxUses)
-			intField("max uses per customer", &p.MaxUsesPerUser, cur.MaxUsesPerUser)
-			timeField := func(name string, want **time.Time, cur *time.Time) {
+			intField("max uses", "最多使用次数", &p.MaxUses, cur.MaxUses)
+			intField("max uses per customer", "每位顾客最多使用次数", &p.MaxUsesPerUser, cur.MaxUsesPerUser)
+			timeField := func(name, nameZh string, want **time.Time, cur *time.Time) {
 				if *want == nil {
 					return
 				}
@@ -317,10 +319,10 @@ func couponUpdate() handler {
 					*want = nil
 					return
 				}
-				diffs = append(diffs, fmt.Sprintf("%s: %s -> %s", name, fmtTimePtr(cur, env.Loc), fmtTimePtr(*want, env.Loc)))
+				diffs.add(fmt.Sprintf("%s: %s -> %s", name, fmtTimePtr(cur, env.Loc), fmtTimePtr(*want, env.Loc)), nameZh+"："+timeZh(cur, env.Loc)+arrowZh+timeZh(*want, env.Loc))
 			}
-			timeField("valid from", &p.ValidFrom, cur.ValidFrom)
-			timeField("valid until", &p.ValidUntil, cur.ValidUntil)
+			timeField("valid from", "生效时间", &p.ValidFrom, cur.ValidFrom)
+			timeField("valid until", "截止时间", &p.ValidUntil, cur.ValidUntil)
 			from, until := cur.ValidFrom, cur.ValidUntil
 			if p.ValidFrom != nil {
 				from = p.ValidFrom
@@ -333,12 +335,14 @@ func couponUpdate() handler {
 			}
 
 			pr := &prepared{EntityType: "coupon", EntityID: c.ID, Before: cur}
-			if len(diffs) == 0 {
+			if diffs.empty() {
 				pr.NoOp = true
 				pr.Summary = fmt.Sprintf("Coupon %s already has these terms. Nothing changed.", c.Code)
+				pr.SummaryZh = fmt.Sprintf("优惠码 %s 已经是这些条件，无需更改。", c.Code)
 				return pr, nil
 			}
-			pr.Summary = fmt.Sprintf("Coupon %s: %s", c.Code, strings.Join(diffs, "; "))
+			pr.Summary = fmt.Sprintf("Coupon %s: %s", c.Code, diffs.enJoined())
+			pr.SummaryZh = fmt.Sprintf("优惠码 %s：%s", c.Code, diffs.zhJoined())
 			return pr, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p CouponUpdateParams, _ []byte) (any, error) {
@@ -424,12 +428,14 @@ func couponActive(kind string, risk Risk, active bool, inverseKind string) handl
 			if c.IsActive == active {
 				pr.NoOp = true
 				pr.Summary = fmt.Sprintf("Coupon %s is already %s. Nothing changed.", c.Code, word[active])
+				pr.SummaryZh = fmt.Sprintf("优惠码 %s 已经是%s状态，无需更改。", c.Code, activeZh(active))
 				return pr, nil
 			}
 			if active && c.ValidUntil != nil && c.ValidUntil.Before(env.Now()) {
 				return nil, Userf("Coupon %s expired on %s. Extend valid_until first.", c.Code, c.ValidUntil.In(env.Loc).Format(time.DateOnly))
 			}
 			pr.Summary = fmt.Sprintf("Coupon %s (%s): %s -> %s", c.Code, couponValueOf(c), word[c.IsActive], word[active])
+			pr.SummaryZh = fmt.Sprintf("优惠码 %s（%s）：%s%s%s", c.Code, couponValueZh(couponValueOf(c)), activeZh(c.IsActive), arrowZh, activeZh(active))
 			return pr, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p CouponRef, _ []byte) (any, error) {
@@ -449,9 +455,9 @@ func couponActive(kind string, risk Risk, active bool, inverseKind string) handl
 // registry lists every action kind.
 func registry() []handler {
 	return []handler{
-		productToggle(KindProductAvailability, "available", func(p *upstream.Product) bool { return p.IsAvailable }, availWord,
+		productToggle(KindProductAvailability, "available", func(p *upstream.Product) bool { return p.IsAvailable }, availWord, availZh,
 			func(in *upstream.UpdateProductInput, v bool) { in.IsAvailable = &v }),
-		productToggle(KindProductVisibility, "visible", func(p *upstream.Product) bool { return p.IsVisible }, visWord,
+		productToggle(KindProductVisibility, "visible", func(p *upstream.Product) bool { return p.IsVisible }, visWord, visZh,
 			func(in *upstream.UpdateProductInput, v bool) { in.IsVisible = &v }),
 		bulkAvailability(),
 		priceChange(),
@@ -464,8 +470,8 @@ func registry() []handler {
 		choiceUpsert(),
 		choiceDelete(),
 		preparationMinutes(),
-		weeklyHours(KindOpeningHours, "Opening hours", func(c *upstream.RestaurantConfig) json.RawMessage { return c.OpeningHours }, (*upstream.Client).UpdateOpeningHours),
-		weeklyHours(KindOrderingHours, "Ordering hours", func(c *upstream.RestaurantConfig) json.RawMessage { return c.OrderingHours }, (*upstream.Client).UpdateOrderingHours),
+		weeklyHours(KindOpeningHours, "Opening hours", "营业时间", func(c *upstream.RestaurantConfig) json.RawMessage { return c.OpeningHours }, (*upstream.Client).UpdateOpeningHours),
+		weeklyHours(KindOrderingHours, "Ordering hours", "接单时间", func(c *upstream.RestaurantConfig) json.RawMessage { return c.OrderingHours }, (*upstream.Client).UpdateOrderingHours),
 		schedule(),
 		couponCreate(),
 		couponUpdate(),

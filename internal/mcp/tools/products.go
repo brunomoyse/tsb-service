@@ -460,6 +460,7 @@ type ApplyOut struct {
 	Applied    bool   `json:"applied"`
 	NoOp       bool   `json:"no_op" jsonschema:"true when the state was already as requested"`
 	Summary    string `json:"summary"`
+	SummaryZh  string `json:"summary_zh"`
 	EntityType string `json:"entity_type"`
 	EntityID   string `json:"entity_id"`
 	Before     any    `json:"before,omitempty"`
@@ -471,7 +472,7 @@ func (d *Deps) applyNow(ctx context.Context, tool, kind string, params any, rc s
 	if err != nil {
 		return ApplyOut{}, err
 	}
-	return ApplyOut{Applied: r.Applied, NoOp: r.NoOp, Summary: r.Summary, EntityType: r.EntityType, EntityID: r.EntityID, Before: toAny(r.Before), After: toAny(r.After)}, nil
+	return ApplyOut{Applied: r.Applied, NoOp: r.NoOp, Summary: r.Summary, SummaryZh: r.SummaryZh, EntityType: r.EntityType, EntityID: r.EntityID, Before: toAny(r.Before), After: toAny(r.After)}, nil
 }
 
 func (d *Deps) propose(ctx context.Context, tool, kind string, params any, blob []byte, rc string) (actions.Proposal, error) {

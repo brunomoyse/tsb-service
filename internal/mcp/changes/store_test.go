@@ -110,3 +110,43 @@ func TestPendingUndoFor(t *testing.T) {
 		t.Errorf("expired pending undo must not count, got %q", id)
 	}
 }
+
+// TestAddsSummaryZhToOldSchema opens a database created before summary_zh
+// existed and checks the column is added and round-trips.
+func TestAddsSummaryZhToOldSchema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, table := range []string{"changes", "audit_log"} {
+		if _, err := s.db.Exec("ALTER TABLE " + table + " DROP COLUMN summary_zh"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = s.Close()
+
+	s, err = Open(path)
+	if err != nil {
+		t.Fatalf("reopen old schema: %v", err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	ctx := context.Background()
+	now := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+	c := &Change{ID: "ch1", Tool: "propose_price_change", Kind: "product.price", EntityType: "product", EntityID: "p1",
+		Params: []byte(`{}`), Before: []byte(`{}`), BeforeHash: "h", Summary: "s", SummaryZh: "「三文鱼卷」价格", Status: StatusPending,
+		CreatedAt: now, ExpiresAt: now.Add(10 * time.Minute)}
+	if err := s.CreateChange(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetChange(ctx, "ch1")
+	if err != nil || got.SummaryZh != "「三文鱼卷」价格" {
+		t.Fatalf("summary_zh round trip: %+v %v", got, err)
+	}
+
+	// Opening an up-to-date database again is a no-op.
+	_ = s.Close()
+	if s, err = Open(path); err != nil {
+		t.Fatalf("reopen migrated schema: %v", err)
+	}
+}

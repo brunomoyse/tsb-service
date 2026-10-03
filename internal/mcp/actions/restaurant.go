@@ -131,9 +131,11 @@ func preparationMinutes() handler {
 			if cfg.PreparationMinutes == p.Minutes {
 				pr.NoOp = true
 				pr.Summary = fmt.Sprintf("Preparation time is already %d minutes. Nothing changed.", p.Minutes)
+				pr.SummaryZh = fmt.Sprintf("备餐时间已经是 %d 分钟，无需更改。", p.Minutes)
 				return pr, nil
 			}
 			pr.Summary = fmt.Sprintf("Preparation time: %d min -> %d min", cfg.PreparationMinutes, p.Minutes)
+			pr.SummaryZh = fmt.Sprintf("备餐时间：%d 分钟%s%d 分钟", cfg.PreparationMinutes, arrowZh, p.Minutes)
 			return pr, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p PreparationParams, _ []byte) (any, error) {
@@ -155,7 +157,7 @@ type hoursBefore struct {
 	Week upstream.Week `json:"week"`
 }
 
-func weeklyHours(kind, label string, read func(*upstream.RestaurantConfig) json.RawMessage, write func(*upstream.Client, context.Context, upstream.Week) error) handler {
+func weeklyHours(kind, label, labelZh string, read func(*upstream.RestaurantConfig) json.RawMessage, write func(*upstream.Client, context.Context, upstream.Week) error) handler {
 	return spec[HoursParams, hoursBefore]{
 		Kind: kind,
 		Risk: RiskSensitive,
@@ -187,22 +189,25 @@ func weeklyHours(kind, label string, read func(*upstream.RestaurantConfig) json.
 			if base == nil {
 				base, _ = upstream.ParseWeek(cfg.OpeningHours)
 			}
-			var diffs []string
+			var diffs lines
 			for _, d := range Weekdays {
 				if !sameDay(base[d], p.Week[d]) {
-					diffs = append(diffs, fmt.Sprintf("%s: %s -> %s", d, DescribeDay(base[d]), DescribeDay(p.Week[d])))
+					diffs.add(fmt.Sprintf("%s: %s -> %s", d, DescribeDay(base[d]), DescribeDay(p.Week[d])),
+						weekdayZh[d]+"："+describeDayZh(base[d])+arrowZh+describeDayZh(p.Week[d]))
 				}
 			}
 			pr := &prepared{EntityType: "restaurant", EntityID: kind, Before: hoursBefore{Week: cur}}
-			if len(diffs) == 0 && cur != nil {
+			if diffs.empty() && cur != nil {
 				pr.NoOp = true
 				pr.Summary = label + " are already set like this. Nothing changed."
+				pr.SummaryZh = labelZh + "已经是这样设置的，无需更改。"
 				return pr, nil
 			}
-			if len(diffs) == 0 {
-				diffs = []string{"same as opening hours, now set explicitly"}
+			if diffs.empty() {
+				diffs.add("same as opening hours, now set explicitly", "与营业时间相同，现在单独设置")
 			}
-			pr.Summary = label + ": " + strings.Join(diffs, "; ")
+			pr.Summary = label + ": " + diffs.enJoined()
+			pr.SummaryZh = labelZh + "：" + diffs.zhJoined()
 			return pr, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p HoursParams, _ []byte) (any, error) {
@@ -388,14 +393,15 @@ func schedule() handler {
 			}
 
 			before := scheduleBefore{Overrides: map[string]*overrideState{}}
-			var lines []string
+			var changed lines
 			if p.OrderingEnabled != nil {
 				if *p.OrderingEnabled == cfg.OrderingEnabled {
 					p.OrderingEnabled = nil
 				} else {
 					cur := cfg.OrderingEnabled
 					before.OrderingEnabled = &cur
-					lines = append(lines, fmt.Sprintf("online ordering: %s -> %s", onOff(cur), onOff(*p.OrderingEnabled)))
+					changed.add(fmt.Sprintf("online ordering: %s -> %s", onOff(cur), onOff(*p.OrderingEnabled)),
+						"在线点餐："+onOffZh(cur)+arrowZh+onOffZh(*p.OrderingEnabled))
 				}
 			}
 			var ups []OverrideSpec
@@ -407,7 +413,8 @@ func schedule() handler {
 				d, _ := time.Parse(time.DateOnly, o.Date)
 				before.Overrides[o.Date] = st
 				ups = append(ups, o)
-				lines = append(lines, fmt.Sprintf("%s (%s): %s -> %s", o.Date, weekdayKey(d), describeOverride(st, week[weekdayKey(d)]), describeSpec(o)))
+				changed.add(fmt.Sprintf("%s (%s): %s -> %s", o.Date, weekdayKey(d), describeOverride(st, week[weekdayKey(d)]), describeSpec(o)),
+					dateZh(o.Date)+"："+describeOverrideZh(st, week[weekdayKey(d)])+arrowZh+describeSpecZh(o))
 			}
 			var dels []string
 			for _, date := range p.Deletes {
@@ -418,17 +425,20 @@ func schedule() handler {
 				d, _ := time.Parse(time.DateOnly, date)
 				before.Overrides[date] = st
 				dels = append(dels, date)
-				lines = append(lines, fmt.Sprintf("%s (%s): %s -> regular hours (%s)", date, weekdayKey(d), describeOverride(st, nil), DescribeDay(week[weekdayKey(d)])))
+				changed.add(fmt.Sprintf("%s (%s): %s -> regular hours (%s)", date, weekdayKey(d), describeOverride(st, nil), DescribeDay(week[weekdayKey(d)])),
+					dateZh(date)+"："+describeOverrideZh(st, nil)+arrowZh+"正常营业时间（"+describeDayZh(week[weekdayKey(d)])+"）")
 			}
 			p.Upserts, p.Deletes = ups, dels
 
 			pr := &prepared{EntityType: "restaurant", EntityID: "schedule", Before: before}
-			if len(lines) == 0 {
+			if changed.empty() {
 				pr.NoOp = true
 				pr.Summary = "The schedule is already like this. Nothing changed."
+				pr.SummaryZh = "营业安排已经是这样，无需更改。"
 				return pr, nil
 			}
-			pr.Summary = strings.Join(lines, "; ")
+			pr.Summary = changed.enJoined()
+			pr.SummaryZh = changed.zhJoined()
 			return pr, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p ScheduleParams, _ []byte) (any, error) {

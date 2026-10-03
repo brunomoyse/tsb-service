@@ -262,6 +262,9 @@ func TestLowRiskTools(t *testing.T) {
 	if r["applied"] != true || h.fake.ProductByID("p-maki-saumon").IsAvailable {
 		t.Fatalf("set_product_availability: %v", r)
 	}
+	if str(r["summary_zh"]) != "「三文鱼卷」：可售 → 售罄" {
+		t.Errorf("summary_zh: %v", r["summary_zh"])
+	}
 	r = h.call("set_product_availability", args)
 	if r["no_op"] != true || !strings.Contains(str(r["summary"]), "already") {
 		t.Errorf("repeat call must be a no-op: %v", r)
@@ -288,10 +291,16 @@ func TestLowRiskTools(t *testing.T) {
 	if len(changes) != 4 || str(changes[3].(map[string]any)["request_context"]) != "今天三文鱼卖完了" {
 		t.Errorf("audit in get_status: %v", changes)
 	}
+	if !strings.Contains(str(changes[3].(map[string]any)["summary_zh"]), "售罄") {
+		t.Errorf("summary_zh in get_status: %v", changes[3])
+	}
 
 	r = h.call("undo_last_change", map[string]any{})
 	if str(r["mode"]) != "applied" || !h.fake.Coupons[0].IsActive {
 		t.Errorf("undo of a low-risk change applies directly: %v", r)
+	}
+	if !strings.HasPrefix(str(r["summary_zh"]), "已撤销：优惠码 WELCOME10") || !strings.Contains(str(r["undone_summary_zh"]), "启用 → 停用") {
+		t.Errorf("undo summary_zh: %v", r)
 	}
 }
 
@@ -365,7 +374,7 @@ func TestSensitiveTools(t *testing.T) {
 	})
 
 	r := h.proposeAndApply("propose_product_creation", map[string]any{"category_id": "cat-maki", "names": map[string]any{"fr": "Maki avocat", "en": "Avocado maki", "zh": "牛油果卷"}, "price_cents": 450}, nil)
-	if !strings.Contains(str(r["summary"]), "Maki avocat") || len(f.Products) != 5 {
+	if !strings.Contains(str(r["summary"]), "Maki avocat") || !strings.Contains(str(r["summary_zh"]), "「牛油果卷」") || len(f.Products) != 5 {
 		t.Errorf("product creation: %v", r)
 	}
 	h.callErr("propose_product_creation", map[string]any{"category_id": "cat-maki", "names": map[string]any{"fr": "Maki X"}, "price_cents": 450})
@@ -463,7 +472,7 @@ func TestClosureTools(t *testing.T) {
 	f := h.fake
 
 	r := h.call("propose_restaurant_closure", map[string]any{"from": "2026-10-03T20:00", "reopen_at": "2026-10-04T19:00", "reason": "family event", "request_context": "今晚八点关门，明天晚上七点开"})
-	if !strings.Contains(str(r["summary"]), "2026-10-03 (saturday)") {
+	if !strings.Contains(str(r["summary"]), "2026-10-03 (saturday)") || !strings.Contains(str(r["summary_zh"]), "10月3日（周六）") {
 		t.Errorf("summary: %v", r)
 	}
 	h.apply(str(r["change_id"]))
@@ -484,7 +493,7 @@ func TestClosureTools(t *testing.T) {
 	}
 
 	r = h.call("propose_restaurant_closure", map[string]any{"reason": "rush"})
-	if !strings.Contains(str(r["summary"]), "online ordering: on -> off") {
+	if !strings.Contains(str(r["summary"]), "online ordering: on -> off") || !strings.Contains(str(r["summary_zh"]), "在线点餐：开启 → 关闭") {
 		t.Errorf("pause summary: %v", r)
 	}
 	h.apply(str(r["change_id"]))

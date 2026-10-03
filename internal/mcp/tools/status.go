@@ -20,6 +20,7 @@ type ChangeOut struct {
 	Kind           string `json:"kind"`
 	Risk           string `json:"risk"`
 	Summary        string `json:"summary"`
+	SummaryZh      string `json:"summary_zh"`
 	Outcome        string `json:"outcome" jsonschema:"applied, rejected, failed, conflict or expired"`
 	Undone         bool   `json:"undone"`
 	ChangeID       string `json:"change_id,omitempty"`
@@ -125,7 +126,7 @@ func registerStatus(s *mcp.Server, d *Deps) {
 			return StatusOut{}, err
 		}
 		for _, e := range entries {
-			out.RecentChanges = append(out.RecentChanges, ChangeOut{At: d.fmtTime(e.At), Source: e.Source, Kind: e.Kind, Risk: e.Risk, Summary: e.Summary,
+			out.RecentChanges = append(out.RecentChanges, ChangeOut{At: d.fmtTime(e.At), Source: e.Source, Kind: e.Kind, Risk: e.Risk, Summary: e.Summary, SummaryZh: e.SummaryZh,
 				Outcome: e.Outcome, Undone: e.UndoneBy != nil, ChangeID: e.ChangeID, RequestContext: e.RequestContext})
 		}
 		return out, nil
@@ -137,11 +138,13 @@ func registerUndo(s *mcp.Server, d *Deps) {
 		WriteContext
 	}
 	type UndoOut struct {
-		Mode          string            `json:"mode" jsonschema:"applied (reverted now), pending (needs the owner's confirmation) or no_op"`
-		Summary       string            `json:"summary"`
-		UndoneSummary string            `json:"undone_summary" jsonschema:"the change being reverted"`
-		UndoneAt      string            `json:"undone_change_at"`
-		Proposal      *actions.Proposal `json:"proposal,omitempty" jsonschema:"set when mode is pending"`
+		Mode            string            `json:"mode" jsonschema:"applied (reverted now), pending (needs the owner's confirmation) or no_op"`
+		Summary         string            `json:"summary"`
+		SummaryZh       string            `json:"summary_zh"`
+		UndoneSummary   string            `json:"undone_summary" jsonschema:"the change being reverted"`
+		UndoneSummaryZh string            `json:"undone_summary_zh"`
+		UndoneAt        string            `json:"undone_change_at"`
+		Proposal        *actions.Proposal `json:"proposal,omitempty" jsonschema:"set when mode is pending"`
 	}
 	add(s, d, &mcp.Tool{
 		Name: "undo_last_change", Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(false), OpenWorldHint: ptr(false)},
@@ -152,7 +155,7 @@ func registerUndo(s *mcp.Server, d *Deps) {
 		if err != nil {
 			return UndoOut{}, err
 		}
-		return UndoOut{Mode: r.Mode, Summary: r.Summary, UndoneSummary: r.Undone, UndoneAt: r.UndoneAt, Proposal: r.Proposal}, nil
+		return UndoOut{Mode: r.Mode, Summary: r.Summary, SummaryZh: r.SummaryZh, UndoneSummary: r.Undone, UndoneSummaryZh: r.UndoneZh, UndoneAt: r.UndoneAt, Proposal: r.Proposal}, nil
 	})
 }
 

@@ -25,6 +25,7 @@ type ChangeView struct {
 	Kind           string `json:"kind"`
 	Status         string `json:"status"`
 	Summary        string `json:"summary"`
+	SummaryZh      string `json:"summary_zh"`
 	EntityType     string `json:"entity_type"`
 	EntityID       string `json:"entity_id"`
 	RequestContext string `json:"request_context,omitempty"`
@@ -85,7 +86,7 @@ func (h *handler) view(c *changes.Change) *ChangeView {
 	if c == nil {
 		return nil
 	}
-	v := &ChangeView{ChangeID: c.ID, Tool: c.Tool, Kind: c.Kind, Status: string(c.Status), Summary: c.Summary, EntityType: c.EntityType, EntityID: c.EntityID,
+	v := &ChangeView{ChangeID: c.ID, Tool: c.Tool, Kind: c.Kind, Status: string(c.Status), Summary: c.Summary, SummaryZh: c.SummaryZh, EntityType: c.EntityType, EntityID: c.EntityID,
 		RequestContext: c.RequestContext, CreatedAt: c.CreatedAt.In(h.loc).Format(time.RFC3339), ExpiresAt: c.ExpiresAt.In(h.loc).Format(time.RFC3339),
 		Error: c.Error, IsUndo: c.UndoOf != nil}
 	if c.DecidedAt != nil {
