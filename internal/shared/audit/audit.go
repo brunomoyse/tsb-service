@@ -148,6 +148,12 @@ func (x GraphQLExtension) InterceptResponse(ctx context.Context, next graphql.Re
 	if resp != nil && len(resp.Errors) > 0 {
 		errMsg = resp.Errors.Error()
 	}
+	// OperationName is only set when the client sends operationName; fall back
+	// to the name written in the document (mutation SetPrep { ... }).
+	opName := oc.OperationName
+	if opName == "" {
+		opName = oc.Operation.Name
+	}
 	for _, sel := range oc.Operation.SelectionSet {
 		field, ok := sel.(*ast.Field)
 		if !ok {
@@ -155,7 +161,7 @@ func (x GraphQLExtension) InterceptResponse(ctx context.Context, next graphql.Re
 		}
 		x.Recorder.Record(ctx, Entry{
 			Action:        "graphql:" + field.Name,
-			OperationName: oc.OperationName,
+			OperationName: opName,
 			Variables:     oc.Variables,
 			Success:       errMsg == "",
 			Error:         errMsg,
