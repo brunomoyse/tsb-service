@@ -2,13 +2,17 @@ package infrastructure
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"tsb-service/internal/modules/restaurant/domain"
 	"tsb-service/pkg/db"
 )
 
-const overrideColumns = `date, closed, schedule, note, created_at, updated_at`
+// schedule is NULL for a closed day written by a Go 1.27 build (a nil json.RawMessage is sent as
+// SQL NULL; Go 1.26 sent JSON null). database/sql cannot scan NULL into json.RawMessage, and one such
+// row failed every List, so restaurantConfig, quoteOrder and createOrder. Read it as JSON null.
+const overrideColumns = `date, closed, COALESCE(schedule, 'null'::jsonb) AS schedule, note, created_at, updated_at`
 
 type ScheduleOverrideRepository struct {
 	pool *db.DBPool
@@ -65,7 +69,7 @@ func (r *ScheduleOverrideRepository) Upsert(ctx context.Context, ov *domain.Sche
 		     note = EXCLUDED.note,
 		     updated_at = NOW()
 		 RETURNING `+overrideColumns,
-		ov.Date, ov.Closed, ov.Schedule, ov.Note)
+		ov.Date, ov.Closed, scheduleParam(ov.Schedule), ov.Note)
 	if err != nil {
 		return nil, err
 	}
@@ -76,4 +80,12 @@ func (r *ScheduleOverrideRepository) Delete(ctx context.Context, date time.Time)
 	_, err := r.pool.ForContext(ctx).ExecContext(ctx,
 		`DELETE FROM restaurant_schedule_overrides WHERE date = $1`, date)
 	return err
+}
+
+// scheduleParam stores a closed day as JSON null, as every row written before Go 1.27 is.
+func scheduleParam(schedule json.RawMessage) []byte {
+	if len(schedule) == 0 {
+		return []byte("null")
+	}
+	return schedule
 }
