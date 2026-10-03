@@ -561,6 +561,7 @@ func main() {
 	posLimiter.Stop()
 	mollieLimiter.Stop()
 	feedbackLimiter.Stop()
+	publicQueryLimiter.Stop()
 	broker.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

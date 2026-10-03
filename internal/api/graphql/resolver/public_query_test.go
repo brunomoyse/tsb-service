@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"tsb-service/internal/api/graphql/apperr"
@@ -104,5 +105,47 @@ func TestAllowPublicQuery(t *testing.T) {
 		if err := r.allowPublicQuery(context.Background(), "quoteOrder"); err != nil {
 			t.Fatalf("a call without a client IP was limited: %v", err)
 		}
+	}
+}
+
+// countingAddresses counts the billed Autocomplete calls.
+type countingAddresses struct {
+	spyAddresses
+	autocompleteCalls int
+}
+
+func (c *countingAddresses) Autocomplete(_ context.Context, _, _ string) ([]addressDomain.Suggestion, error) {
+	c.autocompleteCalls++
+	return []addressDomain.Suggestion{{PlaceID: "p"}}, nil
+}
+
+func TestAutocompleteAddressesIsThrottledAndBounded(t *testing.T) {
+	limiter := middleware.NewRateLimiter(0.0001, 3)
+	t.Cleanup(limiter.Stop)
+	addrs := &countingAddresses{}
+	q := &queryResolver{&Resolver{PublicQueryLimiter: limiter, AddressService: addrs}}
+	ctx := utils.SetClientIP(context.Background(), "203.0.113.9")
+
+	for _, input := range []string{"", "  ab ", strings.Repeat("a", 201)} {
+		_, err := q.AutocompleteAddresses(ctx, input, "s")
+		if appErr, ok := apperr.From(err); !ok || appErr.Code != apperr.CodeUserError {
+			t.Errorf("input %q: err = %v, want USER_ERROR", input, err)
+		}
+	}
+	if addrs.autocompleteCalls != 0 {
+		t.Fatalf("rejected inputs reached Google %d times", addrs.autocompleteCalls)
+	}
+
+	for i := 0; i < 3; i++ {
+		if _, err := q.AutocompleteAddresses(ctx, "rue de la paix 1", "s"); err != nil {
+			t.Fatalf("request %d refused: %v", i+1, err)
+		}
+	}
+	_, err := q.AutocompleteAddresses(ctx, "rue de la paix 1", "s")
+	if appErr, ok := apperr.From(err); !ok || appErr.Code != apperr.CodeRateLimited {
+		t.Fatalf("fourth request: err = %v, want RATE_LIMITED", err)
+	}
+	if addrs.autocompleteCalls != 3 {
+		t.Errorf("autocompleteCalls = %d, want 3", addrs.autocompleteCalls)
 	}
 }
