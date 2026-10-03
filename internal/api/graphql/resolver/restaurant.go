@@ -13,6 +13,7 @@ import (
 	graphql1 "tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/model"
+	"tsb-service/pkg/timezone"
 )
 
 // UpdateOrderingEnabled is the resolver for the updateOrderingEnabled field.
@@ -86,9 +87,9 @@ func (r *mutationResolver) UpsertScheduleOverride(ctx context.Context, input mod
 		scheduleJSON = b
 	}
 
-	// Normalize to start-of-day in the restaurant timezone. The DB column is
-	// DATE, so the time component is discarded on write anyway.
-	date := input.Date.UTC()
+	// The DB column is DATE: keep the calendar day the instant falls on in the
+	// restaurant timezone (local midnight and UTC midnight both map to it).
+	date := timezone.Date(input.Date)
 
 	ov, err := r.RestaurantService.UpsertOverride(ctx, date, input.Closed, scheduleJSON, input.Note)
 	if err != nil {
@@ -103,7 +104,7 @@ func (r *mutationResolver) UpsertScheduleOverride(ctx context.Context, input mod
 
 // DeleteScheduleOverride is the resolver for the deleteScheduleOverride field.
 func (r *mutationResolver) DeleteScheduleOverride(ctx context.Context, date time.Time) (bool, error) {
-	if err := r.RestaurantService.DeleteOverride(ctx, date); err != nil {
+	if err := r.RestaurantService.DeleteOverride(ctx, timezone.Date(date)); err != nil {
 		return false, fmt.Errorf("delete override: %w", err)
 	}
 	r.publishScheduleOverridesUpdated(ctx)

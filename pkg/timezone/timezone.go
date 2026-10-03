@@ -36,3 +36,12 @@ func init() {
 func In(t time.Time) time.Time {
 	return t.In(Location)
 }
+
+// Date returns the calendar date of t in the restaurant timezone, as midnight
+// UTC. Use it before writing a DATE column: the driver sends the UTC text of a
+// time and PostgreSQL keeps its date part, so Brussels midnight
+// (22:00 or 23:00 UTC the day before) would otherwise land a day early.
+func Date(t time.Time) time.Time {
+	l := t.In(Location)
+	return time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, time.UTC)
+}
