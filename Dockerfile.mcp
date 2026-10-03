@@ -1,0 +1,31 @@
+# tsb-mcp: MCP server for the owner's chat agent (see docs/mcp/README.md).
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine3.24 AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
+ARG APP_VERSION=dev
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/tsb-mcp ./cmd/tsb-mcp
+COPY internal/mcp ./internal/mcp
+
+# Pure Go (modernc.org/sqlite): no CGO, static binary.
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags "-s -w -X main.version=${APP_VERSION}" -o /out/tsb-mcp ./cmd/tsb-mcp && \
+    mkdir -p /out/data
+
+FROM gcr.io/distroless/static-debian12:nonroot
+
+WORKDIR /app
+COPY --from=builder /out/tsb-mcp /app/tsb-mcp
+# Writable directory for the SQLite database (mount a volume here).
+COPY --from=builder --chown=65532:65532 /out/data /data
+
+ENV DB_PATH=/data/tsb-mcp.db
+USER 65532:65532
+EXPOSE 8080 8081
+
+ENTRYPOINT ["/app/tsb-mcp"]
+CMD ["--http", ":8080", "--internal", ":8081"]

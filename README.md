@@ -6,7 +6,7 @@ Backend API for Tokyo Sushi Bar.
 
 ## Stack
 
-- Go 1.26 + Gin
+- Go 1.27 + Gin
 - gqlgen (GraphQL generation)
 - PostgreSQL + sqlx
 - Mollie (payments)

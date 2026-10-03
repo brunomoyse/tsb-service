@@ -21,6 +21,7 @@ on:
 env:
   DOCKER_REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.actor }}/tsb-service
+  MCP_IMAGE_NAME: ${{ github.actor }}/tsb-mcp
 
 # ── Test (auto on push to main) ──────────────────────────────────────────────
 
@@ -45,6 +46,15 @@ jobs:
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            --push \
+            .
+
+      - name: Build and Push MCP Image
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --file Dockerfile.mcp \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}:latest \
             --push \
             .
 
@@ -88,6 +98,17 @@ jobs:
             --push \
             .
 
+      - name: Build and Push Production MCP Image
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --file Dockerfile.mcp \
+            --build-arg APP_VERSION=${{ github.ref_name }} \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}:production \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}:${{ github.ref_name }} \
+            --push \
+            .
+
   deploy_production:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     needs: build_production
@@ -111,11 +132,15 @@ jobs:
             export SOPS_AGE_KEY_FILE=/opt/tokyosushi/.config/sops/age/keys.txt
             cd /opt/tokyosushi/tsb-infra
             git pull --ff-only
+            # tsb-mcp ships from this repo; pin it only once the chart declares it.
+            MCP_SET=""
+            if grep -q '^  tsb-mcp:' charts/tokyosushi-apps/values.yaml; then MCP_SET="--set apps.tsb-mcp.image.tag=${TAG}"; fi
             sops -d "secrets/${APP}.secret.enc.yaml" | sudo kubectl apply -n tokyosushi -f -
             sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
               --namespace tokyosushi \
               --reuse-values \
               --set "apps.${APP}.image.tag=${TAG}" \
+              ${MCP_SET} \
               --atomic --timeout 5m
             sudo kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=up
 
@@ -142,6 +167,8 @@ jobs:
           script: |
             set -euo pipefail
             cd /opt/tokyosushi/tsb-infra
+            MCP_SET=""
+            if grep -q '^  tsb-mcp:' charts/tokyosushi-apps/values.yaml; then MCP_SET="--set apps.tsb-mcp.image.tag=${TAG}"; fi
             # Roll back DB migrations first (using current container), before swapping image
             for i in $(seq 1 "${MIGRATIONS_DOWN:-0}"); do
               sudo kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=down
@@ -150,4 +177,5 @@ jobs:
               --namespace tokyosushi \
               --reuse-values \
               --set "apps.${APP}.image.tag=${TAG}" \
+              ${MCP_SET} \
               --atomic --timeout 5m
