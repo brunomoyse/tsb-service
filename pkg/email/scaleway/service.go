@@ -1,6 +1,7 @@
 package scaleway
 
 import (
+	"errors"
 	"fmt"
 	"github.com/scaleway/scaleway-sdk-go/logger"
 	"os"
@@ -122,6 +123,25 @@ func dispatch(req *temv1alpha1.CreateEmailRequest) error {
 		return sendViaSMTP(req)
 	}
 	_, err := temClient.CreateEmail(req)
+	return classifyTemError(err)
+}
+
+// ErrInvalidRecipient: Scaleway refused the recipient address (a typo such as "name@hotmail.coma").
+// It is the customer's input, not a server fault, and retrying cannot help.
+var ErrInvalidRecipient = errors.New("invalid email recipient")
+
+// classifyTemError wraps a TEM rejection of the recipient as ErrInvalidRecipient. Scaleway's own
+// message prints the address as "" whatever it was, so it must not be read as an empty field.
+func classifyTemError(err error) error {
+	var invalid *scw.InvalidArgumentsError
+	if !errors.As(err, &invalid) {
+		return err
+	}
+	for _, d := range invalid.Details {
+		if d.ArgumentName == "rcpt" || d.ArgumentName == "to" {
+			return fmt.Errorf("%w: %w", ErrInvalidRecipient, err)
+		}
+	}
 	return err
 }
 

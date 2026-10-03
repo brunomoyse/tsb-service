@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"os"
@@ -100,6 +101,19 @@ func RequestOtpHandler(c *gin.Context) {
 		return
 	}
 	req.LoginName = strings.ToLower(strings.TrimSpace(req.LoginName))
+	if req.LoginName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "loginName is required"})
+		return
+	}
+	// Reject an address that cannot receive the code before provisioning anything: a typo such as
+	// "name@hotmail.coma" used to create a placeholder account and answer as if a code was sent.
+	// Says nothing about whether an account exists, so enumeration resistance is unchanged.
+	if !shouldSkipOtpEmail(req.LoginName) && !isReviewOtpLogin(req.LoginName) &&
+		!isDeliverableEmail(c.Request.Context(), req.LoginName) {
+		log.Warn("otp request for an undeliverable email", zap.String("email", req.LoginName))
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": ErrInvalidEmail})
+		return
+	}
 
 	lang := req.Lang
 	if lang == "" {
@@ -109,9 +123,11 @@ func RequestOtpHandler(c *gin.Context) {
 	// Resolve (or provision) the Zitadel user for this email. Unknown emails
 	// get a placeholder account so the OTP session can be created uniformly.
 	userID, err := findZitadelUserByEmail(req.LoginName)
+	createdPlaceholder := false
 	if err != nil {
 		log.Debug("otp request for unknown email — creating placeholder", zap.String("email", req.LoginName))
 		userID, err = createPlaceholderZitadelUser(req.LoginName)
+		createdPlaceholder = err == nil
 		if err != nil {
 			log.Warn("placeholder user creation failed", zap.Error(err), zap.String("email", req.LoginName))
 			// Same enumeration-resistant empty response on failure: the caller
@@ -208,6 +224,19 @@ func RequestOtpHandler(c *gin.Context) {
 		if shouldSkipOtpEmail(req.LoginName) || isReviewOtpLogin(req.LoginName) {
 			log.Debug("otp email send skipped (e2e/store-review login)", zap.String("loginName", req.LoginName))
 		} else if err := scaleway.SendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
+			// Backstop for an address the DNS check let through but Scaleway refuses: the
+			// customer's input, so a warning and a clear answer instead of a code that never comes.
+			if errors.Is(err, scaleway.ErrInvalidRecipient) {
+				log.Warn("login otp email refused: invalid recipient", zap.String("email", req.LoginName), zap.Error(err))
+				if createdPlaceholder {
+					// The placeholder can never be logged into: do not leave it behind.
+					if derr := DeleteZitadelUser(c.Request.Context(), userID); derr != nil {
+						log.Warn("failed to delete placeholder for invalid email", zap.String("user_id", userID), zap.Error(derr))
+					}
+				}
+				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": ErrInvalidEmail})
+				return
+			}
 			log.Error("failed to send login otp email", zap.Error(err))
 		}
 	}
@@ -397,7 +426,11 @@ func ResendOtpHandler(c *gin.Context) {
 			if shouldSkipOtpEmail(loginName) || isReviewOtpLogin(loginName) {
 				log.Debug("otp resend email skipped (e2e/store-review login)", zap.String("loginName", loginName))
 			} else if err := scaleway.SendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
-				log.Error("failed to send login otp email", zap.Error(err))
+				if errors.Is(err, scaleway.ErrInvalidRecipient) {
+					log.Warn("login otp resend refused: invalid recipient", zap.String("email", loginName), zap.Error(err))
+				} else {
+					log.Error("failed to send login otp email", zap.Error(err))
+				}
 			}
 		}
 	}
