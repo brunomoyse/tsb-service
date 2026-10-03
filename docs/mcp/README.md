@@ -76,7 +76,7 @@ tsb-service validates JWT access tokens locally (JWKS). The `admin` role is only
 
 **In tsb-service:** the machine user's client id is appended to `ZITADEL_ADMIN_CLIENT_IDS`.
 
-**Token request:** tsb-mcp uses the client credentials grant with the scopes `openid`, `urn:zitadel:iam:org:project:id:<project>:aud` and `urn:zitadel:iam:org:projects:roles`. Tokens are cached until they expire.
+**Token request:** tsb-mcp uses the client credentials grant with the scopes `openid`, `urn:zitadel:iam:org:project:id:<project>:aud` and `urn:zitadel:iam:org:projects:roles`. Tokens are cached until they expire. Such a token only has the project id in `aud` (no app client id), so tsb-service accepts the project id as a second audience; the admin role still needs the client id allowlist.
 
 On its first call, tsb-service provisions an app user for the machine user with the placeholder email `tsb-mcp@machine.invalid` (commit `fix(user): provision Zitadel machine users…`).
 

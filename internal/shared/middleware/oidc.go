@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -60,10 +62,13 @@ type AppJWTVerifier interface {
 // OIDCVerifier validates Zitadel JWTs via JWKS (no network call per request).
 // Optionally verifies app-signed POS JWTs as a fallback when Zitadel validation fails.
 type OIDCVerifier struct {
-	authorizer *authorization.Authorizer[*oauth.IntrospectionContext]
-	userLookup UserLookup
-	appJWT     AppJWTVerifier // optional
-	projectID  string         // Zitadel project ID for project-specific role claim fallback
+	// authorizers accept tokens for the API client ID first, then for the
+	// project ID. Interactive logins put every app's client ID in aud; machine
+	// users (client_credentials) only get the project ID they asked for.
+	authorizers []*authorization.Authorizer[*oauth.IntrospectionContext]
+	userLookup  UserLookup
+	appJWT      AppJWTVerifier // optional
+	projectID   string         // Zitadel project ID for project-specific role claim fallback
 	// adminClientIDs restricts which OIDC clients may carry the admin role.
 	// All apps share one Zitadel project, so without this a token minted for
 	// the customer site would also be admin for anyone holding the role.
@@ -77,7 +82,8 @@ type OIDCVerifier struct {
 // internalURL is optional — when set (e.g., "http://zitadel-api:8080" in Docker),
 // OIDC discovery and JWKS requests are routed to the internal URL while the external
 // domain is preserved as the Host header and issuer.
-// clientID is the audience expected in the JWT (the Zitadel project ID or app client ID).
+// clientID is the audience expected in the JWT (the API app client ID). The
+// project ID is accepted as an audience too, for machine users.
 // userLookup resolves Zitadel sub → app user UUID (pass nil to skip, userID will be the raw Zitadel sub).
 // NewOIDCVerifier initializes the Zitadel Go SDK authorizer for local JWT validation.
 // projectID is the Zitadel project ID used to check the project-specific role claim
@@ -112,20 +118,52 @@ func NewOIDCVerifier(ctx context.Context, issuerURL, internalURL, clientID, proj
 
 	z := zitadel.New(domain)
 
-	// Initialize with local JWT validation (JWKS-based, no per-request introspection)
-	var verifierInit authorization.VerifierInitializer[*oauth.IntrospectionContext]
-	if httpClient != nil {
-		verifierInit = oauth.WithJWT(clientID, httpClient)
-	} else {
-		verifierInit = oauth.DefaultJWTAuthorization(clientID)
+	audiences := []string{clientID}
+	if projectID != "" && projectID != clientID {
+		audiences = append(audiences, projectID)
 	}
 
-	authZ, err := authorization.New(ctx, z, verifierInit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Zitadel authorizer: %w", err)
+	v := &OIDCVerifier{userLookup: userLookup, projectID: projectID}
+	for i, aud := range audiences {
+		// Local JWT validation (JWKS-based, no per-request introspection)
+		var verifierInit authorization.VerifierInitializer[*oauth.IntrospectionContext]
+		if httpClient != nil {
+			verifierInit = oauth.WithJWT(aud, httpClient)
+		} else {
+			verifierInit = oauth.DefaultJWTAuthorization(aud)
+		}
+		var opts []authorization.Option[*oauth.IntrospectionContext]
+		if i < len(audiences)-1 {
+			// A miss here is expected whenever a later audience matches; only
+			// the last authorizer logs its refusal.
+			opts = append(opts, authorization.WithLogger[*oauth.IntrospectionContext](slog.New(slog.DiscardHandler)))
+		}
+		authZ, err := authorization.New(ctx, z, verifierInit, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize Zitadel authorizer: %w", err)
+		}
+		v.authorizers = append(v.authorizers, authZ)
 	}
+	return v, nil
+}
 
-	return &OIDCVerifier{authorizer: authZ, userLookup: userLookup, projectID: projectID}, nil
+// checkAuthorization validates a Zitadel JWT against each accepted audience.
+// It returns the first error when none accepts the token.
+func (v *OIDCVerifier) checkAuthorization(ctx context.Context, tokenStr string) (*oauth.IntrospectionContext, error) {
+	var firstErr error
+	for _, authZ := range v.authorizers {
+		authCtx, err := authZ.CheckAuthorization(ctx, "Bearer "+tokenStr)
+		if err == nil {
+			return authCtx, nil
+		}
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+	if firstErr == nil {
+		firstErr = errors.New("no Zitadel authorizer configured")
+	}
+	return nil, firstErr
 }
 
 // SetAdminClientIDs restricts the admin role to tokens issued to these OIDC
@@ -247,7 +285,7 @@ func (v *OIDCVerifier) resolveAppUserID(ctx context.Context, sub, email, givenNa
 
 // verifyAndSetContext verifies the JWT and sets userID/isAdmin in context.
 func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool {
-	authCtx, err := v.authorizer.CheckAuthorization(c.Request.Context(), "Bearer "+tokenStr)
+	authCtx, err := v.checkAuthorization(c.Request.Context(), tokenStr)
 	if err != nil {
 		zap.L().Debug("OIDC token verification failed", zap.Error(err))
 		return false
@@ -344,7 +382,7 @@ func (v *OIDCVerifier) OptionalAuthMiddleware() gin.HandlerFunc {
 // value means the token had no readable exp claim; callers should treat that
 // as "do not enforce a deadline" rather than "token is already expired".
 func (v *OIDCVerifier) VerifyToken(ctx context.Context, tokenStr string) (subject string, isAdmin, isPOS bool, exp time.Time, err error) {
-	authCtx, zitadelErr := v.authorizer.CheckAuthorization(ctx, "Bearer "+tokenStr)
+	authCtx, zitadelErr := v.checkAuthorization(ctx, tokenStr)
 	if zitadelErr == nil {
 		admin := v.isAdmin(authCtx)
 		var tokenExp time.Time
