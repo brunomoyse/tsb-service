@@ -98,10 +98,23 @@ func GetZitadelUserInfo(_ context.Context, userID string) (email, givenName, fam
 	if status != http.StatusOK {
 		return "", "", "", fmt.Errorf("fetch user returned status %d", status)
 	}
+	return parseZitadelUserInfo(respBody)
+}
 
+// machineUserEmailDomain is the reserved, undeliverable domain used to give
+// Zitadel machine users (service accounts) a unique placeholder email.
+const machineUserEmailDomain = "machine.invalid"
+
+// parseZitadelUserInfo extracts the profile from a Zitadel `GET /v2/users/{id}`
+// response. Machine users (service accounts such as the MCP server) have no
+// email or human profile; they get a unique placeholder email so JIT
+// provisioning does not collide on the users.email UNIQUE constraint and the
+// middleware stops re-fetching the profile on every request.
+func parseZitadelUserInfo(body []byte) (email, givenName, familyName string, err error) {
 	var userResp struct {
 		User struct {
-			Human struct {
+			Username string `json:"username"`
+			Human    *struct {
 				Profile struct {
 					GivenName  string `json:"givenName"`
 					FamilyName string `json:"familyName"`
@@ -110,16 +123,28 @@ func GetZitadelUserInfo(_ context.Context, userID string) (email, givenName, fam
 					Email string `json:"email"`
 				} `json:"email"`
 			} `json:"human"`
+			Machine *struct {
+				Name string `json:"name"`
+			} `json:"machine"`
 		} `json:"user"`
 	}
-	if err := json.Unmarshal(respBody, &userResp); err != nil {
+	if err := json.Unmarshal(body, &userResp); err != nil {
 		return "", "", "", fmt.Errorf("parse user response: %w", err)
 	}
 
-	return userResp.User.Human.Email.Email,
-		userResp.User.Human.Profile.GivenName,
-		userResp.User.Human.Profile.FamilyName,
-		nil
+	u := userResp.User
+	switch {
+	case u.Human != nil:
+		return u.Human.Email.Email, u.Human.Profile.GivenName, u.Human.Profile.FamilyName, nil
+	case u.Machine != nil && u.Username != "":
+		name := u.Machine.Name
+		if name == "" {
+			name = u.Username
+		}
+		return strings.ToLower(u.Username) + "@" + machineUserEmailDomain, name, "bot", nil
+	default:
+		return "", "", "", nil
+	}
 }
 
 // DeleteZitadelUser permanently removes a user from Zitadel by their Zitadel
