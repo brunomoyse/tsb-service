@@ -126,7 +126,7 @@ query McpOrder($id: ID!) {
     ` + orderListFields + `
     displayAddress addressExtra orderNote cancellationReason estimatedReadyTime
     customer { firstName lastName phoneNumber }
-    items { quantity unitPrice totalPrice product { id name } choice { name } selections { quantity choice { name } } }
+    items { quantity unitPrice totalPrice product { id name category { id name translations { language name } } translations { language name } } choice { name } selections { quantity choice { name } } }
     statusHistory { status changedAt }
   }
 }`,

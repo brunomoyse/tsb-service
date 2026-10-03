@@ -34,17 +34,17 @@ func TestSummaryZhEveryKind(t *testing.T) {
 		params any
 		want   []string
 	}{
-		KindProductAvailability:     {ProductToggleParams{ProductID: "p-maki-saumon", Value: false}, []string{"「三文鱼卷」（卷）", "可售 → 售罄"}},
+		KindProductAvailability:     {ProductToggleParams{ProductID: "p-maki-saumon", Value: false}, []string{"卷「三文鱼卷」", "可售 → 售罄"}},
 		KindProductVisibility:       {ProductToggleParams{ProductID: "p-maki-saumon", Value: false}, []string{"显示 → 隐藏"}},
-		KindProductAvailabilityBulk: {BulkAvailabilityParams{Items: []BulkAvailabilityItem{{ProductID: "p-maki-saumon"}, {ProductID: "p-creme"}}}, []string{"1 个商品", "「三文鱼卷」（卷）：可售 → 售罄", "已是该状态：「焦糖布丁」（套餐）"}},
-		KindProductPrice:            {PriceParams{ProductID: "p-maki-saumon", NewPriceCents: 500}, []string{"「三文鱼卷」（卷）价格：4.50 欧元 → 5.00 欧元"}},
+		KindProductAvailabilityBulk: {BulkAvailabilityParams{Items: []BulkAvailabilityItem{{ProductID: "p-maki-saumon"}, {ProductID: "p-creme"}}}, []string{"1 个商品", "卷「三文鱼卷」：可售 → 售罄", "已是该状态：套餐「焦糖布丁」"}},
+		KindProductPrice:            {PriceParams{ProductID: "p-maki-saumon", NewPriceCents: 500}, []string{"卷「三文鱼卷」价格：4.50 欧元 → 5.00 欧元"}},
 		KindProductVAT:              {VATParams{ProductID: "p-maki-saumon", VatCategory: "beverage"}, []string{"餐食 → 饮料"}},
 		KindProductUpdate: {ProductUpdateParams{ProductID: "p-maki-saumon", Names: map[string]string{"zh": "鲑鱼卷"}, CategoryID: &cat, Code: &code, PieceCount: &pieces, IsSpicy: &yes},
 			[]string{"中文名称：「三文鱼卷」 → 「鲑鱼卷」", "分类：卷 → 刺身", "编号：「M1」 → 「M9」", "件数：6 → 8", "辣：否 → 是"}},
 		KindProductCreate: {ProductCreateParams{CategoryID: "cat-maki", Names: map[string]string{"fr": "Maki thon", "en": "Tuna maki", "zh": "金枪鱼卷"}, PriceCents: 480, Available: true, Visible: true},
 			[]string{"新商品「金枪鱼卷」", "分类卷", "4.80 欧元", "可售", "显示"}},
-		KindProductImage:       {ImageParams{ProductID: "p-maki-saumon", ImageURL: "https://example.com/a.jpg", Filename: "a.jpg", ContentType: "image/jpeg", SizeBytes: 2048, SHA256: strings.Repeat("a", 64)}, []string{"「三文鱼卷」（卷）", "无法恢复"}},
-		KindChoiceGroupUpsert:  {ChoiceGroupParams{GroupID: "g-sauce", MaxSelections: ptrTo(2)}, []string{"「卷寿司套餐」（套餐）的选项组「酱汁」", "最多选择：1 → 2"}},
+		KindProductImage:       {ImageParams{ProductID: "p-maki-saumon", ImageURL: "https://example.com/a.jpg", Filename: "a.jpg", ContentType: "image/jpeg", SizeBytes: 2048, SHA256: strings.Repeat("a", 64)}, []string{"卷「三文鱼卷」", "无法恢复"}},
+		KindChoiceGroupUpsert:  {ChoiceGroupParams{GroupID: "g-sauce", MaxSelections: ptrTo(2)}, []string{"套餐「卷寿司套餐」的选项组「酱汁」", "最多选择：1 → 2"}},
 		KindChoiceGroupDelete:  {ChoiceGroupRef{GroupID: "g-sauce"}, []string{"删除选项组「酱汁」", "2 个选项", "Soja、Mayo épicée"}},
 		KindChoiceUpsert:       {ChoiceParams{ChoiceID: "c-spicy", Names: map[string]string{"zh": sauceZh}, PriceModifierCents: ptrTo[int64](60)}, []string{"中文名称：无 → 「辣酱」", "加价：0.50 欧元 → 0.60 欧元"}},
 		KindChoiceDelete:       {ChoiceRef{ChoiceID: "c-soja"}, []string{"从选项组「酱汁」中删除选项「Soja」"}},
@@ -94,7 +94,7 @@ func TestSummaryZhNoOp(t *testing.T) {
 	if err != nil || !p.NoOp {
 		t.Fatalf("want no-op, got %+v %v", p, err)
 	}
-	if p.SummaryZh != "「三文鱼卷」（卷）的价格已经是 4.50 欧元，无需更改。" {
+	if p.SummaryZh != "卷「三文鱼卷」的价格已经是 4.50 欧元，无需更改。" {
 		t.Errorf("summary_zh %q", p.SummaryZh)
 	}
 }
@@ -112,7 +112,7 @@ func TestSummaryZhFallsBackToFrench(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(p.SummaryZh, "「Maki saumon」（卷）价格") {
+	if !strings.HasPrefix(p.SummaryZh, "卷「Maki saumon」价格") {
 		t.Errorf("summary_zh %q", p.SummaryZh)
 	}
 }
@@ -129,7 +129,7 @@ func TestProductLabelZhNamesTheCategory(t *testing.T) {
 		}
 	}
 	f.fake.Unlock()
-	for id, want := range map[string]string{"p-maki-saumon": "「三文鱼」（卷）价格", "p-sashimi-saumon": "「三文鱼」（刺身）价格"} {
+	for id, want := range map[string]string{"p-maki-saumon": "卷「三文鱼」价格", "p-sashimi-saumon": "刺身「三文鱼」价格"} {
 		p, err := f.svc.Propose(f.ctx, "propose_price_change", KindProductPrice, PriceParams{ProductID: id, NewPriceCents: 600}, nil, "", nil)
 		if err != nil {
 			t.Fatal(err)

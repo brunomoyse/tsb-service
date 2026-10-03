@@ -179,7 +179,10 @@ func registerOrders(s *mcp.Server, d *Deps) {
 		OrderID string `json:"order_id"`
 	}
 	type ItemOut struct {
-		Product    string   `json:"product"`
+		Product string `json:"product" jsonschema:"French product name"`
+		// ProductLabels name the product as category + name, like
+		// ProductOut.Labels.
+		ProductLabels map[string]string `json:"product_labels,omitempty" jsonschema:"category + name per language; use it to name the product"`
 		Quantity   int      `json:"quantity"`
 		UnitCents  int64    `json:"unit_cents"`
 		TotalCents int64    `json:"total_cents"`
@@ -231,6 +234,7 @@ func registerOrders(s *mcp.Server, d *Deps) {
 			io := ItemOut{Quantity: it.Quantity, UnitCents: money.MustCents(it.UnitPrice), TotalCents: money.MustCents(it.TotalPrice), Options: []string{}}
 			if it.Product != nil {
 				io.Product = it.Product.Name
+				io.ProductLabels = productOut(&upstream.Product{ID: it.Product.ID, Name: it.Product.Name, Category: it.Product.Category, Translations: it.Product.Translations, Price: "0"}).Labels
 			}
 			if it.Choice != nil {
 				io.Options = append(io.Options, it.Choice.Name)

@@ -1,0 +1,2797 @@
+{
+"_comment": "Tokyo Sushi Bar menu exported from the test database on 2026-10-03, used as a realistic search fixture.",
+"categories": [
+{
+"id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"order": 1,
+"slug": "menu-plateau",
+"names": {
+"en": "Platter menu",
+"fr": "Menu plateau",
+"zh": "拼盘套餐"
+}
+},
+{
+"id": "9e1992c3-b51e-4b9d-845c-ec88b640977a",
+"order": 2,
+"slug": "menu-bento-box",
+"names": {
+"en": "Bento box menu",
+"fr": "Menu bento box",
+"zh": "便当套餐"
+}
+},
+{
+"id": "b72ff149-6d3a-45a2-9e52-f824e2c80727",
+"order": 3,
+"slug": "menu-lunch",
+"names": {
+"en": "Lunch menu",
+"fr": "Menu lunch",
+"zh": "午餐套餐"
+}
+},
+{
+"id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"order": 4,
+"slug": "sushi",
+"names": {
+"en": "Sushi",
+"fr": "Sushi",
+"zh": "寿司"
+}
+},
+{
+"id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"order": 5,
+"slug": "maki",
+"names": {
+"en": "Maki",
+"fr": "Maki",
+"zh": "卷寿司"
+}
+},
+{
+"id": "9e1992c5-4002-4797-ba9d-feb545add16e",
+"order": 6,
+"slug": "gunkan",
+"names": {
+"en": "Gunkan",
+"fr": "Gunkan",
+"zh": "军舰寿司"
+}
+},
+{
+"id": "9e1992c5-bf91-406b-88a7-61dc600d3990",
+"order": 7,
+"slug": "spring-roll",
+"names": {
+"en": "Spring roll",
+"fr": "Spring roll",
+"zh": "春卷"
+}
+},
+{
+"id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"order": 8,
+"slug": "california-roll",
+"names": {
+"en": "California roll",
+"fr": "California roll",
+"zh": "加州卷"
+}
+},
+{
+"id": "9e1992c6-c71c-4a29-9457-2c0eaecab8c8",
+"order": 9,
+"slug": "temaki",
+"names": {
+"en": "Temaki",
+"fr": "Temaki",
+"zh": "手卷"
+}
+},
+{
+"id": "9e1992c7-47c9-44f5-8065-389f83ee6f6a",
+"order": 10,
+"slug": "masago-roll",
+"names": {
+"en": "Masago roll",
+"fr": "Masago roll",
+"zh": "鱼子卷"
+}
+},
+{
+"id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"order": 11,
+"slug": "special-roll",
+"names": {
+"en": "Special roll",
+"fr": "Spécial roll",
+"zh": "特色卷"
+}
+},
+{
+"id": "9e1992c8-49d8-4bd1-8811-4ce3978789b7",
+"order": 12,
+"slug": "chirashi",
+"names": {
+"en": "Chirashi",
+"fr": "Chirashi",
+"zh": "散寿司"
+}
+},
+{
+"id": "9e1992c8-c8fd-4974-803d-cd7f9c0c1e6d",
+"order": 13,
+"slug": "sashimi",
+"names": {
+"en": "Sashimi",
+"fr": "Sashimi",
+"zh": "刺身"
+}
+},
+{
+"id": "9e1992c9-4c21-4723-a416-96550589eb7c",
+"order": 14,
+"slug": "poke-bowl",
+"names": {
+"en": "Poke bowl",
+"fr": "Poke bowl",
+"zh": "夏威夷鱼生饭"
+}
+},
+{
+"id": "a2de2102-7930-4109-b162-ebb03585f6ac",
+"order": 15,
+"slug": "ramen",
+"names": {
+"en": "Ramen",
+"fr": "Ramen",
+"zh": "拉面"
+}
+},
+{
+"id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"order": 16,
+"slug": "tokyo-hot",
+"names": {
+"en": "Tokyo hot",
+"fr": "Tokyo hot",
+"zh": "东京热食"
+}
+},
+{
+"id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"order": 17,
+"slug": "accompagnement",
+"names": {
+"en": "Side dish",
+"fr": "Accompagnement",
+"zh": "配菜"
+}
+},
+{
+"id": "9e1992cb-66d5-4334-b6e6-669f37047773",
+"order": 18,
+"slug": "boisson",
+"names": {
+"en": "Drink",
+"fr": "Boisson",
+"zh": "饮品"
+}
+},
+{
+"id": "efbd4ee3-671a-4568-bd50-d00dc38905cc",
+"order": 19,
+"slug": "dessert",
+"names": {
+"en": "Dessert",
+"fr": "Dessert",
+"zh": "甜点"
+}
+}
+],
+"products": [
+{
+"id": "9e19953a-26ae-4cae-b821-56e909229ba0",
+"code": "A1",
+"slug": "sushi-saumon",
+"price": "2.10",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon",
+"fr": "Saumon",
+"zh": "三文鱼"
+}
+},
+{
+"id": "9e19953d-11e6-4aa0-aa7c-a3b3db582322",
+"code": "A10",
+"slug": "sushi-avocat",
+"price": "2.00",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Avocado",
+"fr": "Avocat",
+"zh": "牛油果"
+}
+},
+{
+"id": "9e19953d-6410-4614-af9a-d92da8882d84",
+"code": "A11",
+"slug": "sushi-anguille",
+"price": "2.80",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Eel",
+"fr": "Anguille",
+"zh": "鳗鱼"
+}
+},
+{
+"id": "9e19953d-ae9a-4a9c-a9af-9a4ae65c6495",
+"code": "A12",
+"slug": "sushi-saumon-mi-cuit",
+"price": "2.40",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Semi-cooked salmon",
+"fr": "Saumon mi-cuit",
+"zh": "半熟三文鱼"
+}
+},
+{
+"id": "9e19953d-fd68-4bf8-8348-c8f5804b8275",
+"code": "A13",
+"slug": "sushi-thon-mi-cuit",
+"price": "2.70",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Semi-cooked tuna",
+"fr": "Thon mi-cuit",
+"zh": "半熟金枪鱼"
+}
+},
+{
+"id": "9e19953e-4f46-4684-b6fd-7c56cf9137d1",
+"code": "A14",
+"slug": "sushi-saint-jacques-mi-cuit",
+"price": "2.90",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Semi-cooked Saint-Jacques",
+"fr": "Saint-Jacques mi-cuit",
+"zh": "半熟扇贝"
+}
+},
+{
+"id": "9e19953e-a0fd-45b2-8144-0ad2988d7f5b",
+"code": "A15",
+"slug": "sushi-tofu",
+"price": "2.10",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tofu",
+"fr": "Tofu",
+"zh": "豆腐"
+}
+},
+{
+"id": "9e19953e-ee69-40ed-b6e5-ce2cf24346a1",
+"code": "A16",
+"slug": "sushi-saumon-cheese",
+"price": "2.30",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon cheese",
+"fr": "Saumon cheese",
+"zh": "三文鱼芝士"
+}
+},
+{
+"id": "9e19953f-435f-4b70-8d1d-abe969d1bf80",
+"code": "A17",
+"slug": "sushi-foie-gras",
+"price": "2.90",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Foie gras",
+"fr": "Foie gras",
+"zh": "鹅肝"
+}
+},
+{
+"id": "9e19953f-9a2c-416a-bd9d-0b707095ccc6",
+"code": "A18",
+"slug": "sushi-maquereau-grille",
+"price": "2.90",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Grilled mackerel",
+"fr": "Maquereau grillé",
+"zh": "烤鲭鱼"
+}
+},
+{
+"id": "9e19953f-ebe2-4928-aa6b-46e02548658a",
+"code": "A19",
+"slug": "sushi-saumon-cuit-caramelise",
+"price": "2.60",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Caramelized cooked salmon",
+"fr": "Saumon cuit caramélisé",
+"zh": "焦糖熟三文鱼"
+}
+},
+{
+"id": "9e19953a-7a7c-45a6-90ef-7c5255517248",
+"code": "A2",
+"slug": "sushi-crevette",
+"price": "2.10",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Shrimp",
+"fr": "Crevette",
+"zh": "虾"
+}
+},
+{
+"id": "9e199540-3e2e-4c99-99ca-782a32ff6964",
+"code": "A20",
+"slug": "sushi-saumon-avocat",
+"price": "2.50",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": false,
+"visible": true,
+"names": {
+"en": "Salmon avocado",
+"fr": "Saumon avocat",
+"zh": "三文鱼牛油果"
+}
+},
+{
+"id": "9e19953a-cac5-45d2-8f48-005cf97615b3",
+"code": "A3",
+"slug": "sushi-thon",
+"price": "2.40",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tuna",
+"fr": "Thon",
+"zh": "金枪鱼"
+}
+},
+{
+"id": "9e19953b-1ee4-4f6c-b6ac-33a90c7d7e16",
+"code": "A4",
+"slug": "sushi-dorade",
+"price": "2.30",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Sea bream",
+"fr": "Dorade",
+"zh": "鲷鱼"
+}
+},
+{
+"id": "9e19953b-6fb1-4517-bb50-7ed4af3450c2",
+"code": "A5",
+"slug": "sushi-omelette",
+"price": "1.90",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Omelette",
+"fr": "Omelette",
+"zh": "玉子"
+}
+},
+{
+"id": "9e19953b-c669-4ddd-97c0-18c3aa6d4377",
+"code": "A6",
+"slug": "sushi-poulpe",
+"price": "2.20",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Octopus",
+"fr": "Octopus",
+"zh": "章鱼"
+}
+},
+{
+"id": "9e19953c-186e-4c8a-8b97-ea2c5675877c",
+"code": "A7",
+"slug": "sushi-dorade-grillee",
+"price": "2.70",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Grilled sea bream",
+"fr": "Dorade grillée",
+"zh": "烤鲷鱼"
+}
+},
+{
+"id": "9e19953c-694e-4599-b7d0-bc57796aaa0a",
+"code": "A8",
+"slug": "sushi-maquereau",
+"price": "2.20",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": true,
+"visible": true,
+"names": {
+"en": "Mackerel",
+"fr": "Maquereau",
+"zh": "鲭鱼"
+}
+},
+{
+"id": "9e19953c-bdfc-4db9-b67c-b505d6fe7095",
+"code": "A9",
+"slug": "sushi-surimi",
+"price": "1.80",
+"category_id": "9e1992c4-37c7-493e-b69a-0b71cc7af146",
+"available": false,
+"visible": true,
+"names": {
+"en": "Surimi",
+"fr": "Surimi",
+"zh": "蟹肉棒"
+}
+},
+{
+"id": "9e199542-4da7-4f4f-9ad9-6b5550b78fa5",
+"code": "B1",
+"slug": "maki-concombre-sesame",
+"price": "4.50",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Cucumber sesame",
+"fr": "Concombre sésame",
+"zh": "芝麻黄瓜"
+}
+},
+{
+"id": "9e199545-302f-4c29-ab37-6ef6906c56bd",
+"code": "B10",
+"slug": "maki-tempura-crevette",
+"price": "5.50",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Shrimp tempura",
+"fr": "Tempura crevette",
+"zh": "天妇罗虾"
+}
+},
+{
+"id": "9e199545-876e-42cb-b55e-274726fec030",
+"code": "B11",
+"slug": "maki-saumon-spicy",
+"price": "5.90",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Spicy salmon",
+"fr": "Saumon spicy",
+"zh": "辣三文鱼"
+}
+},
+{
+"id": "9e199545-d3fc-4cc7-a18c-c869aa9d8ff3",
+"code": "B12",
+"slug": "maki-dorade-mangue",
+"price": "6.10",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Sea bream mango",
+"fr": "Dorade mangue",
+"zh": "鲷鱼芒果"
+}
+},
+{
+"id": "9e199546-2615-48ae-8c4d-64d0018de6c3",
+"code": "B13",
+"slug": "maki-thon-cuit-spicy",
+"price": "5.60",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Spicy cooked tuna",
+"fr": "Thon cuit spicy",
+"zh": "辣熟金枪鱼"
+}
+},
+{
+"id": "9e199546-7b48-478e-8912-d78112d76a06",
+"code": "B14",
+"slug": "maki-tartare-thon-ciboulette",
+"price": "6.30",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tuna and chives tartare",
+"fr": "Tartare thon ciboulette",
+"zh": "金枪鱼香葱他他"
+}
+},
+{
+"id": "9e199546-ccd5-4b08-9c6f-18dfd5a162a3",
+"code": "B15",
+"slug": "maki-mangue",
+"price": "5.00",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Mango",
+"fr": "Mangue",
+"zh": "芒果"
+}
+},
+{
+"id": "9e199547-1bd1-4f2f-a5df-6bc65c9bdab2",
+"code": "B16",
+"slug": "maki-ciboulette-cheese",
+"price": "5.00",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": false,
+"visible": true,
+"names": {
+"en": "Chives cheese",
+"fr": "Ciboulette cheese",
+"zh": "香葱芝士"
+}
+},
+{
+"id": "9e199547-6bf3-4dee-b243-6da4a09356e8",
+"code": "B17",
+"slug": "maki-foie-gras",
+"price": "7.50",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Foie gras",
+"fr": "Foie gras",
+"zh": "鹅肝"
+}
+},
+{
+"id": "9e199547-bca6-4818-93b7-4920efed878d",
+"code": "B19",
+"slug": "maki-saumon-roll-cheese",
+"price": "6.50",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon roll cheese",
+"fr": "Saumon roll cheese",
+"zh": "三文鱼芝士卷"
+}
+},
+{
+"id": "9e199542-a275-45e8-82c3-9282215ec5ca",
+"code": "B2",
+"slug": "maki-avocat",
+"price": "4.50",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Avocado",
+"fr": "Avocat",
+"zh": "牛油果"
+}
+},
+{
+"id": "9e199542-f4be-4380-bb0c-16516bcc8378",
+"code": "B3",
+"slug": "maki-surimi",
+"price": "4.70",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Surimi",
+"fr": "Surimi",
+"zh": "蟹肉棒"
+}
+},
+{
+"id": "9e199543-4570-4d37-9714-5e045377a450",
+"code": "B4",
+"slug": "maki-radis-japonais",
+"price": "4.50",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Japanese radish",
+"fr": "Radis japonais",
+"zh": "日式萝卜"
+}
+},
+{
+"id": "9e199543-9676-4015-ba2e-76376a789588",
+"code": "B5",
+"slug": "maki-cheese-concombre",
+"price": "4.90",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Cucumber cheese",
+"fr": "Cheese concombre",
+"zh": "黄瓜芝士"
+}
+},
+{
+"id": "9e199543-e7df-462d-85d8-b1709b3ec46d",
+"code": "B6",
+"slug": "maki-cheese-avocat",
+"price": "5.30",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Avocado cheese",
+"fr": "Cheese avocat",
+"zh": "牛油果芝士"
+}
+},
+{
+"id": "9e199544-3dba-4630-8de1-85f3084b368f",
+"code": "B7",
+"slug": "maki-anguille",
+"price": "6.00",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Eel",
+"fr": "Anguille",
+"zh": "鳗鱼"
+}
+},
+{
+"id": "9e199544-8c16-4c76-8a9d-44252a31237d",
+"code": "B8",
+"slug": "maki-saumon",
+"price": "5.50",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon",
+"fr": "Saumon",
+"zh": "三文鱼"
+}
+},
+{
+"id": "9e199544-e19c-4f9e-8bdb-51678a565bf3",
+"code": "B9",
+"slug": "maki-thon",
+"price": "6.20",
+"category_id": "9e1992c4-be65-4adf-8e18-6035219974ee",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tuna",
+"fr": "Thon",
+"zh": "金枪鱼"
+}
+},
+{
+"id": "9e199549-3f08-41b0-8eb6-1608c39462b9",
+"code": "C1",
+"slug": "gunkan-oeufs-de-saumon",
+"price": "3.10",
+"category_id": "9e1992c5-4002-4797-ba9d-feb545add16e",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon eggs",
+"fr": "Oeufs de saumon",
+"zh": "三文鱼子"
+}
+},
+{
+"id": "9e199549-8d3a-42f8-805b-2aa1b7d41c3d",
+"code": "C2",
+"slug": "gunkan-oeufs-de-poisson",
+"price": "2.60",
+"category_id": "9e1992c5-4002-4797-ba9d-feb545add16e",
+"available": true,
+"visible": true,
+"names": {
+"en": "Fish eggs",
+"fr": "Oeufs de poisson",
+"zh": "鱼子"
+}
+},
+{
+"id": "9e199549-e0f2-4f29-9488-ab0d7cc3a2c5",
+"code": "C3",
+"slug": "gunkan-tartare-thon-ciboulette",
+"price": "2.60",
+"category_id": "9e1992c5-4002-4797-ba9d-feb545add16e",
+"available": false,
+"visible": true,
+"names": {
+"en": "Tuna-chives tartare",
+"fr": "Tartare thon ciboulette",
+"zh": "金枪鱼香葱他他"
+}
+},
+{
+"id": "9e19954a-31b2-48da-ba57-7c02b8b14001",
+"code": "C4",
+"slug": "gunkan-dorade-mangue",
+"price": "2.80",
+"category_id": "9e1992c5-4002-4797-ba9d-feb545add16e",
+"available": true,
+"visible": true,
+"names": {
+"en": "Mango bream",
+"fr": "Dorade mangue",
+"zh": "芒果鲷鱼"
+}
+},
+{
+"id": "9e19954a-83ea-4b1c-84ff-1856b024102c",
+"code": "C5",
+"slug": "gunkan-tartare-saumon-cheese",
+"price": "2.30",
+"category_id": "9e1992c5-4002-4797-ba9d-feb545add16e",
+"available": false,
+"visible": true,
+"names": {
+"en": "Salmon-cheese tartare",
+"fr": "Tartare saumon cheese",
+"zh": "三文鱼芝士他他"
+}
+},
+{
+"id": "9e19954b-0cd5-406a-8df7-4aadd4a5720f",
+"code": "D1",
+"slug": "spring-roll-saumon-avocat",
+"price": "6.50",
+"category_id": "9e1992c5-bf91-406b-88a7-61dc600d3990",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon avocado",
+"fr": "Saumon avocat",
+"zh": "三文鱼牛油果"
+}
+},
+{
+"id": "9e19954b-5c42-4bfa-ab76-3528a2e4d566",
+"code": "D2",
+"slug": "spring-roll-thon-avocat",
+"price": "7.00",
+"category_id": "9e1992c5-bf91-406b-88a7-61dc600d3990",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tuna avocado",
+"fr": "Thon avocat",
+"zh": "金枪鱼牛油果"
+}
+},
+{
+"id": "9e19954b-aa27-4fc2-8fc4-45b190cd0070",
+"code": "D3",
+"slug": "spring-roll-poulet-cheese",
+"price": "7.60",
+"category_id": "9e1992c5-bf91-406b-88a7-61dc600d3990",
+"available": true,
+"visible": true,
+"names": {
+"en": "Chicken cheese",
+"fr": "Poulet cheese",
+"nl": "",
+"zh": "鸡肉芝士"
+}
+},
+{
+"id": "9e19954b-fbc0-42b4-afac-6298a37bdd0e",
+"code": "D4",
+"slug": "spring-roll-poulet-pane-mayonnaise",
+"price": "7.20",
+"category_id": "9e1992c5-bf91-406b-88a7-61dc600d3990",
+"available": true,
+"visible": true,
+"names": {
+"en": "Breaded chicken mayonnaise",
+"fr": "Poulet pané mayonnaise",
+"zh": "炸鸡蛋黄酱"
+}
+},
+{
+"id": "9e19954c-4815-4903-a06b-27ccda8191d1",
+"code": "D5",
+"slug": "spring-roll-saumon-mangue",
+"price": "6.60",
+"category_id": "9e1992c5-bf91-406b-88a7-61dc600d3990",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon mango",
+"fr": "Saumon mangue",
+"zh": "三文鱼芒果"
+}
+},
+{
+"id": "9e19954c-9b59-40a1-97ea-4eb96998ead6",
+"code": "D6",
+"slug": "spring-roll-tempura-crevette-oignons-frits",
+"price": "7.50",
+"category_id": "9e1992c5-bf91-406b-88a7-61dc600d3990",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tempura shrimp fried onions",
+"fr": "Tempura crevette oignons frits",
+"zh": "天妇罗虾炸洋葱"
+}
+},
+{
+"id": "9e19954c-eca8-4b7c-a5e6-84de5114e914",
+"code": "D7",
+"slug": "spring-roll-poulet-mangue-menthe",
+"price": "7.90",
+"category_id": "9e1992c5-bf91-406b-88a7-61dc600d3990",
+"available": true,
+"visible": true,
+"names": {
+"en": "Chicken mango mint",
+"fr": "Poulet mangue menthe",
+"zh": "鸡肉芒果薄荷"
+}
+},
+{
+"id": "9e19954d-3d56-45df-8bf2-699c1399250f",
+"code": "D8",
+"slug": "spring-roll-tofu-avocat",
+"price": "9.00",
+"category_id": "9e1992c5-bf91-406b-88a7-61dc600d3990",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tofu avocado",
+"fr": "Tofu avocat",
+"nl": "",
+"zh": "豆腐牛油果"
+}
+},
+{
+"id": "9e19954d-8b68-4c92-b67b-16d67ee6c443",
+"code": "D9",
+"slug": "spring-roll-saumon-cheese",
+"price": "6.50",
+"category_id": "9e1992c5-bf91-406b-88a7-61dc600d3990",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon cheese",
+"fr": "Saumon cheese",
+"zh": "三文鱼芝士"
+}
+},
+{
+"id": "9e19954e-0e67-4aa0-aa09-b3d8a5bf328f",
+"code": "E1",
+"slug": "california-roll-saumon-avocat",
+"price": "6.30",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon avocado",
+"fr": "Saumon avocat",
+"zh": "三文鱼牛油果"
+}
+},
+{
+"id": "9e199550-f18d-4884-a34f-5fb66f606158",
+"code": "E10",
+"slug": "california-roll-vegetarien",
+"price": "7.00",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Sweet potato house sauce",
+"fr": "Patate douce sauce maison",
+"zh": "红薯配店制酱"
+}
+},
+{
+"id": "9e199554-eef6-497c-bbad-8ef862288432",
+"code": "E11",
+"slug": "masago-roll-saumon-avocat",
+"price": "6.60",
+"category_id": "9e1992c7-47c9-44f5-8065-389f83ee6f6a",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon avocado",
+"fr": "Saumon avocat",
+"zh": "三文鱼牛油果"
+}
+},
+{
+"id": "9e199555-4093-41ff-9abc-af7380168b0f",
+"code": "E12",
+"slug": "masago-roll-thon-mangue",
+"price": "7.20",
+"category_id": "9e1992c7-47c9-44f5-8065-389f83ee6f6a",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tuna mango",
+"fr": "Thon mangue",
+"zh": "金枪鱼芒果"
+}
+},
+{
+"id": "9e199555-901a-410f-a16f-fe27d272a49f",
+"code": "E13",
+"slug": "masago-roll-tempura-crevette",
+"price": "7.00",
+"category_id": "9e1992c7-47c9-44f5-8065-389f83ee6f6a",
+"available": true,
+"visible": true,
+"names": {
+"en": "Shrimp tempura",
+"fr": "Tempura crevette",
+"zh": "天妇罗虾"
+}
+},
+{
+"id": "9e199551-4365-4c3e-9b75-085d1ffe150f",
+"code": "E16",
+"slug": "california-roll-saumon-cheese",
+"price": "6.50",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon cheese",
+"fr": "Saumon cheese",
+"zh": "三文鱼芝士"
+}
+},
+{
+"id": "9e199551-963f-4be1-a353-1651aab9fd99",
+"code": "E17",
+"slug": "california-roll-poulet-frit-roquette-miel",
+"price": "7.60",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Fried chicken salad honey",
+"fr": "Poulet frit roquette miel",
+"zh": "炸鸡沙拉蜂蜜"
+}
+},
+{
+"id": "9e199551-e3fd-4d37-8d70-3ecdc8982c51",
+"code": "E18",
+"slug": "california-roll-oignons-frits-foie-gras-miel",
+"price": "8.90",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Fried onions foie gras honey",
+"fr": "Oignons frits foie gras miel",
+"zh": "炸洋葱鹅肝蜂蜜"
+}
+},
+{
+"id": "9e199552-35b8-4c4c-8c58-07b73e3026a8",
+"code": "E19",
+"slug": "california-roll-tempura-crevette-coriandre-piquant",
+"price": "8.20",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tempura shrimp coriander spicy",
+"fr": "Tempura crevette coriandre piquant",
+"zh": "辣天妇罗虾香菜"
+}
+},
+{
+"id": "9e19954e-6003-4a49-b2af-df6fede19123",
+"code": "E2",
+"slug": "california-roll-thon-avocat",
+"price": "7.00",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tuna avocado",
+"fr": "Thon avocat",
+"zh": "金枪鱼牛油果"
+}
+},
+{
+"id": "9e199552-84ae-4d78-aaf5-51ffad68ca0f",
+"code": "E20",
+"slug": "california-roll-tempura-crevette-avocat-cheese-fraise",
+"price": "8.30",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tempura shrimp avocado cheese strawberry",
+"fr": "Tempura crevette avocat cheese fraise",
+"zh": "天妇罗虾牛油果芝士草莓"
+}
+},
+{
+"id": "9e199552-d88d-4cd7-96c4-b749e4dec863",
+"code": "E21",
+"slug": "california-roll-poulet-piquant",
+"price": "8.20",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Spicy chicken",
+"fr": "Poulet piquant",
+"zh": "辣鸡肉"
+}
+},
+{
+"id": "9e19954e-ae99-4c38-804d-2858a0532b38",
+"code": "E3",
+"slug": "california-roll-surimi-avocat",
+"price": "6.20",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Surimi avocado",
+"fr": "Surimi avocat",
+"zh": "蟹肉棒牛油果"
+}
+},
+{
+"id": "9e19954f-0438-40e9-9ee8-52daa8568bf1",
+"code": "E4",
+"slug": "california-roll-tempura-crevette-avocat",
+"price": "6.80",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tempura shrimp avocado",
+"fr": "Tempura crevette avocat",
+"zh": "天妇罗虾牛油果"
+}
+},
+{
+"id": "9e19954f-5351-413e-a71c-0128e7554272",
+"code": "E5",
+"slug": "california-roll-tempura-crevette-cheese",
+"price": "6.80",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tempura shrimp cheese",
+"fr": "Tempura crevette cheese",
+"zh": "天妇罗虾芝士"
+}
+},
+{
+"id": "9e19954f-a670-4161-abe5-decd4cb3e3bd",
+"code": "E6",
+"slug": "california-roll-saumon-mangue",
+"price": "6.50",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon mango",
+"fr": "Saumon mangue",
+"zh": "三文鱼芒果"
+}
+},
+{
+"id": "9e19954f-fa9d-4d22-8e30-526f7dd2c856",
+"code": "E7",
+"slug": "california-roll-crevette-avocat-cheese",
+"price": "6.90",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Shrimp avocado cheese",
+"fr": "Crevette avocat cheese",
+"zh": "虾牛油果芝士"
+}
+},
+{
+"id": "9e199550-4d83-4e01-9f7a-da093c44d84e",
+"code": "E8",
+"slug": "california-roll-oignons-frits-poulet",
+"price": "7.50",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Fried onions chicken",
+"fr": "Oignons frits poulet",
+"zh": "炸洋葱鸡肉"
+}
+},
+{
+"id": "9e199550-9fab-4954-aa41-0e7e5ce9bbe8",
+"code": "E9",
+"slug": "california-roll-thon-cuit-pomme-spicy",
+"price": "6.50",
+"category_id": "9e1992c6-4378-48cd-be59-aa585d9f90fc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Cooked tuna spicy apple",
+"fr": "Thon cuit pomme spicy",
+"zh": "辣熟金枪鱼苹果"
+}
+},
+{
+"id": "9e199553-61e0-4ffa-ae12-76b6325659de",
+"code": "F1",
+"slug": "temaki-saumon-avocat-concombre",
+"price": "5.50",
+"category_id": "9e1992c6-c71c-4a29-9457-2c0eaecab8c8",
+"available": true,
+"visible": false,
+"names": {
+"en": "Salmon avocado cucumber",
+"fr": "Saumon avocat concombre",
+"zh": "三文鱼牛油果黄瓜"
+}
+},
+{
+"id": "9e199553-b1d0-4cc7-bf23-98d1f26efd31",
+"code": "F2",
+"slug": "temaki-thon-avocat-concombre",
+"price": "6.00",
+"category_id": "9e1992c6-c71c-4a29-9457-2c0eaecab8c8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tuna avocado cucumber",
+"fr": "Thon avocat concombre",
+"zh": "金枪鱼牛油果黄瓜"
+}
+},
+{
+"id": "9e199554-0ca6-48b8-9f9a-51f853b27f8b",
+"code": "F3",
+"slug": "temaki-tempura-crevette-avocat-concombre",
+"price": "5.50",
+"category_id": "9e1992c6-c71c-4a29-9457-2c0eaecab8c8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Shrimp tempura avocado cucumber",
+"fr": "Tempura crevette avocat concombre",
+"zh": "天妇罗虾牛油果黄瓜"
+}
+},
+{
+"id": "9e199554-665f-497b-a927-271baef8e944",
+"code": "F4",
+"slug": "temaki-oeufs-de-saumon-avocat-concombre",
+"price": "7.50",
+"category_id": "9e1992c6-c71c-4a29-9457-2c0eaecab8c8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon eggs avocado cucumber",
+"fr": "Oeufs de saumon avocat concombre",
+"zh": "三文鱼子牛油果黄瓜"
+}
+},
+{
+"id": "9e199556-12bb-430e-83ff-98d256922b79",
+"code": "G1",
+"slug": "special-roll-saumon-royal",
+"price": "11.00",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Royal salmon",
+"fr": "Saumon royal",
+"zh": "皇家三文鱼"
+}
+},
+{
+"id": "9e199558-f9c9-498c-ac76-03dd05cefec1",
+"code": "G10",
+"slug": "special-roll-chips-rolls",
+"price": "10.80",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Chips rolls",
+"fr": "Chips rolls",
+"zh": "薯片卷"
+}
+},
+{
+"id": "9e199559-4cc3-4a33-8c56-0a6e8a3500de",
+"code": "G11",
+"slug": "special-roll-osaka-rolls",
+"price": "13.80",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Osaka rolls",
+"fr": "Osaka rolls",
+"zh": "大阪卷"
+}
+},
+{
+"id": "9e199559-9ca4-4bdd-a261-8e254dc80c27",
+"code": "G12",
+"slug": "special-roll-foie-gras-fraise-rolls",
+"price": "14.80",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Foie gras strawberry rolls",
+"fr": "Foie gras fraise rolls",
+"zh": "鹅肝草莓卷"
+}
+},
+{
+"id": "9e29fb98-969f-4f5d-b093-3b54cd33b556",
+"code": "G13",
+"slug": "special-roll-poulet-croustillant-rolls",
+"price": "11.80",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Crispy chicken rolls",
+"fr": "Poulet croustillant rolls",
+"nl": "",
+"zh": "脆鸡卷"
+}
+},
+{
+"id": "d0f3eed4-2ecd-4c60-bb64-a188c08b9651",
+"code": "G14",
+"slug": "special-roll-dragon-rolls-saumon",
+"price": "12.00",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Dragon salmon rolls",
+"fr": "Dragon Rolls saumon",
+"nl": "",
+"zh": "龙卷三文鱼"
+}
+},
+{
+"id": "9e19955a-42a5-4b10-a8a5-9caff8e2925a",
+"code": "G15",
+"slug": "special-roll-delice-mangue",
+"price": "11.50",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Mango delight",
+"fr": "Délice mangue",
+"zh": "芒果乐"
+}
+},
+{
+"id": "addfab87-50e6-4404-883b-403924e7f057",
+"code": "G16",
+"slug": "special-roll-dragon-rolls-scampis",
+"price": "12.00",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Dragon scampi rolls",
+"fr": "Dragon Rolls scampis",
+"nl": "",
+"zh": "龙卷虾"
+}
+},
+{
+"id": "10f6ab0c-9040-459d-a6c8-1e1293c81821",
+"code": "G17",
+"slug": "special-roll-california-tofu-avocat-frits",
+"price": "10.80",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Fried tofu avocado california",
+"fr": "California Tofu avocat frits",
+"nl": "",
+"zh": "炸豆腐牛油果加州卷"
+}
+},
+{
+"id": "9e199559-eebb-447b-bb55-53a03ea400cc",
+"code": "G18",
+"slug": "special-roll-spicy-poulet",
+"price": "10.80",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Spicy chicken",
+"fr": "Spicy poulet",
+"zh": "辣鸡肉"
+}
+},
+{
+"id": "9e199556-6400-42ae-8a08-eadadf194e71",
+"code": "G2",
+"slug": "special-roll-mangue-rolls",
+"price": "11.00",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Mango rolls",
+"fr": "Mangue rolls",
+"zh": "芒果卷"
+}
+},
+{
+"id": "9e199556-b4a2-428a-8be3-6cf9bbd221f2",
+"code": "G3",
+"slug": "special-roll-avocat-rolls",
+"price": "12.80",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Avocado rolls",
+"fr": "Avocat rolls",
+"zh": "牛油果卷"
+}
+},
+{
+"id": "9e199557-0907-4aeb-af30-10f0531527ee",
+"code": "G4",
+"slug": "special-roll-anguille-rolls",
+"price": "12.80",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Eel rolls",
+"fr": "Anguille rolls",
+"zh": "鳗鱼卷"
+}
+},
+{
+"id": "9e199557-5b7e-4e8b-8378-5f13f54bc343",
+"code": "G5",
+"slug": "special-roll-oignon-rolls",
+"price": "9.50",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Onion rolls",
+"fr": "Oignon rolls",
+"zh": "洋葱卷"
+}
+},
+{
+"id": "9e199557-a9d1-43c5-9e10-dd2a5f57bfd5",
+"code": "G6",
+"slug": "special-roll-miel-rolls",
+"price": "10.80",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Honey rolls",
+"fr": "Miel rolls",
+"zh": "蜂蜜卷"
+}
+},
+{
+"id": "9e199557-fb1b-4a08-bdfa-ee618649dbb8",
+"code": "G7",
+"slug": "special-roll-assortiment-rolls",
+"price": "12.80",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Mixed rolls",
+"fr": "Assortiment rolls",
+"zh": "什锦卷"
+}
+},
+{
+"id": "9e199558-526b-4a44-861f-1e89a0f61e4f",
+"code": "G8",
+"slug": "special-roll-spicy-saumon",
+"price": "12.80",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Spicy salmon",
+"fr": "Spicy saumon",
+"zh": "辣三文鱼"
+}
+},
+{
+"id": "9e199558-a22d-4cd9-aafc-2decdccb0c0b",
+"code": "G9",
+"slug": "special-roll-crispy-saumon",
+"price": "12.80",
+"category_id": "9e1992c7-c630-47b9-9528-a3ebb9ed4f31",
+"available": true,
+"visible": true,
+"names": {
+"en": "Crispy salmon",
+"fr": "Crispy saumon",
+"zh": "脆三文鱼"
+}
+},
+{
+"id": "9e19955a-cabe-4400-be00-0fe1b19fd9e8",
+"code": "H1",
+"slug": "chirashi-tranches-ou-tartare-de-saumon-avocat",
+"price": "15.30",
+"category_id": "9e1992c8-49d8-4bd1-8811-4ce3978789b7",
+"available": true,
+"visible": true,
+"names": {
+"en": "Slices (or tartare) of salmon and avocado",
+"fr": "Tranches (ou tartare) de saumon avocat",
+"zh": "三文鱼牛油果切片（或鞑靼）"
+}
+},
+{
+"id": "9e19955b-19e0-4070-8b65-f4e13a459116",
+"code": "H2",
+"slug": "chirashi-tranches-ou-tartare-de-thon-avocat",
+"price": "16.80",
+"category_id": "9e1992c8-49d8-4bd1-8811-4ce3978789b7",
+"available": true,
+"visible": true,
+"names": {
+"en": "Slices (or tartare) of tuna and avocado",
+"fr": "Tranches (ou tartare) de thon avocat",
+"zh": "金枪鱼牛油果切片（或他他）"
+}
+},
+{
+"id": "9e19955b-6a35-4702-a540-e0e715461e65",
+"code": "H4",
+"slug": "chirashi-assortiment",
+"price": "19.80",
+"category_id": "9e1992c8-49d8-4bd1-8811-4ce3978789b7",
+"available": true,
+"visible": true,
+"names": {
+"en": "Mix",
+"fr": "Assortiment",
+"zh": "什锦"
+}
+},
+{
+"id": "9e19955b-f33b-4f01-b882-fc3eba770b10",
+"code": "I1",
+"slug": "sashimi-saumon",
+"price": "9.80",
+"category_id": "9e1992c8-c8fd-4974-803d-cd7f9c0c1e6d",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon",
+"fr": "Saumon",
+"zh": "三文鱼"
+}
+},
+{
+"id": "9e19955c-430d-4295-b6e0-aff2453d5768",
+"code": "I2",
+"slug": "sashimi-thon",
+"price": "11.80",
+"category_id": "9e1992c8-c8fd-4974-803d-cd7f9c0c1e6d",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tuna",
+"fr": "Thon",
+"zh": "金枪鱼"
+}
+},
+{
+"id": "9e19955c-9680-4cd4-87d6-1d6bb8567148",
+"code": "I3",
+"slug": "sashimi-saumon-thon",
+"price": "20.80",
+"category_id": "9e1992c8-c8fd-4974-803d-cd7f9c0c1e6d",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon tuna",
+"fr": "Saumon thon",
+"zh": "三文鱼金枪鱼"
+}
+},
+{
+"id": "9e19955c-e3db-44cc-91db-1b8349c4efed",
+"code": "I4",
+"slug": "sashimi-assortiment",
+"price": "24.80",
+"category_id": "9e1992c8-c8fd-4974-803d-cd7f9c0c1e6d",
+"available": true,
+"visible": true,
+"names": {
+"en": "Mix",
+"fr": "Assortiment",
+"zh": "什锦"
+}
+},
+{
+"id": "e0a330cd-90ee-47d6-84e0-6c38b39e603a",
+"code": "K1",
+"slug": "tokyo-hot-soupe-miso",
+"price": "4.00",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Miso soup",
+"fr": "Soupe miso",
+"zh": "味噌汤"
+}
+},
+{
+"id": "226355b2-792c-4c63-a97a-0d7bdaae58f5",
+"code": "K10",
+"slug": "tokyo-hot-raviolis-aux-scampis-a-la-vapeur",
+"price": "7.50",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Steamed scampi ravioli",
+"fr": "Raviolis aux scampis à la vapeur",
+"zh": "蒸虾饺"
+}
+},
+{
+"id": "0230d7cc-b166-4d3c-bb97-09d1ae2b0d3a",
+"code": "K11",
+"slug": "tokyo-hot-katsu-de-poulet-avec-sauce-mayonnaise-piquante",
+"price": "9.80",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Chicken Katsu with Spicy Mayonnaise Sauce",
+"fr": "Katsu de poulet avec sauce mayonnaise piquante",
+"zh": "香辣蛋黄酱炸鸡排"
+}
+},
+{
+"id": "7f33323e-f3e4-4307-929c-d6f19d0bc88f",
+"code": "K12",
+"slug": "tokyo-hot-tempura-scampis",
+"price": "6.90",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tempura scampi",
+"fr": "Tempura scampis",
+"zh": "天妇罗虾"
+}
+},
+{
+"id": "3366e0e6-e777-4994-8db4-b1968d15480f",
+"code": "K13",
+"slug": "tokyo-hot-raviolis-japonais-a-la-crevette",
+"price": "8.50",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Japanese Shrimp Dumplings",
+"fr": "Raviolis japonais à la crevette",
+"zh": "日式虾饺"
+}
+},
+{
+"id": "a6252970-7b7c-4833-84c7-e1cc4bc9136b",
+"code": "K14",
+"slug": "tokyo-hot-brochette-de-saumon",
+"price": "8.80",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon skewers",
+"fr": "Brochette de saumon",
+"zh": "三文鱼串"
+}
+},
+{
+"id": "97246b93-1412-471f-b18d-a8457ce8ef7c",
+"code": "K15",
+"slug": "tokyo-hot-raviolis-japonais-au-poulet",
+"price": "6.80",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Japanese Chicken Dumplings",
+"fr": "Raviolis japonais au poulet",
+"zh": "日式鸡肉饺子"
+}
+},
+{
+"id": "eb97a61a-90d5-4035-b649-0a42daaa7a9d",
+"code": "K16",
+"slug": "tokyo-hot-brochette-de-tofu",
+"price": "6.00",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tofu skewers",
+"fr": "Brochette de tofu",
+"zh": "豆腐串"
+}
+},
+{
+"id": "023f1130-699e-4b15-a96e-8a18608d8fd9",
+"code": "K18",
+"slug": "tokyo-hot-tataki-de-saumon",
+"price": "10.50",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon tataki",
+"fr": "Tataki de saumon",
+"zh": "三文鱼他他"
+}
+},
+{
+"id": "4cb6b759-2ba7-43ec-9c21-23dc719e5a50",
+"code": "K19",
+"slug": "tokyo-hot-nouilles-sautees-aux-legumes",
+"price": "11.50",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Stir-fried noodles with vegetables",
+"fr": "Nouilles sautées aux légumes",
+"zh": "蔬菜炒面"
+}
+},
+{
+"id": "8f391069-dd58-4bae-ac00-091979c1193d",
+"code": "K2",
+"slug": "tokyo-hot-soupe-piquante",
+"price": "5.50",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Spicy soup",
+"fr": "Soupe piquante",
+"zh": "辣汤"
+}
+},
+{
+"id": "61eef4e5-8745-4ae8-a12f-05f90b8baaf9",
+"code": "K20",
+"slug": "tokyo-hot-nouilles-udon-sautees-au-poulet-croustillant",
+"price": "13.80",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Stir-fried Udon Noodles with Crispy Chicken",
+"fr": "Nouilles Udon sautées au poulet croustillant",
+"zh": "脆鸡炒乌冬面"
+}
+},
+{
+"id": "def829e8-6033-429e-87c0-e8e68c6d5179",
+"code": "K22",
+"slug": "tokyo-hot-nouilles-sautees-aux-scampis",
+"price": "15.80",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Stir-fried noodles with scampi",
+"fr": "Nouilles sautées aux scampis",
+"zh": "虾炒面"
+}
+},
+{
+"id": "3e2a5229-f255-4fb4-ac4d-5670ca4fef4f",
+"code": "K23",
+"slug": "tokyo-hot-katsu-de-poulet-au-curry-japonais",
+"price": "16.80",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Japanese Chicken Katsu Curry",
+"fr": "Katsu de poulet au curry japonais",
+"zh": "日式炸鸡咖喱"
+}
+},
+{
+"id": "5768c5af-f7af-48cf-bca8-1b0761646d25",
+"code": "K3",
+"slug": "tokyo-hot-soupe-de-nouilles-au-poulet",
+"price": "4.50",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Chicken Noodle Soup",
+"fr": "Soupe de nouilles au poulet",
+"zh": "鸡肉面汤"
+}
+},
+{
+"id": "085d3ed0-cf02-4d32-83e0-b75dadb6f11e",
+"code": "K35",
+"slug": "accompagnement-riz-blanc-chaud",
+"price": "3.00",
+"category_id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"available": true,
+"visible": true,
+"names": {
+"en": "Hot white rice",
+"fr": "Riz blanc chaud",
+"zh": "热白饭"
+}
+},
+{
+"id": "5db5b9d7-0d82-4ddb-bfc9-11095f47514c",
+"code": "K36",
+"slug": "accompagnement-riz-vinaigre",
+"price": "4.00",
+"category_id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"available": true,
+"visible": true,
+"names": {
+"en": "Vinegar rice",
+"fr": "Riz vinaigré",
+"zh": "醋饭"
+}
+},
+{
+"id": "e02cd096-f644-4721-8fe3-e85cbf5dbc7c",
+"code": "K37",
+"slug": "accompagnement-edamame",
+"price": "3.50",
+"category_id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"available": true,
+"visible": true,
+"names": {
+"en": "Edamame",
+"fr": "Edamame",
+"zh": "毛豆"
+}
+},
+{
+"id": "14824b8f-3039-4597-82c9-7eba99efe867",
+"code": "K38",
+"slug": "accompagnement-wakame",
+"price": "4.00",
+"category_id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"available": true,
+"visible": true,
+"names": {
+"en": "Wakame",
+"fr": "Wakame",
+"zh": "裙带菜"
+}
+},
+{
+"id": "3a7a5b4f-c5d2-41a5-bb08-e53ddf6896bc",
+"code": "K39",
+"slug": "accompagnement-chou-vinaigre",
+"price": "3.50",
+"category_id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"available": true,
+"visible": true,
+"names": {
+"en": "Pickled cabbage",
+"fr": "Chou vinaigré",
+"zh": "腌卷心菜"
+}
+},
+{
+"id": "0be1140f-12a6-4afb-8e92-75c64454f553",
+"code": "K40",
+"slug": "accompagnement-gingembre",
+"price": "3.50",
+"category_id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"available": true,
+"visible": true,
+"names": {
+"en": "Ginger",
+"fr": "Gingembre",
+"zh": "姜片"
+}
+},
+{
+"id": "a7bf9b69-a39d-4bad-9afd-46dcff745808",
+"code": "K42",
+"slug": "accompagnement-sauce-soja-salee-30ml",
+"price": "1.00",
+"category_id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salty soy sauce (30ml)",
+"fr": "Sauce soja salée (30ml)",
+"zh": "咸酱油 (30ml)"
+}
+},
+{
+"id": "2bd23e0f-32a4-419e-8f9c-981e499adae6",
+"code": "K43",
+"slug": "accompagnement-sauce-soja-sucree-30ml",
+"price": "1.00",
+"category_id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"available": true,
+"visible": true,
+"names": {
+"en": "Sweet soy sauce (30ml)",
+"fr": "Sauce soja sucrée (30ml)",
+"zh": "甜酱油 (30ml)"
+}
+},
+{
+"id": "12428baa-368a-4346-aaae-2f95d9d6ae18",
+"code": "K45",
+"slug": "accompagnement-wasabi-28cc",
+"price": "0.80",
+"category_id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"available": true,
+"visible": true,
+"names": {
+"en": "Wasabi (28cc)",
+"fr": "Wasabi (28cc)",
+"zh": "芥末 (28cc)"
+}
+},
+{
+"id": "4d167b75-0dec-472e-a4ec-bb7d1039776b",
+"code": "K46",
+"slug": "accompagnement-mayo-spicy",
+"price": "1.00",
+"category_id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"available": true,
+"visible": true,
+"names": {
+"en": "Spicy mayo",
+"fr": "Mayo spicy",
+"zh": "辣蛋黄酱"
+}
+},
+{
+"id": "7ca33c8f-1e56-4925-b572-a3087fac7641",
+"code": "K47",
+"slug": "accompagnement-sauce-chili-piquante",
+"price": "0.80",
+"category_id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"available": true,
+"visible": true,
+"names": {
+"en": "Hot chili sauce",
+"fr": "Sauce chili piquante",
+"zh": "辣椒酱"
+}
+},
+{
+"id": "652a530d-b617-40cc-ae74-63f07be58f0c",
+"code": "K48",
+"slug": "accompagnement-kimchi-carottes-maison",
+"price": "4.00",
+"category_id": "9e1992ca-e360-4498-ab6a-62852f8f213b",
+"available": false,
+"visible": true,
+"names": {
+"en": "Homemade carrot kimchi",
+"fr": "Kimchi carottes maison",
+"zh": "自制胡萝卜泡菜"
+}
+},
+{
+"id": "eedd1790-cf4c-46ca-b5ad-7da57d9b0141",
+"code": "K7",
+"slug": "tokyo-hot-brochette-de-poulet",
+"price": "5.50",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Chicken skewer",
+"fr": "Brochette de poulet",
+"zh": "鸡肉串"
+}
+},
+{
+"id": "41e2f508-57c2-4e68-96ee-1a7f95682f24",
+"code": "K8",
+"slug": "tokyo-hot-brochette-de-boeuf-au-fromage",
+"price": "7.50",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Beef skewer with cheese",
+"fr": "Brochette de boeuf au fromage",
+"zh": "芝士牛肉串"
+}
+},
+{
+"id": "6d19a765-b33c-4c7e-b6eb-213cda0dc21c",
+"code": "K9",
+"slug": "tokyo-hot-boulettes-de-poulpe-a-la-japonaise",
+"price": "6.60",
+"category_id": "9e1992c9-d637-4dcc-ae10-bd9a445495b8",
+"available": true,
+"visible": true,
+"names": {
+"en": "Japanese Octopus Balls",
+"fr": "Boulettes de poulpe à la japonaise",
+"zh": "章鱼小丸子"
+}
+},
+{
+"id": "82c1f284-a92d-4e3b-9da7-a3d264c6d5d7",
+"code": "R1",
+"slug": "ramen-ramen-poulet",
+"price": "18.80",
+"category_id": "a2de2102-7930-4109-b162-ebb03585f6ac",
+"available": true,
+"visible": true,
+"names": {
+"en": "Chicken ramen",
+"fr": "Ramen poulet",
+"nl": "",
+"zh": "鸡肉拉面"
+}
+},
+{
+"id": "00010c0f-2707-4786-b774-b415dd07b347",
+"code": "R2",
+"slug": "ramen-ramen-boeuf",
+"price": "19.80",
+"category_id": "a2de2102-7930-4109-b162-ebb03585f6ac",
+"available": true,
+"visible": true,
+"names": {
+"en": "Beef ramen",
+"fr": "Ramen boeuf",
+"nl": "",
+"zh": "牛肉拉面"
+}
+},
+{
+"id": "b512a3ee-52fe-4088-9bd6-049b2989647e",
+"code": "R3",
+"slug": "ramen-ramen-tofu",
+"price": "16.80",
+"category_id": "a2de2102-7930-4109-b162-ebb03585f6ac",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tofu ramen",
+"fr": "Ramen tofu",
+"nl": "",
+"zh": "豆腐拉面"
+}
+},
+{
+"id": "1dc70510-fa31-4b91-91e0-009add9a6a22",
+"code": "R4",
+"slug": "ramen-ramen-canard",
+"price": "20.80",
+"category_id": "a2de2102-7930-4109-b162-ebb03585f6ac",
+"available": true,
+"visible": true,
+"names": {
+"en": "Duck ramen",
+"fr": "Ramen canard",
+"nl": "",
+"zh": "鸭肉拉面"
+}
+},
+{
+"id": "9e19955d-6aaf-4cc4-9979-e20e6c856a13",
+"code": "R5",
+"slug": "poke-bowl-saumon",
+"price": "15.80",
+"category_id": "9e1992c9-4c21-4723-a416-96550589eb7c",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon",
+"fr": "Saumon",
+"zh": "三文鱼"
+}
+},
+{
+"id": "9e19955d-bb59-4973-af4c-f46616ae537b",
+"code": "R6",
+"slug": "poke-bowl-thon",
+"price": "17.80",
+"category_id": "9e1992c9-4c21-4723-a416-96550589eb7c",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tuna",
+"fr": "Thon",
+"zh": "金枪鱼"
+}
+},
+{
+"id": "9e19955e-0ccd-41d8-80e8-159cb27e9e86",
+"code": "R7",
+"slug": "poke-bowl-poulet",
+"price": "15.30",
+"category_id": "9e1992c9-4c21-4723-a416-96550589eb7c",
+"available": true,
+"visible": true,
+"names": {
+"en": "Chicken",
+"fr": "Poulet",
+"zh": "鸡肉"
+}
+},
+{
+"id": "9e19955e-5aba-49e3-b219-03f0a0dcc506",
+"code": "R8",
+"slug": "poke-bowl-gyoza-poulet-frit",
+"price": "15.30",
+"category_id": "9e1992c9-4c21-4723-a416-96550589eb7c",
+"available": true,
+"visible": true,
+"names": {
+"en": "Gyoza fried chicken",
+"fr": "Gyoza poulet frit",
+"zh": "煎饺炸鸡"
+}
+},
+{
+"id": "9e19955e-ab77-4e87-8d34-08b4989d5e3c",
+"code": "R9",
+"slug": "poke-bowl-vegetarien-tofu",
+"price": "13.80",
+"category_id": "9e1992c9-4c21-4723-a416-96550589eb7c",
+"available": true,
+"visible": true,
+"names": {
+"en": "Vegetarian tofu",
+"fr": "Végétarien tofu",
+"zh": "素食豆腐"
+}
+},
+{
+"id": "9e199548-4254-4874-a63f-07eea06d0310",
+"code": "T1",
+"slug": "gunkan-saumon-avocat",
+"price": "2.60",
+"category_id": "9e1992c5-4002-4797-ba9d-feb545add16e",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon avocado",
+"fr": "Saumon avocat",
+"zh": "三文鱼牛油果"
+}
+},
+{
+"id": "9e199548-9a1d-481a-8d02-17ea3723a739",
+"code": "T2",
+"slug": "gunkan-thon-avocat",
+"price": "2.80",
+"category_id": "9e1992c5-4002-4797-ba9d-feb545add16e",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tuna avocado",
+"fr": "Thon avocat",
+"zh": "金枪鱼牛油果"
+}
+},
+{
+"id": "9e199548-ee6a-4df9-bd07-c944c24d72a6",
+"code": "T3",
+"slug": "gunkan-avocat-cheese",
+"price": "2.20",
+"category_id": "9e1992c5-4002-4797-ba9d-feb545add16e",
+"available": true,
+"visible": true,
+"names": {
+"en": "Cheese avocado",
+"fr": "Avocat cheese",
+"zh": "芝士牛油果"
+}
+},
+{
+"id": "c8cf3a20-9cf5-48ef-a018-76b1363ecf78",
+"code": null,
+"slug": "boisson-biere-asahi",
+"price": "3.90",
+"category_id": "9e1992cb-66d5-4334-b6e6-669f37047773",
+"available": true,
+"visible": true,
+"names": {
+"en": "Asahi Beer",
+"fr": "Bière Asahi",
+"nl": "",
+"zh": "朝日啤酒"
+}
+},
+{
+"id": "495bd13e-0fb2-4566-add6-98c8c6249e7f",
+"code": null,
+"slug": "boisson-biere-iki-yuzu",
+"price": "3.80",
+"category_id": "9e1992cb-66d5-4334-b6e6-669f37047773",
+"available": false,
+"visible": true,
+"names": {
+"en": "Iki Yuzu Beer",
+"fr": "Bière Iki Yuzu",
+"nl": "",
+"zh": "柚子啤酒"
+}
+},
+{
+"id": "5d6b5b64-478c-4469-a5c3-f8ebb6e03c25",
+"code": null,
+"slug": "boisson-biere-kirin",
+"price": "3.80",
+"category_id": "9e1992cb-66d5-4334-b6e6-669f37047773",
+"available": true,
+"visible": true,
+"names": {
+"en": "Kirin Beer",
+"fr": "Bière Kirin",
+"nl": "",
+"zh": "麒麟啤酒"
+}
+},
+{
+"id": "ad4dc41b-55e5-4487-a6b5-7e5b285cd1df",
+"code": null,
+"slug": "boisson-biere-sapporo",
+"price": "3.80",
+"category_id": "9e1992cb-66d5-4334-b6e6-669f37047773",
+"available": true,
+"visible": true,
+"names": {
+"en": "Sapporo Beer",
+"fr": "Bière Sapporo",
+"nl": "",
+"zh": "札幌啤酒"
+}
+},
+{
+"id": "ab8e8a59-0c7c-4242-8841-c907f144a3f3",
+"code": null,
+"slug": "boisson-biere-tsingtao",
+"price": "3.80",
+"category_id": "9e1992cb-66d5-4334-b6e6-669f37047773",
+"available": false,
+"visible": true,
+"names": {
+"en": "Tsingtao Beer",
+"fr": "Bière Tsingtao",
+"nl": "",
+"zh": "青岛啤酒"
+}
+},
+{
+"id": "0a988294-7f6f-4263-8c45-1c345b46c9ad",
+"code": null,
+"slug": "boisson-coca-cola",
+"price": "2.50",
+"category_id": "9e1992cb-66d5-4334-b6e6-669f37047773",
+"available": true,
+"visible": true,
+"names": {
+"en": "Coca-Cola",
+"fr": "Coca-Cola",
+"nl": "",
+"zh": "可口可乐"
+}
+},
+{
+"id": "d543f232-7fa1-40e8-aebc-bd15424ebc0c",
+"code": null,
+"slug": "boisson-coca-cola-zero",
+"price": "2.50",
+"category_id": "9e1992cb-66d5-4334-b6e6-669f37047773",
+"available": true,
+"visible": true,
+"names": {
+"en": "Coca-Cola Zero",
+"fr": "Coca-Cola zéro",
+"nl": "",
+"zh": "零度可乐"
+}
+},
+{
+"id": "331ad02f-1cb0-4e9b-9fda-d1c85ac972ad",
+"code": null,
+"slug": "boisson-the-glace-litchi",
+"price": "3.80",
+"category_id": "9e1992cb-66d5-4334-b6e6-669f37047773",
+"available": false,
+"visible": true,
+"names": {
+"en": "Lychee Frozen Tea",
+"fr": "Thé glacé litchi",
+"nl": "",
+"zh": "荔枝冰茶"
+}
+},
+{
+"id": "76333032-ff07-4b75-90bd-f6a39b3aaaec",
+"code": null,
+"slug": "boisson-the-glace-melon",
+"price": "3.80",
+"category_id": "9e1992cb-66d5-4334-b6e6-669f37047773",
+"available": false,
+"visible": true,
+"names": {
+"en": "Melon Frozen Tea",
+"fr": "Thé glacé melon",
+"nl": "",
+"zh": "蜜瓜冰茶"
+}
+},
+{
+"id": "0afe0d45-4342-4bc8-8ced-2e6999aa328e",
+"code": null,
+"slug": "dessert-boule-de-sesame-aux-haricots-rouges",
+"price": "5.50",
+"category_id": "efbd4ee3-671a-4568-bd50-d00dc38905cc",
+"available": false,
+"visible": true,
+"names": {
+"en": "Sesame ball with red beans",
+"fr": "Boule de sésame aux haricots rouges",
+"zh": "红豆芝麻球"
+}
+},
+{
+"id": "8ea76a2d-900e-4e26-bcba-90bee8dd39d8",
+"code": null,
+"slug": "dessert-cheesecake-matcha",
+"price": "5.00",
+"category_id": "efbd4ee3-671a-4568-bd50-d00dc38905cc",
+"available": false,
+"visible": true,
+"names": {
+"en": "Matcha Cheesecake",
+"fr": "Cheesecake matcha",
+"zh": "抹茶芝士蛋糕"
+}
+},
+{
+"id": "a7877213-77e1-4f03-93ce-2cb5c20c3d1f",
+"code": null,
+"slug": "dessert-cheesecake-yuzu",
+"price": "5.00",
+"category_id": "efbd4ee3-671a-4568-bd50-d00dc38905cc",
+"available": false,
+"visible": true,
+"names": {
+"en": "Yuzu Cheesecake",
+"fr": "Cheesecake Yuzu",
+"zh": "柚子芝士蛋糕"
+}
+},
+{
+"id": "233dd486-35c8-41d7-9fdd-056b6cd999aa",
+"code": null,
+"slug": "dessert-mochi-glace",
+"price": "7.50",
+"category_id": "efbd4ee3-671a-4568-bd50-d00dc38905cc",
+"available": true,
+"visible": true,
+"names": {
+"en": "Frozen mochi",
+"fr": "Mochi glacé",
+"zh": "冰麻糬"
+}
+},
+{
+"id": "9e199540-c809-4e79-b68e-8eedb472fcbb",
+"code": null,
+"slug": "menu-bento-box-bento-box-1",
+"price": "19.80",
+"category_id": "9e1992c3-b51e-4b9d-845c-ec88b640977a",
+"available": true,
+"visible": true,
+"names": {
+"en": "Bento box 1",
+"fr": "Bento box 1",
+"nl": "",
+"zh": "便当1"
+}
+},
+{
+"id": "9e199541-1a4c-4079-8ab3-ca5dbdf83d69",
+"code": null,
+"slug": "menu-bento-box-bento-box-2",
+"price": "20.80",
+"category_id": "9e1992c3-b51e-4b9d-845c-ec88b640977a",
+"available": true,
+"visible": true,
+"names": {
+"en": "Bento box 2",
+"fr": "Bento box 2",
+"zh": "便当2"
+}
+},
+{
+"id": "9e199541-6bd3-493a-a591-a52906cad62f",
+"code": null,
+"slug": "menu-bento-box-bento-royal",
+"price": "18.80",
+"category_id": "9e1992c3-b51e-4b9d-845c-ec88b640977a",
+"available": false,
+"visible": true,
+"names": {
+"en": "Royal bento",
+"fr": "Bento royal",
+"zh": "皇家便当"
+}
+},
+{
+"id": "9e199541-bf2d-4a74-aaab-68113002a821",
+"code": null,
+"slug": "menu-bento-box-bento-vegetarien",
+"price": "15.80",
+"category_id": "9e1992c3-b51e-4b9d-845c-ec88b640977a",
+"available": false,
+"visible": true,
+"names": {
+"en": "Vegetarian bento",
+"fr": "Bento végétarien",
+"zh": "素食便当"
+}
+},
+{
+"id": "24a3769c-99c4-4f99-aeb8-479590d2078f",
+"code": null,
+"slug": "menu-lunch-menu-lunch-a",
+"price": "14.80",
+"category_id": "b72ff149-6d3a-45a2-9e52-f824e2c80727",
+"available": false,
+"visible": true,
+"names": {
+"en": "Lunch menu A",
+"fr": "Menu lunch A",
+"nl": "",
+"zh": "午餐套餐A"
+}
+},
+{
+"id": "d51db416-f68e-4fcb-8b40-4db395b8a525",
+"code": null,
+"slug": "menu-lunch-menu-lunch-c",
+"price": "15.80",
+"category_id": "b72ff149-6d3a-45a2-9e52-f824e2c80727",
+"available": true,
+"visible": true,
+"names": {
+"en": "Lunch menu C",
+"fr": "Menu lunch C",
+"nl": "",
+"zh": "午餐套餐C"
+}
+},
+{
+"id": "ce2e8cf6-e5c3-4e88-a329-4930635b97d2",
+"code": null,
+"slug": "menu-lunch-menu-lunch-d",
+"price": "17.80",
+"category_id": "b72ff149-6d3a-45a2-9e52-f824e2c80727",
+"available": true,
+"visible": true,
+"names": {
+"en": "Lunch menu D",
+"fr": "Menu lunch D",
+"nl": "",
+"zh": "午餐套餐D"
+}
+},
+{
+"id": "9e199414-bb2f-4aed-ac7f-a6423a2d7092",
+"code": null,
+"slug": "menu-plateau-m1",
+"price": "17.90",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "M1",
+"fr": "M1",
+"nl": "",
+"zh": "M1"
+}
+},
+{
+"id": "9e199415-0f31-46a9-ae14-f0dc0899e681",
+"code": null,
+"slug": "menu-plateau-m2",
+"price": "18.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "M2",
+"fr": "M2",
+"nl": "",
+"zh": "M2"
+}
+},
+{
+"id": "9e199418-44c3-4e92-81d5-99427e724fec",
+"code": null,
+"slug": "menu-plateau-m3",
+"price": "23.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "M3",
+"fr": "M3",
+"nl": "",
+"zh": "M3"
+}
+},
+{
+"id": "9e199416-a3a3-48ac-b6b2-eb2b7925c899",
+"code": null,
+"slug": "menu-plateau-m4",
+"price": "26.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "M4",
+"fr": "M4",
+"nl": "",
+"zh": "M4"
+}
+},
+{
+"id": "9e199418-e962-4969-a5bc-12dd47768537",
+"code": null,
+"slug": "menu-plateau-m5",
+"price": "30.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "M5",
+"fr": "M5",
+"nl": "",
+"zh": "M5"
+}
+},
+{
+"id": "9e19941a-dd58-4753-afed-1e51f4055f55",
+"code": null,
+"slug": "menu-plateau-m6",
+"price": "51.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "M6",
+"fr": "M6",
+"nl": "",
+"zh": "M6"
+}
+},
+{
+"id": "9e199418-9af4-4160-989f-1fad121bd58a",
+"code": null,
+"slug": "menu-plateau-m7",
+"price": "56.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": false,
+"visible": true,
+"names": {
+"en": "M7",
+"fr": "M7",
+"nl": "",
+"zh": "M7"
+}
+},
+{
+"id": "9e199419-97b6-49b7-8b04-afe46ac919a3",
+"code": null,
+"slug": "menu-plateau-plateau-16",
+"price": "18.50",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Platter 18 pieces",
+"fr": "Plateau 18 pièces",
+"zh": "拼盘18件"
+}
+},
+{
+"id": "9e199416-524b-4005-a062-e05c986fa314",
+"code": null,
+"slug": "menu-plateau-plateau-36",
+"price": "45.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Platter 36 pieces",
+"fr": "Plateau 36 pièces",
+"zh": "拼盘36件"
+}
+},
+{
+"id": "9e199417-48c6-457a-999c-ddf84a61e059",
+"code": null,
+"slug": "menu-plateau-plateau-38-pieces",
+"price": "49.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Platter 38 pieces",
+"fr": "Plateau 38 pièces",
+"zh": "拼盘38件"
+}
+},
+{
+"id": "9e199417-ed89-4c19-b4a2-4f30998bcd44",
+"code": null,
+"slug": "menu-plateau-plateau-42-pieces",
+"price": "55.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Platter 42 pieces",
+"fr": "Plateau 42 pièces",
+"zh": "拼盘42件"
+}
+},
+{
+"id": "9e199415-feca-4ded-8eca-3c332cc54481",
+"code": null,
+"slug": "menu-plateau-plateau-46",
+"price": "52.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Platter 46 pieces",
+"fr": "Plateau 46 pièces",
+"zh": "拼盘46件"
+}
+},
+{
+"id": "9e19941a-3a0f-475d-8244-7cdf3f418f0a",
+"code": null,
+"slug": "menu-plateau-plateau-80",
+"price": "109.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Platter 92 pieces",
+"fr": "Plateau 92 pièces",
+"zh": "拼盘92件"
+}
+},
+{
+"id": "9e199415-ae0c-46e3-85cd-328572c33824",
+"code": null,
+"slug": "menu-plateau-plateau-california",
+"price": "23.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "California platter",
+"fr": "Plateau California",
+"nl": "",
+"zh": "加州卷拼盘"
+}
+},
+{
+"id": "9e199415-5b4b-44b1-8962-c2d09ac35398",
+"code": null,
+"slug": "menu-plateau-plateau-saumon",
+"price": "21.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon platter",
+"fr": "Plateau saumon",
+"nl": "",
+"zh": "三文鱼拼盘"
+}
+},
+{
+"id": "9e19941a-8d93-4b09-a3a7-a26675346e53",
+"code": null,
+"slug": "menu-plateau-plateau-sushi-grille",
+"price": "24.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Grilled sushi platter",
+"fr": "Plateau sushi grillé",
+"nl": "",
+"zh": "烤寿司拼盘"
+}
+},
+{
+"id": "9e199416-f4d9-47f2-b8dc-0c8327eeb7e0",
+"code": null,
+"slug": "menu-plateau-plateau-sushi-mix",
+"price": "24.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Mixed sushi platter",
+"fr": "Plateau sushi mix",
+"nl": "",
+"zh": "什锦寿司拼盘"
+}
+},
+{
+"id": "9e199419-e6b0-4026-8392-05232803ecd6",
+"code": null,
+"slug": "menu-plateau-plateau-tokyo",
+"price": "105.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Tokyo platter",
+"fr": "Plateau Tokyo",
+"nl": "",
+"zh": "东京拼盘"
+}
+},
+{
+"id": "2401090b-fcc1-4d29-8c59-7bcfdc74bca5",
+"code": null,
+"slug": "menu-plateau-plateau-vegetarien",
+"price": "17.50",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Vegetarian platter",
+"fr": "Plateau végétarien",
+"nl": "",
+"zh": "素食拼盘"
+}
+},
+{
+"id": "9e199417-9a6e-47fd-be78-c12ee79cb784",
+"code": null,
+"slug": "menu-plateau-saumon-time",
+"price": "16.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon Time",
+"fr": "Saumon Time",
+"nl": "",
+"zh": "三文鱼时光"
+}
+},
+{
+"id": "9e199419-42ab-4c05-a91e-8aab6a24aa8f",
+"code": null,
+"slug": "menu-plateau-sushi-saumon-menu",
+"price": "15.80",
+"category_id": "9e1992c3-2e26-4082-8219-06ca8da5d66f",
+"available": true,
+"visible": true,
+"names": {
+"en": "Salmon sushi menu",
+"fr": "Sushi saumon menu",
+"nl": "",
+"zh": "三文鱼寿司拼盘"
+}
+}
+]
+}

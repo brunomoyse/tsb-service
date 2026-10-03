@@ -36,6 +36,7 @@ type Deps struct {
 // Instructions are sent to the client at initialization.
 const Instructions = `Tools to run the Tokyo Sushi Bar dashboard for the owner.
 - Resolve names to ids first: search_products, list_categories, search_coupons, get_product (choice groups and choices).
+- A product is identified by its category and name together: the same name exists in several categories (三文鱼 is a maki, a sushi, a sashimi and a poke bowl). Name products to the owner by their label (category + name). When search_products' note says the query does not name exactly one product, ask the owner which one before changing anything.
 - Reads and low-risk tools act immediately. propose_* tools only create a pending change and return change_id, summary and expires_at: show the summary to the owner and ask for a yes/no. The change is applied by the agent service, never by a tool.
 - Orders are read only: no tool can create, edit, cancel or refund an order.
 - Money is integer cents (price_cents) in EUR. Times are ISO 8601; without an offset they are Europe/Brussels. Dates are yyyy-mm-dd.

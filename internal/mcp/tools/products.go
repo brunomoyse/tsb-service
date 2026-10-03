@@ -25,11 +25,15 @@ import (
 
 // ProductOut is a product as returned by tools.
 type ProductOut struct {
-	ProductID      string            `json:"product_id"`
+	ProductID string `json:"product_id"`
+	// Labels name the product to the owner: a product is identified by its
+	// category and its name together, never by its name alone.
+	Labels         map[string]string `json:"labels" jsonschema:"how to name the product to the owner, per language: category + name (e.g. zh 卷寿司 三文鱼). The same name exists in several categories, so always use the label"`
 	Name           string            `json:"name" jsonschema:"French name"`
 	Names          map[string]string `json:"names" jsonschema:"name per language (fr, en, zh, nl)"`
 	CategoryID     string            `json:"category_id"`
-	Category       string            `json:"category"`
+	Category       string            `json:"category" jsonschema:"French category name"`
+	CategoryNames  map[string]string `json:"category_names" jsonschema:"category name per language"`
 	PriceCents     int64             `json:"price_cents"`
 	Currency       string            `json:"currency"`
 	Available      bool              `json:"available" jsonschema:"false means sold out"`
@@ -46,10 +50,21 @@ type ProductOut struct {
 
 func productOut(p *upstream.Product) ProductOut {
 	o := ProductOut{ProductID: p.ID, Name: p.NameIn("fr"), Names: map[string]string{}, CategoryID: p.Category.ID, Category: p.Category.Name,
+		Labels: map[string]string{}, CategoryNames: map[string]string{},
 		PriceCents: money.MustCents(p.Price), Currency: money.Currency, Available: p.IsAvailable, Visible: p.IsVisible, VatCategory: p.VatCategory,
 		IsHalal: p.IsHalal, IsSpicy: p.IsSpicy, IsVegetarian: p.IsVegetarian, IsLunchOnly: p.IsLunchOnly, IsDiscountable: p.IsDiscountable}
 	for _, t := range p.Translations {
 		o.Names[t.Language] = t.Name
+	}
+	for _, t := range p.Category.Translations {
+		o.CategoryNames[t.Language] = t.Name
+	}
+	for _, l := range actions.Languages {
+		if cat, name := actions.CategoryNameIn(p.Category, l), p.NameIn(l); cat != "" {
+			o.Labels[l] = cat + " " + name
+		} else {
+			o.Labels[l] = name
+		}
 	}
 	if p.Code != nil {
 		o.Code = *p.Code
@@ -69,13 +84,76 @@ type SearchProductsIn struct {
 
 type ProductMatch struct {
 	ProductOut
-	Score   int    `json:"score" jsonschema:"100 exact, 80 prefix, 60 word prefix, 40 substring, 20-30 typo"`
+	Score   int    `json:"score" jsonschema:"100 exact, 80 prefix, 60 word prefix, 40 substring, 35 name part + category part, 20-30 typo"`
 	Matched string `json:"matched" jsonschema:"the name or field that matched"`
+	Exact   bool   `json:"exact" jsonschema:"the query is exactly this product's name, code, or category + name"`
 }
 
 type SearchProductsOut struct {
-	Query   string         `json:"query"`
-	Results []ProductMatch `json:"results"`
+	Query string `json:"query"`
+	// MatchCount counts every match, also those beyond the limit.
+	MatchCount   int            `json:"match_count"`
+	ExactMatches int            `json:"exact_matches" jsonschema:"results whose name, code or category + name is exactly the query"`
+	Note         string         `json:"note,omitempty" jsonschema:"whether the query identifies one product; read it before acting"`
+	Results      []ProductMatch `json:"results"`
+}
+
+// ProductIndex is a catalogue prepared for search_products.
+type ProductIndex struct {
+	byID map[string]*upstream.Product
+	ix   *search.Index
+}
+
+// NewProductIndex prepares a catalogue for searching.
+func NewProductIndex(ps []upstream.Product) *ProductIndex {
+	ix := &ProductIndex{byID: map[string]*upstream.Product{}, ix: search.NewIndex(productCandidates(ps))}
+	for i := range ps {
+		ix.byID[ps[i].ID] = &ps[i]
+	}
+	return ix
+}
+
+// Search ranks the products against a query (the search_products tool).
+func (ix *ProductIndex) Search(query string, limit int) SearchProductsOut {
+	byID := ix.byID
+	all := ix.ix.Rank(query, 0)
+	out := SearchProductsOut{Query: query, MatchCount: len(all), Results: []ProductMatch{},
+		Note: searchNote(all, func(id string) string { return productOut(byID[id]).Labels["zh"] })}
+	for _, r := range all {
+		if r.Exact {
+			out.ExactMatches++
+		}
+	}
+	for _, r := range all[:min(len(all), limit)] {
+		out.Results = append(out.Results, ProductMatch{ProductOut: productOut(byID[r.ID]), Score: r.Score, Matched: r.Matched, Exact: r.Exact})
+	}
+	return out
+}
+
+// searchNote tells the model whether the query names one product. A product
+// is identified by its category and name together: 三文鱼 alone is a maki, a
+// sushi, a sashimi and a poke bowl.
+func searchNote(matches []search.Result, labelOf func(id string) string) string {
+	exact := 0
+	var exactID string
+	for _, m := range matches {
+		if m.Exact {
+			exact++
+			exactID = m.ID
+		}
+	}
+	switch {
+	case len(matches) == 0:
+		return ""
+	case exact == 1:
+		return fmt.Sprintf("Exactly one product is named by the query: %s. The other results only partly match.", labelOf(exactID))
+	case len(matches) == 1:
+		return fmt.Sprintf("One product partly matches: %s. Make sure it is what the owner meant.", labelOf(matches[0].ID))
+	case exact > 1:
+		return fmt.Sprintf("%d products have exactly this name, in different categories, and %d match in all. A product is identified by its category and name: unless the owner already said which one, ask them, listing the candidates by category + name, before changing anything.", exact, len(matches))
+	default:
+		return fmt.Sprintf("%d products match and none is named exactly. A product is identified by its category and name: unless the owner already said which one, ask them, listing the candidates by category + name, before changing anything.", len(matches))
+	}
 }
 
 func productCandidates(ps []upstream.Product) []search.Candidate {
@@ -87,10 +165,27 @@ func productCandidates(ps []upstream.Product) []search.Candidate {
 			names = append(names, t.Name)
 		}
 		names = append(names, p.Name)
-		if p.Code != nil {
-			names = append(names, *p.Code)
+		cats := []string{p.Category.Name}
+		for _, t := range p.Category.Translations {
+			cats = append(cats, t.Name)
 		}
-		cs[i] = search.Candidate{ID: p.ID, Primary: names, Secondary: []string{p.Category.Name}, Preferred: p.IsAvailable && p.IsVisible, SortKey: p.NameIn("fr")}
+		// A product is named by its category and name together, in any
+		// language mix: "Maki 三文鱼", "三文鱼 maki", "春卷三文鱼牛油果".
+		primary := slices.Clone(names)
+		var pairs [][2]string
+		for _, n := range uniq(names) {
+			for _, c := range uniq(cats) {
+				if n == "" || c == "" {
+					continue
+				}
+				primary = append(primary, c+" "+n, n+" "+c, c+n, n+c)
+				pairs = append(pairs, [2]string{n, c})
+			}
+		}
+		if p.Code != nil {
+			primary = append(primary, *p.Code)
+		}
+		cs[i] = search.Candidate{ID: p.ID, Primary: primary, Secondary: cats, Pairs: pairs, Preferred: p.IsAvailable && p.IsVisible, SortKey: p.NameIn("fr")}
 	}
 	return cs
 }
@@ -168,22 +263,14 @@ func (d *Deps) downloadImage(ctx context.Context, raw string) ([]byte, string, s
 func registerProducts(s *mcp.Server, d *Deps) {
 	add(s, d, &mcp.Tool{
 		Name: "search_products", Annotations: readOnly,
-		Description: describe(`Find products by name (any language incl. Chinese), partial name or code. Case and accents are ignored; exact and prefix matches come first, then available products. Use it to get the product_id before any product action. Results include hidden and sold-out products.`,
+		Description: describe(`Find products by name (any language incl. Chinese), partial name, code, or category + name in any language mix ("Maki 三文鱼", "春卷三文鱼牛油果", "三文鱼卷"). Pass the owner's own words, category included. Case and accents are ignored; exact and prefix matches come first, then available products. A product is identified by its category and name together: the same name exists in several categories. Read "note": when the query does not name exactly one product, ask the owner which one before changing anything. Use it to get the product_id before any product action. Results include hidden and sold-out products.`,
 			`search_products({"query": "三文鱼", "limit": 5})`),
 	}, func(ctx context.Context, in SearchProductsIn) (SearchProductsOut, error) {
 		ps, err := d.Up.Products(ctx)
 		if err != nil {
 			return SearchProductsOut{}, err
 		}
-		byID := map[string]*upstream.Product{}
-		for i := range ps {
-			byID[ps[i].ID] = &ps[i]
-		}
-		out := SearchProductsOut{Query: in.Query, Results: []ProductMatch{}}
-		for _, r := range search.Rank(in.Query, productCandidates(ps), limitOr(in.Limit, 10, 50)) {
-			out.Results = append(out.Results, ProductMatch{ProductOut: productOut(byID[r.ID]), Score: r.Score, Matched: r.Matched})
-		}
-		return out, nil
+		return NewProductIndex(ps).Search(in.Query, limitOr(in.Limit, 10, 50)), nil
 	})
 
 	type GetProductIn struct {
@@ -481,4 +568,15 @@ func (d *Deps) propose(ctx context.Context, tool, kind string, params any, blob 
 		return actions.Proposal{}, err
 	}
 	return *p, nil
+}
+
+// uniq drops repeated strings, keeping the first.
+func uniq(ss []string) []string {
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		if !slices.Contains(out, s) {
+			out = append(out, s)
+		}
+	}
+	return out
 }

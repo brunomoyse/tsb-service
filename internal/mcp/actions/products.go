@@ -31,19 +31,21 @@ var Languages = []string{"fr", "en", "zh", "nl"}
 // VATCategories accepted by tsb-service.
 var VATCategories = []string{"food", "beverage", "zero_rated", "out_of_scope"}
 
-// ProductLabel renders a product for summaries: French name plus Chinese name
-// when it differs, e.g. `"Maki saumon" (三文鱼卷)`.
+// ProductLabel renders a product for summaries as category + name, in French
+// plus Chinese when the Chinese name differs, e.g.
+// `Maki "Saumon" (卷寿司「三文鱼」)`.
 func ProductLabel(p *upstream.Product) string {
-	fr, zh := p.NameIn("fr"), ""
+	fr := p.NameIn("fr")
+	label := fmt.Sprintf("%q", fr)
+	if cat := CategoryNameIn(p.Category, "fr"); cat != "" {
+		label = cat + " " + label
+	}
 	for _, t := range p.Translations {
 		if t.Language == "zh" && t.Name != "" && t.Name != fr {
-			zh = t.Name
+			return label + " (" + productLabelZh(p) + ")"
 		}
 	}
-	if zh != "" {
-		return fmt.Sprintf("%q (%s)", fr, zh)
-	}
-	return fmt.Sprintf("%q", fr)
+	return label
 }
 
 func yesNo(b bool) string {

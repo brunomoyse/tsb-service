@@ -165,8 +165,10 @@ type OrderItem struct {
 	UnitPrice  string `json:"unitPrice"`
 	TotalPrice string `json:"totalPrice"`
 	Product    *struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
+		ID           string        `json:"id"`
+		Name         string        `json:"name"`
+		Category     CategoryRef   `json:"category"`
+		Translations []Translation `json:"translations"`
 	} `json:"product"`
 	Choice *struct {
 		Name string `json:"name"`

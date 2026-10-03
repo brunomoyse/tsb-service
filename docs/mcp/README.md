@@ -37,6 +37,19 @@ Conventions:
 - **Times** are ISO 8601. A time without an offset is read in `TZ_DEFAULT` (Europe/Brussels). Dates are `yyyy-mm-dd`.
 - **Every write** accepts `request_context`: the owner's original message, stored in the audit log.
 - **Errors** are short, safe sentences. Tokens, stack traces and upstream bodies only go to the logs.
+- **Product identity** is category + name. The same name exists in several categories (三文鱼 is a maki, a sushi, a sashimi and a poke bowl; about fifteen products are a "salmon roll"). Every product output carries `labels` (category + name per language) and `category_names`, order items carry `product_labels`, and summaries read `卷寿司「三文鱼」` / `Maki "Saumon" (卷寿司「三文鱼」)`.
+
+### Product search
+
+`search_products` matches names, codes, and category + name in any language mix: `Maki 三文鱼`, `三文鱼 maki`, `春卷 saumon avocat`, `卷寿司三文鱼`. A Chinese query without spaces may also be part of a name followed by part of a category (`三文鱼卷` matches 三文鱼牛油果 under 加州卷).
+
+The output says whether the query names one product:
+
+| Field | Meaning |
+|---|---|
+| `match_count` | every match, also beyond `limit` |
+| `exact_matches`, `results[].exact` | the query is exactly the product's name, code, or category + name |
+| `note` | "Exactly one product..." when one result is exact; otherwise, with several matches, an instruction to ask the owner which one (by category + name) before changing anything |
 
 ### Closures
 
@@ -125,7 +138,7 @@ A successful response is `200` with the change:
 
 ```json
 {"change_id":"chg_…","tool":"propose_price_change","kind":"product.price","status":"applied",
- "summary":"\"Maki box\" (卷寿司套餐): price 13.90 EUR -> 14.50 EUR","summary_zh":"「卷寿司套餐」（套餐）价格：13.90 欧元 → 14.50 欧元","entity_type":"product","entity_id":"…",
+ "summary":"Boxes \"Maki box\" (套餐「卷寿司套餐」): price 13.90 EUR -> 14.50 EUR","summary_zh":"套餐「卷寿司套餐」价格：13.90 欧元 → 14.50 欧元","entity_type":"product","entity_id":"…",
  "created_at":"2026-10-03T13:00:00+02:00","expires_at":"2026-10-03T13:10:00+02:00","decided_at":"…","is_undo":false}
 ```
 
@@ -170,4 +183,5 @@ go test -race ./internal/mcp/... ./cmd/tsb-mcp/...
 - **`tools`:** every tool end to end through the SDK's in-memory transport, plus the tool list, safe errors, and checks that no order write is reachable.
 - **`actions`:** price bounds, closure planning, expiry, conflicts, idempotence and undo.
 - **`internalapi`:** apply, reject, expired, already applied, wrong token, upstream changed, upstream failure.
-- **`search` and `money`:** table-driven tests (Chinese, accents, partial words, ranking).
+- **`search` and `money`:** table-driven tests (Chinese, accents, partial words, ranking, split matches, exact flag).
+- **Real menu (`fakeupstream/realmenu`, `tools/identity_test.go`):** the restaurant's 183 products in 19 categories. Every product must be the only exact match for its category + name in every language and language mix (over 1,800 queries) and for its code; labels must be unique; and a table covers the real ambiguities (三文鱼 in four categories, salmon rolls across seven roll categories, French and Chinese mixed in one query).

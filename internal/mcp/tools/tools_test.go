@@ -262,7 +262,7 @@ func TestLowRiskTools(t *testing.T) {
 	if r["applied"] != true || h.fake.ProductByID("p-maki-saumon").IsAvailable {
 		t.Fatalf("set_product_availability: %v", r)
 	}
-	if str(r["summary_zh"]) != "「三文鱼卷」（卷）：可售 → 售罄" {
+	if str(r["summary_zh"]) != "卷「三文鱼卷」：可售 → 售罄" {
 		t.Errorf("summary_zh: %v", r["summary_zh"])
 	}
 	r = h.call("set_product_availability", args)
