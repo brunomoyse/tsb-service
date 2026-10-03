@@ -125,7 +125,6 @@ query McpOrder($id: ID!) {
   order(id: $id) {
     ` + orderListFields + `
     displayAddress addressExtra orderNote cancellationReason estimatedReadyTime
-    customer { firstName lastName phoneNumber }
     items { quantity unitPrice totalPrice product { id name category { id name translations { language name } } translations { language name } } choice { name } selections { quantity choice { name } } }
     statusHistory { status changedAt }
   }
@@ -164,4 +163,4 @@ fragment McpProductFields on Product {
 
 const couponFields = `id code discountType discountValue minOrderAmount maxUses maxUsesPerUser usedCount isActive status validFrom validUntil createdAt`
 
-const orderListFields = `id createdAt status type isOnlinePayment totalPrice discountAmount deliveryFee couponCode preferredReadyTime displayCustomerName payment { status } items { quantity }`
+const orderListFields = `id createdAt status type isOnlinePayment totalPrice discountAmount deliveryFee couponCode preferredReadyTime customer { firstName lastName } payment { status } items { quantity }`

@@ -11,6 +11,7 @@ import (
 
 	"tsb-service/internal/mcp/actions"
 	"tsb-service/internal/mcp/money"
+	"tsb-service/internal/mcp/privacy"
 	"tsb-service/internal/mcp/upstream"
 )
 
@@ -25,7 +26,7 @@ type OrderSummaryOut struct {
 	Type          string `json:"type" jsonschema:"DELIVERY or PICKUP"`
 	TotalCents    int64  `json:"total_cents"`
 	Currency      string `json:"currency"`
-	Customer      string `json:"customer"`
+	Customer      string `json:"customer" jsonschema:"the customer's first name and last-name initial (Marie D.), or guest. Full last names, phone numbers and emails are only in the dashboard"`
 	ItemCount     int    `json:"item_count"`
 	OnlinePayment bool   `json:"online_payment"`
 	PaymentStatus string `json:"payment_status,omitempty"`
@@ -34,7 +35,7 @@ type OrderSummaryOut struct {
 
 func (d *Deps) orderSummary(o *upstream.Order) OrderSummaryOut {
 	out := OrderSummaryOut{OrderID: o.ID, CreatedAt: d.fmtTime(o.CreatedAt), Status: o.Status, Type: o.Type, TotalCents: money.MustCents(o.TotalPrice),
-		Currency: money.Currency, Customer: o.DisplayCustomerName, OnlinePayment: o.IsOnlinePayment, ReadyTime: d.fmtTimePtr(o.PreferredReadyTime)}
+		Currency: money.Currency, Customer: customerName(o), OnlinePayment: o.IsOnlinePayment, ReadyTime: d.fmtTimePtr(o.PreferredReadyTime)}
 	for _, it := range o.Items {
 		out.ItemCount += it.Quantity
 	}
@@ -200,7 +201,6 @@ func registerOrders(s *mcp.Server, d *Deps) {
 		EstimatedReadyTime string       `json:"estimated_ready_time,omitempty"`
 		Address            string       `json:"address,omitempty"`
 		AddressExtra       string       `json:"address_extra,omitempty"`
-		CustomerPhone      string       `json:"customer_phone,omitempty"`
 		Note               string       `json:"note,omitempty"`
 		CancellationReason string       `json:"cancellation_reason,omitempty"`
 		Items              []ItemOut    `json:"items"`
@@ -208,7 +208,7 @@ func registerOrders(s *mcp.Server, d *Deps) {
 	}
 	add(s, d, &mcp.Tool{
 		Name: "get_order", Annotations: readOnly,
-		Description: describe(`Full details of one order (read only): items with options, totals, customer, address, note, payment and status history.`,
+		Description: describe(`Full details of one order (read only): items with options, totals, the customer's first name and last-name initial, address, note, payment and status history. Customers' full last names, phone numbers and emails are never available here: the owner finds them in the dashboard.`,
 			`get_order({"order_id": "9a8b7c6d-5e4f-3a2b-1c0d-ef9876543210"})`),
 	}, func(ctx context.Context, in GetIn) (GetOut, error) {
 		o, err := d.Up.Order(ctx, in.OrderID)
@@ -224,12 +224,10 @@ func registerOrders(s *mcp.Server, d *Deps) {
 			out.DeliveryFeeCents = money.MustCents(*o.DeliveryFee)
 		}
 		out.CouponCode = valueOr(o.CouponCode, "")
-		out.AddressExtra = valueOr(o.AddressExtra, "")
-		out.Note = valueOr(o.OrderNote, "")
-		out.CancellationReason = valueOr(o.CancellationReason, "")
-		if o.Customer != nil && o.Customer.PhoneNumber != nil {
-			out.CustomerPhone = *o.Customer.PhoneNumber
-		}
+		// Free text from customers can contain a phone number or email.
+		out.AddressExtra = privacy.Scrub(valueOr(o.AddressExtra, ""))
+		out.Note = privacy.Scrub(valueOr(o.OrderNote, ""))
+		out.CancellationReason = privacy.Scrub(valueOr(o.CancellationReason, ""))
 		for _, it := range o.Items {
 			io := ItemOut{Quantity: it.Quantity, UnitCents: money.MustCents(it.UnitPrice), TotalCents: money.MustCents(it.TotalPrice), Options: []string{}}
 			if it.Product != nil {
@@ -287,3 +285,14 @@ func (d *Deps) boundary(field, s string, end bool) (time.Time, error) {
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+// customerName is the customer's first name and last-name initial, or
+// "guest".
+func customerName(o *upstream.Order) string {
+	if o.Customer != nil {
+		if n := upstream.Name(o.Customer.FirstName, o.Customer.LastInitial); n != "" {
+			return n
+		}
+	}
+	return "guest"
+}

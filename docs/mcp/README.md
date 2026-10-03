@@ -37,6 +37,7 @@ Conventions:
 - **Times** are ISO 8601. A time without an offset is read in `TZ_DEFAULT` (Europe/Brussels). Dates are `yyyy-mm-dd`.
 - **Every write** accepts `request_context`: the owner's original message, stored in the audit log.
 - **Errors** are short, safe sentences. Tokens, stack traces and upstream bodies only go to the logs.
+- **Customer privacy.** Tools give a customer's first name and last-name initial only (`Marie D.`). The upstream queries never ask for phone numbers or emails; the last name is reduced to its initial while decoding (`upstream.Initial`), and phone numbers and emails typed into order notes, address details or cancellation reasons are masked (`internal/mcp/privacy`). The owner finds contact details in the dashboard. `internal/mcp/tools/privacy_test.go` proves nothing leaks even when the backend returns everything.
 - **Product identity** is category + name. The same name exists in several categories (三文鱼 is a maki, a sushi, a sashimi and a poke bowl; about fifteen products are a "salmon roll"). Every product output carries `labels` (category + name per language) and `category_names`, order items carry `product_labels`, and summaries read `卷寿司「三文鱼」` / `Maki "Saumon" (卷寿司「三文鱼」)`.
 
 ### Product search

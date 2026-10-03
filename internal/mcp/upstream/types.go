@@ -2,6 +2,7 @@ package upstream
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -183,29 +184,30 @@ type OrderItem struct {
 
 // Order is an order as listed or detailed.
 type Order struct {
-	ID                  string     `json:"id"`
-	CreatedAt           time.Time  `json:"createdAt"`
-	Status              string     `json:"status"`
-	Type                string     `json:"type"`
-	IsOnlinePayment     bool       `json:"isOnlinePayment"`
-	TotalPrice          string     `json:"totalPrice"`
-	DiscountAmount      string     `json:"discountAmount"`
-	DeliveryFee         *string    `json:"deliveryFee"`
-	CouponCode          *string    `json:"couponCode"`
-	PreferredReadyTime  *time.Time `json:"preferredReadyTime"`
-	EstimatedReadyTime  *time.Time `json:"estimatedReadyTime"`
-	DisplayCustomerName string     `json:"displayCustomerName"`
-	DisplayAddress      string     `json:"displayAddress"`
-	AddressExtra        *string    `json:"addressExtra"`
-	OrderNote           *string    `json:"orderNote"`
-	CancellationReason  *string    `json:"cancellationReason"`
-	Payment             *struct {
+	ID                 string     `json:"id"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	Status             string     `json:"status"`
+	Type               string     `json:"type"`
+	IsOnlinePayment    bool       `json:"isOnlinePayment"`
+	TotalPrice         string     `json:"totalPrice"`
+	DiscountAmount     string     `json:"discountAmount"`
+	DeliveryFee        *string    `json:"deliveryFee"`
+	CouponCode         *string    `json:"couponCode"`
+	PreferredReadyTime *time.Time `json:"preferredReadyTime"`
+	EstimatedReadyTime *time.Time `json:"estimatedReadyTime"`
+	DisplayAddress     string     `json:"displayAddress"`
+	AddressExtra       *string    `json:"addressExtra"`
+	OrderNote          *string    `json:"orderNote"`
+	CancellationReason *string    `json:"cancellationReason"`
+	Payment            *struct {
 		Status string `json:"status"`
 	} `json:"payment"`
+	// Customer holds the first name and the last name's initial: the full
+	// last name is dropped while decoding, and phone numbers and emails are
+	// never requested (see internal/mcp/privacy).
 	Customer *struct {
 		FirstName   string  `json:"firstName"`
-		LastName    string  `json:"lastName"`
-		PhoneNumber *string `json:"phoneNumber"`
+		LastInitial Initial `json:"lastName"`
 	} `json:"customer"`
 	Items         []OrderItem `json:"items"`
 	StatusHistory []struct {
@@ -235,8 +237,8 @@ type OrderHistoryInput struct {
 	Page      int        `json:"page,omitempty"`
 }
 
-// CustomerStats is the customerStats response (phone and email are never
-// requested).
+// CustomerStats is the customerStats response (first names and last-name
+// initials only; phone numbers and emails are never requested).
 type CustomerStats struct {
 	Summary struct {
 		TotalCustomers    int    `json:"totalCustomers"`
@@ -247,7 +249,7 @@ type CustomerStats struct {
 	Customers []struct {
 		UserID             string    `json:"userId"`
 		FirstName          string    `json:"firstName"`
-		LastName           string    `json:"lastName"`
+		LastInitial        Initial   `json:"lastName"`
 		RegisteredAt       time.Time `json:"registeredAt"`
 		TotalOrders        int       `json:"totalOrders"`
 		TotalAmount        string    `json:"totalAmount"`
@@ -266,4 +268,39 @@ type CustomerStatsInput struct {
 	EndDate   *time.Time `json:"endDate,omitempty"`
 	OrderType *string    `json:"orderType,omitempty"`
 	MinOrders *int       `json:"minOrders,omitempty"`
+}
+
+// Initial is the first letter of a customer's last name, upper case. It is
+// decoded from the full last name, which is never kept: the assistant must
+// not see customers' last names.
+type Initial string
+
+// UnmarshalJSON keeps the first letter only.
+func (i *Initial) UnmarshalJSON(b []byte) error {
+	var s *string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	*i = ""
+	if s == nil {
+		return nil
+	}
+	for _, r := range strings.TrimSpace(*s) {
+		*i = Initial(strings.ToUpper(string(r)))
+		break
+	}
+	return nil
+}
+
+// Name is the customer's first name followed by the initial ("Marie D."), or
+// the first name alone.
+func Name(first string, last Initial) string {
+	first = strings.TrimSpace(first)
+	if last == "" {
+		return first
+	}
+	if first == "" {
+		return string(last) + "."
+	}
+	return first + " " + string(last) + "."
 }

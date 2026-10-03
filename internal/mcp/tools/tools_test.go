@@ -239,10 +239,17 @@ func TestReadTools(t *testing.T) {
 		t.Errorf("get_daily_summary: %v", r)
 	}
 
-	r = h.call("get_customer_stats", map[string]any{"query": "wang"})
+	// Customers are searched by first name only: a last name finds nothing.
+	if r = h.call("get_customer_stats", map[string]any{"query": "wang"}); len(list(r["top_customers"])) != 0 {
+		t.Errorf("get_customer_stats found a customer by last name: %v", r)
+	}
+	r = h.call("get_customer_stats", map[string]any{"query": "li"})
 	cust := list(r["top_customers"])
-	if len(cust) != 1 || str(cust[0].(map[string]any)["last_name"]) != "Wang" {
+	if len(cust) != 1 || str(cust[0].(map[string]any)["name"]) != "Li W." {
 		t.Errorf("get_customer_stats: %v", r)
+	}
+	if _, ok := cust[0].(map[string]any)["last_name"]; ok {
+		t.Errorf("get_customer_stats returns last names: %v", r)
 	}
 	b, _ := json.Marshal(r)
 	if strings.Contains(string(b), "phone") || strings.Contains(string(b), "email") {

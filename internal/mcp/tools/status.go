@@ -163,15 +163,14 @@ func registerCustomers(s *mcp.Server, d *Deps) {
 	type StatsIn struct {
 		From      string `json:"from,omitempty" jsonschema:"yyyy-mm-dd, orders from this day"`
 		To        string `json:"to,omitempty" jsonschema:"yyyy-mm-dd, orders until this day (included)"`
-		Query     string `json:"query,omitempty" jsonschema:"filter customers by name (partial)"`
+		Query     string `json:"query,omitempty" jsonschema:"filter customers by first name (partial), optionally with the last-name initial (Marie D)"`
 		MinOrders int    `json:"min_orders,omitempty" jsonschema:"only customers with at least this many orders"`
 		OrderType string `json:"order_type,omitempty" jsonschema:"DELIVERY or PICKUP"`
 		Limit     int    `json:"limit,omitempty" jsonschema:"default 20, max 100"`
 	}
 	type CustomerOut struct {
 		CustomerID         string `json:"customer_id"`
-		FirstName          string `json:"first_name"`
-		LastName           string `json:"last_name"`
+		Name               string `json:"name" jsonschema:"first name and last-name initial, e.g. Marie D."`
 		Orders             int    `json:"orders"`
 		TotalCents         int64  `json:"total_cents"`
 		AverageCents       int64  `json:"average_cents"`
@@ -187,12 +186,12 @@ func registerCustomers(s *mcp.Server, d *Deps) {
 		RevenueCents  int64         `json:"revenue_cents"`
 		AverageCents  int64         `json:"average_order_cents"`
 		Currency      string        `json:"currency"`
-		TopCustomers  []CustomerOut `json:"top_customers" jsonschema:"sorted by number of orders; no contact details"`
+		TopCustomers  []CustomerOut `json:"top_customers" jsonschema:"sorted by number of orders; first names and last-name initials only"`
 		TotalMatching int           `json:"total_matching"`
 	}
 	add(s, d, &mcp.Tool{
 		Name: "get_customer_stats", Annotations: readOnly,
-		Description: describe(`Customer statistics for a period: totals and the most frequent customers by name with order counts and amounts (no phone numbers or emails).`,
+		Description: describe(`Customer statistics for a period: totals and the most frequent customers by first name and last-name initial with order counts and amounts. Customers' full last names, phone numbers and emails are never available here: the owner finds them in the dashboard.`,
 			`get_customer_stats({"from": "2026-09-01", "to": "2026-09-30", "limit": 10})`),
 	}, func(ctx context.Context, in StatsIn) (StatsOut, error) {
 		var input upstream.CustomerStatsInput
@@ -229,7 +228,7 @@ func registerCustomers(s *mcp.Server, d *Deps) {
 		if strings.TrimSpace(in.Query) != "" {
 			cands := make([]search.Candidate, len(list))
 			for i, c := range list {
-				cands[i] = search.Candidate{ID: c.UserID, Primary: []string{c.FirstName + " " + c.LastName, c.LastName + " " + c.FirstName}, SortKey: c.LastName}
+				cands[i] = search.Candidate{ID: c.UserID, Primary: []string{c.FirstName, upstream.Name(c.FirstName, c.LastInitial)}, SortKey: c.FirstName}
 			}
 			keep := map[string]int{}
 			for i, r := range search.Rank(in.Query, cands, 0) {
@@ -249,7 +248,7 @@ func registerCustomers(s *mcp.Server, d *Deps) {
 				break
 			}
 			c := list[i]
-			out.TopCustomers = append(out.TopCustomers, CustomerOut{CustomerID: c.UserID, FirstName: c.FirstName, LastName: c.LastName, Orders: c.TotalOrders,
+			out.TopCustomers = append(out.TopCustomers, CustomerOut{CustomerID: c.UserID, Name: upstream.Name(c.FirstName, c.LastInitial), Orders: c.TotalOrders,
 				TotalCents: centsOf(c.TotalAmount), AverageCents: centsOf(c.AverageOrderAmount), FirstOrder: d.fmtTime(c.FirstOrderDate), LastOrder: d.fmtTime(c.LastOrderDate),
 				PreferredOrderType: c.PreferredOrderType, DeliveryCount: c.DeliveryCount, PickupCount: c.PickupCount})
 		}

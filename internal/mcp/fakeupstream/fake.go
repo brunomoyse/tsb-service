@@ -43,8 +43,12 @@ type Server struct {
 	Overrides  map[string]*upstream.ScheduleOverride
 	Coupons    []*upstream.Coupon
 	Orders     []*upstream.Order
-	Images     map[string][]byte
-	Calls      []Call
+	// Contacts are customers' full details by order id. The fake returns
+	// them with every order, like a backend that over-returns, although
+	// tsb-mcp never asks for them: tests prove they never reach a tool.
+	Contacts map[string]Contact
+	Images   map[string][]byte
+	Calls    []Call
 	// FailOps makes the named operations return a GraphQL error with this code.
 	FailOps map[string]string
 	// TokenRequests counts /oauth/v2/token calls.
@@ -135,16 +139,23 @@ func (s *Server) seed() {
 			Status string `json:"status"`
 		}{Status: st}
 	}
+	s.Contacts = map[string]Contact{
+		"o-1": {FirstName: "Marie", LastName: "Dupont", Phone: "+32 470 12 34 56", Email: "marie.dupont@example.com"},
+		"o-2": {FirstName: "Li", LastName: "Wang", Phone: "0498 76 54 32", Email: "wang.li@qq.com"},
+		"o-3": {FirstName: "Paul", LastName: "Martin", Phone: "+32 471 11 22 33", Email: "paul.martin@example.be"},
+		"o-5": {FirstName: "Marie", LastName: "Dupont", Phone: "+32 470 12 34 56", Email: "marie.dupont@example.com"},
+	}
 	s.Orders = []*upstream.Order{
-		{ID: "o-1", CreatedAt: time.Date(2026, 10, 3, 10, 5, 0, 0, time.UTC), Status: "DELIVERED", Type: "DELIVERY", IsOnlinePayment: true, TotalPrice: "32.5", DiscountAmount: "0", DeliveryFee: new("2"), DisplayCustomerName: "DUPONT Marie", DisplayAddress: "Rue X 1, 4000 Liège", Payment: pay("paid"),
+		{ID: "o-1", CreatedAt: time.Date(2026, 10, 3, 10, 5, 0, 0, time.UTC), Status: "DELIVERED", Type: "DELIVERY", IsOnlinePayment: true, TotalPrice: "32.5", DiscountAmount: "0", DeliveryFee: new("2"), DisplayAddress: "Rue X 1, 4000 Liège", Payment: pay("paid"),
 			Items: []upstream.OrderItem{{Quantity: 2, UnitPrice: "4.5", TotalPrice: "9"}}},
-		{ID: "o-2", CreatedAt: time.Date(2026, 10, 3, 11, 0, 0, 0, time.UTC), Status: "PICKED_UP", Type: "PICKUP", TotalPrice: "20", DiscountAmount: "2", DisplayCustomerName: "WANG Li",
+		{ID: "o-2", CreatedAt: time.Date(2026, 10, 3, 11, 0, 0, 0, time.UTC), Status: "PICKED_UP", Type: "PICKUP", TotalPrice: "20", DiscountAmount: "2",
 			Items: []upstream.OrderItem{{Quantity: 1, UnitPrice: "20", TotalPrice: "20"}}},
-		{ID: "o-3", CreatedAt: time.Date(2026, 10, 3, 11, 30, 0, 0, time.UTC), Status: "PENDING", Type: "PICKUP", TotalPrice: "15", DiscountAmount: "0", DisplayCustomerName: "MARTIN Paul",
+		{ID: "o-3", CreatedAt: time.Date(2026, 10, 3, 11, 30, 0, 0, time.UTC), Status: "PENDING", Type: "PICKUP", TotalPrice: "15", DiscountAmount: "0",
+			OrderNote: new("Sonnez au 0471 11 22 33 ou paul.martin@example.be, code porte 1234"), AddressExtra: new("Appartement 3, tel +32 471 11 22 33"),
 			Items: []upstream.OrderItem{{Quantity: 1, UnitPrice: "15", TotalPrice: "15"}}},
-		{ID: "o-4", CreatedAt: time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC), Status: "CANCELLED", Type: "DELIVERY", TotalPrice: "40", DiscountAmount: "0", DisplayCustomerName: "LEE Kim",
+		{ID: "o-4", CreatedAt: time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC), Status: "CANCELLED", Type: "DELIVERY", TotalPrice: "40", DiscountAmount: "0",
 			Items: []upstream.OrderItem{{Quantity: 1, UnitPrice: "40", TotalPrice: "40"}}},
-		{ID: "o-5", CreatedAt: time.Date(2026, 10, 2, 19, 0, 0, 0, time.UTC), Status: "DELIVERED", Type: "DELIVERY", TotalPrice: "50", DiscountAmount: "0", DisplayCustomerName: "DUPONT Marie",
+		{ID: "o-5", CreatedAt: time.Date(2026, 10, 2, 19, 0, 0, 0, time.UTC), Status: "DELIVERED", Type: "DELIVERY", TotalPrice: "50", DiscountAmount: "0",
 			Items: []upstream.OrderItem{{Quantity: 1, UnitPrice: "50", TotalPrice: "50"}}},
 	}
 }
@@ -496,11 +507,15 @@ func (s *Server) dispatch(req request, upload []byte) (any, error) {
 		}
 		return nil, fmt.Errorf("coupon not found")
 	case "McpOrders":
-		return map[string]any{"orders": s.Orders}, nil
+		orders := make([]map[string]any, len(s.Orders))
+		for i, o := range s.Orders {
+			orders[i] = s.orderJSON(o)
+		}
+		return map[string]any{"orders": orders}, nil
 	case "McpOrder":
 		for _, o := range s.Orders {
 			if o.ID == fmt.Sprint(v["id"]) {
-				return map[string]any{"order": o}, nil
+				return map[string]any{"order": s.orderJSON(o)}, nil
 			}
 		}
 		return nil, fmt.Errorf("order not found")
@@ -626,9 +641,11 @@ func (s *Server) orderHistory(in upstream.OrderHistoryInput) any {
 	}
 	start := (page - 1) * first
 	end := min(start+first, len(matched))
-	pageOrders := []*upstream.Order{}
+	pageOrders := []map[string]any{}
 	if start < len(matched) {
-		pageOrders = matched[start:end]
+		for _, o := range matched[start:end] {
+			pageOrders = append(pageOrders, s.orderJSON(o))
+		}
 	}
 	return map[string]any{"orderHistory": map[string]any{
 		"summary": map[string]any{"totalOrders": len(matched), "totalRevenue": centsStr(total), "averageOrder": centsStr(avg)},
@@ -735,4 +752,24 @@ func (s *Server) categoryRef(id string) upstream.CategoryRef {
 		}
 	}
 	return ref
+}
+
+// Contact is a customer's full details.
+type Contact struct {
+	FirstName, LastName, Phone, Email string
+}
+
+// orderJSON is an order as tsb-service would return it with every customer
+// field filled in, whatever the query asked for.
+func (s *Server) orderJSON(o *upstream.Order) map[string]any {
+	b, _ := json.Marshal(o)
+	var m map[string]any
+	_ = json.Unmarshal(b, &m)
+	if c, ok := s.Contacts[o.ID]; ok {
+		m["displayCustomerName"] = strings.ToUpper(c.LastName) + " " + c.FirstName
+		m["customer"] = map[string]any{"firstName": c.FirstName, "lastName": c.LastName, "phoneNumber": c.Phone, "email": c.Email}
+	} else {
+		m["displayCustomerName"] = "Guest"
+	}
+	return m
 }
