@@ -67,10 +67,15 @@ func userHasTOTP(userID string) (bool, error) {
 	return slices.Contains(resp.AuthMethodTypes, authMethodTOTP), nil
 }
 
-// sessionFactors is the subset of a Zitadel session needed for MFA checks.
+// sessionFactors is the subset of a Zitadel session needed for MFA checks
+// and for profile completion.
 type sessionFactors struct {
 	UserID       string
 	TOTPVerified bool
+	// OTPEmailVerified is set once the emailed code was checked on the session.
+	OTPEmailVerified bool
+	// IntentVerified is set once an IdP (Google/Apple) intent was checked.
+	IntentVerified bool
 }
 
 func fetchSessionFactors(sessionID string) (sessionFactors, error) {
@@ -90,6 +95,12 @@ func fetchSessionFactors(sessionID string) (sessionFactors, error) {
 				TOTP struct {
 					VerifiedAt string `json:"verifiedAt"`
 				} `json:"totp"`
+				OTPEmail struct {
+					VerifiedAt string `json:"verifiedAt"`
+				} `json:"otpEmail"`
+				Intent struct {
+					VerifiedAt string `json:"verifiedAt"`
+				} `json:"intent"`
 			} `json:"factors"`
 		} `json:"session"`
 	}
@@ -101,7 +112,9 @@ func fetchSessionFactors(sessionID string) (sessionFactors, error) {
 	}
 	return sessionFactors{
 		UserID:       resp.Session.Factors.User.ID,
-		TOTPVerified: resp.Session.Factors.TOTP.VerifiedAt != "",
+		TOTPVerified:     resp.Session.Factors.TOTP.VerifiedAt != "",
+		OTPEmailVerified: resp.Session.Factors.OTPEmail.VerifiedAt != "",
+		IntentVerified:   resp.Session.Factors.Intent.VerifiedAt != "",
 	}, nil
 }
 

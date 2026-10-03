@@ -253,28 +253,38 @@ func waitForZitadelUserProjection(userID string) error {
 // placeholder name marker, meaning the OTP request created the account on the
 // fly and the user has not yet supplied their real first/last name.
 func userNeedsProfileCompletion(userID string) (bool, error) {
+	given, _, err := fetchUserProfileNames(userID)
+	if err != nil {
+		return false, err
+	}
+	return given == placeholderProfileMarker, nil
+}
+
+// fetchUserProfileNames returns a human user's given and family name.
+func fetchUserProfileNames(userID string) (givenName, familyName string, err error) {
 	respBody, status, err := zitadelRequest("GET", "/v2/users/"+userID, nil)
 	if err != nil {
-		return false, fmt.Errorf("fetch user: %w", err)
+		return "", "", fmt.Errorf("fetch user: %w", err)
 	}
 	if status != http.StatusOK {
-		return false, fmt.Errorf("fetch user returned status %d", status)
+		return "", "", fmt.Errorf("fetch user returned status %d", status)
 	}
 
 	var resp struct {
 		User struct {
 			Human struct {
 				Profile struct {
-					GivenName string `json:"givenName"`
+					GivenName  string `json:"givenName"`
+					FamilyName string `json:"familyName"`
 				} `json:"profile"`
 			} `json:"human"`
 		} `json:"user"`
 	}
 	if err := json.Unmarshal(respBody, &resp); err != nil {
-		return false, fmt.Errorf("parse user response: %w", err)
+		return "", "", fmt.Errorf("parse user response: %w", err)
 	}
 
-	return resp.User.Human.Profile.GivenName == placeholderProfileMarker, nil
+	return resp.User.Human.Profile.GivenName, resp.User.Human.Profile.FamilyName, nil
 }
 
 // updateZitadelUserProfile sets a human user's first and last name. Used by
@@ -297,34 +307,3 @@ func updateZitadelUserProfile(userID, firstName, lastName string) error {
 	}
 	return nil
 }
-
-// lookupSessionUserID resolves a Zitadel session to its associated user ID.
-// Used by the verify and complete-profile handlers to map a session back to
-// the user whose profile they need to inspect or update.
-func lookupSessionUserID(sessionID string) (string, error) {
-	respBody, status, err := zitadelRequest("GET", "/v2/sessions/"+sessionID, nil)
-	if err != nil {
-		return "", fmt.Errorf("fetch session: %w", err)
-	}
-	if status != http.StatusOK {
-		return "", fmt.Errorf("fetch session returned status %d", status)
-	}
-
-	var resp struct {
-		Session struct {
-			Factors struct {
-				User struct {
-					ID string `json:"id"`
-				} `json:"user"`
-			} `json:"factors"`
-		} `json:"session"`
-	}
-	if err := json.Unmarshal(respBody, &resp); err != nil {
-		return "", fmt.Errorf("parse session response: %w", err)
-	}
-	if resp.Session.Factors.User.ID == "" {
-		return "", fmt.Errorf("session response missing user id")
-	}
-	return resp.Session.Factors.User.ID, nil
-}
-
