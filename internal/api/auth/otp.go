@@ -49,6 +49,12 @@ func shouldSkipOtpEmail(loginName string) bool {
 	return ok
 }
 
+// Test seams over the email backend: tests substitute these so no mail is ever sent.
+var (
+	emailBackendReady = scaleway.IsInitialized
+	sendLoginOtpEmail = scaleway.SendLoginOtpEmail
+)
+
 // requestOtpBody is the frontend's request to start a passwordless login.
 type requestOtpBody struct {
 	LoginName string `json:"loginName"`
@@ -198,7 +204,7 @@ func RequestOtpHandler(c *gin.Context) {
 	// No-op for every non-review login.
 	stashReviewOtp(req.LoginName, zResp.Challenges.OtpEmail)
 
-	if zResp.Challenges.OtpEmail != "" && scaleway.IsInitialized() {
+	if zResp.Challenges.OtpEmail != "" && emailBackendReady() {
 		// Best-effort profile fetch for the email salutation. Falls back to the
 		// email address for placeholder accounts (givenName == "-") or when
 		// Zitadel returns no profile.
@@ -223,7 +229,7 @@ func RequestOtpHandler(c *gin.Context) {
 		}
 		if shouldSkipOtpEmail(req.LoginName) || isReviewOtpLogin(req.LoginName) {
 			log.Debug("otp email send skipped (e2e/store-review login)", zap.String("loginName", req.LoginName))
-		} else if err := scaleway.SendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
+		} else if err := sendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
 			// Backstop for an address the DNS check let through but Scaleway refuses: the
 			// customer's input, so a warning and a clear answer instead of a code that never comes.
 			if errors.Is(err, scaleway.ErrInvalidRecipient) {
@@ -410,7 +416,7 @@ func ResendOtpHandler(c *gin.Context) {
 		return
 	}
 
-	if zResp.Challenges.OtpEmail != "" && scaleway.IsInitialized() {
+	if zResp.Challenges.OtpEmail != "" && emailBackendReady() {
 		// We don't have the loginName on a resend — Zitadel's session
 		// response doesn't echo it back — so look it up by sessionId. The
 		// cheapest path is to re-fetch the session itself.
@@ -425,7 +431,7 @@ func ResendOtpHandler(c *gin.Context) {
 			}
 			if shouldSkipOtpEmail(loginName) || isReviewOtpLogin(loginName) {
 				log.Debug("otp resend email skipped (e2e/store-review login)", zap.String("loginName", loginName))
-			} else if err := scaleway.SendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
+			} else if err := sendLoginOtpEmail(user, lang, zResp.Challenges.OtpEmail); err != nil {
 				if errors.Is(err, scaleway.ErrInvalidRecipient) {
 					log.Warn("login otp resend refused: invalid recipient", zap.String("email", loginName), zap.Error(err))
 				} else {

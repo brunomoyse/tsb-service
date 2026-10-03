@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -41,7 +42,11 @@ func CompleteOtpProfileHandler(c *gin.Context) {
 	log := logging.FromContext(c.Request.Context())
 
 	var req completeProfileRequest
-	if err := c.ShouldBindJSON(&req); err != nil ||
+	err := c.ShouldBindJSON(&req)
+	// A name of only spaces would replace the placeholder and the customer would never be asked again.
+	req.FirstName = strings.TrimSpace(req.FirstName)
+	req.LastName = strings.TrimSpace(req.LastName)
+	if err != nil ||
 		req.SessionID == "" || req.SessionToken == "" ||
 		req.FirstName == "" || req.LastName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "sessionId, sessionToken, firstName and lastName are required"})
