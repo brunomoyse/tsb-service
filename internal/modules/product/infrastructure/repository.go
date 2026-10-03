@@ -312,6 +312,25 @@ func (r *ProductRepository) FindAll(ctx context.Context) ([]*domain.Product, err
 	return r.queryProducts(ctx, query)
 }
 
+// orderDetailsTranslationJoins picks one product name and one category name per product in the
+// request language ($2), falling back to fr, en, nl, zh (domain.translationFallbackOrder). A missing
+// translation must never drop the product: filtering on the language in WHERE did exactly that and
+// made every product "not found" for nl, which has no category translations.
+const orderDetailsTranslationJoins = `LEFT JOIN LATERAL (
+            SELECT t.name
+              FROM product_translations t
+             WHERE t.product_id = p.id AND t.name <> ''
+             ORDER BY array_position(ARRAY[$2::text, 'fr', 'en', 'nl', 'zh'], t.language::text) NULLS LAST
+             LIMIT 1
+        ) pt ON true
+        LEFT JOIN LATERAL (
+            SELECT ct.name
+              FROM product_category_translations ct
+             WHERE ct.product_category_id = p.category_id AND ct.name <> ''
+             ORDER BY array_position(ARRAY[$2::text, 'fr', 'en', 'nl', 'zh'], ct.language::text) NULLS LAST
+             LIMIT 1
+        ) pct ON true`
+
 func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error) {
 	lang := utils.GetLang(ctx)
 
@@ -339,16 +358,11 @@ func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) 
             p.is_discountable,
             p.is_lunch_only,
             p.vat_category,
-            pct.name AS category_name,
-            pt.name  AS name
+            COALESCE(pct.name, '') AS category_name,
+            COALESCE(pt.name, '')  AS name
         FROM products p
-        LEFT JOIN product_translations pt 
-          ON p.id = pt.product_id
-        LEFT JOIN product_category_translations pct 
-          ON p.category_id = pct.product_category_id
+        ` + orderDetailsTranslationJoins + `
         WHERE p.id = ANY($1)
-          AND pt.language = $2
-          AND pct.language = $2
         ORDER BY p.code;
     `
 	var products []*domain.ProductOrderDetails
@@ -359,8 +373,8 @@ func (r *ProductRepository) FindByIDs(ctx context.Context, productIDs []string) 
 }
 
 // FindForPricing fetches what an order line is priced from (current price, VAT, flags) together with
-// the availability flag, without failing on sold-out products like FindByIDs does. The translation
-// joins are the same as FindByIDs, so a product the order would reject as unknown is unknown here too.
+// the availability flag, without failing on sold-out products like FindByIDs does. A product is
+// unknown here only when its row does not exist: translations fall back across languages.
 func (r *ProductRepository) FindForPricing(ctx context.Context, productIDs []string) ([]*domain.ProductOrderDetails, error) {
 	lang := utils.GetLang(ctx)
 
@@ -373,16 +387,11 @@ func (r *ProductRepository) FindForPricing(ctx context.Context, productIDs []str
             p.is_lunch_only,
             p.is_available,
             p.vat_category,
-            pct.name AS category_name,
-            pt.name  AS name
+            COALESCE(pct.name, '') AS category_name,
+            COALESCE(pt.name, '')  AS name
         FROM products p
-        LEFT JOIN product_translations pt
-          ON p.id = pt.product_id
-        LEFT JOIN product_category_translations pct
-          ON p.category_id = pct.product_category_id
+        ` + orderDetailsTranslationJoins + `
         WHERE p.id = ANY($1)
-          AND pt.language = $2
-          AND pct.language = $2
         ORDER BY p.code;
     `
 	var products []*domain.ProductOrderDetails
@@ -405,16 +414,11 @@ func (r *ProductRepository) FindNamesByIDs(ctx context.Context, productIDs []str
             p.is_discountable,
             p.is_lunch_only,
             p.vat_category,
-            pct.name AS category_name,
-            pt.name  AS name
+            COALESCE(pct.name, '') AS category_name,
+            COALESCE(pt.name, '')  AS name
         FROM products p
-        LEFT JOIN product_translations pt
-          ON p.id = pt.product_id
-        LEFT JOIN product_category_translations pct
-          ON p.category_id = pct.product_category_id
+        ` + orderDetailsTranslationJoins + `
         WHERE p.id = ANY($1)
-          AND pt.language = $2
-          AND pct.language = $2
         ORDER BY p.code;
     `
 	var products []*domain.ProductOrderDetails

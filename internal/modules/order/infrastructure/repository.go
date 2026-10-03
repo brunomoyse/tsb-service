@@ -257,8 +257,12 @@ func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*dom
 		FROM order_product op
 		JOIN products p ON op.product_id = p.id
 		JOIN product_categories pc ON p.category_id = pc.id
-		JOIN product_category_translations pct ON pc.id = pct.product_category_id AND pct.language = $2
-		JOIN product_translations pt ON p.id = pt.product_id AND pt.language = $2
+		LEFT JOIN LATERAL (
+			SELECT t.name FROM product_translations t
+			WHERE t.product_id = p.id
+			ORDER BY array_position(ARRAY[$2::text, 'fr', 'en', 'nl', 'zh'], t.language::text) NULLS LAST
+			LIMIT 1
+		) pt ON true
 		WHERE op.order_id = $1
 		ORDER BY pc."order" ASC, p.code ASC, pt.name ASC
 	`
@@ -478,11 +482,15 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 		FROM order_product op
         JOIN products p ON op.product_id = p.id
         JOIN product_categories pc ON p.category_id = pc.id
-        JOIN product_category_translations pct ON pc.id = pct.product_category_id AND pct.language = ?
-        JOIN product_translations pt ON p.id = pt.product_id AND pt.language = ?
+        LEFT JOIN LATERAL (
+        	SELECT t.name FROM product_translations t
+        	WHERE t.product_id = p.id
+        	ORDER BY array_position(ARRAY[?::text, 'fr', 'en', 'nl', 'zh'], t.language::text) NULLS LAST
+        	LIMIT 1
+        ) pt ON true
         WHERE op.order_id IN (?)
         ORDER BY pc."order" ASC, p.code ASC, pt.name ASC
-    `, lang, lang, orderIDs)
+    `, lang, orderIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build IN query: %w", err)
 	}
