@@ -799,11 +799,13 @@ func (r *ProductRepository) FindCategoriesByProductIDs(
         pc.id              AS category_id,
         pc.order           AS category_order,
         pc.slug            AS category_slug,
-        pct.language       AS language,
-        pct.name           AS category_name
+        COALESCE(pct.language, '') AS language,
+        COALESCE(pct.name, '')     AS category_name
     FROM products p
     JOIN product_categories pc ON p.category_id = pc.id
-    JOIN product_category_translations pct ON pc.id = pct.product_category_id
+    -- LEFT: a category without any translation row is still the product's category (the schema
+    -- makes product.category non-null, so dropping it failed the whole order read).
+    LEFT JOIN product_category_translations pct ON pc.id = pct.product_category_id
     WHERE p.id = ANY($1)
     `
 	rows, err := r.pool.ForContext(ctx).QueryxContext(ctx, query, pq.Array(productIDs))
@@ -840,23 +842,23 @@ func (r *ProductRepository) FindCategoriesByProductIDs(
 		}
 
 		catMap := temp[pid]
-		if cat, exists := catMap[cr.CategoryID]; exists {
-			// we've already seen this category → just append another translation
+		cat, exists := catMap[cr.CategoryID]
+		if !exists {
+			// first time we see this category for this product
+			cat = &domain.Category{
+				ID:           cr.CategoryID,
+				Order:        cr.CategoryOrder,
+				Slug:         cr.CategorySlug,
+				Translations: []domain.Translation{},
+			}
+			catMap[cr.CategoryID] = cat
+		}
+		// An empty language is the LEFT JOIN row of a category without translations.
+		if cr.Language != "" {
 			cat.Translations = append(cat.Translations, domain.Translation{
 				Language: cr.Language,
 				Name:     cr.CategoryName,
 			})
-		} else {
-			// first time we see this category for this product
-			catMap[cr.CategoryID] = &domain.Category{
-				ID:    cr.CategoryID,
-				Order: cr.CategoryOrder,
-				Slug:  cr.CategorySlug,
-				Translations: []domain.Translation{{
-					Language: cr.Language,
-					Name:     cr.CategoryName,
-				}},
-			}
 		}
 	}
 	if err := rows.Err(); err != nil {

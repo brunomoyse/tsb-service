@@ -82,6 +82,11 @@ func decimalPtrStr(d *decimal.Decimal) *string {
 
 // ToGQLProduct converts a domain.Product into the GraphQL model.Product.
 func ToGQLProduct(p *productDomain.Product, lang string) *model.Product {
+	// A product without any translation row has no name, it must not panic the whole order read.
+	tr := p.GetTranslationFor(lang)
+	if tr == nil {
+		tr = &productDomain.Translation{}
+	}
 	return &model.Product{
 		ID:             p.ID,
 		CreatedAt:      p.CreatedAt,
@@ -97,16 +102,20 @@ func ToGQLProduct(p *productDomain.Product, lang string) *model.Product {
 		IsDiscountable: p.IsDiscountable,
 		IsVegetarian:   p.IsVegetarian,
 		VatCategory:    string(p.VatCategory),
-		Name:           p.GetTranslationFor(lang).Name,
-		Description:    p.GetTranslationFor(lang).Description,
+		Name:           tr.Name,
+		Description:    tr.Description,
 	}
 }
 
 // ToGQLProductCategory converts a domain.Category into the GraphQL model.ProductCategory.
 func ToGQLProductCategory(c *productDomain.Category, lang string) *model.ProductCategory {
+	var name string
+	if tr := c.GetTranslationFor(lang); tr != nil {
+		name = tr.Name
+	}
 	return &model.ProductCategory{
 		ID:    c.ID,
-		Name:  c.GetTranslationFor(lang).Name,
+		Name:  name,
 		Order: c.Order,
 		Slug:  c.Slug,
 	}
@@ -208,11 +217,12 @@ func ToGQLPayment(p *paymentDomain.MolliePayment) *model.Payment {
 	_ = json.Unmarshal(p.Links, &links)
 
 	return &model.Payment{
-		ID:        p.ID,
-		CreatedAt: p.CreatedAt,
-		OrderID:   p.OrderID,
-		Status:    string(p.Status),
-		Links:     links,
+		ID:              p.ID,
+		CreatedAt:       p.CreatedAt,
+		OrderID:         p.OrderID,
+		MolliePaymentID: p.MolliePaymentID,
+		Status:          string(p.Status),
+		Links:           links,
 	}
 }
 
