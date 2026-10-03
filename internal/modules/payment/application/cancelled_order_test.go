@@ -142,7 +142,7 @@ func TestHandlePaymentPaid_CancelledOrderIsRefundedOnce(t *testing.T) {
 	// Stored status is still open: the webhook persists paid only afterwards.
 	svc, fm, _ := newTestService(t, dummyPayment(domain.PaymentStatusOpen), order)
 
-	got, err := svc.HandlePaymentPaid(context.Background(), order.ID)
+	got, err := svc.HandlePaymentPaid(t.Context(), order.ID)
 	if err != nil {
 		t.Fatalf("HandlePaymentPaid: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestHandlePaymentPaid_CancelledOrderIsRefundedOnce(t *testing.T) {
 	}
 
 	// A Mollie retry of the same webhook must not refund a second time.
-	if _, err := svc.HandlePaymentPaid(context.Background(), order.ID); err != nil {
+	if _, err := svc.HandlePaymentPaid(t.Context(), order.ID); err != nil {
 		t.Fatalf("retry: %v", err)
 	}
 	if n := fm.count("POST /v2/payments/tr_1/refunds"); n != 1 {
@@ -165,7 +165,7 @@ func TestHandlePaymentPaid_CancelledOrderIsRefundedOnce(t *testing.T) {
 func TestSettleCancelledOrderPayment(t *testing.T) {
 	t.Run("open payment is cancelled at Mollie", func(t *testing.T) {
 		svc, fm, _ := newTestService(t, dummyPayment(domain.PaymentStatusOpen), dummyOrder(orderDomain.OrderStatusCanceled))
-		refunded, err := svc.SettleCancelledOrderPayment(context.Background(), dummyPayment(domain.PaymentStatusOpen))
+		refunded, err := svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusOpen))
 		if err != nil || refunded {
 			t.Fatalf("refunded=%v err=%v, want false nil", refunded, err)
 		}
@@ -176,11 +176,11 @@ func TestSettleCancelledOrderPayment(t *testing.T) {
 
 	t.Run("paid payment is refunded, already refunded is skipped", func(t *testing.T) {
 		svc, fm, repo := newTestService(t, dummyPayment(domain.PaymentStatusPaid), dummyOrder(orderDomain.OrderStatusCanceled))
-		refunded, err := svc.SettleCancelledOrderPayment(context.Background(), dummyPayment(domain.PaymentStatusPaid))
+		refunded, err := svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusPaid))
 		if err != nil || !refunded {
 			t.Fatalf("refunded=%v err=%v, want true nil", refunded, err)
 		}
-		again, err := svc.SettleCancelledOrderPayment(context.Background(), repo.payment)
+		again, err := svc.SettleCancelledOrderPayment(t.Context(), repo.payment)
 		if err != nil || again {
 			t.Fatalf("second refund: refunded=%v err=%v, want false nil", again, err)
 		}
@@ -191,7 +191,7 @@ func TestSettleCancelledOrderPayment(t *testing.T) {
 
 	t.Run("failed payment needs nothing", func(t *testing.T) {
 		svc, fm, _ := newTestService(t, dummyPayment(domain.PaymentStatusFailed), dummyOrder(orderDomain.OrderStatusCanceled))
-		if _, err := svc.SettleCancelledOrderPayment(context.Background(), dummyPayment(domain.PaymentStatusFailed)); err != nil {
+		if _, err := svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusFailed)); err != nil {
 			t.Fatal(err)
 		}
 		if len(fm.calls) != 0 {

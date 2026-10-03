@@ -10,7 +10,7 @@ import (
 func TestAdminAndStaffScopes(t *testing.T) {
 	next := func(context.Context) (any, error) { return "ok", nil }
 
-	base := utils.SetUserID(context.Background(), "11111111-1111-1111-1111-111111111111")
+	base := utils.SetUserID(t.Context(), "11111111-1111-1111-1111-111111111111")
 	admin := utils.SetIsAdmin(base, true)
 	pos := utils.SetIsPOS(base, true)
 

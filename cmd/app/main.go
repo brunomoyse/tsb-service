@@ -512,10 +512,7 @@ func main() {
 	// Use ReadHeaderTimeout instead of ReadTimeout, and omit WriteTimeout,
 	// because both set deadlines on the underlying net.Conn that persist after
 	// WebSocket hijack — killing long-lived subscription connections.
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	port := cmp.Or(os.Getenv("PORT"), "8080")
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           router,

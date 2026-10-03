@@ -1,7 +1,6 @@
 package internalapi_test
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -52,7 +51,7 @@ func setup(t *testing.T) *env {
 	t.Cleanup(e.fake.Close)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	sa := upstream.ServiceAccount{Issuer: e.fake.URL, ClientID: "mcp-client", ClientSecret: "mcp-secret", ProjectID: "1"}
-	up := upstream.New(e.fake.URL, sa.TokenSource(context.Background()), log)
+	up := upstream.New(e.fake.URL, sa.TokenSource(t.Context()), log)
 	store, err := changes.Open(filepath.Join(t.TempDir(), "mcp.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +65,7 @@ func setup(t *testing.T) *env {
 
 func (e *env) propose(cents int64) string {
 	e.t.Helper()
-	p, err := e.svc.Propose(context.Background(), "propose_price_change", actions.KindProductPrice, actions.PriceParams{ProductID: "p-maki-saumon", NewPriceCents: cents}, nil, "maki 5 euros", nil)
+	p, err := e.svc.Propose(e.t.Context(), "propose_price_change", actions.KindProductPrice, actions.PriceParams{ProductID: "p-maki-saumon", NewPriceCents: cents}, nil, "maki 5 euros", nil)
 	if err != nil {
 		e.t.Fatal(err)
 	}
@@ -106,7 +105,7 @@ func TestApply(t *testing.T) {
 	if e.fake.ProductByID("p-maki-saumon").Price != "5" {
 		t.Error("price not changed upstream")
 	}
-	audit, _ := e.svc.Store().RecentAudit(context.Background(), 1)
+	audit, _ := e.svc.Store().RecentAudit(t.Context(), 1)
 	if audit[0].Source != actions.SourceApply || audit[0].RequestContext != "是的" || audit[0].Outcome != "applied" {
 		t.Errorf("audit: %+v", audit[0])
 	}

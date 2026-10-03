@@ -1,7 +1,6 @@
 package upstream_test
 
 import (
-	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -20,7 +19,7 @@ import (
 func newClient(t *testing.T, f *fakeupstream.Server) *upstream.Client {
 	t.Helper()
 	sa := upstream.ServiceAccount{Issuer: f.URL, ClientID: "mcp-client", ClientSecret: "mcp-secret", ProjectID: "123"}
-	return upstream.New(f.URL, sa.TokenSource(context.Background()), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	return upstream.New(f.URL, sa.TokenSource(t.Context()), slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
 // TestNoOrderWrites guarantees the MCP server can never send an order write
@@ -52,14 +51,14 @@ func TestTokenSourceAndCall(t *testing.T) {
 	defer f.Close()
 	c := newClient(t, f)
 
-	ps, err := c.Products(context.Background())
+	ps, err := c.Products(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(ps) == 0 || ps[0].Translations[2].Name == "" {
 		t.Fatalf("unexpected products: %+v", ps)
 	}
-	if _, err := c.Products(context.Background()); err != nil {
+	if _, err := c.Products(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if f.TokenRequests != 1 {
@@ -76,7 +75,7 @@ func TestInternalURLKeepsPublicHost(t *testing.T) {
 	}))
 	defer srv.Close()
 	sa := upstream.ServiceAccount{Issuer: "https://auth.example.com", InternalURL: srv.URL, ClientID: "a", ClientSecret: "b", ProjectID: "1"}
-	if _, err := sa.TokenSource(context.Background()).Token(); err != nil {
+	if _, err := sa.TokenSource(t.Context()).Token(); err != nil {
 		t.Fatal(err)
 	}
 	if gotHost != "auth.example.com" {
@@ -88,7 +87,7 @@ func TestErrorMapping(t *testing.T) {
 	f := fakeupstream.New()
 	defer f.Close()
 	c := newClient(t, f)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := c.Product(ctx, "missing")
 	if !upstream.IsNotFound(err) {
@@ -122,7 +121,7 @@ func TestImageUploadIsMultipart(t *testing.T) {
 	f := fakeupstream.New()
 	defer f.Close()
 	c := newClient(t, f)
-	if _, err := c.UpdateProductImage(context.Background(), "p-maki-saumon", true, "maki.png", "image/png", []byte("PNGDATA")); err != nil {
+	if _, err := c.UpdateProductImage(t.Context(), "p-maki-saumon", true, "maki.png", "image/png", []byte("PNGDATA")); err != nil {
 		t.Fatal(err)
 	}
 	if string(f.Images["p-maki-saumon"]) != "PNGDATA" {

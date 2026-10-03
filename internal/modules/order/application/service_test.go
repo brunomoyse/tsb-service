@@ -113,8 +113,6 @@ func (f *fakeCouponService) GetCoupon(context.Context, uuid.UUID) (*couponDomain
 func (f *fakeCouponService) CreateCoupon(context.Context, *couponDomain.Coupon) error { return nil }
 func (f *fakeCouponService) UpdateCoupon(context.Context, *couponDomain.Coupon) error { return nil }
 
-func strPtr(s string) *string { return &s }
-
 func TestUpdateOrderCouponRollback(t *testing.T) {
 	canceled := domain.OrderStatusCanceled
 	couponID := uuid.New()
@@ -125,11 +123,11 @@ func TestUpdateOrderCouponRollback(t *testing.T) {
 	}
 
 	t.Run("cancelling an order with a coupon rolls back usage once", func(t *testing.T) {
-		repo := &fakeOrderRepo{order: newOrder(domain.OrderStatusConfirmed, strPtr("TOKYO10"))}
+		repo := &fakeOrderRepo{order: newOrder(domain.OrderStatusConfirmed, new("TOKYO10"))}
 		coupons := &fakeCouponService{coupon: &couponDomain.Coupon{ID: couponID}}
 		svc := NewOrderService(repo, coupons)
 
-		if err := svc.UpdateOrder(context.Background(), repo.order.ID, &canceled, nil, nil); err != nil {
+		if err := svc.UpdateOrder(t.Context(), repo.order.ID, &canceled, nil, nil); err != nil {
 			t.Fatalf("UpdateOrder: %v", err)
 		}
 		if len(coupons.decrementCalls) != 1 {
@@ -141,11 +139,11 @@ func TestUpdateOrderCouponRollback(t *testing.T) {
 	})
 
 	t.Run("re-cancelling an already-cancelled order does not roll back again", func(t *testing.T) {
-		repo := &fakeOrderRepo{order: newOrder(domain.OrderStatusCanceled, strPtr("TOKYO10"))}
+		repo := &fakeOrderRepo{order: newOrder(domain.OrderStatusCanceled, new("TOKYO10"))}
 		coupons := &fakeCouponService{coupon: &couponDomain.Coupon{ID: couponID}}
 		svc := NewOrderService(repo, coupons)
 
-		if err := svc.UpdateOrder(context.Background(), repo.order.ID, &canceled, nil, nil); err != nil {
+		if err := svc.UpdateOrder(t.Context(), repo.order.ID, &canceled, nil, nil); err != nil {
 			t.Fatalf("UpdateOrder: %v", err)
 		}
 		if len(coupons.decrementCalls) != 0 {
@@ -158,7 +156,7 @@ func TestUpdateOrderCouponRollback(t *testing.T) {
 		coupons := &fakeCouponService{coupon: &couponDomain.Coupon{ID: couponID}}
 		svc := NewOrderService(repo, coupons)
 
-		if err := svc.UpdateOrder(context.Background(), repo.order.ID, &canceled, nil, nil); err != nil {
+		if err := svc.UpdateOrder(t.Context(), repo.order.ID, &canceled, nil, nil); err != nil {
 			t.Fatalf("UpdateOrder: %v", err)
 		}
 		if len(coupons.decrementCalls) != 0 {
@@ -169,13 +167,13 @@ func TestUpdateOrderCouponRollback(t *testing.T) {
 
 func TestCancelStaleTestOrdersRollsBackCoupons(t *testing.T) {
 	couponID := uuid.New()
-	withCoupon := domain.CancelledOrderRef{ID: uuid.New(), UserID: uuid.New(), CouponCode: strPtr("TOKYO10")}
+	withCoupon := domain.CancelledOrderRef{ID: uuid.New(), UserID: uuid.New(), CouponCode: new("TOKYO10")}
 	withoutCoupon := domain.CancelledOrderRef{ID: uuid.New(), UserID: uuid.New()}
 	repo := &fakeOrderRepo{staleTestOrders: []domain.CancelledOrderRef{withCoupon, withoutCoupon}}
 	coupons := &fakeCouponService{coupon: &couponDomain.Coupon{ID: couponID}}
 	svc := NewOrderService(repo, coupons)
 
-	n, err := svc.CancelStaleTestOrders(context.Background(), 10*time.Minute)
+	n, err := svc.CancelStaleTestOrders(t.Context(), 10*time.Minute)
 	if err != nil {
 		t.Fatalf("CancelStaleTestOrders: %v", err)
 	}

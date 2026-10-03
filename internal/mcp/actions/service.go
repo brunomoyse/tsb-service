@@ -13,7 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -413,8 +413,7 @@ func (s *Service) ApplyPending(ctx context.Context, id, requestContext string) (
 			conflict = &ConflictError{Fields: diffFields(c.Before, current)}
 		}
 	} else {
-		var ue *UserError
-		if errors.As(err, &ue) || upstream.IsNotFound(err) {
+		if _, ok := errors.AsType[*UserError](err); ok || upstream.IsNotFound(err) {
 			conflict = &ConflictError{Fields: []string{err.Error()}}
 		} else {
 			return c, err // upstream unavailable: leave pending so it can be retried
@@ -504,8 +503,7 @@ func (s *Service) Undo(ctx context.Context, requestContext string) (*UndoResult,
 		return nil, Userf("The last change (%s) cannot be undone automatically.", entry.Summary)
 	}
 	if err != nil {
-		var ue *UserError
-		if errors.As(err, &ue) {
+		if _, ok := errors.AsType[*UserError](err); ok {
 			return nil, err
 		}
 		return nil, fmt.Errorf("compute undo: %w", err)
@@ -567,7 +565,7 @@ func diffFields(a, b json.RawMessage) []string {
 			out = append(out, k)
 		}
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	if len(out) == 0 {
 		out = []string{"state"}
 	}

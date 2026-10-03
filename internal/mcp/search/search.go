@@ -4,7 +4,8 @@
 package search
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -176,15 +177,17 @@ func (ix *Index) Rank(query string, limit int) []Result {
 	for i := range idx {
 		idx[i] = i
 	}
-	sort.SliceStable(idx, func(a, b int) bool {
-		i, j := idx[a], idx[b]
-		if res[i].Score != res[j].Score {
-			return res[i].Score > res[j].Score
+	slices.SortStableFunc(idx, func(i, j int) int {
+		if c := cmp.Compare(res[j].Score, res[i].Score); c != 0 {
+			return c
 		}
 		if out[i].c.Preferred != out[j].c.Preferred {
-			return out[i].c.Preferred
+			if out[i].c.Preferred {
+				return -1
+			}
+			return 1
 		}
-		return out[i].sortKey < out[j].sortKey
+		return strings.Compare(out[i].sortKey, out[j].sortKey)
 	})
 	if limit > 0 && len(idx) > limit {
 		idx = idx[:limit]
@@ -248,12 +251,7 @@ func allTokens(tokens []string, pred func(string) bool) bool {
 }
 
 func anyWord(words []string, pred func(string) bool) bool {
-	for _, w := range words {
-		if pred(w) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(words, pred)
 }
 
 // fuzzyToken tolerates one typo for Latin tokens of at least 4 letters,

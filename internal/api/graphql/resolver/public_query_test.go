@@ -34,13 +34,13 @@ func deliveryQuote(f *pricingFixture, spy *spyAddresses, placeID string, signedI
 	p := f.pricer()
 	p.addresses = spy
 	in := pricingInput{
-		OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: strp(placeID),
+		OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: new(placeID),
 		Items: []pricingItem{item(salmonID, 3)},
 	}
 	if signedIn {
 		in.UserID = &f.user
 	}
-	res, err := p.price(context.Background(), in)
+	res, err := p.price(f.t.Context(), in)
 	if err != nil {
 		f.t.Fatalf("price: %v", err)
 	}
@@ -77,9 +77,9 @@ func TestAllowPublicQuery(t *testing.T) {
 	limiter := middleware.NewRateLimiter(0.0001, 2) // burst of 2, effectively no refill during the test
 	t.Cleanup(limiter.Stop)
 	r := &Resolver{PublicQueryLimiter: limiter}
-	ctx := utils.SetClientIP(context.Background(), "203.0.113.7")
+	ctx := utils.SetClientIP(t.Context(), "203.0.113.7")
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if err := r.allowPublicQuery(ctx, "quoteOrder"); err != nil {
 			t.Fatalf("request %d refused: %v", i+1, err)
 		}
@@ -93,7 +93,7 @@ func TestAllowPublicQuery(t *testing.T) {
 	if err := r.allowPublicQuery(ctx, "resolveAddress"); err != nil {
 		t.Errorf("resolveAddress shares the quoteOrder bucket: %v", err)
 	}
-	if err := r.allowPublicQuery(utils.SetClientIP(context.Background(), "203.0.113.8"), "quoteOrder"); err != nil {
+	if err := r.allowPublicQuery(utils.SetClientIP(t.Context(), "203.0.113.8"), "quoteOrder"); err != nil {
 		t.Errorf("another IP is throttled: %v", err)
 	}
 
@@ -101,8 +101,8 @@ func TestAllowPublicQuery(t *testing.T) {
 	if err := (&Resolver{}).allowPublicQuery(ctx, "quoteOrder"); err != nil {
 		t.Errorf("nil limiter: %v", err)
 	}
-	for i := 0; i < 5; i++ {
-		if err := r.allowPublicQuery(context.Background(), "quoteOrder"); err != nil {
+	for range 5 {
+		if err := r.allowPublicQuery(t.Context(), "quoteOrder"); err != nil {
 			t.Fatalf("a call without a client IP was limited: %v", err)
 		}
 	}
@@ -124,7 +124,7 @@ func TestAutocompleteAddressesIsThrottledAndBounded(t *testing.T) {
 	t.Cleanup(limiter.Stop)
 	addrs := &countingAddresses{}
 	q := &queryResolver{&Resolver{PublicQueryLimiter: limiter, AddressService: addrs}}
-	ctx := utils.SetClientIP(context.Background(), "203.0.113.9")
+	ctx := utils.SetClientIP(t.Context(), "203.0.113.9")
 
 	for _, input := range []string{"", "  ab ", strings.Repeat("a", 201)} {
 		_, err := q.AutocompleteAddresses(ctx, input, "s")
@@ -136,7 +136,7 @@ func TestAutocompleteAddressesIsThrottledAndBounded(t *testing.T) {
 		t.Fatalf("rejected inputs reached Google %d times", addrs.autocompleteCalls)
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if _, err := q.AutocompleteAddresses(ctx, "rue de la paix 1", "s"); err != nil {
 			t.Fatalf("request %d refused: %v", i+1, err)
 		}

@@ -1,7 +1,6 @@
 package resolver
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -44,7 +43,7 @@ func TestAssistantErrors(t *testing.T) {
 
 func TestAssistantDisabledResolvers(t *testing.T) {
 	r := &Resolver{} // no AssistantService configured
-	ctx := context.Background()
+	ctx := t.Context()
 	c, err := (&queryResolver{r}).AssistantConnection(ctx)
 	if err != nil || c.Enabled || c.State != model.AssistantConnectionStateDisconnected {
 		t.Errorf("connection %+v %v", c, err)

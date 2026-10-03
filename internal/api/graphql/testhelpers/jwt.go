@@ -30,13 +30,11 @@ func GenerateTestRefreshToken(userID string, isAdmin bool) (string, error) {
 
 func generateTestToken(userID string, isAdmin bool, tokenType string, duration time.Duration) (string, error) {
 	claims := testJwtClaims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   userID,
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
-		},
-		Type:    tokenType,
-		ID:      uuid.NewString(),
-		IsAdmin: isAdmin,
+		Subject:   userID,
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
+		Type:      tokenType,
+		ID:        uuid.NewString(),
+		IsAdmin:   isAdmin,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -46,13 +44,11 @@ func generateTestToken(userID string, isAdmin bool, tokenType string, duration t
 // GenerateExpiredToken creates an expired JWT token for testing auth failure cases
 func GenerateExpiredToken(userID string, isAdmin bool) (string, error) {
 	claims := testJwtClaims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   userID,
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
-		},
-		Type:    "access",
-		ID:      uuid.NewString(),
-		IsAdmin: isAdmin,
+		Subject:   userID,
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
+		Type:      "access",
+		ID:        uuid.NewString(),
+		IsAdmin:   isAdmin,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

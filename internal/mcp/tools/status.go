@@ -147,7 +147,7 @@ func registerUndo(s *mcp.Server, d *Deps) {
 		Proposal        *actions.Proposal `json:"proposal,omitempty" jsonschema:"set when mode is pending"`
 	}
 	add(s, d, &mcp.Tool{
-		Name: "undo_last_change", Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(false), OpenWorldHint: ptr(false)},
+		Name: "undo_last_change", Annotations: &mcp.ToolAnnotations{DestructiveHint: new(false), OpenWorldHint: new(false)},
 		Description: describe(`Revert the most recent change made through the assistant in the last 30 minutes, using the state saved before it. A low-risk change (availability, visibility, preparation time, coupon deactivation) is reverted immediately. Reverting a sensitive change (price, hours, closure...) creates a pending change that needs confirmation like any proposal. Calling it again reverts the change before that. Deletions and photos cannot be undone.`,
 			`undo_last_change({"request_context": "刚才那个撤销"})`),
 	}, func(ctx context.Context, in UndoIn) (UndoOut, error) {

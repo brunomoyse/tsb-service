@@ -68,7 +68,7 @@ func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateC
 		// No code supplied: generate a unique one, retrying on the rare collision.
 		const maxAttempts = 5
 		var lastErr error
-		for attempt := 0; attempt < maxAttempts; attempt++ {
+		for range maxAttempts {
 			code, genErr := couponDomain.GenerateCode()
 			if genErr != nil {
 				return nil, fmt.Errorf("failed to generate coupon code: %w", genErr)

@@ -54,7 +54,7 @@ func login(t *testing.T, s *Service, id uuid.UUID, key []byte) string {
 	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte(buildLoginHmacPayload(in)))
 	in.HMAC = base64.StdEncoding.EncodeToString(mac.Sum(nil))
-	tok, err := s.DeviceLogin(context.Background(), in)
+	tok, err := s.DeviceLogin(t.Context(), in)
 	if err != nil {
 		t.Fatalf("DeviceLogin: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestVerifyAccessToken_RevokedDeviceIsRejected(t *testing.T) {
 	s, repo, id, key := newTestPOS(t)
 	tok := login(t, s, id, key)
 
-	if got, err := s.VerifyAccessToken(context.Background(), tok); err != nil || got != id {
+	if got, err := s.VerifyAccessToken(t.Context(), tok); err != nil || got != id {
 		t.Fatalf("active device: got %v err %v", got, err)
 	}
 
@@ -73,12 +73,12 @@ func TestVerifyAccessToken_RevokedDeviceIsRejected(t *testing.T) {
 	repo.devices[id].RevokedAt = &now
 
 	// Within the cache TTL the earlier "active" answer is still served.
-	if _, err := s.VerifyAccessToken(context.Background(), tok); err != nil {
+	if _, err := s.VerifyAccessToken(t.Context(), tok); err != nil {
 		t.Fatalf("cached check: %v", err)
 	}
 	s.active.now = func() time.Time { return now.Add(deviceStatusTTL + time.Second) }
 
-	if _, err := s.VerifyAccessToken(context.Background(), tok); !errors.Is(err, ErrDeviceRevoked) {
+	if _, err := s.VerifyAccessToken(t.Context(), tok); !errors.Is(err, ErrDeviceRevoked) {
 		t.Fatalf("revoked device: err = %v, want ErrDeviceRevoked", err)
 	}
 }
@@ -87,8 +87,8 @@ func TestVerifyAccessToken_CachesLookups(t *testing.T) {
 	s, repo, id, key := newTestPOS(t)
 	tok := login(t, s, id, key)
 	before := repo.lookups
-	for i := 0; i < 5; i++ {
-		if _, err := s.VerifyAccessToken(context.Background(), tok); err != nil {
+	for range 5 {
+		if _, err := s.VerifyAccessToken(t.Context(), tok); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -108,12 +108,12 @@ func TestVerifyAccessToken_UnknownDeviceAndMissingExp(t *testing.T) {
 	}
 
 	unknown := sign(jwt.MapClaims{"sub": uuid.NewString(), "iss": "tsb-pos", "exp": time.Now().Add(time.Hour).Unix()})
-	if _, err := s.VerifyAccessToken(context.Background(), unknown); !errors.Is(err, ErrDeviceNotEnrolled) {
+	if _, err := s.VerifyAccessToken(t.Context(), unknown); !errors.Is(err, ErrDeviceNotEnrolled) {
 		t.Fatalf("unknown device: err = %v, want ErrDeviceNotEnrolled", err)
 	}
 
 	noExp := sign(jwt.MapClaims{"sub": uuid.NewString(), "iss": "tsb-pos"})
-	if _, err := s.VerifyAccessToken(context.Background(), noExp); err == nil {
+	if _, err := s.VerifyAccessToken(t.Context(), noExp); err == nil {
 		t.Fatal("token without exp was accepted")
 	}
 }

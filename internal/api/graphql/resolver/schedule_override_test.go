@@ -59,11 +59,11 @@ func TestScheduleOverrideDateIsBrusselsCalendarDay(t *testing.T) {
 			svc := &overrideRecorder{}
 			m := &mutationResolver{&Resolver{RestaurantService: svc, Broker: pubsub.NewBroker()}}
 
-			ov, err := m.UpsertScheduleOverride(context.Background(), model.ScheduleOverrideInput{Date: sent, Closed: true})
+			ov, err := m.UpsertScheduleOverride(t.Context(), model.ScheduleOverrideInput{Date: sent, Closed: true})
 			if err != nil {
 				t.Fatalf("upsert: %v", err)
 			}
-			if _, err := m.DeleteScheduleOverride(context.Background(), sent); err != nil {
+			if _, err := m.DeleteScheduleOverride(t.Context(), sent); err != nil {
 				t.Fatalf("delete: %v", err)
 			}
 

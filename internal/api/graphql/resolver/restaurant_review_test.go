@@ -96,8 +96,9 @@ func selfStyledReviewer() *userDomain.User {
 }
 
 // authedCtx returns a context carrying a userID, as the @auth middleware sets.
-func authedCtx() context.Context {
-	return utils.SetUserID(context.Background(), "11111111-1111-1111-1111-111111111111")
+func authedCtx(t testing.TB) context.Context {
+	t.Helper()
+	return utils.SetUserID(t.Context(), "11111111-1111-1111-1111-111111111111")
 }
 
 // TestIsOrderingCurrentlyOpen_ReviewBypass: while closed, only a store-review
@@ -105,7 +106,7 @@ func authedCtx() context.Context {
 func TestIsOrderingCurrentlyOpen_ReviewBypass(t *testing.T) {
 	t.Run("review user sees open while closed", func(t *testing.T) {
 		res := closedConfigResolver(t, reviewUser())
-		open, err := res.IsOrderingCurrentlyOpen(authedCtx(), nil)
+		open, err := res.IsOrderingCurrentlyOpen(authedCtx(t), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -116,7 +117,7 @@ func TestIsOrderingCurrentlyOpen_ReviewBypass(t *testing.T) {
 
 	t.Run("normal user stays closed", func(t *testing.T) {
 		res := closedConfigResolver(t, normalUser())
-		open, err := res.IsOrderingCurrentlyOpen(authedCtx(), nil)
+		open, err := res.IsOrderingCurrentlyOpen(authedCtx(t), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -127,7 +128,7 @@ func TestIsOrderingCurrentlyOpen_ReviewBypass(t *testing.T) {
 
 	t.Run("anonymous caller stays closed", func(t *testing.T) {
 		res := closedConfigResolver(t, normalUser())
-		open, err := res.IsOrderingCurrentlyOpen(context.Background(), nil)
+		open, err := res.IsOrderingCurrentlyOpen(t.Context(), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -142,7 +143,7 @@ func TestIsOrderingCurrentlyOpen_ReviewBypass(t *testing.T) {
 func TestAvailableSlotsToday_ReviewBypass(t *testing.T) {
 	t.Run("review user gets synthetic slots while closed", func(t *testing.T) {
 		res := closedConfigResolver(t, reviewUser())
-		slots, err := res.AvailableSlotsToday(authedCtx(), nil)
+		slots, err := res.AvailableSlotsToday(authedCtx(t), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -153,7 +154,7 @@ func TestAvailableSlotsToday_ReviewBypass(t *testing.T) {
 
 	t.Run("self-styled John Apple gets no slots while closed", func(t *testing.T) {
 		res := closedConfigResolver(t, selfStyledReviewer())
-		slots, err := res.AvailableSlotsToday(authedCtx(), nil)
+		slots, err := res.AvailableSlotsToday(authedCtx(t), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -164,7 +165,7 @@ func TestAvailableSlotsToday_ReviewBypass(t *testing.T) {
 
 	t.Run("normal user gets no slots while closed", func(t *testing.T) {
 		res := closedConfigResolver(t, normalUser())
-		slots, err := res.AvailableSlotsToday(authedCtx(), nil)
+		slots, err := res.AvailableSlotsToday(authedCtx(t), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -175,7 +176,7 @@ func TestAvailableSlotsToday_ReviewBypass(t *testing.T) {
 
 	t.Run("anonymous caller gets no slots while closed", func(t *testing.T) {
 		res := closedConfigResolver(t, normalUser())
-		slots, err := res.AvailableSlotsToday(context.Background(), nil)
+		slots, err := res.AvailableSlotsToday(t.Context(), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

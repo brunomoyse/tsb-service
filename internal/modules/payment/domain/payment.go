@@ -69,10 +69,10 @@ type PaymentLinks struct {
 	Checkout struct {
 		Href string `json:"href"`
 		Type string `json:"type"`
-	} `json:"checkout,omitempty"`
+	} `json:"checkout"`
 
 	Self struct {
 		Href string `json:"href"`
 		Type string `json:"type"`
-	} `json:"self,omitempty"`
+	} `json:"self"`
 }

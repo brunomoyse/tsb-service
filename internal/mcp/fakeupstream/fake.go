@@ -12,7 +12,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -90,8 +90,6 @@ func (s *Server) ProductByID(id string) upstream.Product {
 	return *s.product(id)
 }
 
-func ptr[T any](v T) *T { return &v }
-
 func (s *Server) seed() {
 	s.Categories = []upstream.Category{
 		{ID: "cat-maki", Order: 1, Slug: "makis", Name: "Makis", Translations: []upstream.Translation{{Language: "fr", Name: "Makis"}, {Language: "zh", Name: "卷"}}},
@@ -102,11 +100,11 @@ func (s *Server) seed() {
 		return []upstream.Translation{{Language: "fr", Name: fr}, {Language: "en", Name: en}, {Language: "zh", Name: zh}}
 	}
 	s.Products = []*upstream.Product{
-		{ID: "p-maki-saumon", Code: ptr("M1"), Slug: "maki-saumon", Name: "Maki saumon", Price: "4.5", VatCategory: "food", PieceCount: ptr(6),
+		{ID: "p-maki-saumon", Code: new("M1"), Slug: "maki-saumon", Name: "Maki saumon", Price: "4.5", VatCategory: "food", PieceCount: new(6),
 			IsAvailable: true, IsVisible: true, IsDiscountable: true, Category: s.categoryRef("cat-maki"), Translations: tr("Maki saumon", "Salmon maki", "三文鱼卷")},
-		{ID: "p-sashimi-saumon", Code: ptr("S1"), Slug: "sashimi-saumon", Name: "Sashimi saumon", Price: "12", VatCategory: "food",
+		{ID: "p-sashimi-saumon", Code: new("S1"), Slug: "sashimi-saumon", Name: "Sashimi saumon", Price: "12", VatCategory: "food",
 			IsAvailable: true, IsVisible: true, IsDiscountable: true, Category: s.categoryRef("cat-sashimi"), Translations: tr("Sashimi saumon", "Salmon sashimi", "三文鱼刺身")},
-		{ID: "p-maki-box", Code: ptr("B1"), Slug: "maki-box", Name: "Maki box", Price: "13.9", VatCategory: "food",
+		{ID: "p-maki-box", Code: new("B1"), Slug: "maki-box", Name: "Maki box", Price: "13.9", VatCategory: "food",
 			IsAvailable: true, IsVisible: true, Category: s.categoryRef("cat-box"), Translations: tr("Maki box", "Maki box", "卷寿司套餐"),
 			ChoiceGroups: []upstream.ChoiceGroup{{ID: "g-sauce", MinSelections: 1, MaxSelections: 1, SortOrder: 0, Name: "Sauce",
 				Translations: []upstream.ChoiceTranslation{{Locale: "fr", Name: "Sauce"}, {Locale: "zh", Name: "酱汁"}},
@@ -128,7 +126,7 @@ func (s *Server) seed() {
 	s.Config = upstream.RestaurantConfig{OrderingEnabled: true, PreparationMinutes: 30, IsCurrentlyOpen: true, IsOrderingCurrentlyOpen: true, UpdatedAt: time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)}
 	s.Coupons = []*upstream.Coupon{
 		{ID: "cp-welcome", Code: "WELCOME10", DiscountType: "PERCENTAGE", DiscountValue: "10", IsActive: true, Status: "ACTIVE", CreatedAt: time.Date(2026, 9, 1, 8, 0, 0, 0, time.UTC)},
-		{ID: "cp-old", Code: "SUMMER5", DiscountType: "FIXED", DiscountValue: "5", MinOrderAmount: ptr("30"), IsActive: false, Status: "INACTIVE", CreatedAt: time.Date(2026, 6, 1, 8, 0, 0, 0, time.UTC)},
+		{ID: "cp-old", Code: "SUMMER5", DiscountType: "FIXED", DiscountValue: "5", MinOrderAmount: new("30"), IsActive: false, Status: "INACTIVE", CreatedAt: time.Date(2026, 6, 1, 8, 0, 0, 0, time.UTC)},
 	}
 	pay := func(st string) *struct {
 		Status string `json:"status"`
@@ -138,7 +136,7 @@ func (s *Server) seed() {
 		}{Status: st}
 	}
 	s.Orders = []*upstream.Order{
-		{ID: "o-1", CreatedAt: time.Date(2026, 10, 3, 10, 5, 0, 0, time.UTC), Status: "DELIVERED", Type: "DELIVERY", IsOnlinePayment: true, TotalPrice: "32.5", DiscountAmount: "0", DeliveryFee: ptr("2"), DisplayCustomerName: "DUPONT Marie", DisplayAddress: "Rue X 1, 4000 Liège", Payment: pay("paid"),
+		{ID: "o-1", CreatedAt: time.Date(2026, 10, 3, 10, 5, 0, 0, time.UTC), Status: "DELIVERED", Type: "DELIVERY", IsOnlinePayment: true, TotalPrice: "32.5", DiscountAmount: "0", DeliveryFee: new("2"), DisplayCustomerName: "DUPONT Marie", DisplayAddress: "Rue X 1, 4000 Liège", Payment: pay("paid"),
 			Items: []upstream.OrderItem{{Quantity: 2, UnitPrice: "4.5", TotalPrice: "9"}}},
 		{ID: "o-2", CreatedAt: time.Date(2026, 10, 3, 11, 0, 0, 0, time.UTC), Status: "PICKED_UP", Type: "PICKUP", TotalPrice: "20", DiscountAmount: "2", DisplayCustomerName: "WANG Li",
 			Items: []upstream.OrderItem{{Quantity: 1, UnitPrice: "20", TotalPrice: "20"}}},
@@ -323,7 +321,7 @@ func (s *Server) dispatch(req request, upload []byte) (any, error) {
 				keys = append(keys, k)
 			}
 		}
-		sort.Strings(keys)
+		slices.Sort(keys)
 		out := []*upstream.ScheduleOverride{}
 		for _, k := range keys {
 			out = append(out, s.Overrides[k])
@@ -616,7 +614,7 @@ func (s *Server) orderHistory(in upstream.OrderHistoryInput) any {
 		}
 		matched = append(matched, o)
 	}
-	sort.Slice(matched, func(i, j int) bool { return matched[i].CreatedAt.After(matched[j].CreatedAt) })
+	slices.SortFunc(matched, func(a, b *upstream.Order) int { return b.CreatedAt.Compare(a.CreatedAt) })
 	var total int64
 	for _, o := range matched {
 		c, _ := toCents(o.TotalPrice)
@@ -649,7 +647,7 @@ func applyCoupon(c *upstream.Coupon, in upstream.CouponInput) {
 		c.DiscountValue = trimPrice(*in.DiscountValue)
 	}
 	if in.MinOrderAmount != nil {
-		c.MinOrderAmount = ptr(trimPrice(*in.MinOrderAmount))
+		c.MinOrderAmount = new(trimPrice(*in.MinOrderAmount))
 	}
 	if in.MaxUses != nil {
 		c.MaxUses = in.MaxUses

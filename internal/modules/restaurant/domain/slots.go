@@ -110,7 +110,7 @@ func (c *RestaurantConfig) ReviewSlotsToday(now time.Time) []TimeSlot {
 	start := roundUpToNextQuarter(local.Add(time.Duration(prep) * time.Minute))
 
 	slots := make([]TimeSlot, 0, reviewSlotCount)
-	for i := 0; i < reviewSlotCount; i++ {
+	for i := range reviewSlotCount {
 		cur := start.Add(time.Duration(i) * slotStepMinutes * time.Minute)
 		slots = append(slots, TimeSlot{
 			Label:              cur.Format("15:04"),
@@ -173,7 +173,7 @@ func (c *RestaurantConfig) NextOpeningAt(now time.Time, overrides map[string]*Sc
 
 	local := timezone.In(now)
 
-	for offset := 0; offset < 7; offset++ {
+	for offset := range 7 {
 		day := local.AddDate(0, 0, offset)
 		schedule, _ := resolveDaySchedule(day, hours, overrides)
 		if schedule == nil {

@@ -134,26 +134,24 @@ func (h *handler) reject(w http.ResponseWriter, r *http.Request) {
 
 // fail maps errors to HTTP statuses with an owner-friendly message.
 func (h *handler) fail(w http.ResponseWriter, r *http.Request, c *changes.Change, err error) {
-	var (
-		ce *actions.ConflictError
-		se *actions.StatusError
-		ue *actions.UserError
-		up *upstream.Error
-	)
+	se, isStatus := errors.AsType[*actions.StatusError](err)
+	ce, isConflict := errors.AsType[*actions.ConflictError](err)
+	ue, isUser := errors.AsType[*actions.UserError](err)
+	up, isUpstream := errors.AsType[*upstream.Error](err)
 	body := errorBody{Change: h.view(c)}
 	status := http.StatusInternalServerError
 	switch {
 	case errors.Is(err, actions.ErrNotFound):
 		status, body.Code, body.Error = http.StatusNotFound, "not_found", "No pending change with this id."
-	case errors.As(err, &se) && errors.Is(err, actions.ErrExpired):
+	case isStatus && errors.Is(err, actions.ErrExpired):
 		status, body.Code, body.Error = http.StatusGone, "expired", se.Error()
-	case errors.As(err, &se):
+	case isStatus:
 		status, body.Code, body.Error = http.StatusConflict, "already_"+string(se.Status), se.Error()
-	case errors.As(err, &ce):
+	case isConflict:
 		status, body.Code, body.Error = http.StatusConflict, "conflict", ce.Error()
-	case errors.As(err, &ue):
+	case isUser:
 		status, body.Code, body.Error = http.StatusUnprocessableEntity, "rejected", ue.Msg
-	case errors.As(err, &up):
+	case isUpstream:
 		status, body.Code, body.Error = http.StatusBadGateway, "upstream", up.Error()
 	default:
 		body.Code, body.Error = "internal", "Something went wrong while applying the change."

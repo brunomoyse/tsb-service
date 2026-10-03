@@ -1,7 +1,6 @@
 package resolver
 
 import (
-	"context"
 	"errors"
 	"testing"
 )
@@ -15,7 +14,7 @@ func TestErrorPresenterWithoutOperationContext(t *testing.T) {
 			t.Fatalf("ErrorPresenter panicked: %v", r)
 		}
 	}()
-	got := ErrorPresenter(context.Background(), errors.New("could not read request body: http: request body too large"))
+	got := ErrorPresenter(t.Context(), errors.New("could not read request body: http: request body too large"))
 	if got == nil || got.Message == "" {
 		t.Fatalf("ErrorPresenter returned %v", got)
 	}

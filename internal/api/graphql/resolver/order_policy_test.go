@@ -6,7 +6,6 @@ package resolver
 // back into the pricer fails here.
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -26,7 +25,7 @@ func addressAt(placeID, postcode string, meters float64) *addressDomain.Address 
 }
 
 func deliveryAt(f *pricingFixture, placeID string, items ...pricingItem) *pricingResult {
-	return f.price(pricingInput{OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: strp(placeID), Items: items})
+	return f.price(pricingInput{OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: new(placeID), Items: items})
 }
 
 func TestPolicy_DeliveryFeeTiersDriveThePricer(t *testing.T) {
@@ -158,8 +157,8 @@ func TestPolicy_DeliveryDisabledQuoteDoesNotPriceDelivery(t *testing.T) {
 			spy := &spyAddresses{cached: map[string]*addressDomain.Address{"far-ish": {PlaceID: "far-ish", Postcode: "4020", Distance: 6000}}}
 			p := f.pricer()
 			p.addresses = spy
-			res, err := p.price(context.Background(), pricingInput{
-				OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: strp("far-ish"),
+			res, err := p.price(t.Context(), pricingInput{
+				OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: new("far-ish"),
 				UserID: &f.user, Items: c.items, FailFast: false,
 			})
 			if err != nil {

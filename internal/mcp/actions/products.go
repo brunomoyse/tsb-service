@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"sort"
 	"strings"
 
 	"tsb-service/internal/mcp/money"
@@ -670,7 +669,9 @@ func productCreate() handler {
 			in := upstream.CreateProductInput{CategoryID: p.CategoryID, Code: p.Code, PieceCount: p.PieceCount, Price: money.FromCents(p.PriceCents), VatCategory: p.VatCategory,
 				IsAvailable: p.Available, IsVisible: p.Visible, IsHalal: p.IsHalal, IsSpicy: p.IsSpicy, IsVegetarian: p.IsVegetarian, IsLunchOnly: p.IsLunchOnly, IsDiscountable: p.IsDiscountable}
 			langs := slices.Sorted(maps.Keys(p.Names))
-			sort.SliceStable(langs, func(i, j int) bool { return langs[i] == "fr" })
+			if i := slices.Index(langs, "fr"); i > 0 { // French (base language) first
+				langs = append([]string{"fr"}, slices.Delete(langs, i, i+1)...)
+			}
 			for _, l := range langs {
 				t := upstream.Translation{Language: l, Name: p.Names[l]}
 				if d, ok := p.Descriptions[l]; ok {

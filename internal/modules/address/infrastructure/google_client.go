@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	neturl "net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -94,8 +95,8 @@ func (c *GoogleClient) Autocomplete(ctx context.Context, input, sessionToken, la
 	var apiResp struct {
 		Suggestions []struct {
 			PlacePrediction struct {
-				PlaceID        string `json:"placeId"`
-				Text           struct {
+				PlaceID string `json:"placeId"`
+				Text    struct {
 					Text string `json:"text"`
 				} `json:"text"`
 				StructuredFormat struct {
@@ -167,9 +168,9 @@ func (c *GoogleClient) PlaceDetails(ctx context.Context, placeID, sessionToken, 
 			Longitude float64 `json:"longitude"`
 		} `json:"location"`
 		AddressComponents []struct {
-			LongText string   `json:"longText"`
-			ShortText string  `json:"shortText"`
-			Types    []string `json:"types"`
+			LongText  string   `json:"longText"`
+			ShortText string   `json:"shortText"`
+			Types     []string `json:"types"`
 		} `json:"addressComponents"`
 	}
 
@@ -238,8 +239,8 @@ func (c *GoogleClient) ComputeRoute(ctx context.Context, destLat, destLng float6
 				},
 			},
 		},
-		"travelMode":         "DRIVE",
-		"routingPreference":  "TRAFFIC_AWARE",
+		"travelMode":        "DRIVE",
+		"routingPreference": "TRAFFIC_AWARE",
 	}
 
 	bodyBytes, err := json.Marshal(reqBody)
@@ -305,10 +306,5 @@ func (c *GoogleClient) ComputeRoute(ctx context.Context, destLat, destLng float6
 }
 
 func containsType(types []string, target string) bool {
-	for _, t := range types {
-		if t == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(types, target)
 }

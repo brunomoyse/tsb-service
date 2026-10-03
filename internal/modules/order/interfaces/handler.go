@@ -3,7 +3,7 @@ package interfaces
 import (
 	"fmt"
 	"net/http"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -218,10 +218,10 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 	for rate := range vatByRate {
 		vatRates = append(vatRates, rate)
 	}
-	sort.Slice(vatRates, func(i, j int) bool {
-		ri, _ := decimal.NewFromString(vatRates[i])
-		rj, _ := decimal.NewFromString(vatRates[j])
-		return ri.GreaterThan(rj)
+	slices.SortFunc(vatRates, func(a, b string) int {
+		ra, _ := decimal.NewFromString(a)
+		rb, _ := decimal.NewFromString(b)
+		return rb.Cmp(ra)
 	})
 	for _, rate := range vatRates {
 		amount := vatByRate[rate]

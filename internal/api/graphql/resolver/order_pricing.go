@@ -7,10 +7,12 @@ package resolver
 // gqlgen relocates helper code it finds in the files it regenerates.
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -507,12 +509,11 @@ func (p *orderPricer) priceLine(
 			GroupID: selectionGroupByChoice[choiceID], ChoiceID: choiceID, Quantity: quantity,
 		})
 	}
-	sort.Slice(selections, func(a, b int) bool {
-		ga, gb := selections[a].GroupID.String(), selections[b].GroupID.String()
-		if ga != gb {
-			return ga < gb
-		}
-		return selections[a].ChoiceID.String() < selections[b].ChoiceID.String()
+	slices.SortFunc(selections, func(a, b orderDomain.OrderProductSelection) int {
+		return cmp.Or(
+			strings.Compare(a.GroupID.String(), b.GroupID.String()),
+			strings.Compare(a.ChoiceID.String(), b.ChoiceID.String()),
+		)
 	})
 	normalized := make([]pricingSelection, 0, len(selections))
 	for _, s := range selections {
@@ -637,8 +638,7 @@ func (p *orderPricer) priceCoupon(ctx context.Context, res *pricingResult, in pr
 		}
 		appErr := apperr.Newf(couponErrorCode(err), "invalid coupon: %w", err)
 		var minimum *string
-		var minErr *couponDomain.MinOrderNotMetError
-		if errors.As(err, &minErr) {
+		if minErr, ok := errors.AsType[*couponDomain.MinOrderNotMetError](err); ok {
 			required := minErr.Required.String()
 			minimum = &required
 			appErr = appErr.With("minimum", required)

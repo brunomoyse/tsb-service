@@ -15,7 +15,7 @@ func TestMCPOnlyTalksHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("go list: %v\n%s", err, out)
 	}
-	for _, pkg := range strings.Fields(string(out)) {
+	for pkg := range strings.FieldsSeq(string(out)) {
 		if !strings.HasPrefix(pkg, "tsb-service/") {
 			continue
 		}

@@ -1,7 +1,9 @@
 package graphql_test
 
 import (
+	"context"
 	"encoding/json"
+	"maps"
 	"testing"
 
 	"github.com/google/uuid"
@@ -81,9 +83,7 @@ func silenceOrderEmails(t *testing.T, tc *TestContext) {
 
 func quoteInput(orderType string, items []map[string]any, extra map[string]any) map[string]any {
 	input := map[string]any{"orderType": orderType, "isOnlinePayment": false, "items": items}
-	for k, v := range extra {
-		input[k] = v
-	}
+	maps.Copy(input, extra)
 	return input
 }
 
@@ -190,7 +190,7 @@ func TestQuoteOrderIssues(t *testing.T) {
 		_, err := tc.DB.DB.ExecContext(t.Context(), `UPDATE products SET is_available = false WHERE id = $1`, tea)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			_, _ = tc.DB.DB.ExecContext(t.Context(), `UPDATE products SET is_available = true WHERE id = $1`, tea)
+			_, _ = tc.DB.DB.ExecContext(context.Background(), `UPDATE products SET is_available = true WHERE id = $1`, tea)
 		})
 
 		items := []map[string]any{{"productId": salmon, "quantity": 1}, {"productId": tea, "quantity": 1}}
@@ -214,7 +214,7 @@ func TestQuoteOrderIssues(t *testing.T) {
 		_, err := tc.DB.DB.ExecContext(t.Context(), `UPDATE products SET price = 13.00 WHERE id = $1`, salmon)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			_, _ = tc.DB.DB.ExecContext(t.Context(), `UPDATE products SET price = 12.50 WHERE id = $1`, salmon)
+			_, _ = tc.DB.DB.ExecContext(context.Background(), `UPDATE products SET price = 12.50 WHERE id = $1`, salmon)
 		})
 
 		q := quoteOrder(t, tc, "", quoteInput("PICKUP", []map[string]any{
@@ -379,7 +379,7 @@ func TestPublicQueriesAreRateLimitedPerIP(t *testing.T) {
 	// code matters: the first two calls must reach the service, the third must be refused first).
 	const resolveQuery = `query ($p: String!, $s: String!) { resolveAddress(placeId: $p, sessionToken: $s) { id } }`
 	vars := map[string]any{"p": "nope", "s": "tok"}
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		resp := run(resolveQuery, vars)
 		for _, e := range resp.Errors {
 			assert.NotEqual(t, "RATE_LIMITED", e.Extensions["code"], "call %d must not be limited", i+1)

@@ -53,7 +53,7 @@ func TestFindOrCreateByZitadelID_EmailLinking(t *testing.T) {
 	t.Run("unlinked migrated row is adopted", func(t *testing.T) {
 		repo := &linkRepo{users: []*domain.User{{ID: uuid.New(), Email: "a@example.com", FirstName: "A", LastName: "B"}}}
 		svc := NewUserService(repo, nil)
-		u, err := svc.FindOrCreateByZitadelID(context.Background(), "sub-new", "a@example.com", "A", "B")
+		u, err := svc.FindOrCreateByZitadelID(t.Context(), "sub-new", "a@example.com", "A", "B")
 		if err != nil {
 			t.Fatalf("link: %v", err)
 		}
@@ -66,7 +66,7 @@ func TestFindOrCreateByZitadelID_EmailLinking(t *testing.T) {
 		victim := &domain.User{ID: uuid.New(), Email: "victim@example.com", FirstName: "V", LastName: "V", ZitadelUserID: sub("sub-victim")}
 		repo := &linkRepo{users: []*domain.User{victim}}
 		svc := NewUserService(repo, nil)
-		_, err := svc.FindOrCreateByZitadelID(context.Background(), "sub-attacker", "victim@example.com", "X", "Y")
+		_, err := svc.FindOrCreateByZitadelID(t.Context(), "sub-attacker", "victim@example.com", "X", "Y")
 		if !errors.Is(err, domain.ErrIdentityConflict) {
 			t.Fatalf("err = %v, want ErrIdentityConflict", err)
 		}

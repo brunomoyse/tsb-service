@@ -200,7 +200,7 @@ func (f *pricingFixture) price(in pricingInput) *pricingResult {
 	if in.UserID == nil {
 		in.UserID = &f.user
 	}
-	res, err := f.pricer().price(context.Background(), in)
+	res, err := f.pricer().price(f.t.Context(), in)
 	if err != nil {
 		f.t.Fatalf("price: unexpected server error: %v", err)
 	}
@@ -208,8 +208,6 @@ func (f *pricingFixture) price(in pricingInput) *pricingResult {
 }
 
 func item(id uuid.UUID, qty int) pricingItem { return pricingItem{ProductID: id, Quantity: qty} }
-
-func strp(s string) *string { return &s }
 
 func dec(s string) decimal.Decimal { return decimal.RequireFromString(s) }
 
@@ -427,7 +425,7 @@ func TestPricing_EmptyAndOversizedBaskets(t *testing.T) {
 
 func TestPricing_DeliveryMinimumUsesTheGoodsBeforeTheFee(t *testing.T) {
 	f := newPricingFixture(t)
-	res := f.price(pricingInput{OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: strp("mid"), Items: []pricingItem{item(salmonID, 1)}})
+	res := f.price(pricingInput{OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: new("mid"), Items: []pricingItem{item(salmonID, 1)}})
 	wantCodes(t, res.Issues, apperr.CodeDeliveryMinimumNotMet)
 	if res.Issues[0].Minimum == nil || *res.Issues[0].Minimum != "25" {
 		t.Errorf("minimum = %v, want 25", res.Issues[0].Minimum)
@@ -446,7 +444,7 @@ func TestPricing_DeliveryFeeAndAddressChecks(t *testing.T) {
 		return f.price(pricingInput{OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: placeID, Items: basket})
 	}
 
-	near := deliver(strp("near"))
+	near := deliver(new("near"))
 	wantCodes(t, near.Issues)
 	wantMoney(t, "free delivery under 3 km", near.DeliveryFee, "0")
 	wantMoney(t, "total", near.Total, "25.00")
@@ -454,16 +452,16 @@ func TestPricing_DeliveryFeeAndAddressChecks(t *testing.T) {
 		t.Errorf("address snapshot = %+v", near.Address)
 	}
 
-	mid := deliver(strp("mid"))
+	mid := deliver(new("mid"))
 	wantCodes(t, mid.Issues)
 	wantMoney(t, "fee at 3.5 km", mid.DeliveryFee, "1")
 	wantMoney(t, "total with fee", mid.Total, "26.00")
 
 	wantCodes(t, deliver(nil).Issues, apperr.CodeAddressRequired)
-	wantCodes(t, deliver(strp("")).Issues, apperr.CodeAddressRequired)
-	wantCodes(t, deliver(strp("nowhere")).Issues, apperr.CodeAddressUnresolvable)
-	wantCodes(t, deliver(strp("far")).Issues, apperr.CodeDeliveryOutOfZone)
-	wantCodes(t, deliver(strp("excluded")).Issues, apperr.CodeDeliveryAreaExcluded)
+	wantCodes(t, deliver(new("")).Issues, apperr.CodeAddressRequired)
+	wantCodes(t, deliver(new("nowhere")).Issues, apperr.CodeAddressUnresolvable)
+	wantCodes(t, deliver(new("far")).Issues, apperr.CodeDeliveryOutOfZone)
+	wantCodes(t, deliver(new("excluded")).Issues, apperr.CodeDeliveryAreaExcluded)
 }
 
 // ---- coupons -------------------------------------------------------------------------------------
@@ -471,7 +469,7 @@ func TestPricing_DeliveryFeeAndAddressChecks(t *testing.T) {
 func TestPricing_CouponIsValidatedAndSnappedWithoutReserving(t *testing.T) {
 	f := newPricingFixture(t)
 	// Pickup 2 × 12.50 + 3.50 = 28.50; pickup 2.50; 10 % coupon of 28.50 = 2.85 → 2.90
-	res := f.price(pricingInput{CouponCode: strp("TENPCT"), Items: []pricingItem{item(salmonID, 2), item(teaID, 1)}})
+	res := f.price(pricingInput{CouponCode: new("TENPCT"), Items: []pricingItem{item(salmonID, 2), item(teaID, 1)}})
 	wantCodes(t, res.Issues)
 	if res.Coupon == nil || !res.Coupon.Valid || res.Coupon.Code != "TENPCT" || res.Coupon.ErrorCode != nil {
 		t.Fatalf("coupon = %+v", res.Coupon)
@@ -485,8 +483,8 @@ func TestPricing_CouponIsValidatedAndSnappedWithoutReserving(t *testing.T) {
 
 func TestPricing_CouponFollowsTheBasket(t *testing.T) {
 	f := newPricingFixture(t)
-	small := f.price(pricingInput{CouponCode: strp("TENPCT"), Items: []pricingItem{item(salmonID, 1)}})
-	big := f.price(pricingInput{CouponCode: strp("TENPCT"), Items: []pricingItem{item(salmonID, 4)}})
+	small := f.price(pricingInput{CouponCode: new("TENPCT"), Items: []pricingItem{item(salmonID, 1)}})
+	big := f.price(pricingInput{CouponCode: new("TENPCT"), Items: []pricingItem{item(salmonID, 4)}})
 	wantMoney(t, "10 % of 12.50 = 1.25 → 1.30", small.CouponDiscount, "1.30")
 	wantMoney(t, "10 % of 50.00", big.CouponDiscount, "5.00")
 }
@@ -495,21 +493,21 @@ func TestPricing_CouponRefusals(t *testing.T) {
 	f := newPricingFixture(t)
 	basket := []pricingItem{item(salmonID, 1)}
 
-	unknown := f.price(pricingInput{CouponCode: strp("NOPE"), Items: basket})
+	unknown := f.price(pricingInput{CouponCode: new("NOPE"), Items: basket})
 	wantCodes(t, unknown.Issues, apperr.CodeCouponInvalid)
 	if unknown.Coupon == nil || unknown.Coupon.Valid || unknown.Coupon.ErrorCode == nil || *unknown.Coupon.ErrorCode != "COUPON_INVALID" {
 		t.Errorf("coupon = %+v", unknown.Coupon)
 	}
 	wantMoney(t, "no discount", unknown.CouponDiscount, "0")
 
-	min := f.price(pricingInput{CouponCode: strp("MIN30"), Items: basket})
+	min := f.price(pricingInput{CouponCode: new("MIN30"), Items: basket})
 	wantCodes(t, min.Issues, apperr.CodeCouponMinOrderNotMet)
 	if min.Issues[0].Minimum == nil || *min.Issues[0].Minimum != "30" {
 		t.Errorf("coupon minimum = %v", min.Issues[0].Minimum)
 	}
 
 	f.orders = fakeOrders{hasActiveCoupon: true}
-	active := f.price(pricingInput{CouponCode: strp("FIVE"), Items: basket})
+	active := f.price(pricingInput{CouponCode: new("FIVE"), Items: basket})
 	wantCodes(t, active.Issues, apperr.CodeCouponAlreadyActive)
 	if active.Coupon.Valid {
 		t.Error("a coupon blocked by another open order is not valid")
@@ -521,8 +519,8 @@ func TestPricing_CouponRefusals(t *testing.T) {
 func TestPricing_CouponInfrastructureFailureIsAServerFault(t *testing.T) {
 	f := newPricingFixture(t)
 	f.coupons.failure = &couponDomain.CheckFailedError{Err: errors.New("pq: connection refused")}
-	res, err := f.pricer().price(context.Background(), pricingInput{
-		OrderType: orderDomain.OrderTypePickUp, UserID: &f.user, CouponCode: strp("FIVE"), Items: []pricingItem{item(salmonID, 1)},
+	res, err := f.pricer().price(t.Context(), pricingInput{
+		OrderType: orderDomain.OrderTypePickUp, UserID: &f.user, CouponCode: new("FIVE"), Items: []pricingItem{item(salmonID, 1)},
 	})
 	if err == nil {
 		t.Fatalf("expected a server error, got result %+v", res)
@@ -538,8 +536,8 @@ func TestPricing_CouponInfrastructureFailureIsAServerFault(t *testing.T) {
 
 func TestPricing_AnonymousQuoteDoesNotEvaluateTheCoupon(t *testing.T) {
 	f := newPricingFixture(t)
-	res, err := f.pricer().price(context.Background(), pricingInput{
-		OrderType: orderDomain.OrderTypePickUp, CouponCode: strp("FIVE"), Items: []pricingItem{item(salmonID, 1)},
+	res, err := f.pricer().price(t.Context(), pricingInput{
+		OrderType: orderDomain.OrderTypePickUp, CouponCode: new("FIVE"), Items: []pricingItem{item(salmonID, 1)},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -560,16 +558,16 @@ func TestPricing_NegativeTotalIsClampedAtZero(t *testing.T) {
 	// (cash) or 0.25 → 0.30 (online).
 	basket := []pricingItem{item(odd95ID, 1)}
 
-	cash := f.price(pricingInput{CouponCode: strp("WHOLE"), Items: basket})
+	cash := f.price(pricingInput{CouponCode: new("WHOLE"), Items: basket})
 	wantCodes(t, cash.Issues)
 	wantMoney(t, "couponDiscount", cash.CouponDiscount, "13.00")
 	wantMoney(t, "cash total never negative", cash.Total, "0")
 
-	online := f.price(pricingInput{IsOnlinePayment: true, CouponCode: strp("WHOLE"), Items: basket})
+	online := f.price(pricingInput{IsOnlinePayment: true, CouponCode: new("WHOLE"), Items: basket})
 	wantMoney(t, "online total is exactly the fee", online.Total, "0.30")
 
 	// A fixed coupon far above the basket, stacked with the pickup discount on a 28.50 basket.
-	huge := f.price(pricingInput{CouponCode: strp("BIGFIXD"), Items: []pricingItem{item(salmonID, 2), item(teaID, 1)}})
+	huge := f.price(pricingInput{CouponCode: new("BIGFIXD"), Items: []pricingItem{item(salmonID, 2), item(teaID, 1)}})
 	if huge.Total.Sign() < 0 {
 		t.Errorf("total = %s, must never be negative", huge.Total)
 	}
@@ -581,8 +579,8 @@ func TestPricing_NegativeTotalIsClampedAtZero(t *testing.T) {
 func TestPricing_TotalIsWhatTheOrderRepositoryStores(t *testing.T) {
 	f := newPricingFixture(t)
 	res := f.price(pricingInput{
-		OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: strp("mid"), IsOnlinePayment: true,
-		CouponCode: strp("FIVE"), Items: []pricingItem{item(salmonID, 2), item(teaID, 2)},
+		OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: new("mid"), IsOnlinePayment: true,
+		CouponCode: new("FIVE"), Items: []pricingItem{item(salmonID, 2), item(teaID, 2)},
 	})
 	wantCodes(t, res.Issues)
 	var items decimal.Decimal
@@ -598,7 +596,7 @@ func TestPricing_TotalIsWhatTheOrderRepositoryStores(t *testing.T) {
 func TestPricing_FailFastStopsAtTheFirstProblemAndSkipsLaterLookups(t *testing.T) {
 	f := newPricingFixture(t)
 	in := pricingInput{
-		OrderType: orderDomain.OrderTypeDelivery, CouponCode: strp("FIVE"),
+		OrderType: orderDomain.OrderTypeDelivery, CouponCode: new("FIVE"),
 		Items: []pricingItem{item(uuid.New(), 1), item(soldOutID, 1)},
 	}
 
@@ -627,7 +625,7 @@ func TestPricing_FailFastStopsAtTheFirstProblemAndSkipsLaterLookups(t *testing.T
 func TestPricing_ServerFaultsAreErrorsNotIssues(t *testing.T) {
 	f := newPricingFixture(t)
 	f.catalog.fail = errors.New("db down")
-	_, err := f.pricer().price(context.Background(), pricingInput{UserID: &f.user, Items: []pricingItem{item(teaID, 1)}})
+	_, err := f.pricer().price(t.Context(), pricingInput{UserID: &f.user, Items: []pricingItem{item(teaID, 1)}})
 	if err == nil {
 		t.Fatal("a failed product lookup must be returned as an error, not reported as a customer issue")
 	}

@@ -35,7 +35,7 @@ func shouldSkipOtpEmail(loginName string) bool {
 			return
 		}
 		noSendLogins = make(map[string]struct{})
-		for _, l := range strings.Split(raw, ",") {
+		for l := range strings.SplitSeq(raw, ",") {
 			if l = strings.ToLower(strings.TrimSpace(l)); l != "" {
 				noSendLogins[l] = struct{}{}
 			}

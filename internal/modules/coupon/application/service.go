@@ -72,8 +72,7 @@ func (s *couponService) ValidateCoupon(ctx context.Context, code string, orderAm
 		// generic to avoid leaking coupon state to enumeration attempts.
 		// A valid-but-min-not-met code is not enumeration, so it doesn't count
 		// toward the daily limit; every other failure does.
-		var minErr *domain.MinOrderNotMetError
-		if errors.As(err, &minErr) {
+		if minErr, ok := errors.AsType[*domain.MinOrderNotMetError](err); ok {
 			return coupon, decimal.Zero, minErr
 		}
 		s.recordFailedAttempt(ctx, userID)

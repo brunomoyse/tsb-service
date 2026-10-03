@@ -47,7 +47,7 @@ func isReviewOtpLogin(loginName string) bool {
 			return
 		}
 		reviewLogins = make(map[string]struct{})
-		for _, l := range strings.Split(raw, ",") {
+		for l := range strings.SplitSeq(raw, ",") {
 			if l = strings.ToLower(strings.TrimSpace(l)); l != "" {
 				reviewLogins[l] = struct{}{}
 			}
@@ -77,7 +77,7 @@ var (
 // parseReviewSubs splits a comma-separated list of Zitadel user ids.
 func parseReviewSubs(raw string) map[string]struct{} {
 	subs := make(map[string]struct{})
-	for _, s := range strings.Split(raw, ",") {
+	for s := range strings.SplitSeq(raw, ",") {
 		if s = strings.TrimSpace(s); s != "" {
 			subs[s] = struct{}{}
 		}

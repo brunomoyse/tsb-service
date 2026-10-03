@@ -66,11 +66,9 @@ func (a *alerts) send(_ context.Context, at time.Time) error {
 
 var t0 = time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 
-func ptr(t time.Time) *time.Time { return &t }
-
 func TestWatchPublishesAndAlertsOncePerIncident(t *testing.T) {
-	ctx := context.Background()
-	client := &fakeClient{conn: domain.Connection{State: domain.StateConnected, Since: ptr(t0), EverConnected: true}}
+	ctx := t.Context()
+	client := &fakeClient{conn: domain.Connection{State: domain.StateConnected, Since: new(t0), EverConnected: true}}
 	pub, al := &recorder{}, &alerts{}
 	s := NewService(client, pub, al.send, func() time.Time { return t0 })
 
@@ -92,7 +90,7 @@ func TestWatchPublishesAndAlertsOncePerIncident(t *testing.T) {
 	}
 
 	// Reconnected, then expired again: a new incident, a new email.
-	client.set(domain.Connection{State: domain.StateConnected, Since: ptr(exp.Add(time.Hour)), EverConnected: true})
+	client.set(domain.Connection{State: domain.StateConnected, Since: new(exp.Add(time.Hour)), EverConnected: true})
 	s.refresh(ctx)
 	exp2 := exp.Add(48 * time.Hour)
 	client.set(domain.Connection{State: domain.StateExpired, ExpiredAt: &exp2, EverConnected: true})
@@ -103,7 +101,7 @@ func TestWatchPublishesAndAlertsOncePerIncident(t *testing.T) {
 }
 
 func TestAlertRetriedAfterFailure(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	exp := t0.Add(time.Minute)
 	client := &fakeClient{conn: domain.Connection{State: domain.StateExpired, ExpiredAt: &exp, EverConnected: true}}
 	al := &alerts{fail: true}
@@ -122,7 +120,7 @@ func TestOldExpiryNotAlertedAgainAfterRestart(t *testing.T) {
 	client := &fakeClient{conn: domain.Connection{State: domain.StateExpired, ExpiredAt: &exp, EverConnected: true}}
 	al := &alerts{}
 	s := NewService(client, &recorder{}, al.send, func() time.Time { return t0 })
-	s.refresh(context.Background())
+	s.refresh(t.Context())
 	if len(al.sent) != 0 {
 		t.Errorf("an expiry from before the restart was alerted again: %v", al.sent)
 	}
@@ -130,18 +128,18 @@ func TestOldExpiryNotAlertedAgainAfterRestart(t *testing.T) {
 	exp = t0.Add(-5 * time.Minute)
 	client.set(domain.Connection{State: domain.StateExpired, ExpiredAt: &exp, EverConnected: true})
 	s2 := NewService(client, &recorder{}, al.send, func() time.Time { return t0 })
-	s2.refresh(context.Background())
+	s2.refresh(t.Context())
 	if len(al.sent) != 1 {
 		t.Errorf("recent expiry not alerted: %v", al.sent)
 	}
 }
 
 func TestManualDisconnectIsNotAlerted(t *testing.T) {
-	client := &fakeClient{conn: domain.Connection{State: domain.StateConnected, Since: ptr(t0), EverConnected: true}}
+	client := &fakeClient{conn: domain.Connection{State: domain.StateConnected, Since: new(t0), EverConnected: true}}
 	pub, al := &recorder{}, &alerts{}
 	s := NewService(client, pub, al.send, func() time.Time { return t0 })
-	s.refresh(context.Background())
-	c, err := s.Disconnect(context.Background())
+	s.refresh(t.Context())
+	c, err := s.Disconnect(t.Context())
 	if err != nil || c.State != domain.StateDisconnected {
 		t.Fatal(c, err)
 	}
@@ -151,7 +149,7 @@ func TestManualDisconnectIsNotAlerted(t *testing.T) {
 }
 
 func TestUnavailableAndDisabled(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	s := NewService(&fakeClient{err: domain.ErrUnavailable}, nil, nil, nil)
 	c, err := s.Connection(ctx)
 	if err != nil || c.State != domain.StateUnavailable {
@@ -191,7 +189,7 @@ func TestConcurrentObservationsSendOneAlert(t *testing.T) {
 	c := domain.Connection{State: domain.StateExpired, ExpiredAt: &exp}
 	var wg sync.WaitGroup
 	for range 5 {
-		wg.Go(func() { s.Observe(context.Background(), c) })
+		wg.Go(func() { s.Observe(t.Context(), c) })
 	}
 	time.Sleep(20 * time.Millisecond)
 	close(release)

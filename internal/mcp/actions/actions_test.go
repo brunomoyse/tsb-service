@@ -48,7 +48,7 @@ func newFixture(t *testing.T) *fixture {
 	t.Cleanup(fake.Close)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	sa := upstream.ServiceAccount{Issuer: fake.URL, ClientID: "mcp-client", ClientSecret: "mcp-secret", ProjectID: "1"}
-	up := upstream.New(fake.URL, sa.TokenSource(context.Background()), log)
+	up := upstream.New(fake.URL, sa.TokenSource(t.Context()), log)
 	store, err := changes.Open(filepath.Join(t.TempDir(), "mcp.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func newFixture(t *testing.T) *fixture {
 	// Saturday 3 October 2026, 13:00 in Brussels.
 	clk := &clock{t: time.Date(2026, 10, 3, 13, 0, 0, 0, brussels)}
 	env := &Env{Up: up, Loc: brussels, PriceMaxPct: 50, Now: clk.Now}
-	return &fixture{svc: NewService(env, store, 10*time.Minute, log), fake: fake, clock: clk, ctx: context.Background()}
+	return &fixture{svc: NewService(env, store, 10*time.Minute, log), fake: fake, clock: clk, ctx: t.Context()}
 }
 
 func TestPriceBoundsViaPropose(t *testing.T) {
@@ -86,8 +86,7 @@ func TestPriceBoundsViaPropose(t *testing.T) {
 				}
 				return
 			}
-			var ue *UserError
-			if !errors.As(err, &ue) || !strings.Contains(err.Error(), tt.wantErr) {
+			if _, ok := errors.AsType[*UserError](err); !ok || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("want user error containing %q, got %v", tt.wantErr, err)
 			}
 		})
@@ -111,8 +110,7 @@ func TestApplyPendingLifecycle(t *testing.T) {
 		t.Errorf("price = %s, want 5", got)
 	}
 	_, err = f.svc.ApplyPending(f.ctx, p.ChangeID, "")
-	var se *StatusError
-	if !errors.As(err, &se) || se.Status != changes.StatusApplied || !errors.Is(err, ErrNotPending) {
+	if se, ok := errors.AsType[*StatusError](err); !ok || se.Status != changes.StatusApplied || !errors.Is(err, ErrNotPending) {
 		t.Fatalf("second apply: %v", err)
 	}
 	if _, err := f.svc.Reject(f.ctx, p.ChangeID, ""); !errors.Is(err, ErrNotPending) {
@@ -156,8 +154,7 @@ func TestConflictDetection(t *testing.T) {
 	f.fake.Unlock()
 
 	_, err = f.svc.ApplyPending(f.ctx, p.ChangeID, "")
-	var ce *ConflictError
-	if !errors.As(err, &ce) || !errors.Is(err, ErrConflict) || ce.Fields[0] != "price_cents" {
+	if ce, ok := errors.AsType[*ConflictError](err); !ok || !errors.Is(err, ErrConflict) || ce.Fields[0] != "price_cents" {
 		t.Fatalf("want conflict on price_cents, got %v", err)
 	}
 	if got := f.fake.ProductByID("p-maki-saumon").Price; got != "4.8" {

@@ -43,7 +43,7 @@ func findBestLanguageMatch(headerValue string, supportedLanguages []string) stri
 	// Normalize and filter languages
 	var commonLanguages []languageQuality
 	for _, langQuality := range languagesWithQuality {
-		baseLang := strings.Split(langQuality.Language, "-")[0] // Normalize (e.g., en-GB → en)
+		baseLang, _, _ := strings.Cut(langQuality.Language, "-") // Normalize (e.g., en-GB → en)
 		for _, supportedLang := range supportedLanguages {
 			if baseLang == supportedLang {
 				commonLanguages = append(commonLanguages, languageQuality{

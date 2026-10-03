@@ -638,8 +638,8 @@ func (s *Service) PlanReopening(ctx context.Context) (ScheduleParams, []string, 
 	// restore[date] = state before the oldest still-relevant closure.
 	restore := map[string]*overrideState{}
 	expected := map[string]OverrideSpec{}
-	for i := len(entries) - 1; i >= 0; i-- { // oldest first
-		e := entries[i]
+	for _, e := range slices.Backward(entries) { // oldest first
+
 		if e.UndoneBy != nil {
 			continue
 		}

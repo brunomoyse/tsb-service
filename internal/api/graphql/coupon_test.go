@@ -399,7 +399,7 @@ func TestValidateCouponDailyLimit(t *testing.T) {
 	t.Run("valid codes never count toward the limit", func(t *testing.T) {
 		// Six successful validations — more than the limit — must all pass,
 		// proving successes are not counted.
-		for i := 0; i < 6; i++ {
+		for i := range 6 {
 			res := validate("DAILYOK")
 			assert.True(t, res.Valid, "valid coupon should validate on attempt %d", i+1)
 		}
@@ -407,7 +407,7 @@ func TestValidateCouponDailyLimit(t *testing.T) {
 
 	t.Run("failed attempts are capped at five per day", func(t *testing.T) {
 		// First five failures return the generic invalid-coupon message.
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			res := validate("NOPE-000")
 			assert.False(t, res.Valid, "attempt %d should fail", i+1)
 			require.NotNil(t, res.ErrorMessage)

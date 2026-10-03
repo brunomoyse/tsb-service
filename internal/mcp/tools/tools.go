@@ -67,36 +67,30 @@ type WriteContext struct {
 }
 
 var (
-	readOnly    = &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(false)}
-	lowRisk     = &mcp.ToolAnnotations{DestructiveHint: ptr(false), IdempotentHint: true, OpenWorldHint: ptr(false)}
-	proposeOnly = &mcp.ToolAnnotations{DestructiveHint: ptr(false), IdempotentHint: false, OpenWorldHint: ptr(false)}
+	readOnly    = &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: new(false)}
+	lowRisk     = &mcp.ToolAnnotations{DestructiveHint: new(false), IdempotentHint: true, OpenWorldHint: new(false)}
+	proposeOnly = &mcp.ToolAnnotations{DestructiveHint: new(false), IdempotentHint: false, OpenWorldHint: new(false)}
 )
-
-func ptr[T any](v T) *T { return &v }
 
 const genericError = "Something went wrong in the assistant. Please try again."
 
 // safeErr converts any error into a short message fit for the owner. Details
 // are logged, never returned.
 func (d *Deps) safeErr(tool string, err error) error {
-	var (
-		ue *actions.UserError
-		up *upstream.Error
-		ce *actions.ConflictError
-	)
-	switch {
-	case errors.As(err, &ue):
+	if ue, ok := errors.AsType[*actions.UserError](err); ok {
 		return errors.New(ue.Msg)
-	case errors.As(err, &ce):
-		return errors.New(ce.Error())
-	case errors.As(err, &up):
-		return errors.New(up.Error())
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
-		return &actions.UserError{Msg: "The request took too long. Please try again."}
-	default:
-		d.Log.Error("tool failed", "tool", tool, "error", err)
-		return &actions.UserError{Msg: genericError}
 	}
+	if ce, ok := errors.AsType[*actions.ConflictError](err); ok {
+		return errors.New(ce.Error())
+	}
+	if up, ok := errors.AsType[*upstream.Error](err); ok {
+		return errors.New(up.Error())
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return &actions.UserError{Msg: "The request took too long. Please try again."}
+	}
+	d.Log.Error("tool failed", "tool", tool, "error", err)
+	return &actions.UserError{Msg: genericError}
 }
 
 // add registers a typed tool with error sanitising.

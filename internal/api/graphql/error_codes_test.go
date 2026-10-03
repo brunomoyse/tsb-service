@@ -2,6 +2,7 @@ package graphql_test
 
 import (
 	"encoding/json"
+	"maps"
 	"testing"
 
 	"github.com/google/uuid"
@@ -25,9 +26,7 @@ func createOrderInput(orderType string, items []map[string]any, extra map[string
 		"isOnlinePayment": false,
 		"items":           items,
 	}
-	for k, v := range extra {
-		input[k] = v
-	}
+	maps.Copy(input, extra)
 	return input
 }
 
@@ -184,7 +183,7 @@ func TestValidateCouponErrorCode(t *testing.T) {
 	})
 
 	t.Run("unknown coupon stays generic until the daily limit", func(t *testing.T) {
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			res := validate("NOPE-000", "40")
 			require.NotNil(t, res.ErrorCode)
 			assert.Equal(t, "COUPON_INVALID", *res.ErrorCode, "attempt %d", i+1)

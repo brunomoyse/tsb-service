@@ -47,8 +47,7 @@ func (e *Error) Extensions() map[string]any {
 
 // From returns the *Error in err's chain, if any.
 func From(err error) (*Error, bool) {
-	var appErr *Error
-	if errors.As(err, &appErr) {
+	if appErr, ok := errors.AsType[*Error](err); ok {
 		return appErr, true
 	}
 	return nil, false

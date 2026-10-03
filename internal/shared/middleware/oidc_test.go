@@ -22,7 +22,7 @@ func TestResolveAppUserID(t *testing.T) {
 
 	t.Run("nil userLookup refuses the request", func(t *testing.T) {
 		v := &OIDCVerifier{}
-		appID, ok := v.resolveAppUserID(context.Background(), sub, "", "", "")
+		appID, ok := v.resolveAppUserID(t.Context(), sub, "", "", "")
 		if ok {
 			t.Fatalf("expected ok=false when userLookup is nil, got appID=%q", appID)
 		}
@@ -34,7 +34,7 @@ func TestResolveAppUserID(t *testing.T) {
 	t.Run("lookup error refuses the request", func(t *testing.T) {
 		lookup := &stubUserLookup{err: errors.New("db down")}
 		v := &OIDCVerifier{userLookup: lookup}
-		appID, ok := v.resolveAppUserID(context.Background(), sub, "", "", "")
+		appID, ok := v.resolveAppUserID(t.Context(), sub, "", "", "")
 		if ok {
 			t.Fatalf("expected ok=false on lookup error, got appID=%q", appID)
 		}
@@ -50,7 +50,7 @@ func TestResolveAppUserID(t *testing.T) {
 		want := "11111111-1111-1111-1111-111111111111"
 		lookup := &stubUserLookup{appID: want}
 		v := &OIDCVerifier{userLookup: lookup}
-		appID, ok := v.resolveAppUserID(context.Background(), sub, "u@example.com", "First", "Last")
+		appID, ok := v.resolveAppUserID(t.Context(), sub, "u@example.com", "First", "Last")
 		if !ok {
 			t.Fatalf("expected ok=true on successful lookup")
 		}

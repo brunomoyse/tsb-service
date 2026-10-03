@@ -416,11 +416,11 @@ func TestVerifyOtpHandler_DuplicateSubmitReturnsCachedResponse(t *testing.T) {
 // in-flight verifies for the same sessionID end up calling Zitadel exactly
 // once, the rest get the cached success.
 func TestVerifyOtpHandler_ConcurrentSubmitsAreSerialized(t *testing.T) {
-	var patchHits int32
+	var patchHits atomic.Int32
 	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/v2/sessions/sess-conc" && r.Method == "PATCH":
-			atomic.AddInt32(&patchHits, 1)
+			patchHits.Add(1)
 			// Hold the response briefly so the other goroutines pile up on
 			// the per-session mutex rather than racing serially through.
 			time.Sleep(20 * time.Millisecond)
@@ -446,18 +446,16 @@ func TestVerifyOtpHandler_ConcurrentSubmitsAreSerialized(t *testing.T) {
 
 	var wg sync.WaitGroup
 	results := make([]int, concurrency)
-	for i := 0; i < concurrency; i++ {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
+	for i := range concurrency {
+		wg.Go(func() {
 			w, c := ginContext("POST", "/auth/session/otp/verify", body)
 			VerifyOtpHandler(c)
-			results[idx] = w.Code
-		}(i)
+			results[i] = w.Code
+		})
 	}
 	wg.Wait()
 
-	assert.Equal(t, int32(1), atomic.LoadInt32(&patchHits), "concurrent verifies must hit Zitadel exactly once")
+	assert.Equal(t, int32(1), patchHits.Load(), "concurrent verifies must hit Zitadel exactly once")
 	for i, code := range results {
 		assert.Equal(t, http.StatusOK, code, "goroutine %d must have observed a successful verify", i)
 	}
@@ -467,11 +465,11 @@ func TestVerifyOtpHandler_ConcurrentSubmitsAreSerialized(t *testing.T) {
 // failed verify, retrying with a different code still hits Zitadel — only
 // successful (sessionID, code) pairs are cached.
 func TestVerifyOtpHandler_DifferentCodeBypassesCache(t *testing.T) {
-	var patchCalls int32
+	var patchCalls atomic.Int32
 	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/v2/sessions/sess-mix" && r.Method == "PATCH":
-			n := atomic.AddInt32(&patchCalls, 1)
+			n := patchCalls.Add(1)
 			if n == 1 {
 				w.WriteHeader(http.StatusBadRequest)
 				_, _ = w.Write([]byte(`{"code":3,"message":"otp invalid"}`))
@@ -502,7 +500,7 @@ func TestVerifyOtpHandler_DifferentCodeBypassesCache(t *testing.T) {
 	VerifyOtpHandler(c2)
 	require.Equal(t, http.StatusOK, w2.Code)
 
-	assert.Equal(t, int32(2), atomic.LoadInt32(&patchCalls), "wrong-then-right code must hit Zitadel twice — failures are not cached")
+	assert.Equal(t, int32(2), patchCalls.Load(), "wrong-then-right code must hit Zitadel twice — failures are not cached")
 }
 
 // --- ResendOtpHandler Tests ---

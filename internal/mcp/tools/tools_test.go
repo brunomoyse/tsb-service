@@ -44,12 +44,12 @@ func (h *harness) Now() time.Time {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	h := &harness{t: t, ctx: context.Background(), now: time.Date(2026, 10, 3, 13, 0, 0, 0, brussels)}
+	h := &harness{t: t, ctx: t.Context(), now: time.Date(2026, 10, 3, 13, 0, 0, 0, brussels)}
 	h.fake = fakeupstream.New()
 	t.Cleanup(h.fake.Close)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	sa := upstream.ServiceAccount{Issuer: h.fake.URL, ClientID: "mcp-client", ClientSecret: "mcp-secret", ProjectID: "1"}
-	up := upstream.New(h.fake.URL, sa.TokenSource(context.Background()), log)
+	up := upstream.New(h.fake.URL, sa.TokenSource(t.Context()), log)
 	store, err := changes.Open(filepath.Join(t.TempDir(), "mcp.db"))
 	if err != nil {
 		t.Fatal(err)

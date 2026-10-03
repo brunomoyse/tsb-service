@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/shopspring/decimal"
@@ -109,10 +110,5 @@ func (p OrderingPolicy) DeliveryFee(distanceMeters float64) (fee decimal.Decimal
 // IsPostcodeExcluded reports whether delivery to the postcode is refused regardless of distance.
 func (p OrderingPolicy) IsPostcodeExcluded(postcode string) bool {
 	postcode = strings.TrimSpace(postcode)
-	for _, excluded := range p.ExcludedPostcodes {
-		if excluded == postcode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(p.ExcludedPostcodes, postcode)
 }

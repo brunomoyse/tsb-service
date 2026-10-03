@@ -1,11 +1,11 @@
 package middleware
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"maps"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -65,9 +65,7 @@ func signToken(t *testing.T, key *rsa.PrivateKey, claims jwt.MapClaims) string {
 		"nbf": now.Unix(),
 		"exp": now.Add(time.Hour).Unix(),
 	}
-	for k, v := range claims {
-		base[k] = v
-	}
+	maps.Copy(base, claims)
 	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, base)
 	tok.Header["kid"] = testKeyID
 	s, err := tok.SignedString(key)
@@ -79,7 +77,7 @@ func signToken(t *testing.T, key *rsa.PrivateKey, claims jwt.MapClaims) string {
 
 func TestVerifyTokenAudiences(t *testing.T) {
 	key, internalURL := fakeZitadel(t)
-	v, err := NewOIDCVerifier(context.Background(), "https://"+testIssuerHost, internalURL, testClientID, testProjectID, nil)
+	v, err := NewOIDCVerifier(t.Context(), "https://"+testIssuerHost, internalURL, testClientID, testProjectID, nil)
 	if err != nil {
 		t.Fatalf("NewOIDCVerifier: %v", err)
 	}
@@ -118,7 +116,7 @@ func TestVerifyTokenAudiences(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sub, isAdmin, isPOS, _, err := v.VerifyToken(context.Background(), signToken(t, key, tt.claims))
+			sub, isAdmin, isPOS, _, err := v.VerifyToken(t.Context(), signToken(t, key, tt.claims))
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("VerifyToken accepted the token (sub %q)", sub)

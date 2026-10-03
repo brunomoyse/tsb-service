@@ -1,7 +1,6 @@
 package infrastructure
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -37,7 +36,7 @@ func TestAgentClient(t *testing.T) {
 		}
 	}))
 	defer srv.Close()
-	ctx := context.Background()
+	ctx := t.Context()
 	c := NewAgentClient(srv.URL+"/", "secret", nil)
 
 	conn, err := c.Connection(ctx)

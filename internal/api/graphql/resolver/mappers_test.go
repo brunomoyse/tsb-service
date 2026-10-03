@@ -228,11 +228,11 @@ func TestValidatePreferredReadyTime_ErrorCodes(t *testing.T) {
 		want      apperr.Code
 	}{
 		{"closed and no slot", nil, atBrussels(t, "2026-05-13", "16:30"), false, apperr.CodeSlotRequired},
-		{"another day", ptrTime(atBrussels(t, "2026-05-14", "12:30")), noon, true, apperr.CodeSlotNotToday},
-		{"inside the preparation window", ptrTime(atBrussels(t, "2026-05-13", "12:15")), noon, true, apperr.CodeSlotTooSoon},
-		{"not on a 15 minute boundary", ptrTime(atBrussels(t, "2026-05-13", "12:40")), noon, true, apperr.CodeSlotMisaligned},
-		{"between services", ptrTime(atBrussels(t, "2026-05-13", "16:30")), noon, true, apperr.CodeSlotOutsideHours},
-		{"valid slot", ptrTime(atBrussels(t, "2026-05-13", "12:45")), noon, true, ""},
+		{"another day", new(atBrussels(t, "2026-05-14", "12:30")), noon, true, apperr.CodeSlotNotToday},
+		{"inside the preparation window", new(atBrussels(t, "2026-05-13", "12:15")), noon, true, apperr.CodeSlotTooSoon},
+		{"not on a 15 minute boundary", new(atBrussels(t, "2026-05-13", "12:40")), noon, true, apperr.CodeSlotMisaligned},
+		{"between services", new(atBrussels(t, "2026-05-13", "16:30")), noon, true, apperr.CodeSlotOutsideHours},
+		{"valid slot", new(atBrussels(t, "2026-05-13", "12:45")), noon, true, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -252,8 +252,6 @@ func TestValidatePreferredReadyTime_ErrorCodes(t *testing.T) {
 		}
 	})
 }
-
-func ptrTime(t time.Time) *time.Time { return &t }
 
 func TestCouponErrorCode(t *testing.T) {
 	cases := []struct {

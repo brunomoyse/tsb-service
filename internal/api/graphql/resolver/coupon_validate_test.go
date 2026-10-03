@@ -27,7 +27,7 @@ func (s errCouponService) ValidateCoupon(context.Context, string, decimal.Decima
 func validateAs(t *testing.T, err error) (*string, *string, error) {
 	t.Helper()
 	r := &Resolver{CouponService: errCouponService{err: err}}
-	ctx := utils.SetUserID(context.Background(), uuid.NewString())
+	ctx := utils.SetUserID(t.Context(), uuid.NewString())
 	res, gqlErr := r.Query().ValidateCoupon(ctx, "ANY", "10")
 	if gqlErr != nil {
 		return nil, nil, gqlErr

@@ -44,18 +44,18 @@ func TestSummaryZhEveryKind(t *testing.T) {
 		KindProductCreate: {ProductCreateParams{CategoryID: "cat-maki", Names: map[string]string{"fr": "Maki thon", "en": "Tuna maki", "zh": "金枪鱼卷"}, PriceCents: 480, Available: true, Visible: true},
 			[]string{"新商品「金枪鱼卷」", "分类卷", "4.80 欧元", "可售", "显示"}},
 		KindProductImage:       {ImageParams{ProductID: "p-maki-saumon", ImageURL: "https://example.com/a.jpg", Filename: "a.jpg", ContentType: "image/jpeg", SizeBytes: 2048, SHA256: strings.Repeat("a", 64)}, []string{"卷「三文鱼卷」", "无法恢复"}},
-		KindChoiceGroupUpsert:  {ChoiceGroupParams{GroupID: "g-sauce", MaxSelections: ptrTo(2)}, []string{"套餐「卷寿司套餐」的选项组「酱汁」", "最多选择：1 → 2"}},
+		KindChoiceGroupUpsert:  {ChoiceGroupParams{GroupID: "g-sauce", MaxSelections: new(2)}, []string{"套餐「卷寿司套餐」的选项组「酱汁」", "最多选择：1 → 2"}},
 		KindChoiceGroupDelete:  {ChoiceGroupRef{GroupID: "g-sauce"}, []string{"删除选项组「酱汁」", "2 个选项", "Soja、Mayo épicée"}},
-		KindChoiceUpsert:       {ChoiceParams{ChoiceID: "c-spicy", Names: map[string]string{"zh": sauceZh}, PriceModifierCents: ptrTo[int64](60)}, []string{"中文名称：无 → 「辣酱」", "加价：0.50 欧元 → 0.60 欧元"}},
+		KindChoiceUpsert:       {ChoiceParams{ChoiceID: "c-spicy", Names: map[string]string{"zh": sauceZh}, PriceModifierCents: new(int64(60))}, []string{"中文名称：无 → 「辣酱」", "加价：0.50 欧元 → 0.60 欧元"}},
 		KindChoiceDelete:       {ChoiceRef{ChoiceID: "c-soja"}, []string{"从选项组「酱汁」中删除选项「Soja」"}},
 		KindPreparationMinutes: {PreparationParams{Minutes: 45}, []string{"备餐时间：30 分钟 → 45 分钟"}},
 		KindOpeningHours:       {HoursParams{Week: week}, []string{"营业时间：", "周一：休息 → 11:30至14:30", "周三：11:30至14:30，18:00至22:00 → 休息"}},
 		KindOrderingHours:      {HoursParams{Week: week}, []string{"接单时间："}},
-		KindSchedule: {ScheduleParams{Origin: OriginOverride, OrderingEnabled: ptrTo(false), Upserts: []OverrideSpec{{Date: "2026-10-05", Closed: true, Note: &note}}},
+		KindSchedule: {ScheduleParams{Origin: OriginOverride, OrderingEnabled: new(false), Upserts: []OverrideSpec{{Date: "2026-10-05", Closed: true, Note: &note}}},
 			[]string{"在线点餐：开启 → 关闭", "10月5日（周一）：正常营业时间（休息） → 全天休息（备注：装修）"}},
-		KindCouponCreate: {CouponCreateParams{Code: "NEW15", Discount: CouponValue{Type: "percentage", PercentOff: 15}, MinOrderCents: ptrTo[int64](2000), ValidUntil: &until, Active: true},
+		KindCouponCreate: {CouponCreateParams{Code: "NEW15", Discount: CouponValue{Type: "percentage", PercentOff: 15}, MinOrderCents: new(int64(2000)), ValidUntil: &until, Active: true},
 			[]string{"新优惠码 NEW15：优惠 15%", "最低消费 20.00 欧元", "10月31日 23:00 止", "启用"}},
-		KindCouponUpdate:     {CouponUpdateParams{CouponID: "cp-welcome", Discount: &CouponValue{Type: "fixed", AmountOffCent: 300}, MaxUses: ptrTo(50)}, []string{"优惠码 WELCOME10", "折扣：优惠 10% → 减 3.00 欧元", "最多使用次数：无 → 50"}},
+		KindCouponUpdate:     {CouponUpdateParams{CouponID: "cp-welcome", Discount: &CouponValue{Type: "fixed", AmountOffCent: 300}, MaxUses: new(50)}, []string{"优惠码 WELCOME10", "折扣：优惠 10% → 减 3.00 欧元", "最多使用次数：无 → 50"}},
 		KindCouponActivate:   {CouponRef{CouponID: "cp-old"}, []string{"优惠码 SUMMER5（减 5.00 欧元）：停用 → 启用"}},
 		KindCouponDeactivate: {CouponRef{CouponID: "cp-welcome"}, []string{"优惠码 WELCOME10（优惠 10%）：启用 → 停用"}},
 	}
@@ -116,8 +116,6 @@ func TestSummaryZhFallsBackToFrench(t *testing.T) {
 		t.Errorf("summary_zh %q", p.SummaryZh)
 	}
 }
-
-func ptrTo[T any](v T) *T { return &v }
 
 func TestProductLabelZhNamesTheCategory(t *testing.T) {
 	// The same Chinese name in two categories must read differently.

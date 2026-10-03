@@ -1,7 +1,6 @@
 package changes
 
 import (
-	"context"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -20,7 +19,7 @@ func openTest(t *testing.T) *Store {
 
 func TestChangeLifecycle(t *testing.T) {
 	s := openTest(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 
 	c := &Change{ID: "ch1", Tool: "propose_price_change", Kind: "product.price", EntityType: "product", EntityID: "p1",
@@ -52,7 +51,7 @@ func TestChangeLifecycle(t *testing.T) {
 
 func TestAuditUndoSelection(t *testing.T) {
 	s := openTest(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	base := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 
 	add := func(min int, outcome string, undoOf *int64) int64 {
@@ -96,7 +95,7 @@ func TestAuditUndoSelection(t *testing.T) {
 
 func TestPendingUndoFor(t *testing.T) {
 	s := openTest(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Now().UTC()
 	aid := int64(7)
 	_ = s.CreateChange(ctx, &Change{ID: "u1", Tool: "undo_last_change", Kind: "k", EntityType: "e", EntityID: "1", Params: []byte(`{}`), Before: []byte(`{}`),
@@ -131,7 +130,7 @@ func TestAddsSummaryZhToOldSchema(t *testing.T) {
 		t.Fatalf("reopen old schema: %v", err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
-	ctx := context.Background()
+	ctx := t.Context()
 	now := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 	c := &Change{ID: "ch1", Tool: "propose_price_change", Kind: "product.price", EntityType: "product", EntityID: "p1",
 		Params: []byte(`{}`), Before: []byte(`{}`), BeforeHash: "h", Summary: "s", SummaryZh: "「三文鱼卷」价格", Status: StatusPending,

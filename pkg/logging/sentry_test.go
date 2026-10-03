@@ -49,7 +49,7 @@ func TestSentryBridge(t *testing.T) {
 	zap.L().Warn("benign warning")                        // excluded (below Error)
 	zap.L().Error("boom", zap.String("detail", "kaboom")) // captured
 	zap.L().Error("already reported", SkipSentry)         // suppressed
-	FromContext(SetRequestID(context.Background(), "req-9")).
+	FromContext(SetRequestID(t.Context(), "req-9")).
 		Error("with context") // captured + request_id tag
 
 	sentry.Flush(time.Second)
