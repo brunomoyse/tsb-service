@@ -179,11 +179,7 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 				changed = true
 			}
 			if changed {
-				log.Info("backfilling app user profile from Zitadel",
-					zap.String("email", user.Email),
-					zap.String("first_name", user.FirstName),
-					zap.String("last_name", user.LastName),
-				)
+				log.Info("backfilling app user profile from Zitadel", zap.String("user_id", user.ID.String()))
 				return s.repo.UpdateUser(ctx, user)
 			}
 		}
@@ -197,6 +193,12 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 	if email != "" {
 		user, err = s.repo.FindByEmail(ctx, email)
 		if err == nil {
+			// Only adopt a row that is not yet linked (migrated users). A row
+			// already bound to another sub belongs to someone else.
+			if linkedElsewhere(user, zitadelID) {
+				log.Warn("refusing to relink app user to a second Zitadel identity", zap.String("user_id", user.ID.String()))
+				return nil, domain.ErrIdentityConflict
+			}
 			user.ZitadelUserID = &zitadelID
 			if user.FirstName == "" && firstName != "" {
 				user.FirstName = firstName
@@ -204,16 +206,12 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 			if user.LastName == "" && lastName != "" {
 				user.LastName = lastName
 			}
-			log.Info("linking existing app user to Zitadel", zap.String("email", email))
+			log.Info("linking existing app user to Zitadel", zap.String("user_id", user.ID.String()))
 			return s.repo.UpdateUser(ctx, user)
 		}
 	}
 
-	log.Info("creating app user from Zitadel JIT",
-		zap.String("email", email),
-		zap.String("first_name", firstName),
-		zap.String("last_name", lastName),
-	)
+	log.Info("creating app user from Zitadel JIT")
 	newUser := domain.User{
 		FirstName:     firstName,
 		LastName:      lastName,
@@ -232,6 +230,9 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 			}
 			if email != "" {
 				if existing, findErr := s.repo.FindByEmail(ctx, email); findErr == nil {
+					if linkedElsewhere(existing, zitadelID) {
+						return nil, domain.ErrIdentityConflict
+					}
 					return existing, nil
 				}
 			}
@@ -246,6 +247,12 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 // user record. JWT access tokens validated locally (oauth.WithJWT) don't
 // populate these fields on the auth context, so the OIDC middleware forwards
 // empty strings for social-IdP logins where ID-token claims aren't available.
+// linkedElsewhere reports whether u is already bound to a Zitadel identity
+// other than zitadelID.
+func linkedElsewhere(u *domain.User, zitadelID string) bool {
+	return u.ZitadelUserID != nil && *u.ZitadelUserID != "" && *u.ZitadelUserID != zitadelID
+}
+
 func (s *userService) enrichFromZitadel(ctx context.Context, zitadelID, email, firstName, lastName string) (string, string, string) {
 	if s.zitadelFetcher == nil || (email != "" && firstName != "" && lastName != "") {
 		return email, firstName, lastName

@@ -137,8 +137,15 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 		// CheckOrigin behaviour.
 		Implementation: originCheckedWebsocket{allowedOrigins: allowedOrigins},
 		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
-			// If auth was already set by HTTP middleware (via cookie), keep it
+			// If auth was already set by HTTP middleware (header or cookie on
+			// the upgrade request), keep it, but still end the socket when that
+			// token expires, as the connection_init branch below does.
 			if utils.GetUserID(ctx) != "" {
+				if exp := utils.GetTokenExpiry(ctx); !exp.IsZero() {
+					var cancel context.CancelFunc
+					ctx, cancel = context.WithDeadline(ctx, exp)
+					_ = cancel
+				}
 				return ctx, &initPayload, nil
 			}
 			// Fall back to connectionParams Authorization header

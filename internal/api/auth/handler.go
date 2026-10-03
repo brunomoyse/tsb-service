@@ -5,9 +5,11 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -92,7 +94,7 @@ func FinalizeOIDCHandler(c *gin.Context) {
 		},
 	}
 
-	respBody, status, err := zitadelRequest("POST", "/v2/oidc/auth_requests/"+req.AuthRequestID, body)
+	respBody, status, err := zitadelRequest("POST", "/v2/oidc/auth_requests/"+url.PathEscape(req.AuthRequestID), body)
 	if err != nil {
 		logging.FromContext(c.Request.Context()).Error("zitadel oidc finalize failed", zap.Error(err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": "authentication service unavailable"})
@@ -138,20 +140,26 @@ func AuthorizeProxyHandler(c *gin.Context) {
 		return
 	}
 
+	// Only the issuer's own authorize endpoint may be proxied. Without this
+	// check the handler is an unauthenticated server-side GET to any URL.
+	target, err := validateAuthorizeURL(req.AuthorizeURL)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_authorize_url"})
+		return
+	}
+
 	// Rewrite the authorize URL to use the internal Zitadel address (if configured)
 	// to avoid Cloudflare Tunnel hairpin (public domain → Cloudflare → Tunnel → same server → 502).
-	// Preserve the original host for the Host header (Zitadel uses virtual hosting).
+	// Keep the issuer host for the Host header (Zitadel uses virtual hosting).
 	var originalHost string
 	if client.externalHost != "" {
-		if parsed, err := url.Parse(req.AuthorizeURL); err == nil {
-			if internal, err2 := url.Parse(client.baseURL); err2 == nil {
-				originalHost = parsed.Host
-				parsed.Scheme = internal.Scheme
-				parsed.Host = internal.Host
-				req.AuthorizeURL = parsed.String()
-			}
+		if internal, err2 := url.Parse(client.baseURL); err2 == nil {
+			originalHost = target.Host
+			target.Scheme = internal.Scheme
+			target.Host = internal.Host
 		}
 	}
+	req.AuthorizeURL = target.String()
 
 	// Follow the redirect chain to capture the authRequestID from the Location header
 	var redirectURL string
@@ -163,7 +171,7 @@ func AuthorizeProxyHandler(c *gin.Context) {
 		},
 	}
 
-	httpReq, err := http.NewRequest("GET", req.AuthorizeURL, nil)
+	httpReq, err := http.NewRequest(http.MethodGet, req.AuthorizeURL, nil)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "invalid authorize URL"})
 		return
@@ -204,6 +212,34 @@ func AuthorizeProxyHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"authRequestId": authRequestID, "redirectUrl": redirectURL})
+}
+
+// authorizePath is the only Zitadel path AuthorizeProxyHandler may fetch.
+const authorizePath = "/oauth/v2/authorize"
+
+// errInvalidAuthorizeURL is returned when a proxied authorize URL is not the
+// issuer's authorize endpoint.
+var errInvalidAuthorizeURL = errors.New("authorize URL is not the issuer authorize endpoint")
+
+// validateAuthorizeURL accepts only {issuer}/oauth/v2/authorize?... and
+// returns the parsed URL. Scheme and host must match the configured issuer;
+// userinfo and fragments are rejected.
+func validateAuthorizeURL(raw string) (*url.URL, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil, errInvalidAuthorizeURL
+	}
+	issuer, err := url.Parse(strings.TrimRight(client.issuerURL, "/"))
+	if err != nil || issuer.Host == "" {
+		return nil, errInvalidAuthorizeURL
+	}
+	if u.User != nil || u.Fragment != "" || u.Opaque != "" ||
+		!strings.EqualFold(u.Scheme, issuer.Scheme) ||
+		!strings.EqualFold(u.Host, issuer.Host) ||
+		u.Path != issuer.Path+authorizePath {
+		return nil, errInvalidAuthorizeURL
+	}
+	return u, nil
 }
 
 // POST /auth/token-exchange

@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -275,7 +276,7 @@ func VerifyOtpHandler(c *gin.Context) {
 		},
 	}
 
-	respBody, status, err := zitadelRequest("PATCH", "/v2/sessions/"+req.SessionID, body)
+	respBody, status, err := zitadelRequest("PATCH", "/v2/sessions/"+url.PathEscape(req.SessionID), body)
 	if err != nil {
 		log.Error("zitadel otp session update failed", zap.Error(err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": "authentication service unavailable"})
@@ -356,7 +357,7 @@ func ResendOtpHandler(c *gin.Context) {
 		},
 	}
 
-	respBody, status, err := zitadelRequest("PATCH", "/v2/sessions/"+req.SessionID, body)
+	respBody, status, err := zitadelRequest("PATCH", "/v2/sessions/"+url.PathEscape(req.SessionID), body)
 	if err != nil {
 		log.Error("zitadel otp resend failed", zap.Error(err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": "authentication service unavailable"})
@@ -411,7 +412,7 @@ func ResendOtpHandler(c *gin.Context) {
 // Returns empty strings on any failure — callers should treat that as a
 // silent skip rather than an error.
 func lookupSessionUser(sessionID string) (loginName string, firstName string) {
-	respBody, status, err := zitadelRequest("GET", "/v2/sessions/"+sessionID, nil)
+	respBody, status, err := zitadelRequest("GET", "/v2/sessions/"+url.PathEscape(sessionID), nil)
 	if err != nil || status != http.StatusOK {
 		return "", ""
 	}

@@ -40,7 +40,7 @@ func (r *Resolver) quoteOrder(ctx context.Context, input model.QuoteOrderInput) 
 		if user, err := r.UserService.GetUserByID(ctx, userID.String()); err != nil {
 			zap.L().Debug("quoteOrder: user lookup failed, quoting as a regular customer", zap.Error(err))
 		} else if user != nil {
-			skipGate = auth.IsReviewUser(user.Email, user.FirstName, user.LastName)
+			skipGate = auth.IsReviewUser(user.ZitadelUserID)
 		}
 	}
 

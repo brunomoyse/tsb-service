@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -14,7 +15,7 @@ import (
 
 // idpStartRequest is the frontend's request to start a social IdP login.
 type idpStartRequest struct {
-	Provider   string `json:"provider"`   // "google", "apple"
+	Provider   string `json:"provider"` // "google", "apple"
 	SuccessURL string `json:"successUrl"`
 	FailureURL string `json:"failureUrl"`
 }
@@ -180,7 +181,7 @@ func CreateIdPSessionHandler(c *gin.Context) {
 // an existing Zitadel user by email (and links the IdP) or creates a new one.
 func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (string, error) {
 	// 1. Retrieve IdP intent info (includes user template and IdP details)
-	intentBody, intentStatus, err := zitadelRequest("POST", "/v2/idp_intents/"+intentID, map[string]any{
+	intentBody, intentStatus, err := zitadelRequest("POST", "/v2/idp_intents/"+url.PathEscape(intentID), map[string]any{
 		"idpIntentToken": intentToken,
 	})
 	if err != nil {
@@ -233,7 +234,7 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 					"userName": intentInfo.IdpInfo.UserName,
 				},
 			}
-			linkResp, linkStatus, linkErr := zitadelAdminRequest("POST", "/v2/users/"+userID+"/links", linkBody)
+			linkResp, linkStatus, linkErr := zitadelAdminRequest("POST", "/v2/users/"+url.PathEscape(userID)+"/links", linkBody)
 			if linkErr != nil {
 				return "", fmt.Errorf("link idp to user: %w", linkErr)
 			}

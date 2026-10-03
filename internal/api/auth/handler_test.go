@@ -53,15 +53,20 @@ func ginContext(method, path, body string) (*httptest.ResponseRecorder, *gin.Con
 
 // --- CompleteOtpProfileHandler Tests ---
 
-func TestCompleteOtpProfileHandler_Success(t *testing.T) {
-	var profileUpdated bool
-	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
+// profileMock serves a session with the given factors JSON for sess-1, a
+// user with the given given/family name, and records profile PUTs.
+func profileMock(t *testing.T, factors, givenName, familyName string, puts *int) http.HandlerFunc {
+	t.Helper()
+	return func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/v2/sessions/sess-1" && r.Method == "GET":
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"session":{"factors":{"user":{"id":"placeholder-user"}}}}`))
+			_, _ = w.Write([]byte(`{"session":{"factors":` + factors + `}}`))
+		case r.URL.Path == "/v2/users/placeholder-user" && r.Method == "GET":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"` + givenName + `","familyName":"` + familyName + `"}}}}`))
 		case r.URL.Path == "/v2/users/human/placeholder-user" && r.Method == "PUT":
-			profileUpdated = true
+			*puts++
 			var body map[string]any
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 			profile := body["profile"].(map[string]any)
@@ -72,17 +77,69 @@ func TestCompleteOtpProfileHandler_Success(t *testing.T) {
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-	})
+	}
+}
 
-	body := `{"sessionId":"sess-1","sessionToken":"tok-1","firstName":"Alice","lastName":"Wonderland"}`
-	w, c := ginContext("POST", "/auth/session/otp/complete-profile", body)
+const (
+	otpVerifiedFactors    = `{"user":{"id":"placeholder-user"},"otpEmail":{"verifiedAt":"2026-10-03T10:00:00Z"}}`
+	intentVerifiedFactors = `{"user":{"id":"placeholder-user"},"intent":{"verifiedAt":"2026-10-03T10:00:00Z"}}`
+	userOnlyFactors       = `{"user":{"id":"placeholder-user"}}`
+	completeProfileBody   = `{"sessionId":"sess-1","sessionToken":"tok-1","firstName":"Alice","lastName":"Wonderland"}`
+)
+
+func TestCompleteOtpProfileHandler_Success(t *testing.T) {
+	for name, factors := range map[string]string{"otp": otpVerifiedFactors, "idp intent": intentVerifiedFactors} {
+		t.Run(name, func(t *testing.T) {
+			puts := 0
+			setupMockZitadel(t, profileMock(t, factors, placeholderProfileMarker, placeholderProfileMarker, &puts))
+
+			w, c := ginContext("POST", "/auth/session/otp/complete-profile", completeProfileBody)
+			CompleteOtpProfileHandler(c)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, 1, puts, "Zitadel user profile must be updated")
+			var resp map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, true, resp["success"])
+		})
+	}
+}
+
+// An otp/request session for someone else's email has only the user factor
+// until the emailed code is checked, so it must not be able to rename them.
+func TestCompleteOtpProfileHandler_UnverifiedSession(t *testing.T) {
+	puts := 0
+	setupMockZitadel(t, profileMock(t, userOnlyFactors, placeholderProfileMarker, placeholderProfileMarker, &puts))
+
+	w, c := ginContext("POST", "/auth/session/otp/complete-profile", completeProfileBody)
+	CompleteOtpProfileHandler(c)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Contains(t, w.Body.String(), "invalid_session")
+	assert.Equal(t, 0, puts)
+}
+
+func TestCompleteOtpProfileHandler_EstablishedAccount(t *testing.T) {
+	puts := 0
+	setupMockZitadel(t, profileMock(t, otpVerifiedFactors, "Bob", "Builder", &puts))
+
+	w, c := ginContext("POST", "/auth/session/otp/complete-profile", completeProfileBody)
+	CompleteOtpProfileHandler(c)
+
+	assert.Equal(t, http.StatusConflict, w.Code)
+	assert.Contains(t, w.Body.String(), "profile_already_complete")
+	assert.Equal(t, 0, puts)
+}
+
+func TestCompleteOtpProfileHandler_RetryWithSameNames(t *testing.T) {
+	puts := 0
+	setupMockZitadel(t, profileMock(t, otpVerifiedFactors, "Alice", "Wonderland", &puts))
+
+	w, c := ginContext("POST", "/auth/session/otp/complete-profile", completeProfileBody)
 	CompleteOtpProfileHandler(c)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	assert.True(t, profileUpdated, "Zitadel user profile must be updated")
-	var resp map[string]any
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	assert.Equal(t, true, resp["success"])
+	assert.Equal(t, 0, puts)
 }
 
 func TestCompleteOtpProfileHandler_InvalidSession(t *testing.T) {

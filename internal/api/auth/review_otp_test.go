@@ -2,29 +2,27 @@ package auth
 
 import "testing"
 
-// TestIsReviewAppleUser covers the Apple App Store reviewer matcher: it must
-// recognize the "John Apple"/"John Appleseed" relay identity (so their order is
-// flagged as a test order) while never matching a real customer.
-func TestIsReviewAppleUser(t *testing.T) {
+// TestIsReviewUser covers the store-review matcher: only an allowlisted
+// Zitadel sub qualifies, never self-editable profile data.
+func TestIsReviewUser(t *testing.T) {
+	t.Setenv("REVIEW_ZITADEL_SUBS", " 3712345 , 3799999,,")
+
+	sub := func(s string) *string { return &s }
 	cases := []struct {
-		name                       string
-		email, firstName, lastName string
-		want                       bool
+		name string
+		sub  *string
+		want bool
 	}{
-		{"reviewer John Apple", "ydgynb8c26@privaterelay.appleid.com", "John", "Apple", true},
-		{"reviewer John Appleseed", "abc@privaterelay.appleid.com", "John", "Appleseed", true},
-		{"case + whitespace tolerant", "ABC@Privaterelay.AppleID.com ", " john ", " apple ", true},
-		{"right name but real email", "john@gmail.com", "John", "Apple", false},
-		{"relay but different first name", "abc@privaterelay.appleid.com", "Jane", "Apple", false},
-		{"relay but different last name", "abc@privaterelay.appleid.com", "John", "Doe", false},
-		{"real customer named John on relay", "abc@privaterelay.appleid.com", "John", "Smith", false},
-		{"empty", "", "", "", false},
+		{"allowlisted sub", sub("3712345"), true},
+		{"second allowlisted sub", sub("3799999"), true},
+		{"unknown sub", sub("3700000"), false},
+		{"empty sub", sub(""), false},
+		{"no sub (e.g. legacy row)", nil, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := IsReviewAppleUser(tc.email, tc.firstName, tc.lastName); got != tc.want {
-				t.Errorf("IsReviewAppleUser(%q,%q,%q) = %v, want %v",
-					tc.email, tc.firstName, tc.lastName, got, tc.want)
+			if got := IsReviewUser(tc.sub); got != tc.want {
+				t.Errorf("IsReviewUser = %v, want %v", got, tc.want)
 			}
 		})
 	}

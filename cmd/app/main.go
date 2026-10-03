@@ -137,6 +137,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Production must not boot with controls that fail open when unset: an
+	// empty admin client allowlist honors the admin role from every client,
+	// and an empty Turnstile secret skips the feedback captcha.
+	if os.Getenv("APP_ENV") == "production" {
+		for _, name := range []string{"ZITADEL_ADMIN_CLIENT_IDS", "TURNSTILE_SECRET_KEY"} {
+			if strings.TrimSpace(os.Getenv(name)) == "" {
+				zap.L().Error(name + " is required when APP_ENV=production")
+				os.Exit(1)
+			}
+		}
+		if len(os.Getenv("POS_JWT_SECRET")) < 32 {
+			// Not fatal yet: production does not set it today. Each replica
+			// then signs POS tokens with its own ephemeral key.
+			zap.L().Error("POS_JWT_SECRET should be set (32+ bytes) in production; POS tokens use a per-replica ephemeral key")
+		}
+	}
+
 	// OIDC env vars (verifier created after userService for user lookup)
 	zitadelIssuer := os.Getenv("ZITADEL_ISSUER")
 	zitadelClientID := os.Getenv("ZITADEL_CLIENT_ID")
@@ -208,7 +225,7 @@ func main() {
 	notificationService := notificationApplication.NewNotificationService(notificationRepo)
 	orderService := orderApplication.NewOrderService(orderRepo, couponService)
 	productService := productApplication.NewProductService(productRepo)
-	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, scheduleOverrideRepo, os.Getenv("APP_ENV") != "production")
+	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, scheduleOverrideRepo, os.Getenv("ORDERING_GATE_DISABLED") == "true")
 	userService := userApplication.NewUserService(userRepo, zitadelUserFetcher{})
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService)
 
@@ -316,6 +333,12 @@ func main() {
 	// of trusting client-supplied X-Forwarded-For. Without this, ClientIP() is
 	// spoofable and per-IP rate limits on auth/OTP endpoints can be bypassed.
 	router.TrustedPlatform = gin.PlatformCloudflare
+	// Never fall back to a client-supplied X-Forwarded-For: requests without
+	// CF-Connecting-IP use the TCP peer address.
+	if err := router.SetTrustedProxies(nil); err != nil {
+		zap.L().Error("failed to set trusted proxies", zap.Error(err))
+		os.Exit(1)
+	}
 	// Order matters: Sentry first (catches panics in every subsequent handler),
 	// then RequestID + Logger + SentryContext (propagates request_id/user_id as Sentry scope tags).
 	router.Use(sentrygin.New(sentrygin.Options{Repanic: true}))
@@ -334,12 +357,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Request body size limit (1MB default). GraphQL multipart and the image
-	// preview proxy apply their own limits internally, so the global cap is
-	// skipped for those two paths.
+	// Request body size limit (1MB default). GraphQL multipart uploads and the
+	// image preview proxy apply their own limits internally, so the global cap
+	// is skipped for those. Plain GraphQL JSON POSTs keep the 1MB cap: gqlgen
+	// reads them with io.ReadAll and has no limit of its own.
 	router.Use(func(c *gin.Context) {
 		p := c.Request.URL.Path
-		if p != "/api/v1/graphql" && p != "/api/v1/images/preview" {
+		multipartGraphQL := p == "/api/v1/graphql" &&
+			strings.HasPrefix(strings.ToLower(c.GetHeader("Content-Type")), "multipart/form-data")
+		if !multipartGraphQL && p != "/api/v1/images/preview" {
 			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
 		}
 		c.Next()
@@ -584,6 +610,7 @@ func main() {
 	posLimiter.Stop()
 	mollieLimiter.Stop()
 	feedbackLimiter.Stop()
+	publicQueryLimiter.Stop()
 	broker.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

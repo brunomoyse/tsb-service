@@ -13,6 +13,11 @@ import (
 // without depending on the database driver.
 var ErrDuplicateUser = errors.New("user already exists")
 
+// ErrIdentityConflict is returned when a login's email matches an app user
+// that is already linked to a different Zitadel identity. Linking it would
+// hand that account to whoever controls the second identity.
+var ErrIdentityConflict = errors.New("email already linked to another identity")
+
 type UserRepository interface {
 	Save(ctx context.Context, u *User) (uuid.UUID, error)
 	FindByID(ctx context.Context, id string) (*User, error)

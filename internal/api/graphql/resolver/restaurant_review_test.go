@@ -55,6 +55,7 @@ func closedConfigResolver(t *testing.T, u *userDomain.User) *restaurantConfigRes
 		OpeningHours:       allClosedOpeningHours(t),
 		PreparationMinutes: 30,
 	}
+	t.Setenv("REVIEW_ZITADEL_SUBS", reviewZitadelSub)
 	r := &Resolver{
 		RestaurantService: fakeRestaurantService{cfg: cfg},
 		UserService:       fakeUserService{user: u},
@@ -62,20 +63,36 @@ func closedConfigResolver(t *testing.T, u *userDomain.User) *restaurantConfigRes
 	return &restaurantConfigResolver{r}
 }
 
+// reviewZitadelSub is the store-review account allowlisted by closedConfigResolver.
+const reviewZitadelSub = "372000000000000001"
+
 func reviewUser() *userDomain.User {
+	sub := reviewZitadelSub
 	return &userDomain.User{
-		Email:     "abc@privaterelay.appleid.com",
-		FirstName: "John",
-		LastName:  "Apple",
+		Email:         "abc@privaterelay.appleid.com",
+		FirstName:     "John",
+		LastName:      "Apple",
+		ZitadelUserID: &sub,
 	}
 }
 
 func normalUser() *userDomain.User {
+	sub := "372000000000000002"
 	return &userDomain.User{
-		Email:     "jane@gmail.com",
-		FirstName: "Jane",
-		LastName:  "Doe",
+		Email:         "jane@gmail.com",
+		FirstName:     "Jane",
+		LastName:      "Doe",
+		ZitadelUserID: &sub,
 	}
+}
+
+// selfStyledReviewer copied the review account's name and relay email into
+// their own profile (updateMe) but is not allowlisted.
+func selfStyledReviewer() *userDomain.User {
+	u := reviewUser()
+	sub := "372000000000000003"
+	u.ZitadelUserID = &sub
+	return u
 }
 
 // authedCtx returns a context carrying a userID, as the @auth middleware sets.
@@ -131,6 +148,17 @@ func TestAvailableSlotsToday_ReviewBypass(t *testing.T) {
 		}
 		if len(slots) == 0 {
 			t.Errorf("expected synthetic slots for review user while closed")
+		}
+	})
+
+	t.Run("self-styled John Apple gets no slots while closed", func(t *testing.T) {
+		res := closedConfigResolver(t, selfStyledReviewer())
+		slots, err := res.AvailableSlotsToday(authedCtx(), nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(slots) != 0 {
+			t.Errorf("profile fields alone granted the review bypass (%d slots)", len(slots))
 		}
 	})
 

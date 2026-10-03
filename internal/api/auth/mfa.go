@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 
 	"github.com/gin-gonic/gin"
@@ -51,7 +52,7 @@ func audit(c *gin.Context, action string, success bool) {
 
 // userHasTOTP reports whether the Zitadel user has a verified TOTP factor.
 func userHasTOTP(userID string) (bool, error) {
-	respBody, status, err := zitadelRequest("GET", "/v2/users/"+userID+"/authentication_methods", nil)
+	respBody, status, err := zitadelRequest("GET", "/v2/users/"+url.PathEscape(userID)+"/authentication_methods", nil)
 	if err != nil {
 		return false, fmt.Errorf("fetch authentication methods: %w", err)
 	}
@@ -67,14 +68,19 @@ func userHasTOTP(userID string) (bool, error) {
 	return slices.Contains(resp.AuthMethodTypes, authMethodTOTP), nil
 }
 
-// sessionFactors is the subset of a Zitadel session needed for MFA checks.
+// sessionFactors is the subset of a Zitadel session needed for MFA checks
+// and for profile completion.
 type sessionFactors struct {
 	UserID       string
 	TOTPVerified bool
+	// OTPEmailVerified is set once the emailed code was checked on the session.
+	OTPEmailVerified bool
+	// IntentVerified is set once an IdP (Google/Apple) intent was checked.
+	IntentVerified bool
 }
 
 func fetchSessionFactors(sessionID string) (sessionFactors, error) {
-	respBody, status, err := zitadelRequest("GET", "/v2/sessions/"+sessionID, nil)
+	respBody, status, err := zitadelRequest("GET", "/v2/sessions/"+url.PathEscape(sessionID), nil)
 	if err != nil {
 		return sessionFactors{}, fmt.Errorf("fetch session: %w", err)
 	}
@@ -90,6 +96,12 @@ func fetchSessionFactors(sessionID string) (sessionFactors, error) {
 				TOTP struct {
 					VerifiedAt string `json:"verifiedAt"`
 				} `json:"totp"`
+				OTPEmail struct {
+					VerifiedAt string `json:"verifiedAt"`
+				} `json:"otpEmail"`
+				Intent struct {
+					VerifiedAt string `json:"verifiedAt"`
+				} `json:"intent"`
 			} `json:"factors"`
 		} `json:"session"`
 	}
@@ -100,14 +112,16 @@ func fetchSessionFactors(sessionID string) (sessionFactors, error) {
 		return sessionFactors{}, fmt.Errorf("session has no user")
 	}
 	return sessionFactors{
-		UserID:       resp.Session.Factors.User.ID,
-		TOTPVerified: resp.Session.Factors.TOTP.VerifiedAt != "",
+		UserID:           resp.Session.Factors.User.ID,
+		TOTPVerified:     resp.Session.Factors.TOTP.VerifiedAt != "",
+		OTPEmailVerified: resp.Session.Factors.OTPEmail.VerifiedAt != "",
+		IntentVerified:   resp.Session.Factors.Intent.VerifiedAt != "",
 	}, nil
 }
 
 // authRequestClientID returns the OIDC client an auth request was opened for.
 func authRequestClientID(authRequestID string) (string, error) {
-	respBody, status, err := zitadelRequest("GET", "/v2/oidc/auth_requests/"+authRequestID, nil)
+	respBody, status, err := zitadelRequest("GET", "/v2/oidc/auth_requests/"+url.PathEscape(authRequestID), nil)
 	if err != nil {
 		return "", fmt.Errorf("fetch auth request: %w", err)
 	}
@@ -182,7 +196,7 @@ func VerifyTotpHandler(c *gin.Context) {
 			"totp": map[string]any{"code": req.Code},
 		},
 	}
-	respBody, status, err := zitadelRequest("PATCH", "/v2/sessions/"+req.SessionID, body)
+	respBody, status, err := zitadelRequest("PATCH", "/v2/sessions/"+url.PathEscape(req.SessionID), body)
 	if err != nil {
 		log.Error("zitadel totp session update failed", zap.Error(err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": "authentication service unavailable"})
@@ -247,7 +261,7 @@ func StartTOTPHandler(c *gin.Context) {
 		return
 	}
 
-	respBody, status, err := zitadelAdminRequest("POST", "/v2/users/"+userID+"/totp", map[string]any{})
+	respBody, status, err := zitadelAdminRequest("POST", "/v2/users/"+url.PathEscape(userID)+"/totp", map[string]any{})
 	if err != nil {
 		log.Error("zitadel totp register failed", zap.Error(err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": "authentication service unavailable"})
@@ -293,7 +307,7 @@ func ConfirmTOTPHandler(c *gin.Context) {
 		return
 	}
 
-	respBody, status, err := zitadelAdminRequest("POST", "/v2/users/"+userID+"/totp/verify", map[string]any{"code": req.Code})
+	respBody, status, err := zitadelAdminRequest("POST", "/v2/users/"+url.PathEscape(userID)+"/totp/verify", map[string]any{"code": req.Code})
 	if err != nil {
 		log.Error("zitadel totp verify failed", zap.Error(err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": "authentication service unavailable"})
@@ -351,7 +365,7 @@ func RemoveTOTPHandler(c *gin.Context) {
 		return
 	}
 
-	respBody, status, err := zitadelAdminRequest("DELETE", "/v2/users/"+userID+"/totp", nil)
+	respBody, status, err := zitadelAdminRequest("DELETE", "/v2/users/"+url.PathEscape(userID)+"/totp", nil)
 	if err != nil {
 		log.Error("zitadel totp remove failed", zap.Error(err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": "authentication service unavailable"})
@@ -388,7 +402,7 @@ func checkTOTPCode(userID, code string) (bool, error) {
 	}
 	var sess zitadelSessionResponse
 	if err := json.Unmarshal(respBody, &sess); err == nil && sess.SessionID != "" {
-		if _, delStatus, delErr := zitadelRequest("DELETE", "/v2/sessions/"+sess.SessionID,
+		if _, delStatus, delErr := zitadelRequest("DELETE", "/v2/sessions/"+url.PathEscape(sess.SessionID),
 			map[string]any{"sessionToken": sess.SessionToken}); delErr != nil || delStatus != http.StatusOK {
 			zap.L().Warn("failed to delete totp check session", zap.String("session_id", sess.SessionID), zap.Int("status", delStatus), zap.Error(delErr))
 		}

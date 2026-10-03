@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -40,13 +41,18 @@ func DefaultConfig(secret []byte) Config {
 	}
 }
 
+// deviceStatusTTL bounds how long a revocation can take to reach every
+// replica: VerifyAccessToken caches each device's active state this long.
+const deviceStatusTTL = 30 * time.Second
+
 type Service struct {
 	cfg     Config
 	devices domain.DeviceRepository
+	active  *deviceStatusCache
 }
 
 func NewService(cfg Config, d domain.DeviceRepository) *Service {
-	return &Service{cfg: cfg, devices: d}
+	return &Service{cfg: cfg, devices: d, active: newDeviceStatusCache(deviceStatusTTL)}
 }
 
 // ---- device login
@@ -67,9 +73,8 @@ type AccessToken struct {
 }
 
 // DeviceLogin verifies the HMAC and issues an HS256 access token whose only
-// claim of consequence is `deviceId`. Middleware grants admin scope to any
-// valid POS token, so callers can hit the same GraphQL surface as a Zitadel
-// admin once the token is set.
+// claim of consequence is `deviceId`. Middleware grants staff (POS) scope to
+// a valid token from a device that is still enrolled and not revoked.
 func (s *Service) DeviceLogin(ctx context.Context, in DeviceLoginInput) (*AccessToken, error) {
 	device, err := s.verifyDeviceRequest(ctx, in.DeviceID, in.Timestamp, in.Nonce, in.HMAC, buildLoginHmacPayload(in))
 	if err != nil {
@@ -152,14 +157,16 @@ func (s *Service) issueAccessToken(deviceID uuid.UUID) (*AccessToken, error) {
 
 // VerifyAccessToken validates a POS-issued HS256 token and returns the device
 // UUID. Used by the HTTP/WS middleware to accept POS tokens alongside Zitadel
-// JWTs. POS tokens always confer admin scope at the middleware level.
-func (s *Service) VerifyAccessToken(tokenStr string) (uuid.UUID, error) {
+// JWTs; they confer staff scope. The device must still be enrolled and not
+// revoked, so revoking a lost handheld cuts its access within deviceStatusTTL
+// instead of when its 8h token expires.
+func (s *Service) VerifyAccessToken(ctx context.Context, tokenStr string) (uuid.UUID, error) {
 	parsed, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
 		return s.cfg.JWTSecret, nil
-	}, jwt.WithValidMethods([]string{"HS256"}))
+	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired(), jwt.WithIssuer("tsb-pos"))
 	if err != nil || !parsed.Valid {
 		return uuid.Nil, err
 	}
@@ -175,7 +182,31 @@ func (s *Service) VerifyAccessToken(tokenStr string) (uuid.UUID, error) {
 	if err != nil {
 		return uuid.Nil, err
 	}
+	if err := s.deviceActive(ctx, id); err != nil {
+		return uuid.Nil, err
+	}
 	return id, nil
+}
+
+// deviceActive reports an error unless the device exists and is not revoked.
+// Results are cached for deviceStatusTTL; lookup errors are not cached.
+func (s *Service) deviceActive(ctx context.Context, id uuid.UUID) error {
+	if found, status := s.active.get(id); found {
+		return status
+	}
+	device, err := s.devices.FindByID(ctx, id)
+	switch {
+	case errors.Is(err, sql.ErrNoRows) || (err == nil && device == nil):
+		s.active.put(id, ErrDeviceNotEnrolled)
+		return ErrDeviceNotEnrolled
+	case err != nil:
+		return fmt.Errorf("load pos device: %w", err)
+	case device.RevokedAt != nil:
+		s.active.put(id, ErrDeviceRevoked)
+		return ErrDeviceRevoked
+	}
+	s.active.put(id, nil)
+	return nil
 }
 
 // AccessTokenExpiry reads the exp claim from a POS token without re-verifying

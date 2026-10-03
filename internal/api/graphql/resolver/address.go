@@ -8,12 +8,23 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"strings"
 	graphql1 "tsb-service/internal/api/graphql"
+	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/model"
+	"unicode/utf8"
 )
 
 // AutocompleteAddresses is the resolver for the autocompleteAddresses field.
 func (r *queryResolver) AutocompleteAddresses(ctx context.Context, input string, sessionToken string) ([]*model.AddressSuggestion, error) {
+	// Public and every call is a billed Google Places Autocomplete request:
+	// bound the input and throttle per IP like resolveAddress.
+	if n := utf8.RuneCountInString(strings.TrimSpace(input)); n < minAutocompleteInput || n > maxAutocompleteInput {
+		return nil, apperr.New(apperr.CodeUserError, "address search must be between 3 and 200 characters")
+	}
+	if err := r.allowPublicQuery(ctx, "autocompleteAddresses"); err != nil {
+		return nil, err
+	}
 	suggestions, err := r.AddressService.Autocomplete(ctx, input, sessionToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to autocomplete addresses: %w", err)

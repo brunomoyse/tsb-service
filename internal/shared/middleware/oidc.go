@@ -52,7 +52,7 @@ type UserLookup interface {
 // POS tokens grant staff scope (utils.SetIsPOS), never admin: the device only
 // reaches the @staff operations the shop floor needs.
 type AppJWTVerifier interface {
-	VerifyAccessToken(token string) (deviceID uuid.UUID, err error)
+	VerifyAccessToken(ctx context.Context, token string) (deviceID uuid.UUID, err error)
 	// AccessTokenExpiry parses the token's exp claim without re-verifying
 	// the signature. Callers SHOULD only use the returned time after a
 	// successful VerifyAccessToken. Zero means the token carries no exp.
@@ -228,7 +228,7 @@ func (v *OIDCVerifier) tryVerifyAppJWT(c *gin.Context, tokenStr string) bool {
 	if v.appJWT == nil {
 		return false
 	}
-	deviceID, err := v.appJWT.VerifyAccessToken(tokenStr)
+	deviceID, err := v.appJWT.VerifyAccessToken(c.Request.Context(), tokenStr)
 	if err != nil || deviceID == uuid.Nil {
 		zap.L().Debug("app JWT verification failed", zap.Error(err))
 		return false
@@ -392,7 +392,7 @@ func (v *OIDCVerifier) VerifyToken(ctx context.Context, tokenStr string) (subjec
 		return authCtx.UserID(), admin, false, tokenExp, nil
 	}
 	if v.appJWT != nil {
-		if deviceID, appErr := v.appJWT.VerifyAccessToken(tokenStr); appErr == nil {
+		if deviceID, appErr := v.appJWT.VerifyAccessToken(ctx, tokenStr); appErr == nil {
 			return deviceID.String(), false, true, v.appJWT.AccessTokenExpiry(tokenStr), nil
 		}
 	}

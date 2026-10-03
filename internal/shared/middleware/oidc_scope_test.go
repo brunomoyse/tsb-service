@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -48,7 +49,9 @@ func TestClientMayBeAdmin(t *testing.T) {
 
 type stubAppJWT struct{ deviceID uuid.UUID }
 
-func (s stubAppJWT) VerifyAccessToken(string) (uuid.UUID, error) { return s.deviceID, nil }
+func (s stubAppJWT) VerifyAccessToken(context.Context, string) (uuid.UUID, error) {
+	return s.deviceID, nil
+}
 func (s stubAppJWT) AccessTokenExpiry(string) time.Time          { return time.Time{} }
 
 func TestPOSTokenGetsStaffScopeNotAdmin(t *testing.T) {
