@@ -21,11 +21,16 @@ import (
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/brand"
 	es "tsb-service/pkg/email/scaleway"
+	"tsb-service/pkg/utils"
 )
 
 type PaymentService interface {
 	CreatePayment(ctx context.Context, o orderDomain.Order, op []orderDomain.OrderProduct, u userDomain.User, a *addressDomain.Address, customRedirectURL *string) (*domain.MolliePayment, error)
 	CreateFullRefund(ctx context.Context, externalPaymentID string) error
+	// SettleCancelledOrderPayment undoes the payment of an order that staff
+	// just cancelled: a paid payment is refunded, an open one is cancelled at
+	// Mollie so it can no longer be paid. Reports whether a refund was issued.
+	SettleCancelledOrderPayment(ctx context.Context, payment *domain.MolliePayment) (refunded bool, err error)
 	// FetchMollieStatus fetches the authoritative payment status from Mollie
 	// without touching the local DB. The webhook handler persists it only after
 	// the order business logic succeeds (see PersistPaymentStatus).
@@ -230,29 +235,63 @@ func (s *paymentService) CreateFullRefund(ctx context.Context, externalPaymentID
 		return fmt.Errorf("payment is not paid: %s", payment.Status)
 	}
 
+	_, err = s.refundRemaining(ctx, payment)
+	return err
+}
+
+// refundRemaining refunds the full payment amount unless it was already
+// refunded, so repeated cancels or webhook retries never refund twice. The
+// caller is responsible for knowing the payment is paid at Mollie.
+func (s *paymentService) refundRemaining(ctx context.Context, payment *domain.MolliePayment) (refunded bool, err error) {
+	if payment.AmountRefunded.GreaterThanOrEqual(payment.Amount) {
+		return false, nil
+	}
+
 	refundRequest := mollie.CreatePaymentRefund{
 		Amount: amt(payment.Amount),
 	}
 
-	res, refund, err := s.mollieClient.Refunds.CreatePaymentRefund(ctx, externalPaymentID, refundRequest, nil)
+	res, refund, err := s.mollieClient.Refunds.CreatePaymentRefund(ctx, payment.MolliePaymentID, refundRequest, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create refund: %w", err)
+		return false, fmt.Errorf("failed to create refund: %w", err)
 	}
 
 	if res.StatusCode != 200 && res.StatusCode != 201 {
-		return fmt.Errorf("failed to create refund: %s", res.Status)
+		return false, fmt.Errorf("failed to create refund: %s", res.Status)
 	}
 
 	refundedAmount, parseErr := decimal.NewFromString(refund.Amount.Value)
 	if parseErr != nil {
-		return fmt.Errorf("failed to parse refund amount: %w", parseErr)
+		return false, fmt.Errorf("failed to parse refund amount: %w", parseErr)
 	}
 
-	if err := s.repo.MarkAsRefund(ctx, externalPaymentID, refundedAmount); err != nil {
-		return fmt.Errorf("failed to mark payment as refunded: %w", err)
+	if err := s.repo.MarkAsRefund(ctx, payment.MolliePaymentID, refundedAmount); err != nil {
+		return false, fmt.Errorf("failed to mark payment as refunded: %w", err)
 	}
 
-	return nil
+	return true, nil
+}
+
+func (s *paymentService) SettleCancelledOrderPayment(ctx context.Context, payment *domain.MolliePayment) (bool, error) {
+	switch payment.Status {
+	case domain.PaymentStatusPaid:
+		return s.refundRemaining(ctx, payment)
+	case domain.PaymentStatusOpen, domain.PaymentStatusPending, domain.PaymentStatusAuthorized:
+		// Not paid yet: cancel it at Mollie so the customer cannot pay for a
+		// cancelled order. If Mollie no longer allows cancelling, a later
+		// paid webhook refunds it (see HandlePaymentPaid).
+		if !payment.IsCancelable {
+			zap.L().Warn("open payment of a cancelled order is not cancelable at Mollie",
+				zap.String("payment_id", payment.MolliePaymentID))
+			return false, nil
+		}
+		if _, _, err := s.mollieClient.Payments.Cancel(ctx, payment.MolliePaymentID); err != nil {
+			return false, fmt.Errorf("failed to cancel payment: %w", err)
+		}
+		return false, nil
+	default:
+		return false, nil
+	}
 }
 
 // FetchMollieStatus retrieves the authoritative payment status + timestamps from
@@ -329,6 +368,15 @@ func (s *paymentService) HandlePaymentPaid(ctx context.Context, orderID uuid.UUI
 		return nil, fmt.Errorf("no order products found for order %s", orderID)
 	}
 
+	// The order was cancelled (by staff, or a failed earlier attempt) while
+	// its checkout was still open, and the customer paid it anyway. Refund
+	// instead of announcing a new order. Runs before the paid status is
+	// persisted, so a failed refund returns an error and Mollie retries;
+	// refundRemaining skips an already refunded payment on that retry.
+	if order.OrderStatus == orderDomain.OrderStatusCanceled || order.OrderStatus == orderDomain.OrderStatusFailed {
+		return order, s.refundPaidCancelledOrder(ctx, order)
+	}
+
 	// Amount verification: log mismatch for manual review, don't block the order
 	payment, paymentErr := s.repo.FindByOrderID(ctx, orderID)
 	if paymentErr == nil && payment != nil && !payment.Amount.Equal(order.TotalPrice) {
@@ -389,6 +437,32 @@ func (s *paymentService) HandlePaymentPaid(ctx context.Context, orderID uuid.UUI
 	}
 
 	return order, nil
+}
+
+// refundPaidCancelledOrder refunds a payment that Mollie reports as paid for
+// an order that is already cancelled, and tells the customer.
+func (s *paymentService) refundPaidCancelledOrder(ctx context.Context, order *orderDomain.Order) error {
+	payment, err := s.repo.FindByOrderID(ctx, order.ID)
+	if err != nil || payment == nil {
+		return fmt.Errorf("failed to find payment for cancelled order %s: %w", order.ID, err)
+	}
+	refunded, err := s.refundRemaining(ctx, payment)
+	if err != nil {
+		return err
+	}
+	zap.L().Warn("payment completed for a cancelled order, refunded",
+		zap.String("order_id", order.ID.String()), zap.Bool("refund_issued", refunded))
+	if !refunded {
+		return nil
+	}
+	u, err := s.userService.GetUserByID(ctx, order.UserID.String())
+	if err != nil || u == nil || !u.NotifyOrderUpdates {
+		return nil
+	}
+	if emailErr := es.SendRefundIssuedEmail(*u, order.Language, order.ID.String(), utils.FormatDecimal(payment.Amount)); emailErr != nil {
+		zap.L().Error("failed to send refund issued email", zap.String("order_id", order.ID.String()), zap.Error(emailErr))
+	}
+	return nil
 }
 
 // HandlePaymentFailed handles the business logic when a payment is cancelled/failed/expired:

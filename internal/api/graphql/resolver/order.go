@@ -412,34 +412,38 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		}()
 	}
 
-	// If new status is "CANCELED", refund & send the cancellation email
-	if o.OrderStatus == orderDomain.OrderStatusCanceled {
+	// On the transition into CANCELLED: refund a paid payment (or cancel an
+	// open one at Mollie) and send the cancellation email. Re-saving an order
+	// that was already cancelled does neither again.
+	if o.OrderStatus == orderDomain.OrderStatusCanceled && oldOrder.OrderStatus != orderDomain.OrderStatusCanceled {
 		payment, err := r.PaymentService.GetPaymentByOrderID(ctx, o.ID)
 		if err == nil && payment != nil {
-			refundErr := r.PaymentService.CreateFullRefund(ctx, payment.MolliePaymentID)
+			refunded, refundErr := r.PaymentService.SettleCancelledOrderPayment(ctx, payment)
 			if refundErr != nil {
 				return nil, fmt.Errorf("failed to initiate refund: %w", refundErr)
 			}
 
 			// Send refund issued email
-			go func() {
-				ctx, cancel := emailContext()
-				defer cancel()
-				user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
-				if err != nil {
-					zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
-					return
-				}
+			if refunded {
+				go func() {
+					ctx, cancel := emailContext()
+					defer cancel()
+					user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
+					if err != nil {
+						zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
+						return
+					}
 
-				if !user.NotifyOrderUpdates {
-					return
-				}
-				refundAmount := utils.FormatDecimal(o.TotalPrice)
-				err = es.SendRefundIssuedEmail(*user, lang, o.ID.String(), refundAmount)
-				if err != nil {
-					zap.L().Error("failed to send refund issued email", zap.String("order_id", o.ID.String()), zap.Error(err))
-				}
-			}()
+					if !user.NotifyOrderUpdates {
+						return
+					}
+					refundAmount := utils.FormatDecimal(o.TotalPrice)
+					err = es.SendRefundIssuedEmail(*user, lang, o.ID.String(), refundAmount)
+					if err != nil {
+						zap.L().Error("failed to send refund issued email", zap.String("order_id", o.ID.String()), zap.Error(err))
+					}
+				}()
+			}
 		}
 
 		go func() {

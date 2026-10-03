@@ -128,6 +128,9 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 			switch {
 			case order == nil:
 				// nothing to publish
+			case order.OrderStatus == orderDomain.OrderStatusCanceled || order.OrderStatus == orderDomain.OrderStatusFailed:
+				// Paid after the order was cancelled: HandlePaymentPaid refunded
+				// it. Never announce it to staff as a new order.
 			case order.IsTest:
 				// Store-review test order: stays fully invisible to staff — no
 				// subscription publish, no push. It will auto-cancel after 10 min.
