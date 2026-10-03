@@ -3,9 +3,11 @@ package graphql_test
 import (
 	"context"
 	"errors"
+	"net/url"
 	"testing"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
+	"github.com/stretchr/testify/require"
 
 	"tsb-service/internal/api/graphql/resolver"
 	"tsb-service/internal/api/graphql/testhelpers"
@@ -36,8 +38,22 @@ type TestContext struct {
 	Fixtures *testhelpers.TestFixtures
 }
 
+// testContextOptions tune the environment of a test; the zero value is the default one.
+type testContextOptions struct {
+	// EnforceOrderingHours turns the opening-hours / slot gate on. By default the restaurant
+	// service runs in dev mode, which skips the gate so tests can order at any time.
+	EnforceOrderingHours bool
+	// MollieBaseURL points the Mollie client at a stub (testhelpers.MollieStub).
+	MollieBaseURL string
+}
+
 // setupTestContext creates a complete test environment
 func setupTestContext(t *testing.T) *TestContext {
+	return setupTestContextWith(t, testContextOptions{})
+}
+
+// setupTestContextWith creates a complete test environment with the given options.
+func setupTestContextWith(t *testing.T, opts testContextOptions) *TestContext {
 	// Setup test database
 	testDB := testhelpers.SetupTestDatabase(t)
 
@@ -45,7 +61,7 @@ func setupTestContext(t *testing.T) *TestContext {
 	fixtures := testhelpers.SeedTestData(t, testDB.DB)
 
 	// Create resolver with real services and repositories
-	r := createTestResolver(testDB)
+	r := createTestResolverWith(t, testDB, opts)
 
 	// Create GraphQL test client
 	client := testhelpers.NewGraphQLTestClient(r, testhelpers.TestJWTSecret)
@@ -63,8 +79,8 @@ func setupTestContext(t *testing.T) *TestContext {
 	}
 }
 
-// createTestResolver creates a resolver with all dependencies wired up
-func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
+// createTestResolverWith creates a resolver with all dependencies wired up.
+func createTestResolverWith(t *testing.T, testDB *testhelpers.TestDatabase, opts testContextOptions) *resolver.Resolver {
 	// Wrap the test DB in a DBPool (both customer and admin use the same connection)
 	pool := &db.DBPool{Customer: testDB.DB, Admin: testDB.DB}
 
@@ -84,6 +100,12 @@ func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
 	// Create Mollie client (test mode)
 	mollieCfg := mollie.NewAPITestingConfig(true)
 	mollieClient, _ := mollie.NewClient(nil, mollieCfg)
+	if opts.MollieBaseURL != "" {
+		base, err := url.Parse(opts.MollieBaseURL)
+		require.NoError(t, err)
+		mollieClient.BaseURL = base
+		require.NoError(t, mollieClient.WithAuthenticationValue("test_dummy_token"))
+	}
 
 	// Create services (use a mock Google client for tests; real API calls require actual API key)
 	// For now, we'll use nil for googleClient since this test doesn't call Autocomplete/Resolve
@@ -92,7 +114,7 @@ func createTestResolver(testDB *testhelpers.TestDatabase) *resolver.Resolver {
 	couponService := couponApplication.NewCouponService(couponRepo)
 	orderService := orderApplication.NewOrderService(orderRepo, couponService)
 	productService := productApplication.NewProductService(productRepo)
-	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, scheduleOverrideRepo, true)
+	restaurantService := restaurantApplication.NewRestaurantService(restaurantRepo, scheduleOverrideRepo, !opts.EnforceOrderingHours)
 	userService := userApplication.NewUserService(userRepo, nil)
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService)
 

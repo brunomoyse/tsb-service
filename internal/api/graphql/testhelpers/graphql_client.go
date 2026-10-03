@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/gin-gonic/gin"
 
 	"tsb-service/internal/api/graphql"
 	"tsb-service/internal/api/graphql/directives"
@@ -14,6 +15,7 @@ import (
 	paymentApplication "tsb-service/internal/modules/payment/application"
 	productApplication "tsb-service/internal/modules/product/application"
 	userApplication "tsb-service/internal/modules/user/application"
+	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/utils"
 )
 
@@ -63,16 +65,17 @@ func NewGraphQLTestClient(r *resolver.Resolver, jwtSecret string) *GraphQLTestCl
 			}
 		}
 
-		// Extract Accept-Language header for multi-language support
-		language := req.Header.Get("Accept-Language")
-		if language == "" {
-			language = "en" // Default to English
-		}
-		ctx = utils.SetLang(ctx, language)
-
 		req = req.WithContext(ctx)
 		srv.ServeHTTP(w, req)
 	})
+
+	// The language comes from the production middleware, so the tests see exactly the values the
+	// resolvers get (a missing or unsupported Accept-Language header becomes "en").
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.Use(middleware.LanguageExtractor())
+	engine.Any("/*path", gin.WrapH(httpHandler))
+	httpHandler = engine.ServeHTTP
 
 	// Create test server
 	server := httptest.NewServer(httpHandler)
