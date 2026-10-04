@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/mail"
 	"net/url"
 	"os"
 	"strings"
@@ -71,8 +73,25 @@ type sentMail struct {
 }
 
 type fakeSMTP struct {
-	mu   sync.Mutex
-	mail []sentMail
+	mu       sync.Mutex
+	mail     []sentMail
+	rejected map[string]bool
+}
+
+// reject makes the server refuse every message to the address (a mailbox that bounces).
+func (s *fakeSMTP) reject(addr string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.rejected == nil {
+		s.rejected = map[string]bool{}
+	}
+	s.rejected[strings.ToLower(addr)] = true
+}
+
+func (s *fakeSMTP) isRejected(addr string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.rejected[strings.ToLower(addr)]
 }
 
 var (
@@ -126,8 +145,12 @@ func (s *fakeSMTP) serve(conn net.Conn) {
 			cur = sentMail{From: strings.TrimSpace(line[len("MAIL FROM:"):])}
 			say("250 ok")
 		case strings.HasPrefix(cmd, "RCPT TO:"):
-			rcpt := strings.Trim(strings.TrimSpace(line[len("RCPT TO:"):]), "<>")
-			cur.To = append(cur.To, strings.ToLower(rcpt))
+			rcpt := strings.ToLower(strings.Trim(strings.TrimSpace(line[len("RCPT TO:"):]), "<>"))
+			if s.isRejected(rcpt) {
+				say("550 mailbox unavailable")
+				continue
+			}
+			cur.To = append(cur.To, rcpt)
 			say("250 ok")
 		case cmd == "DATA":
 			say("354 go ahead")
@@ -170,6 +193,54 @@ func (s *fakeSMTP) mailTo(addr string) []sentMail {
 		}
 	}
 	return out
+}
+
+// subjectOf is the decoded Subject header of a message.
+func subjectOf(t *testing.T, m sentMail) string {
+	t.Helper()
+	msg, err := mail.ReadMessage(strings.NewReader(m.Data))
+	require.NoError(t, err)
+	subject, err := new(mime.WordDecoder).DecodeHeader(msg.Header.Get("Subject"))
+	require.NoError(t, err)
+	return subject
+}
+
+// subjectsTo lists the subjects of the messages sent to the address so far.
+func (s *fakeSMTP) subjectsTo(t *testing.T, addr string) []string {
+	t.Helper()
+	var out []string
+	for _, m := range s.mailTo(addr) {
+		out = append(out, subjectOf(t, m))
+	}
+	return out
+}
+
+// waitSubject waits until the address received a message with the subject and returns it.
+func (s *fakeSMTP) waitSubject(t *testing.T, addr, subject string) sentMail {
+	t.Helper()
+	var found sentMail
+	require.Eventually(t, func() bool {
+		for _, m := range s.mailTo(addr) {
+			if subjectOf(t, m) == subject {
+				found = m
+				return true
+			}
+		}
+		return false
+	}, 20*time.Second, 20*time.Millisecond, "no %q e-mail reached %s; got %v", subject, addr, s.subjectsTo(t, addr))
+	return found
+}
+
+// count of the messages with the subject sent to the address.
+func (s *fakeSMTP) countSubject(t *testing.T, addr, subject string) int {
+	t.Helper()
+	n := 0
+	for _, got := range s.subjectsTo(t, addr) {
+		if got == subject {
+			n++
+		}
+	}
+	return n
 }
 
 // waitMailTo waits until n messages reached the address and returns them.
@@ -282,8 +353,9 @@ type pushReq struct {
 	Payload map[string]any
 }
 
-// fakeAPNs is Apple's push endpoint: the device token "dead-ios" is answered as unregistered, and
-// "refused-ios" as a payload the server refuses for another reason.
+// fakeAPNs is Apple's push endpoint: a device token starting with "dead-" is answered as
+// unregistered, one starting with "refused-" as a payload the server refuses for another reason and
+// one starting with "broken-" as a dropped connection.
 type fakeAPNs struct {
 	Server *httptest.Server
 	mu     sync.Mutex
@@ -301,14 +373,14 @@ func newFakeAPNs(t *testing.T) *fakeAPNs {
 		f.mu.Lock()
 		f.reqs = append(f.reqs, pushReq{Token: token, Payload: payload})
 		f.mu.Unlock()
-		switch token {
-		case "dead-ios":
+		switch {
+		case strings.HasPrefix(token, "dead-"):
 			w.WriteHeader(http.StatusGone)
 			_, _ = io.WriteString(w, `{"reason":"Unregistered"}`)
-		case "refused-ios":
+		case strings.HasPrefix(token, "refused-"):
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = io.WriteString(w, `{"reason":"PayloadEmpty"}`)
-		case "broken-ios":
+		case strings.HasPrefix(token, "broken-"):
 			// A connection that dies: the client reports a transport error.
 			hj, ok := w.(http.Hijacker)
 			if !ok {
@@ -619,6 +691,25 @@ func (e *covEnv) ctxFor(userID string, admin bool, lang string) context.Context 
 		ctx = utils.SetLang(ctx, lang)
 	}
 	return ctx
+}
+
+// ctxForCancel is ctxFor on top of a cancellable parent (subscriptions end with their context).
+func (e *covEnv) ctxForCancel(parent context.Context, userID string, admin bool, lang string) context.Context {
+	ctx := e.ctxFor(userID, admin, lang)
+	return &mergedCtx{Context: parent, values: ctx}
+}
+
+// mergedCtx takes cancellation from one context and the values from another.
+type mergedCtx struct {
+	context.Context
+	values context.Context
+}
+
+func (m *mergedCtx) Value(key any) any {
+	if v := m.values.Value(key); v != nil {
+		return v
+	}
+	return m.Context.Value(key)
 }
 
 // t0 is a root context (a function so the helpers above read like the rest of the file).
