@@ -207,6 +207,13 @@ var notPublic = []netip.Prefix{
 	netip.MustParsePrefix("198.18.0.0/15"), // benchmarking
 	netip.MustParsePrefix("240.0.0.0/4"),   // reserved, including the 255.255.255.255 broadcast
 	netip.MustParsePrefix("::/96"),         // deprecated IPv4-compatible IPv6 (::7f00:1 is 127.0.0.1)
+	// IPv6 ranges that are global unicast to netip yet never a public web server: local-use NAT64
+	// (an operator's own translation prefix, it can carry a private IPv4), deprecated site-local,
+	// Teredo tunnels (the address embeds a server and an obfuscated client) and documentation.
+	netip.MustParsePrefix("64:ff9b:1::/48"),
+	netip.MustParsePrefix("fec0::/10"),
+	netip.MustParsePrefix("2001::/32"),
+	netip.MustParsePrefix("2001:db8::/32"),
 }
 
 var (
