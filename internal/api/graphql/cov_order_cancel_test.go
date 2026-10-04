@@ -375,10 +375,8 @@ func TestUpdatePaymentStatusMutation(t *testing.T) {
 	t.Run("an order without a payment is an error", func(t *testing.T) {
 		resp := gqlAs(t, env.TestContext, adminToken(t, env.TestContext), "fr", m, map[string]any{"o": uuid.NewString(), "s": "paid"})
 		require.Len(t, resp.Errors, 1)
-		// NOTE(product decision pending): an unknown order is reported as a generic "Internal server error"
-		// although the client could be told NOT_FOUND / USER_ERROR. Pinned as it is today; change it
-		// together with the resolver when the owner decides.
-		assert.Equal(t, "Internal server error", resp.Errors[0].Message)
+		assert.Equal(t, "NOT_FOUND", resp.Errors[0].Extensions["code"])
+		assert.Equal(t, "this order has no payment", resp.Errors[0].Message)
 	})
 
 	t.Run("a customer may not touch payments", func(t *testing.T) {

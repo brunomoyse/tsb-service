@@ -260,7 +260,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input model.UpdateOrderInput) (*model.Order, error) {
 	oldOrder, _, err := r.OrderService.GetOrderByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get order: %w", err)
+		return nil, orderLookupError(err)
 	}
 
 	if err := r.refuseReopeningSettledOrder(ctx, oldOrder, input.Status); err != nil {
@@ -712,7 +712,7 @@ func (r *mutationResolver) RegisterLiveActivityToken(ctx context.Context, orderI
 
 	order, _, err := r.OrderService.GetOrderByID(ctx, orderID)
 	if err != nil {
-		return false, fmt.Errorf("failed to load order: %w", err)
+		return false, orderLookupError(err)
 	}
 	if order == nil || order.UserID != uid {
 		return false, apperr.New(apperr.CodeNotFound, "order not found")
@@ -732,7 +732,7 @@ func (r *mutationResolver) RegisterLiveActivityToken(ctx context.Context, orderI
 func (r *mutationResolver) UpdateMyOrdersLanguage(ctx context.Context, language string) (int, error) {
 	lang := normalizeOrderLanguage(language)
 	if lang == "" {
-		return 0, fmt.Errorf("unsupported language: %q", language)
+		return 0, apperr.Newf(apperr.CodeUserError, "unsupported language: %q", language)
 	}
 
 	uid, err := uuid.Parse(utils.GetUserID(ctx))
@@ -1016,7 +1016,7 @@ func (r *queryResolver) Orders(ctx context.Context) ([]*model.Order, error) {
 func (r *queryResolver) Order(ctx context.Context, id uuid.UUID) (*model.Order, error) {
 	o, _, err := r.OrderService.GetOrderByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get order: %w", err)
+		return nil, orderLookupError(err)
 	}
 
 	if o == nil {
@@ -1143,7 +1143,7 @@ func (r *queryResolver) MyOrder(ctx context.Context, id uuid.UUID) (*model.Order
 	// @TODO: Check if the user is the owner of the order in the service layer.
 	o, _, err := r.OrderService.GetOrderByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get order: %w", err)
+		return nil, orderLookupError(err)
 	}
 
 	if o == nil {

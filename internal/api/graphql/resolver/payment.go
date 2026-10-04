@@ -7,6 +7,8 @@ package resolver
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"tsb-service/internal/api/graphql/apperr"
@@ -31,6 +33,9 @@ func (r *mutationResolver) UpdatePaymentStatus(ctx context.Context, orderID uuid
 	// Update the payment status using the service layer
 	payment, err := r.PaymentService.UpdatePaymentStatusByOrderID(ctx, orderID, status)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperr.New(apperr.CodeNotFound, "this order has no payment")
+		}
 		return nil, fmt.Errorf("failed to update payment status: %w", err)
 	}
 

@@ -80,3 +80,12 @@ func paymentSettled(p *paymentDomain.MolliePayment) bool {
 		return false
 	}
 }
+
+// orderLookupError turns the error of an order lookup into what the client should see: NOT_FOUND
+// for an order that does not exist (not the generic internal error), an internal error otherwise.
+func orderLookupError(err error) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return apperr.New(apperr.CodeNotFound, "order not found")
+	}
+	return fmt.Errorf("failed to get order: %w", err)
+}
