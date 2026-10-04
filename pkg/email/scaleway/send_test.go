@@ -179,17 +179,47 @@ func TestEveryCustomerEmailInEveryLanguage(t *testing.T) {
 	}
 }
 
-// TestEveryEmailRejectsUnknownLanguage: there is no template set for other
-// languages, so the caller gets a render error rather than a half-built email.
-func TestEveryEmailRejectsUnknownLanguage(t *testing.T) {
+// languageVariants maps each raw language value a caller may hand to a Send*
+// function to the language the customer must actually receive. French is the
+// fallback for everything unsupported (owner decision).
+var languageVariants = []struct{ in, want string }{
+	{"fr", "fr"}, {"en", "en"}, {"nl", "nl"}, {"zh", "zh"},
+	// case-insensitive, whitespace tolerant
+	{"EN", "en"}, {"Fr", "fr"}, {" nl ", "nl"}, {"ZH", "zh"},
+	// region / script tags reduce to the base language
+	{"fr-BE", "fr"}, {"fr_FR", "fr"}, {"en-GB", "en"}, {"EN-us", "en"},
+	{"nl-BE", "nl"}, {"zh-CN", "zh"}, {"zh-Hans", "zh"}, {"zh_TW", "zh"},
+	// unsupported, empty or garbage -> French
+	{"de", "fr"}, {"de-DE", "fr"}, {"", "fr"}, {"   ", "fr"}, {"xx", "fr"}, {"english", "fr"}, {"-", "fr"}, {"%%", "fr"},
+}
+
+// TestEveryEmailNormalisesItsLanguage drives every Send* function with each raw
+// language value and requires the delivered email (template, subject and every
+// per-language string such as the ETA wording) to equal the one produced for the
+// expected base language. Unsupported languages must never fail the send.
+func TestEveryEmailNormalisesItsLanguage(t *testing.T) {
+	deliver := func(t *testing.T, tc sendCase, lang string) mailView {
+		srv := startFakeSMTP(t)
+		useSMTP(t, srv)
+		require.NoError(t, tc.send(lang), "language %q must never fail the send", lang)
+		require.Len(t, srv.messages(), 1)
+		return lastMail(t, srv)
+	}
 	for _, tc := range sendCases() {
-		t.Run(tc.name, func(t *testing.T) {
-			srv := startFakeSMTP(t)
-			useSMTP(t, srv)
-			err := tc.send("de")
-			require.ErrorContains(t, err, "failed to render email template")
-			require.Empty(t, srv.messages())
-		})
+		canonical := map[string]mailView{}
+		for _, lang := range allLangs {
+			canonical[lang] = deliver(t, tc, lang)
+		}
+		for _, v := range languageVariants {
+			t.Run(tc.name+"/"+v.in, func(t *testing.T) {
+				got := deliver(t, tc, v.in)
+				want := canonical[v.want]
+				require.Equal(t, tc.subjects[v.want], got.Subject)
+				require.True(t, strings.HasPrefix(got.Text, greeting[v.want]), "text opens with the %s greeting, got %.40q", v.want, got.Text)
+				require.Equal(t, want.Text, got.Text)
+				require.Equal(t, want.HTML, got.HTML)
+			})
+		}
 	}
 }
 
@@ -433,7 +463,11 @@ func TestLocalizedCancellationReason(t *testing.T) {
 	require.Equal(t, "outside delivery area", LocalizedCancellationReason(&r, "en"))
 	require.Equal(t, "buiten bezorggebied", LocalizedCancellationReason(&r, "nl"))
 	require.Equal(t, "超出配送范围", LocalizedCancellationReason(&r, "zh"))
-	require.Equal(t, "hors zone de livraison", LocalizedCancellationReason(&r, "de"), "unknown language falls back to French")
+	for _, lang := range []string{"de", "", "  ", "xx-YY"} {
+		require.Equal(t, "hors zone de livraison", LocalizedCancellationReason(&r, lang), "unsupported language %q falls back to French", lang)
+	}
+	require.Equal(t, "outside delivery area", LocalizedCancellationReason(&r, " EN-gb "), "region tags and case reduce to the base language")
+	require.Equal(t, "超出配送范围", LocalizedCancellationReason(&r, "zh-Hans"))
 	require.Empty(t, LocalizedCancellationReason(nil, "en"))
 	require.Empty(t, LocalizedCancellationReason(&other, "en"))
 	require.Empty(t, LocalizedCancellationReason(&unknown, "en"), "an unmapped reason has no label")

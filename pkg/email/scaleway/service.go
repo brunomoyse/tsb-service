@@ -13,6 +13,7 @@ import (
 	"github.com/scaleway/scaleway-sdk-go/scw"
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/brand"
+	"tsb-service/pkg/i18n/locale"
 )
 
 // brandCfg returns the restaurant identity used in subjects, template bodies
@@ -160,6 +161,8 @@ func orderThreadHeaders(orderID string) []*temv1alpha1.CreateEmailRequestHeader 
 }
 
 func SendVerificationEmail(user userDomain.User, lang string, verificationURL string) error {
+	lang = locale.Normalize(lang)
+
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -195,10 +198,7 @@ func SendVerificationEmail(user userDomain.User, lang string, verificationURL st
 		"nl": "Bevestig uw e-mailadres",
 	}
 
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
+	subject := subjects[lang]
 
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
@@ -216,6 +216,8 @@ func SendVerificationEmail(user userDomain.User, lang string, verificationURL st
 }
 
 func SendWelcomeEmail(user userDomain.User, lang, menuURL string) error {
+	lang = locale.Normalize(lang)
+
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -250,10 +252,7 @@ func SendWelcomeEmail(user userDomain.User, lang, menuURL string) error {
 		"nl": "Welkom bij " + brandCfg().Name,
 	}
 
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
+	subject := subjects[lang]
 
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
@@ -271,6 +270,8 @@ func SendWelcomeEmail(user userDomain.User, lang, menuURL string) error {
 }
 
 func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.Order, op []orderDomain.OrderProduct) error {
+	lang = locale.Normalize(lang)
+
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -305,10 +306,7 @@ func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.
 		"nl": "Bestelling wacht op bevestiging",
 	}
 
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
+	subject := subjects[lang]
 
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
@@ -327,6 +325,8 @@ func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.
 }
 
 func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomain.Order, op []orderDomain.OrderProduct, address *addressDomain.Address) error {
+	lang = locale.Normalize(lang)
+
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -361,10 +361,7 @@ func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomai
 		"nl": "Bestelling bevestigd",
 	}
 
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
+	subject := subjects[lang]
 
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
@@ -387,6 +384,8 @@ func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomai
 // returned to the backend via returnCode; we deliver it ourselves so the
 // template matches our brand and locales.
 func SendLoginOtpEmail(user userDomain.User, lang string, code string) error {
+	lang = locale.Normalize(lang)
+
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -421,10 +420,7 @@ func SendLoginOtpEmail(user userDomain.User, lang string, code string) error {
 		"nl": fmt.Sprintf("Uw inlogcode: %s", code),
 	}
 
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
+	subject := subjects[lang]
 
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
@@ -467,19 +463,17 @@ var cancellationReasonLabels = map[string]map[orderDomain.OrderCancellationReaso
 }
 
 // LocalizedCancellationReason returns the localized label for a reason, or an empty
-// string when the reason is nil, OTHER, or the language is unknown.
+// string when the reason is nil or OTHER. An unsupported language uses French.
 func LocalizedCancellationReason(reason *orderDomain.OrderCancellationReason, lang string) string {
 	if reason == nil || *reason == orderDomain.OrderCancellationReasonOther {
 		return ""
 	}
-	labels, ok := cancellationReasonLabels[lang]
-	if !ok {
-		labels = cancellationReasonLabels["fr"]
-	}
-	return labels[*reason]
+	return cancellationReasonLabels[locale.Normalize(lang)][*reason]
 }
 
 func SendOrderCanceledEmail(user userDomain.User, lang string, orderID string, reason *orderDomain.OrderCancellationReason) error {
+	lang = locale.Normalize(lang)
+
 	// Copy baseReq to avoid modifying the original request.
 	newReq := *baseReq
 
@@ -516,10 +510,7 @@ func SendOrderCanceledEmail(user userDomain.User, lang string, orderID string, r
 		"nl": "Bestelling geannuleerd",
 	}
 
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
+	subject := subjects[lang]
 
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
@@ -538,6 +529,8 @@ func SendOrderCanceledEmail(user userDomain.User, lang string, orderID string, r
 }
 
 func SendOrderReadyEmail(user userDomain.User, lang string, order orderDomain.Order) error {
+	lang = locale.Normalize(lang)
+
 	newReq := *baseReq
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
@@ -577,10 +570,7 @@ func SendOrderReadyEmail(user userDomain.User, lang string, order orderDomain.Or
 		}
 	}
 
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
+	subject := subjects[lang]
 
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
@@ -597,6 +587,8 @@ func SendOrderReadyEmail(user userDomain.User, lang string, order orderDomain.Or
 }
 
 func SendOrderCompletedEmail(user userDomain.User, lang string) error {
+	lang = locale.Normalize(lang)
+
 	newReq := *baseReq
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
@@ -625,10 +617,7 @@ func SendOrderCompletedEmail(user userDomain.User, lang string) error {
 		"nl": "Bedankt voor uw bestelling!",
 	}
 
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
+	subject := subjects[lang]
 
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
@@ -644,6 +633,8 @@ func SendOrderCompletedEmail(user userDomain.User, lang string) error {
 }
 
 func SendRefundIssuedEmail(user userDomain.User, lang string, orderID string, refundAmount string) error {
+	lang = locale.Normalize(lang)
+
 	newReq := *baseReq
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
@@ -672,10 +663,7 @@ func SendRefundIssuedEmail(user userDomain.User, lang string, orderID string, re
 		"nl": "Uw terugbetaling is uitgevoerd",
 	}
 
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
+	subject := subjects[lang]
 
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
@@ -692,6 +680,8 @@ func SendRefundIssuedEmail(user userDomain.User, lang string, orderID string, re
 }
 
 func SendAccountLinkedEmail(user userDomain.User, lang string) error {
+	lang = locale.Normalize(lang)
+
 	newReq := *baseReq
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
@@ -720,10 +710,7 @@ func SendAccountLinkedEmail(user userDomain.User, lang string) error {
 		"nl": "Google-account gekoppeld",
 	}
 
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
+	subject := subjects[lang]
 
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
@@ -739,6 +726,8 @@ func SendAccountLinkedEmail(user userDomain.User, lang string) error {
 }
 
 func SendReadyTimeUpdatedEmail(user userDomain.User, lang string, order orderDomain.Order) error {
+	lang = locale.Normalize(lang)
+
 	newReq := *baseReq
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
@@ -767,10 +756,7 @@ func SendReadyTimeUpdatedEmail(user userDomain.User, lang string, order orderDom
 		"nl": "Geschatte tijd bijgewerkt",
 	}
 
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
+	subject := subjects[lang]
 
 	newReq.Subject = subject
 	newReq.HTML = htmlContent
@@ -787,6 +773,8 @@ func SendReadyTimeUpdatedEmail(user userDomain.User, lang string, order orderDom
 }
 
 func SendReengagementEmail(user userDomain.User, lang string) error {
+	lang = locale.Normalize(lang)
+
 	newReq := *baseReq
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
@@ -815,10 +803,7 @@ func SendReengagementEmail(user userDomain.User, lang string) error {
 		"nl": "Wij missen u bij " + brandCfg().Name + "!",
 	}
 
-	subject, ok := subjects[lang]
-	if !ok {
-		subject = subjects["fr"]
-	}
+	subject := subjects[lang]
 
 	newReq.Subject = subject
 	newReq.HTML = htmlContent

@@ -17,6 +17,7 @@ import (
 	"github.com/shopspring/decimal"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	userDomain "tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/i18n/locale"
 	"tsb-service/pkg/timezone"
 	"tsb-service/pkg/utils"
 )
@@ -121,6 +122,7 @@ func logoURL() string {
 // --------------------------------------------------------------------------------
 
 // formatEstimatedReadyTime formats the estimated ready time based on the language
+// (normalised through locale.Normalize, so unsupported languages read as French)
 // French: "lundi 15 janvier 2025 à 18:30"
 // English: "Monday, January 15, 2025 at 6:30 PM"
 // Chinese: "2025年1月15日 星期一 18:30"
@@ -149,10 +151,7 @@ func formatEstimatedReadyTime(t *time.Time, lang string) string {
 	hour := local.Hour()
 	minute := local.Minute()
 
-	switch lang {
-	case "fr":
-		return fmt.Sprintf("%s %d %s %d à %02d:%02d",
-			frenchDays[weekday], day, frenchMonths[month], year, hour, minute)
+	switch locale.Normalize(lang) {
 	case "en":
 		// English format with AM/PM
 		period := "AM"
@@ -174,8 +173,7 @@ func formatEstimatedReadyTime(t *time.Time, lang string) string {
 	case "nl":
 		return fmt.Sprintf("%s %d %s %d om %02d:%02d",
 			dutchDays[weekday], day, dutchMonths[month], year, hour, minute)
-	default:
-		// Default to French
+	default: // French, also the fallback for every unsupported language
 		return fmt.Sprintf("%s %d %s %d à %02d:%02d",
 			frenchDays[weekday], day, frenchMonths[month], year, hour, minute)
 	}

@@ -59,6 +59,11 @@ func TestFormatEstimatedReadyTime(t *testing.T) {
 		{"zh sunday", ts(2026, 7, 5, 10, 0), "zh", "2026年7月5日 星期日 12:00"},
 		{"nl sunday december", ts(2026, 12, 6, 10, 0), "nl", "zondag 6 december 2026 om 11:00"},
 		{"unknown language defaults to French", ts(2026, 7, 1, 17, 30), "de", "mercredi 1 juillet 2026 à 19:30"},
+		{"region tag reduces to base language", ts(2026, 7, 1, 17, 30), "en-GB", "Wednesday, July 1, 2026 at 7:30 PM"},
+		{"nl-BE is Dutch", ts(2026, 7, 1, 17, 30), "nl-BE", "woensdag 1 juli 2026 om 19:30"},
+		{"zh-Hans is Chinese", ts(2026, 7, 1, 17, 30), "zh-Hans", "2026年7月1日 星期三 19:30"},
+		{"language is case-insensitive", ts(2026, 7, 1, 17, 30), " EN ", "Wednesday, July 1, 2026 at 7:30 PM"},
+		{"fr-BE is French", ts(2026, 7, 1, 17, 30), "fr-BE", "mercredi 1 juillet 2026 à 19:30"},
 		{"empty language defaults to French", ts(2026, 7, 1, 17, 30), "", "mercredi 1 juillet 2026 à 19:30"},
 		{"fr minutes are zero padded", ts(2026, 8, 3, 7, 5), "fr", "lundi 3 août 2026 à 09:05"},
 	}
