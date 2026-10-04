@@ -67,18 +67,18 @@ var cancellationReasonPushLabels = map[string]map[orderDomain.OrderCancellationR
 	"nl": {
 		orderDomain.OrderCancellationReasonOutOfStock:    "uitverkocht",
 		orderDomain.OrderCancellationReasonKitchenClosed: "keuken gesloten",
-		orderDomain.OrderCancellationReasonDeliveryArea:  "buiten bezorggebied",
+		orderDomain.OrderCancellationReasonDeliveryArea:  "buiten de leveringszone",
 	},
 	"zh": {
 		orderDomain.OrderCancellationReasonOutOfStock:    "缺货",
-		orderDomain.OrderCancellationReasonKitchenClosed: "厨房已关闭",
+		orderDomain.OrderCancellationReasonKitchenClosed: "厨房已停止接单",
 		orderDomain.OrderCancellationReasonDeliveryArea:  "超出配送范围",
 	},
 }
 
 var cancellationReasonBodyFormat = map[string]string{
 	"fr": "Votre commande a été annulée : %s.",
-	"en": "Your order has been canceled: %s.",
+	"en": "Your order has been cancelled: %s.",
 	"nl": "Uw bestelling is geannuleerd: %s.",
 	"zh": "您的订单已被取消：%s。",
 }
@@ -124,26 +124,26 @@ var orderNotificationTexts = map[string]map[orderDomain.OrderStatus]notification
 		orderDomain.OrderStatusOutForDelivery: {Title: "Your order is on its way!", Body: "It'll be with you soon."},
 		orderDomain.OrderStatusDelivered:      {Title: "Delivered", Body: "Your order has been delivered. Enjoy!"},
 		orderDomain.OrderStatusPickedUp:       {Title: "Picked up", Body: "Your order has been picked up. Enjoy!"},
-		orderDomain.OrderStatusCanceled:       {Title: "Order canceled", Body: "Your order has been canceled."},
+		orderDomain.OrderStatusCanceled:       {Title: "Order cancelled", Body: "Your order has been cancelled."},
 		orderDomain.OrderStatusFailed:         {Title: "Order failed", Body: "There was a problem with your order."},
 	},
 	"zh": {
 		orderDomain.OrderStatusConfirmed:      {Title: "订单已确认", Body: "您的订单已被餐厅确认。"},
 		orderDomain.OrderStatusPreparing:      {Title: "正在准备", Body: "您的订单正在准备中。"},
-		orderDomain.OrderStatusAwaitingUp:     {Title: "您的订单已准备好！", Body: "已为您准备好。"},
-		orderDomain.OrderStatusOutForDelivery: {Title: "您的订单正在配送中！", Body: "很快就送到。"},
-		orderDomain.OrderStatusDelivered:      {Title: "已送达", Body: "您的订单已送达，请享用！"},
-		orderDomain.OrderStatusPickedUp:       {Title: "已取走", Body: "您的订单已取走，请享用！"},
+		orderDomain.OrderStatusAwaitingUp:     {Title: "您的订单已准备好！", Body: "请尽快取餐。"},
+		orderDomain.OrderStatusOutForDelivery: {Title: "您的订单正在配送中！", Body: "很快就到。"},
+		orderDomain.OrderStatusDelivered:      {Title: "已送达", Body: "您的订单已送达，祝您用餐愉快！"},
+		orderDomain.OrderStatusPickedUp:       {Title: "已取餐", Body: "您已取餐，祝您用餐愉快！"},
 		orderDomain.OrderStatusCanceled:       {Title: "订单已取消", Body: "您的订单已被取消。"},
 		orderDomain.OrderStatusFailed:         {Title: "订单失败", Body: "您的订单出现了问题。"},
 	},
 	"nl": {
 		orderDomain.OrderStatusConfirmed:      {Title: "Bestelling bevestigd", Body: "Uw bestelling is bevestigd door het restaurant."},
-		orderDomain.OrderStatusPreparing:      {Title: "In voorbereiding", Body: "Uw bestelling wordt bereid."},
-		orderDomain.OrderStatusAwaitingUp:     {Title: "Uw bestelling is klaar!", Body: "Het staat voor u klaar."},
-		orderDomain.OrderStatusOutForDelivery: {Title: "Uw bestelling is onderweg!", Body: "Het is zo bij u."},
-		orderDomain.OrderStatusDelivered:      {Title: "Bezorgd", Body: "Uw bestelling is bezorgd. Eet smakelijk!"},
-		orderDomain.OrderStatusPickedUp:       {Title: "Opgehaald", Body: "Uw bestelling is opgehaald. Eet smakelijk!"},
+		orderDomain.OrderStatusPreparing:      {Title: "In bereiding", Body: "Uw bestelling wordt bereid."},
+		orderDomain.OrderStatusAwaitingUp:     {Title: "Uw bestelling is klaar!", Body: "Ze staat voor u klaar."},
+		orderDomain.OrderStatusOutForDelivery: {Title: "Uw bestelling is onderweg!", Body: "Ze is zo bij u."},
+		orderDomain.OrderStatusDelivered:      {Title: "Geleverd", Body: "Uw bestelling is geleverd. Smakelijk!"},
+		orderDomain.OrderStatusPickedUp:       {Title: "Afgehaald", Body: "Uw bestelling is afgehaald. Smakelijk!"},
 		orderDomain.OrderStatusCanceled:       {Title: "Bestelling geannuleerd", Body: "Uw bestelling is geannuleerd."},
 		orderDomain.OrderStatusFailed:         {Title: "Bestelling mislukt", Body: "Er is een probleem met uw bestelling."},
 	},
@@ -170,10 +170,10 @@ var newOrderTexts = map[string]*notificationText{
 }
 
 var readyTimeUpdatedTexts = map[string]*notificationText{
-	"fr": {Title: "Heure de retrait mise à jour", Body: "Nouvelle heure estimée : %s."},
-	"en": {Title: "Ready time updated", Body: "New estimated ready time: %s."},
-	"zh": {Title: "预计完成时间已更新", Body: "新的预计完成时间：%s。"},
-	"nl": {Title: "Afhaaltijd bijgewerkt", Body: "Nieuwe geschatte afhaaltijd: %s."},
+	"fr": {Title: "Heure estimée mise à jour", Body: "Nouvelle heure estimée : %s."},
+	"en": {Title: "Estimated time updated", Body: "New estimated time: %s."},
+	"zh": {Title: "预计时间已更新", Body: "新的预计时间：%s。"},
+	"nl": {Title: "Geschatte tijd bijgewerkt", Body: "Nieuwe geschatte tijd: %s."},
 }
 
 func formatReadyTimeForNotification(t time.Time, language string) string {
@@ -213,7 +213,7 @@ var pickupOverrides = map[string]map[orderDomain.OrderStatus]notificationText{
 		orderDomain.OrderStatusAwaitingUp: {Title: "您的订单已准备好！", Body: "请到柜台取餐。"},
 	},
 	"nl": {
-		orderDomain.OrderStatusAwaitingUp: {Title: "Uw bestelling is klaar!", Body: "U kunt het aan de balie ophalen."},
+		orderDomain.OrderStatusAwaitingUp: {Title: "Uw bestelling is klaar!", Body: "U kunt ze aan de balie afhalen."},
 	},
 }
 
