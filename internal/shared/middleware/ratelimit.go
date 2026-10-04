@@ -9,6 +9,9 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// visitorTTL is how long an idle visitor is remembered.
+const visitorTTL = 3 * time.Minute
+
 type visitor struct {
 	limiter  *rate.Limiter
 	lastSeen time.Time
@@ -57,15 +60,20 @@ func (rl *RateLimiter) cleanup() {
 	for {
 		select {
 		case <-ticker.C:
-			rl.mu.Lock()
-			for ip, v := range rl.visitors {
-				if time.Since(v.lastSeen) > 3*time.Minute {
-					delete(rl.visitors, ip)
-				}
-			}
-			rl.mu.Unlock()
+			rl.sweep(time.Now())
 		case <-rl.done:
 			return
+		}
+	}
+}
+
+// sweep forgets visitors not seen in the last visitorTTL.
+func (rl *RateLimiter) sweep(now time.Time) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	for ip, v := range rl.visitors {
+		if now.Sub(v.lastSeen) > visitorTTL {
+			delete(rl.visitors, ip)
 		}
 	}
 }
