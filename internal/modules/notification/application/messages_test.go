@@ -65,7 +65,7 @@ func TestGetOrderStatusNotification(t *testing.T) {
 
 	t.Run("cancellation reason follows the normalised language", func(t *testing.T) {
 		r := orderDomain.OrderCancellationReasonOutOfStock
-		require.Equal(t, "Your order has been canceled: out of stock.", GetOrderStatusNotification(orderDomain.OrderStatusCanceled, "EN-us", "DELIVERY", &r).Body)
+		require.Equal(t, "Your order has been cancelled: out of stock.", GetOrderStatusNotification(orderDomain.OrderStatusCanceled, "EN-us", "DELIVERY", &r).Body)
 		require.Equal(t, "Votre commande a été annulée : rupture de stock.", GetOrderStatusNotification(orderDomain.OrderStatusCanceled, "", "DELIVERY", &r).Body)
 	})
 
@@ -95,8 +95,8 @@ func TestGetOrderStatusNotification(t *testing.T) {
 			want   string
 		}{
 			{"fr", orderDomain.OrderCancellationReasonOutOfStock, "Votre commande a été annulée : rupture de stock."},
-			{"en", orderDomain.OrderCancellationReasonKitchenClosed, "Your order has been canceled: kitchen closed."},
-			{"nl", orderDomain.OrderCancellationReasonDeliveryArea, "Uw bestelling is geannuleerd: buiten bezorggebied."},
+			{"en", orderDomain.OrderCancellationReasonKitchenClosed, "Your order has been cancelled: kitchen closed."},
+			{"nl", orderDomain.OrderCancellationReasonDeliveryArea, "Uw bestelling is geannuleerd: buiten de leveringszone."},
 			{"zh", orderDomain.OrderCancellationReasonOutOfStock, "您的订单已被取消：缺货。"},
 		}
 		for _, c := range cases {
@@ -112,7 +112,7 @@ func TestGetOrderStatusNotification(t *testing.T) {
 	})
 
 	t.Run("reason OTHER, nil or unknown keeps the generic body", func(t *testing.T) {
-		generic := "Your order has been canceled."
+		generic := "Your order has been cancelled."
 		require.Equal(t, generic, GetOrderStatusNotification(orderDomain.OrderStatusCanceled, "en", "DELIVERY", reason(orderDomain.OrderCancellationReasonOther)).Body)
 		require.Equal(t, generic, GetOrderStatusNotification(orderDomain.OrderStatusCanceled, "en", "DELIVERY", nil).Body)
 		require.Equal(t, generic, GetOrderStatusNotification(orderDomain.OrderStatusCanceled, "en", "DELIVERY", reason("SOMETHING_NEW")).Body)
@@ -135,9 +135,9 @@ func TestGetReadyTimeUpdatedNotification(t *testing.T) {
 	summer := time.Date(2026, 7, 1, 17, 5, 0, 0, time.UTC) // 19:05 local
 	t.Run("24h clock in the restaurant timezone for non-English", func(t *testing.T) {
 		require.Equal(t, "Nouvelle heure estimée : 19:05.", GetReadyTimeUpdatedNotification("fr", &summer).Body)
-		require.Equal(t, "Nieuwe geschatte afhaaltijd: 19:05.", GetReadyTimeUpdatedNotification("nl", &summer).Body)
-		require.Equal(t, "新的预计完成时间：19:05。", GetReadyTimeUpdatedNotification("zh", &summer).Body)
-		require.Equal(t, "Heure de retrait mise à jour", GetReadyTimeUpdatedNotification("fr", &summer).Title)
+		require.Equal(t, "Nieuwe geschatte tijd: 19:05.", GetReadyTimeUpdatedNotification("nl", &summer).Body)
+		require.Equal(t, "新的预计时间：19:05。", GetReadyTimeUpdatedNotification("zh", &summer).Body)
+		require.Equal(t, "Heure estimée mise à jour", GetReadyTimeUpdatedNotification("fr", &summer).Title)
 	})
 
 	t.Run("unknown language falls back to French", func(t *testing.T) {
@@ -148,7 +148,7 @@ func TestGetReadyTimeUpdatedNotification(t *testing.T) {
 		for in, want := range pushLanguageVariants {
 			require.Equal(t, GetReadyTimeUpdatedNotification(want, &summer), GetReadyTimeUpdatedNotification(in, &summer), "%q must read as %q", in, want)
 		}
-		require.Equal(t, "New estimated ready time: 7:05 PM.", GetReadyTimeUpdatedNotification("EN-GB", &summer).Body, "12h clock follows the normalised language")
+		require.Equal(t, "New estimated time: 7:05 PM.", GetReadyTimeUpdatedNotification("EN-GB", &summer).Body, "12h clock follows the normalised language")
 	})
 
 	t.Run("English uses a 12h clock", func(t *testing.T) {
@@ -164,9 +164,9 @@ func TestGetReadyTimeUpdatedNotification(t *testing.T) {
 		}
 		for _, c := range cases {
 			msg := GetReadyTimeUpdatedNotification("en", &c.utc)
-			require.Equal(t, "New estimated ready time: "+c.want+".", msg.Body)
+			require.Equal(t, "New estimated time: "+c.want+".", msg.Body)
 		}
-		require.Equal(t, "Ready time updated", GetReadyTimeUpdatedNotification("en", &summer).Title)
+		require.Equal(t, "Estimated time updated", GetReadyTimeUpdatedNotification("en", &summer).Title)
 	})
 }
 
@@ -284,7 +284,7 @@ func TestGetLiveUpdateData(t *testing.T) {
 	t.Run("cancellation reason flows into the text", func(t *testing.T) {
 		d := GetLiveUpdateData("o", orderDomain.OrderStatusCanceled, "en", "DELIVERY", "", reason(orderDomain.OrderCancellationReasonOutOfStock))
 		require.Equal(t, "stop", d["event"])
-		require.Equal(t, "Your order has been canceled: out of stock.", d["text"])
+		require.Equal(t, "Your order has been cancelled: out of stock.", d["text"])
 		require.Equal(t, "0", d["progressValue"])
 	})
 }
