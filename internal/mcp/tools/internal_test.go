@@ -208,13 +208,15 @@ func TestCustomerName(t *testing.T) {
 }
 
 func TestCheckDialAddress(t *testing.T) {
-	blocked := []string{"127.0.0.1:443", "[::1]:443", "10.0.0.5:80", "192.168.1.10:80", "172.16.0.1:80", "169.254.169.254:80", "0.0.0.0:80", "[::]:80", "224.0.0.1:80", "[fe80::1]:80", "[ff02::1]:80", "[fd00::1]:80", "localhost:80", "no-port"}
+	blocked := []string{"127.0.0.1:443", "[::1]:443", "10.0.0.5:80", "192.168.1.10:80", "172.16.0.1:80", "169.254.169.254:80", "0.0.0.0:80", "[::]:80", "224.0.0.1:80", "[fe80::1]:80", "[ff02::1]:80", "[fd00::1]:80", "localhost:80", "no-port",
+		// IPv4-mapped IPv6 literals are judged by their embedded IPv4 address.
+		"[::ffff:127.0.0.1]:80", "[::ffff:10.0.0.1]:80", "[::ffff:192.168.1.1]:80", "[::ffff:169.254.169.254]:80", "[::ffff:0.0.0.0]:80"}
 	for _, a := range blocked {
 		if err := checkDialAddress(a); err == nil {
 			t.Errorf("%s must be refused", a)
 		}
 	}
-	for _, a := range []string{"93.184.216.34:443", "[2606:2800:220:1:248:1893:25c8:1946]:443", "8.8.8.8:80"} {
+	for _, a := range []string{"93.184.216.34:443", "[2606:2800:220:1:248:1893:25c8:1946]:443", "8.8.8.8:80", "[::ffff:8.8.8.8]:80"} {
 		if err := checkDialAddress(a); err != nil {
 			t.Errorf("%s must be allowed: %v", a, err)
 		}
@@ -232,6 +234,17 @@ func TestSafeHTTPClientRefusesLocalServers(t *testing.T) {
 	c := safeHTTPClient()
 	if c.Timeout != 30*time.Second {
 		t.Errorf("timeout = %v", c.Timeout)
+	}
+	// No proxy, whatever HTTPS_PROXY says: the guard only sees the address that is dialled, so a
+	// proxy from the environment would be connected to instead of the (checked) image host.
+	t.Setenv("HTTPS_PROXY", "http://proxy.invalid:3128")
+	t.Setenv("HTTP_PROXY", "http://proxy.invalid:3128")
+	tr, ok := safeHTTPClient().Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("transport is %T", c.Transport)
+	}
+	if tr.Proxy != nil {
+		t.Error("the image client must not use a proxy from the environment")
 	}
 	if _, err := c.Get(srv.URL); err == nil || !strings.Contains(err.Error(), "is not allowed") {
 		t.Fatalf("a loopback server must not be reachable: %v", err)
