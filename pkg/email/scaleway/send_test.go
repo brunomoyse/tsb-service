@@ -1,11 +1,13 @@
 package scaleway
 
 import (
+	"embed"
 	"strings"
 	"testing"
 	"time"
 
 	"tsb-service/pkg/email/smtptest"
+	"tsb-service/pkg/i18n/locale"
 
 	"github.com/stretchr/testify/require"
 
@@ -14,6 +16,26 @@ import (
 )
 
 var allLangs = []string{"fr", "en", "nl", "zh"}
+
+// The subjects maps and template directories are indexed with locale.Normalize(lang): every
+// supported language needs both. Adding a language to locale fails here until the e-mails have it.
+func TestEmailLanguagesAreTheSupportedLanguages(t *testing.T) {
+	require.ElementsMatch(t, locale.Supported(), allLangs, "allLangs must list exactly the supported languages")
+	for _, lang := range locale.Supported() {
+		for _, fs := range []embed.FS{htmlEmailFS, textEmailFS} {
+			entries, err := fs.ReadDir("templates/" + lang)
+			require.NoError(t, err, "a template directory for %s", lang)
+			require.NotEmpty(t, entries, lang)
+		}
+	}
+	dirs, err := htmlEmailFS.ReadDir("templates")
+	require.NoError(t, err)
+	var shipped []string
+	for _, d := range dirs {
+		shipped = append(shipped, d.Name())
+	}
+	require.ElementsMatch(t, locale.Supported(), shipped, "no template directory for an unsupported language")
+}
 
 // greeting is the salutation every customer-facing template opens with.
 var greeting = map[string]string{"fr": "Bonjour Jeanne Dupont", "en": "Hello Jeanne Dupont", "nl": "Hallo Jeanne Dupont", "zh": "您好"}

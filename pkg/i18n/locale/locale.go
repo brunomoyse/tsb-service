@@ -7,7 +7,10 @@
 // without handling a miss.
 package locale
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 // Default is the fallback language for every customer-facing text.
 const Default = "fr"
@@ -32,4 +35,16 @@ func Normalize(tag string) string {
 		return base
 	}
 	return Default
+}
+
+// Supported lists the supported languages, sorted. Packages that keep a translation table per
+// language assert in a test that their table covers exactly this set, so adding a language here
+// cannot silently leave a table without it.
+func Supported() []string {
+	out := make([]string, 0, len(supported))
+	for l := range supported {
+		out = append(out, l)
+	}
+	sort.Strings(out)
+	return out
 }

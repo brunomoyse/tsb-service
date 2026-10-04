@@ -27,3 +27,15 @@ func TestNormalizeAlwaysReturnsASupportedLanguage(t *testing.T) {
 	}
 	require.Equal(t, "fr", Default)
 }
+
+func TestSupportedListsEveryLanguageNormalizeKnows(t *testing.T) {
+	require.Equal(t, []string{"en", "fr", "nl", "zh"}, Supported())
+	for _, l := range Supported() {
+		require.Equal(t, l, Normalize(l), "a supported language normalises to itself")
+	}
+	require.Contains(t, Supported(), Default)
+
+	got := Supported()
+	got[0] = "xx"
+	require.Equal(t, []string{"en", "fr", "nl", "zh"}, Supported(), "the caller gets a copy")
+}

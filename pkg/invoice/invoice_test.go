@@ -8,12 +8,14 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"tsb-service/pkg/brand"
+	"tsb-service/pkg/i18n/locale"
 	"tsb-service/pkg/invoice/invoicetest"
 )
 
@@ -400,4 +402,25 @@ func TestGeneratePDFFailsOnCorruptLogo(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, pdf)
 	require.ErrorContains(t, err, "failed to generate PDF")
+}
+
+// Every invoice language must be a supported language, and the gap with the supported set is
+// pinned: BUG(product decision pending) only fr and en have labels (see
+// TestGeneratePDFUnsupportedLanguageFallsBackToFrench). When nl/zh labels are added this test
+// fails until "missing" is emptied.
+func TestInvoiceLabelsVersusSupportedLanguages(t *testing.T) {
+	var have []string
+	for lang := range translations {
+		have = append(have, lang)
+	}
+	sort.Strings(have)
+	require.Subset(t, locale.Supported(), have, "an invoice language that locale does not support is unreachable")
+
+	var missing []string
+	for _, lang := range locale.Supported() {
+		if _, ok := translations[lang]; !ok {
+			missing = append(missing, lang)
+		}
+	}
+	require.Equal(t, []string{"nl", "zh"}, missing, "languages without invoice labels (known gap)")
 }

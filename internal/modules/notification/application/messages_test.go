@@ -1,6 +1,7 @@
 package application
 
 import (
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 
 	orderDomain "tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/brand"
+	"tsb-service/pkg/i18n/locale"
 )
 
 func reason(r orderDomain.OrderCancellationReason) *orderDomain.OrderCancellationReason { return &r }
@@ -285,4 +287,36 @@ func TestGetLiveUpdateData(t *testing.T) {
 		require.Equal(t, "Your order has been canceled: out of stock.", d["text"])
 		require.Equal(t, "0", d["progressValue"])
 	})
+}
+
+// keys of a translation table, sorted.
+func langsOf[V any](m map[string]V) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// The notification texts are looked up with locale.Normalize(language) and dereferenced without a
+// fallback (GetNewOrderNotification), so a table that lacks a supported language would panic or
+// send an empty push. Adding a language to locale must fail here until every table has it.
+func TestEveryTranslationTableCoversEverySupportedLanguage(t *testing.T) {
+	want := locale.Supported()
+	require.Equal(t, want, langsOf(cancellationReasonPushLabels), "cancellationReasonPushLabels")
+	require.Equal(t, want, langsOf(cancellationReasonBodyFormat), "cancellationReasonBodyFormat")
+	require.Equal(t, want, langsOf(orderNotificationTexts), "orderNotificationTexts")
+	require.Equal(t, want, langsOf(newOrderTexts), "newOrderTexts")
+	require.Equal(t, want, langsOf(readyTimeUpdatedTexts), "readyTimeUpdatedTexts")
+	require.Equal(t, want, langsOf(pickupOverrides), "pickupOverrides")
+
+	for _, l := range want {
+		require.NotNil(t, newOrderTexts[l], l)
+		require.NotEmpty(t, newOrderTexts[l].Title, l)
+		require.NotEmpty(t, readyTimeUpdatedTexts[l].Title, l)
+		require.Contains(t, readyTimeUpdatedTexts[l].Body, "%s", l)
+		require.Contains(t, cancellationReasonBodyFormat[l], "%s", l)
+		require.NotEmpty(t, cancellationReasonPushLabels[l], l)
+	}
 }
