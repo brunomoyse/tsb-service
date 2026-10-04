@@ -292,10 +292,14 @@ func deref(s *string) string {
 }
 
 func vatLabel(language string) string {
-	if language == "en" {
+	switch language {
+	case "en":
 		return "VAT"
+	case "nl":
+		return "btw"
+	default:
+		return "TVA"
 	}
-	return "TVA"
 }
 
 func vatAmountFromGross(gross decimal.Decimal, rate decimal.Decimal) decimal.Decimal {
