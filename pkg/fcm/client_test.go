@@ -6,77 +6,39 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
-	firebase "firebase.google.com/go/v4"
+	"tsb-service/pkg/fcm/fcmtest"
+
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
-	"google.golang.org/api/option"
 )
 
-// fakeFCM is an httptest server impersonating the FCM v1 send endpoint.
-type fakeFCM struct {
-	*httptest.Server
-	mu     sync.Mutex
-	bodies []map[string]any
-	paths  []string
-	status int
-	resp   string
-}
-
-func newFakeFCM(t *testing.T, status int, resp string) *fakeFCM {
+// newTestClient wires a Client to the fake FCM endpoint (no real credentials), the way the
+// resolvers' tests do.
+func newTestClient(t *testing.T, srv *fcmtest.Server) *Client {
 	t.Helper()
-	f := &fakeFCM{status: status, resp: resp}
-	f.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw, _ := io.ReadAll(r.Body)
-		var body map[string]any
-		_ = json.Unmarshal(raw, &body)
-		f.mu.Lock()
-		f.bodies = append(f.bodies, body)
-		f.paths = append(f.paths, r.URL.Path)
-		f.mu.Unlock()
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(f.status)
-		_, _ = io.WriteString(w, f.resp)
-	}))
-	t.Cleanup(f.Close)
-	return f
-}
-
-// newTestClient wires a Client to the fake FCM endpoint (no real credentials).
-func newTestClient(t *testing.T, srv *fakeFCM) *Client {
-	t.Helper()
-	app, err := firebase.NewApp(t.Context(), &firebase.Config{ProjectID: "tsb-test"},
-		option.WithEndpoint(srv.URL), option.WithoutAuthentication())
+	c, err := NewWithEndpoint(t.Context(), "tsb-test", srv.URL)
 	require.NoError(t, err)
-	mc, err := app.Messaging(t.Context())
-	require.NoError(t, err)
-	return &Client{msgClient: mc}
+	return c
 }
 
-const okResp = `{"name":"projects/tsb-test/messages/0:123"}`
+const okResp = fcmtest.OK
 
-func fcmError(status, code string) string {
-	return `{"error":{"code":0,"status":"` + status + `","message":"x","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"` + code + `"}]}}`
-}
+func fcmError(status, code string) string { return fcmtest.Error(status, code) }
 
 func TestSendAlert(t *testing.T) {
 	t.Run("posts a high-priority notification message to the project endpoint", func(t *testing.T) {
-		srv := newFakeFCM(t, 200, okResp)
+		srv := fcmtest.New(t, 200, okResp)
 		c := newTestClient(t, srv)
 
 		require.NoError(t, c.SendAlert("reg-token", "Order confirmed", "Thanks!", map[string]string{"orderId": "o-1"}))
 
-		require.Equal(t, []string{"/projects/tsb-test/messages:send"}, srv.paths)
-		msg, ok := srv.bodies[0]["message"].(map[string]any)
-		require.True(t, ok)
+		require.Equal(t, []string{"/projects/tsb-test/messages:send"}, srv.Paths())
+		msg := srv.Requests()[0].Payload
 		require.Equal(t, "reg-token", msg["token"])
 		require.Equal(t, map[string]any{"title": "Order confirmed", "body": "Thanks!"}, msg["notification"])
 		require.Equal(t, map[string]any{"orderId": "o-1"}, msg["data"])
@@ -87,12 +49,12 @@ func TestSendAlert(t *testing.T) {
 	})
 
 	t.Run("unregistered token maps to ErrTokenInvalid", func(t *testing.T) {
-		c := newTestClient(t, newFakeFCM(t, 404, fcmError("NOT_FOUND", "UNREGISTERED")))
+		c := newTestClient(t, fcmtest.New(t, 404, fcmError("NOT_FOUND", "UNREGISTERED")))
 		require.ErrorIs(t, c.SendAlert("dead", "t", "b", nil), ErrTokenInvalid)
 	})
 
 	t.Run("invalid argument maps to ErrTokenInvalid", func(t *testing.T) {
-		c := newTestClient(t, newFakeFCM(t, 400, fcmError("INVALID_ARGUMENT", "INVALID_ARGUMENT")))
+		c := newTestClient(t, fcmtest.New(t, 400, fcmError("INVALID_ARGUMENT", "INVALID_ARGUMENT")))
 		require.ErrorIs(t, c.SendAlert("malformed", "t", "b", nil), ErrTokenInvalid)
 	})
 
@@ -100,7 +62,7 @@ func TestSendAlert(t *testing.T) {
 		core, logs := observer.New(zap.WarnLevel)
 		defer zap.ReplaceGlobals(zap.New(core))()
 
-		c := newTestClient(t, newFakeFCM(t, 403, fcmError("PERMISSION_DENIED", "SENDER_ID_MISMATCH")))
+		c := newTestClient(t, fcmtest.New(t, 403, fcmError("PERMISSION_DENIED", "SENDER_ID_MISMATCH")))
 		err := c.SendAlert("t", "t", "b", nil)
 		require.ErrorContains(t, err, "send FCM notification")
 		require.NotErrorIs(t, err, ErrTokenInvalid)
@@ -110,13 +72,13 @@ func TestSendAlert(t *testing.T) {
 
 func TestSendDataMessage(t *testing.T) {
 	t.Run("sends a data-only message (no notification block)", func(t *testing.T) {
-		srv := newFakeFCM(t, 200, okResp)
+		srv := fcmtest.New(t, 200, okResp)
 		c := newTestClient(t, srv)
 
 		data := map[string]string{"event": "update", "progressValue": "50"}
 		require.NoError(t, c.SendDataMessage("reg-token", data))
 
-		msg := srv.bodies[0]["message"].(map[string]any)
+		msg := srv.Requests()[0].Payload
 		require.Equal(t, "reg-token", msg["token"])
 		require.Equal(t, map[string]any{"event": "update", "progressValue": "50"}, msg["data"])
 		require.NotContains(t, msg, "notification", "data message must be silent")
@@ -124,10 +86,10 @@ func TestSendDataMessage(t *testing.T) {
 	})
 
 	t.Run("unregistered and invalid tokens map to ErrTokenInvalid", func(t *testing.T) {
-		c := newTestClient(t, newFakeFCM(t, 404, fcmError("NOT_FOUND", "UNREGISTERED")))
+		c := newTestClient(t, fcmtest.New(t, 404, fcmError("NOT_FOUND", "UNREGISTERED")))
 		require.ErrorIs(t, c.SendDataMessage("dead", map[string]string{"a": "b"}), ErrTokenInvalid)
 
-		c = newTestClient(t, newFakeFCM(t, 400, fcmError("INVALID_ARGUMENT", "INVALID_ARGUMENT")))
+		c = newTestClient(t, fcmtest.New(t, 400, fcmError("INVALID_ARGUMENT", "INVALID_ARGUMENT")))
 		require.ErrorIs(t, c.SendDataMessage("bad", map[string]string{"a": "b"}), ErrTokenInvalid)
 	})
 
@@ -135,7 +97,7 @@ func TestSendDataMessage(t *testing.T) {
 		core, logs := observer.New(zap.WarnLevel)
 		defer zap.ReplaceGlobals(zap.New(core))()
 
-		c := newTestClient(t, newFakeFCM(t, 403, fcmError("PERMISSION_DENIED", "SENDER_ID_MISMATCH")))
+		c := newTestClient(t, fcmtest.New(t, 403, fcmError("PERMISSION_DENIED", "SENDER_ID_MISMATCH")))
 		err := c.SendDataMessage("t", map[string]string{"a": "b"})
 		require.ErrorContains(t, err, "send FCM data message")
 		require.NotErrorIs(t, err, ErrTokenInvalid)

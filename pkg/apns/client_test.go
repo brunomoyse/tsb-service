@@ -6,64 +6,19 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
+
+	"tsb-service/pkg/apns/apnstest"
 
 	"github.com/sideshow/apns2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
 )
-
-// capturedReq is a request received by a fake APNs endpoint.
-type capturedReq struct {
-	Path    string
-	Header  http.Header
-	Payload map[string]any
-}
-
-// fakeAPNs is an httptest server standing in for one APNs environment. Each
-// request is recorded and answered with the configured status/reason.
-type fakeAPNs struct {
-	*httptest.Server
-	mu     sync.Mutex
-	reqs   []capturedReq
-	status int
-	reason string
-}
-
-func newFakeAPNs(t *testing.T, status int, reason string) *fakeAPNs {
-	t.Helper()
-	f := &fakeAPNs{status: status, reason: reason}
-	f.Server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		var raw map[string]any
-		_ = json.Unmarshal(body, &raw)
-		f.mu.Lock()
-		f.reqs = append(f.reqs, capturedReq{Path: r.URL.Path, Header: r.Header.Clone(), Payload: raw})
-		f.mu.Unlock()
-		w.WriteHeader(f.status)
-		if f.reason != "" {
-			_ = json.NewEncoder(w).Encode(map[string]string{"reason": f.reason})
-		}
-	}))
-	t.Cleanup(f.Close)
-	return f
-}
-
-func (f *fakeAPNs) requests() []capturedReq {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return append([]capturedReq(nil), f.reqs...)
-}
 
 // writeP8 writes an ECDSA P-256 PKCS#8 key in the .p8 format Apple issues.
 func writeP8(t *testing.T) string {
@@ -79,7 +34,7 @@ func writeP8(t *testing.T) string {
 
 // newTestClient builds a real Client (via NewClient, so JWT auth is exercised)
 // and points its two environments at the given fake servers.
-func newTestClient(t *testing.T, preferProd bool, prod, dev *fakeAPNs) *Client {
+func newTestClient(t *testing.T, preferProd bool, prod, dev *apnstest.Server) *Client {
 	t.Helper()
 	c, err := NewClient(writeP8(t), "KEYID12345", "TEAMID1234", "be.test.app", preferProd)
 	require.NoError(t, err)
@@ -136,15 +91,15 @@ func TestIsWrongEnvironmentReason(t *testing.T) {
 
 func TestSendAlert(t *testing.T) {
 	t.Run("sends the alert payload to the preferred (production) endpoint with JWT auth", func(t *testing.T) {
-		prod, dev := newFakeAPNs(t, 200, ""), newFakeAPNs(t, 200, "")
+		prod, dev := apnstest.New(t, 200, ""), apnstest.New(t, 200, "")
 		c := newTestClient(t, true, prod, dev)
 
 		err := c.SendAlert("devtok123", "Order confirmed", "Your order is confirmed", map[string]string{"orderId": "o-1"})
 		require.NoError(t, err)
 
-		reqs := prod.requests()
+		reqs := prod.Requests()
 		require.Len(t, reqs, 1)
-		require.Empty(t, dev.requests(), "no fallback on success")
+		require.Empty(t, dev.Requests(), "no fallback on success")
 		r := reqs[0]
 		require.Equal(t, "/3/device/devtok123", r.Path)
 		require.Equal(t, "be.test.app", r.Header.Get("apns-topic"))
@@ -160,29 +115,29 @@ func TestSendAlert(t *testing.T) {
 	})
 
 	t.Run("prefers the sandbox endpoint when not production", func(t *testing.T) {
-		prod, dev := newFakeAPNs(t, 200, ""), newFakeAPNs(t, 200, "")
+		prod, dev := apnstest.New(t, 200, ""), apnstest.New(t, 200, "")
 		c := newTestClient(t, false, prod, dev)
 		require.NoError(t, c.SendAlert("t", "a", "b", nil))
-		require.Len(t, dev.requests(), 1)
-		require.Empty(t, prod.requests())
+		require.Len(t, dev.Requests(), 1)
+		require.Empty(t, prod.Requests())
 	})
 
 	t.Run("wrong-environment reply retries once on the other endpoint", func(t *testing.T) {
 		for _, reason := range []string{apns2.ReasonBadDeviceToken, "BadEnvironmentKeyInToken", apns2.ReasonBadCertificateEnvironment} {
-			prod, dev := newFakeAPNs(t, 400, reason), newFakeAPNs(t, 200, "")
+			prod, dev := apnstest.New(t, 400, reason), apnstest.New(t, 200, "")
 			c := newTestClient(t, true, prod, dev)
 			require.NoError(t, c.SendAlert("sandbox-token", "a", "b", nil), reason)
-			require.Len(t, prod.requests(), 1, reason)
-			require.Len(t, dev.requests(), 1, "retry must hit the other environment: "+reason)
+			require.Len(t, prod.Requests(), 1, reason)
+			require.Len(t, dev.Requests(), 1, "retry must hit the other environment: "+reason)
 		}
 	})
 
 	t.Run("token invalid on both environments is reported as ErrTokenInvalid", func(t *testing.T) {
-		prod, dev := newFakeAPNs(t, 400, apns2.ReasonBadDeviceToken), newFakeAPNs(t, 400, apns2.ReasonBadDeviceToken)
+		prod, dev := apnstest.New(t, 400, apns2.ReasonBadDeviceToken), apnstest.New(t, 400, apns2.ReasonBadDeviceToken)
 		c := newTestClient(t, true, prod, dev)
 		require.ErrorIs(t, c.SendAlert("dead", "a", "b", nil), ErrTokenInvalid)
-		require.Len(t, prod.requests(), 1)
-		require.Len(t, dev.requests(), 1, "exactly one retry, no loop")
+		require.Len(t, prod.Requests(), 1)
+		require.Len(t, dev.Requests(), 1, "exactly one retry, no loop")
 	})
 
 	t.Run("Unregistered and ExpiredToken are final: ErrTokenInvalid without a retry", func(t *testing.T) {
@@ -190,10 +145,10 @@ func TestSendAlert(t *testing.T) {
 			status int
 			reason string
 		}{{410, apns2.ReasonUnregistered}, {410, apns2.ReasonExpiredToken}} {
-			prod, dev := newFakeAPNs(t, c.status, c.reason), newFakeAPNs(t, 200, "")
+			prod, dev := apnstest.New(t, c.status, c.reason), apnstest.New(t, 200, "")
 			cl := newTestClient(t, true, prod, dev)
 			require.ErrorIs(t, cl.SendAlert("gone", "a", "b", nil), ErrTokenInvalid, c.reason)
-			require.Empty(t, dev.requests(), "dead token must not be retried: "+c.reason)
+			require.Empty(t, dev.Requests(), "dead token must not be retried: "+c.reason)
 		}
 	})
 
@@ -202,10 +157,10 @@ func TestSendAlert(t *testing.T) {
 		undo := zap.ReplaceGlobals(zap.New(core))
 		defer undo()
 
-		prod, dev := newFakeAPNs(t, 429, apns2.ReasonTooManyRequests), newFakeAPNs(t, 200, "")
+		prod, dev := apnstest.New(t, 429, apns2.ReasonTooManyRequests), apnstest.New(t, 200, "")
 		c := newTestClient(t, true, prod, dev)
 		require.NoError(t, c.SendAlert("t", "a", "b", nil))
-		require.Empty(t, dev.requests())
+		require.Empty(t, dev.Requests())
 
 		entries := logs.FilterMessage("APNs alert push not sent").All()
 		require.Len(t, entries, 1)
@@ -214,17 +169,17 @@ func TestSendAlert(t *testing.T) {
 	})
 
 	t.Run("network error is wrapped and not retried as token-invalid", func(t *testing.T) {
-		prod, dev := newFakeAPNs(t, 200, ""), newFakeAPNs(t, 200, "")
+		prod, dev := apnstest.New(t, 200, ""), apnstest.New(t, 200, "")
 		c := newTestClient(t, true, prod, dev)
 		prod.Close()
 		err := c.SendAlert("t", "a", "b", nil)
 		require.ErrorContains(t, err, "push alert notification")
 		require.NotErrorIs(t, err, ErrTokenInvalid)
-		require.Empty(t, dev.requests(), "transport error is not a wrong-environment signal")
+		require.Empty(t, dev.Requests(), "transport error is not a wrong-environment signal")
 	})
 
 	t.Run("network error on the retry leg is surfaced", func(t *testing.T) {
-		prod, dev := newFakeAPNs(t, 400, apns2.ReasonBadDeviceToken), newFakeAPNs(t, 200, "")
+		prod, dev := apnstest.New(t, 400, apns2.ReasonBadDeviceToken), apnstest.New(t, 200, "")
 		c := newTestClient(t, true, prod, dev)
 		dev.Close()
 		err := c.SendAlert("t", "a", "b", nil)
@@ -233,10 +188,10 @@ func TestSendAlert(t *testing.T) {
 	})
 
 	t.Run("custom data keys sit beside aps", func(t *testing.T) {
-		prod, dev := newFakeAPNs(t, 200, ""), newFakeAPNs(t, 200, "")
+		prod, dev := apnstest.New(t, 200, ""), apnstest.New(t, 200, "")
 		c := newTestClient(t, true, prod, dev)
 		require.NoError(t, c.SendAlert("t", "a", "b", map[string]string{"k1": "v1", "k2": "v2"}))
-		p := prod.requests()[0].Payload
+		p := prod.Requests()[0].Payload
 		require.Equal(t, "v1", p["k1"])
 		require.Equal(t, "v2", p["k2"])
 		require.Contains(t, p, "aps")
@@ -245,13 +200,13 @@ func TestSendAlert(t *testing.T) {
 
 func TestSendLiveActivity(t *testing.T) {
 	t.Run("sends a liveactivity push with the dedicated topic and high priority", func(t *testing.T) {
-		prod, dev := newFakeAPNs(t, 200, ""), newFakeAPNs(t, 200, "")
+		prod, dev := apnstest.New(t, 200, ""), apnstest.New(t, 200, "")
 		c := newTestClient(t, true, prod, dev)
 
 		state := map[string]any{"title": "Preparing", "subtitle": "soon", "progress": 0.5}
 		require.NoError(t, c.SendLiveActivity("la-token", state, "update"))
 
-		reqs := prod.requests()
+		reqs := prod.Requests()
 		require.Len(t, reqs, 1)
 		r := reqs[0]
 		require.Equal(t, "/3/device/la-token", r.Path)
@@ -267,22 +222,22 @@ func TestSendLiveActivity(t *testing.T) {
 	})
 
 	t.Run("end event is forwarded", func(t *testing.T) {
-		prod, dev := newFakeAPNs(t, 200, ""), newFakeAPNs(t, 200, "")
+		prod, dev := apnstest.New(t, 200, ""), apnstest.New(t, 200, "")
 		c := newTestClient(t, true, prod, dev)
 		require.NoError(t, c.SendLiveActivity("t", map[string]any{}, "end"))
-		require.Equal(t, "end", prod.requests()[0].Payload["aps"].(map[string]any)["event"])
+		require.Equal(t, "end", prod.Requests()[0].Payload["aps"].(map[string]any)["event"])
 	})
 
 	t.Run("wrong-environment retry", func(t *testing.T) {
-		prod, dev := newFakeAPNs(t, 400, apns2.ReasonBadDeviceToken), newFakeAPNs(t, 200, "")
+		prod, dev := apnstest.New(t, 400, apns2.ReasonBadDeviceToken), apnstest.New(t, 200, "")
 		c := newTestClient(t, true, prod, dev)
 		require.NoError(t, c.SendLiveActivity("t", nil, "update"))
-		require.Len(t, dev.requests(), 1)
+		require.Len(t, dev.Requests(), 1)
 	})
 
 	t.Run("dead token", func(t *testing.T) {
 		for _, reason := range []string{apns2.ReasonBadDeviceToken, apns2.ReasonUnregistered, apns2.ReasonExpiredToken} {
-			prod, dev := newFakeAPNs(t, 410, reason), newFakeAPNs(t, 410, reason)
+			prod, dev := apnstest.New(t, 410, reason), apnstest.New(t, 410, reason)
 			c := newTestClient(t, true, prod, dev)
 			require.ErrorIs(t, c.SendLiveActivity("t", nil, "update"), ErrTokenInvalid, reason)
 		}
@@ -292,7 +247,7 @@ func TestSendLiveActivity(t *testing.T) {
 		core, logs := observer.New(zap.WarnLevel)
 		undo := zap.ReplaceGlobals(zap.New(core))
 		defer undo()
-		prod, dev := newFakeAPNs(t, 500, "InternalServerError"), newFakeAPNs(t, 200, "")
+		prod, dev := apnstest.New(t, 500, "InternalServerError"), apnstest.New(t, 200, "")
 		c := newTestClient(t, true, prod, dev)
 		require.NoError(t, c.SendLiveActivity("t", nil, "update"))
 		entries := logs.FilterMessage("APNs live activity push not sent").All()
@@ -301,7 +256,7 @@ func TestSendLiveActivity(t *testing.T) {
 	})
 
 	t.Run("network error is wrapped", func(t *testing.T) {
-		prod, dev := newFakeAPNs(t, 200, ""), newFakeAPNs(t, 200, "")
+		prod, dev := apnstest.New(t, 200, ""), apnstest.New(t, 200, "")
 		c := newTestClient(t, true, prod, dev)
 		prod.Close()
 		err := c.SendLiveActivity("t", nil, "update")
@@ -309,10 +264,10 @@ func TestSendLiveActivity(t *testing.T) {
 	})
 
 	t.Run("unmarshalable content state is a marshal error", func(t *testing.T) {
-		prod, dev := newFakeAPNs(t, 200, ""), newFakeAPNs(t, 200, "")
+		prod, dev := apnstest.New(t, 200, ""), apnstest.New(t, 200, "")
 		c := newTestClient(t, true, prod, dev)
 		err := c.SendLiveActivity("t", map[string]any{"bad": make(chan int)}, "update")
 		require.ErrorContains(t, err, "marshal live activity payload")
-		require.Empty(t, prod.requests())
+		require.Empty(t, prod.Requests())
 	})
 }
