@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Received | {{restaurantName}}</title>
+    <title>Order received | {{restaurantName}}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
@@ -18,9 +18,9 @@
     <!-- CONTENT -->
     <tr><td style="background-color:#ffffff;padding:36px;">
         <p style="margin:0 0 16px;font-size:18px;color:#2D2D2D;font-weight:600;">Hello {{.UserName}},</p>
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Thank you for ordering at <strong>{{restaurantName}}</strong>! We confirm that we have received your order and it is currently pending validation by the restaurant. You will receive another email shortly confirming your order along with an estimated delivery/takeaway time.</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Thank you for ordering from <strong>{{restaurantName}}</strong>! We confirm that we have received your order and it is currently awaiting confirmation from the restaurant. You will receive another email shortly confirming your order along with an estimated delivery or pickup time.</p>
 
-        <p style="margin:0 0 12px;font-size:16px;font-weight:600;color:#2D2D2D;">Order Summary</p>
+        <p style="margin:0 0 12px;font-size:16px;font-weight:600;color:#2D2D2D;">Order summary</p>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 20px;">
             <tr>
                 <th style="background-color:#F0EBE3;padding:10px 12px;text-align:left;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:2px solid #E8E4DF;">Product</th>
@@ -43,19 +43,19 @@
             </tr>
             {{if .HasTakeaway}}
             <tr>
-                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Takeaway Discount (-10%):</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Pickup discount:</td>
                 <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">-{{.TakeawayDiscount}}&nbsp;&euro;</td>
             </tr>
             {{end}}
             {{if .HasCoupon}}
             <tr>
-                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}}:</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Promo code{{if .CouponCode}} ({{.CouponCode}}){{end}}:</td>
                 <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">-{{.CouponDiscount}}&nbsp;&euro;</td>
             </tr>
             {{end}}
             {{if eq .OrderType "DELIVERY"}}
             <tr>
-                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Delivery Fee:</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Delivery fee:</td>
                 <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">{{.DeliveryFee}}&nbsp;&euro;</td>
             </tr>
             {{end}}
@@ -65,7 +65,7 @@
             </tr>
         </table>
 
-        <p style="margin:20px 0 0;font-size:14px;line-height:1.6;color:#2D2D2D;">If you have any questions about your order, please do not hesitate to contact us. We appreciate your trust in us and look forward to delighting you with our authentic sushi experience.</p>
+        <p style="margin:20px 0 0;font-size:14px;line-height:1.6;color:#2D2D2D;">If you have any questions about your order, please do not hesitate to contact us. Thank you for your trust!</p>
     </td></tr>
     <!-- FOOTER -->
     <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:0 0 12px 12px;">

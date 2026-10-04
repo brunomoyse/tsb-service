@@ -1,9 +1,9 @@
 Hello {{.UserName}},
 
-Thank you for ordering at {{restaurantName}}! We confirm that we have received your order and it is currently pending validation by the restaurant. You will receive another email shortly confirming your order along with an estimated delivery/takeaway time.
+Thank you for ordering from {{restaurantName}}! We confirm that we have received your order and it is currently awaiting confirmation from the restaurant. You will receive another email shortly confirming your order along with an estimated delivery or pickup time.
 
 ----------------------------
-Order Summary
+Order summary
 ----------------------------
 {{range .OrderItems}}
 Product:  {{.Name}}
@@ -14,17 +14,17 @@ Price:    {{.TotalPrice}} €
 ----------------------------
 Subtotal:              {{.SubtotalPrice}} €
 {{if eq .OrderType "DELIVERY"}}
-Delivery Fee:          {{.DeliveryFee}} €
+Delivery fee:          {{.DeliveryFee}} €
 {{end}}
 {{if .HasTakeaway}}
-Takeaway Discount:     -{{.TakeawayDiscount}} €
+Pickup discount:     -{{.TakeawayDiscount}} €
 {{end}}
 {{if .HasCoupon}}
-Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}}:  -{{.CouponDiscount}} €
+Promo code{{if .CouponCode}} ({{.CouponCode}}){{end}}:  -{{.CouponDiscount}} €
 {{end}}
 Total:                 {{.TotalPrice}} €
 
-If you have any questions about your order, please do not hesitate to contact us. We appreciate your trust in us and look forward to delighting you with our authentic sushi experience.
+If you have any questions about your order, please do not hesitate to contact us. Thank you for your trust!
 
 If you did not place this order, please disregard this email.
 
