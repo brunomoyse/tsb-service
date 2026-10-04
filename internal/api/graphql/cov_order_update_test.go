@@ -22,13 +22,12 @@ import (
 // pushCustomer is a customer with a device of each kind, an iOS and an Android one the push
 // providers accept, and ones they reject: dead (unregistered) and refused (any other failure).
 type pushCustomer struct {
-	id                                   uuid.UUID
-	email, token                         string
-	ios, android                         string
-	deadIOS, refusedIOS                  string
-	deadAndroid, refusedAndroid          string
-	withMail                             bool
-	devicesRegistered, refusedRegistered bool
+	id                          uuid.UUID
+	email, token                string
+	ios, android                string
+	deadIOS, refusedIOS         string
+	deadAndroid, refusedAndroid string
+	withMail                    bool
 }
 
 // newPushCustomer seeds the customer; mail=true turns their order e-mails on. Devices are added

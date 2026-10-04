@@ -134,7 +134,6 @@ type faultyOrders struct {
 	getCalls        *atomic.Int32
 	failDelete      bool
 	wrongItems      bool
-	failLanguage    bool
 	failStatusHist  bool
 	failOrdersQuery bool
 	nilOrder        bool

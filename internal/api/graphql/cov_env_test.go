@@ -693,7 +693,7 @@ func (e *covEnv) ctxFor(userID string, admin bool, lang string) context.Context 
 
 // loadersFor is ctxFor for any resolver (the loaders read through that resolver's services).
 func loadersFor(r *resolver.Resolver, userID string, admin bool, lang string) context.Context {
-	ctx := t0()
+	ctx := context.Background()
 	ctx = productApplication.AttachDataLoaders(ctx, r.ProductService)
 	ctx = paymentApplication.AttachDataLoaders(ctx, r.PaymentService)
 	ctx = orderApplication.AttachDataLoaders(ctx, r.OrderService)
@@ -726,9 +726,6 @@ func (m *mergedCtx) Value(key any) any {
 	}
 	return m.Context.Value(key)
 }
-
-// t0 is a root context (a function so the helpers above read like the rest of the file).
-func t0() context.Context { return context.Background() }
 
 // customer seeds a customer whose notification e-mails are on (the e-mail address is returned too).
 func (e *covEnv) customerWithMail(t *testing.T, label string) (id uuid.UUID, email, token string) {
