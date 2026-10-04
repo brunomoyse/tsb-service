@@ -23,6 +23,7 @@ import (
 	orderDomain "tsb-service/internal/modules/order/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
 	restaurantDomain "tsb-service/internal/modules/restaurant/domain"
+	"tsb-service/pkg/types"
 )
 
 func TestNormalizeOrderLanguage(t *testing.T) {
@@ -143,6 +144,15 @@ func TestMappersOfSmallTypes(t *testing.T) {
 		assert.Empty(t, bare.ID)
 		assert.Zero(t, bare.Distance)
 	})
+}
+
+func TestToGQLOrderWithUnreadableExtras(t *testing.T) {
+	got := ToGQLOrder(&orderDomain.Order{ID: uuid.New(), OrderExtra: types.NullableJSON(`{"not":"a list"}`), TotalPrice: decimal.RequireFromString("5")})
+	assert.Nil(t, got.OrderExtra, "an unreadable extras column is dropped, the order still maps")
+	assert.Equal(t, "5", got.TotalPrice)
+
+	ok := ToGQLOrder(&orderDomain.Order{ID: uuid.New(), OrderExtra: types.NullableJSON(`[{"name":"sauce"}]`)})
+	assert.Len(t, ok.OrderExtra, 1)
 }
 
 func TestParseHHMMToMinutes(t *testing.T) {

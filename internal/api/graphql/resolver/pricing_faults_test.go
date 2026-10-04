@@ -158,11 +158,17 @@ func TestPricingServerFaults(t *testing.T) {
 		wantMoney(t, "the modifier counts as zero", res.Subtotal, "10.00")
 	})
 
-	t.Run("an anonymous quote whose address cache cannot be read is a server fault", func(t *testing.T) {
+	t.Run("an anonymous quote whose address cache cannot be read is reported as an unresolvable address", func(t *testing.T) {
 		f := newPricingFixture(t)
-		res, err := f.priceWith(func(p *orderPricer) { p.addresses = shakyAddresses{cacheErr: errLookup} }, pricingInput{
-			UserID: nil, OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: new("near"), Items: []pricingItem{item(salmonID, 3)}})
-		// The address lookup failure is reported to the customer as an unresolvable address.
+		p := f.pricer()
+		p.addresses = shakyAddresses{cacheErr: errLookup}
+		res, err := p.price(t.Context(), pricingInput{
+			OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: new("near"), Items: []pricingItem{item(salmonID, 3)}})
+		require.NoError(t, err)
+		wantCodes(t, res.Issues, apperr.CodeAddressUnresolvable)
+
+		res, err = f.pricer().price(t.Context(), pricingInput{
+			OrderType: orderDomain.OrderTypeDelivery, AddressPlaceID: new("unknown"), Items: []pricingItem{item(salmonID, 3)}})
 		require.NoError(t, err)
 		wantCodes(t, res.Issues, apperr.CodeAddressUnresolvable)
 	})

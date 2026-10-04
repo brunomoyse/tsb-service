@@ -3,6 +3,7 @@ package graphql_test
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,6 +28,11 @@ type faultyNotif struct {
 	register, unregister, registerActivity bool
 	adminTokens, tokens, activityTokens    bool
 	clearActivity                          bool
+	// meet makes GetDeviceTokens wait until that many callers asked, so goroutines that read the
+	// tokens at the same time all see the same list (what happens in production when they are
+	// scheduled together, and what a test cannot otherwise rely on).
+	meet    int
+	arrived *atomic.Int32
 }
 
 func (f faultyNotif) RegisterDeviceToken(ctx context.Context, u uuid.UUID, tok, platform, role string) error {
@@ -61,7 +67,15 @@ func (f faultyNotif) GetDeviceTokens(ctx context.Context, u uuid.UUID) ([]notifi
 	if f.tokens {
 		return nil, errBoom
 	}
-	return f.NotificationService.GetDeviceTokens(ctx, u)
+	tokens, err := f.NotificationService.GetDeviceTokens(ctx, u)
+	if f.meet > 0 {
+		f.arrived.Add(1)
+		deadline := time.Now().Add(10 * time.Second)
+		for int(f.arrived.Load()) < f.meet && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+	}
+	return tokens, err
 }
 
 func (f faultyNotif) GetLiveActivityTokens(ctx context.Context, o uuid.UUID) ([]notificationDomain.LiveActivityToken, error) {

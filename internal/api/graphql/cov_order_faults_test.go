@@ -1,6 +1,7 @@
 package graphql_test
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -152,7 +153,11 @@ func TestUpdateOrderSideEffectsThatFail(t *testing.T) {
 		id := env.seedOrderRow(t, c.id, "PENDING", "PICKUP", "en")
 		env.addActivityToken(t, id, "dead-activity")
 
-		update(env.Resolver, id, model.UpdateOrderInput{Status: status(orderDomain.OrderStatusConfirmed)})
+		// The alert and the Live Update goroutines read the tokens together, so both see the dead ones.
+		together := env.with(func(r *resolver.Resolver) {
+			r.NotificationService = faultyNotif{NotificationService: env.Notif, meet: 2, arrived: &atomic.Int32{}}
+		})
+		update(together, id, model.UpdateOrderInput{Status: status(orderDomain.OrderStatusConfirmed)})
 		waitLog(t, logs, "failed to send alert push")
 		waitLog(t, logs, "failed to send FCM push")
 		waitLog(t, logs, "failed to send live activity push")
