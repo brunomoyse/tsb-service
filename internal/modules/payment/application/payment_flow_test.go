@@ -1197,7 +1197,8 @@ func TestSettleCancelledOrderPayment_EdgeCases(t *testing.T) {
 	t.Run("non cancelable open payment is left alone", func(t *testing.T) {
 		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
 		f.mollie.notCancelable = true
-		refunded, err := f.svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusOpen))
+		settled, err := f.svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusOpen))
+		refunded := settled.Refunded
 		if err != nil || refunded {
 			t.Fatalf("refunded=%v err=%v", refunded, err)
 		}
@@ -1259,7 +1260,8 @@ func TestSettleCancelledOrderPayment_FollowsMollie(t *testing.T) {
 		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
 		f.mollie.status = "paid"
 
-		refunded, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+		settled, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+		refunded := settled.Refunded
 
 		if err != nil || !refunded {
 			t.Fatalf("refunded=%v err=%v", refunded, err)
@@ -1276,7 +1278,8 @@ func TestSettleCancelledOrderPayment_FollowsMollie(t *testing.T) {
 		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
 		f.mollie.status = "canceled"
 
-		refunded, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+		settled, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+		refunded := settled.Refunded
 
 		if err != nil || refunded {
 			t.Fatalf("refunded=%v err=%v", refunded, err)
@@ -1290,7 +1293,8 @@ func TestSettleCancelledOrderPayment_FollowsMollie(t *testing.T) {
 		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
 		f.mollie.notCancelable = true
 
-		refunded, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+		settled, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+		refunded := settled.Refunded
 
 		if err != nil || refunded {
 			t.Fatalf("refunded=%v err=%v", refunded, err)
@@ -1316,27 +1320,60 @@ func TestSettleCancelledOrderPayment_FollowsMollie(t *testing.T) {
 		}
 	})
 
-	t.Run("a cancelled open payment is recorded as cancelled at once", func(t *testing.T) {
+	// The settlement does not write the payment's new status: the caller does so once the order is
+	// saved (see PersistPaymentStatus), so that a failed save leaves our row "open" and Mollie's
+	// canceled webhook still cancels the order.
+	t.Run("a cancelled open payment is handed back as canceled, not recorded by the settlement", func(t *testing.T) {
 		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
 
-		if _, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"]); err != nil {
+		settled, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		if got := f.repo.payments["tr_1"].Status; got != domain.PaymentStatusCanceled {
-			t.Fatalf("stored status = %q, want canceled", got)
+		if settled.Refunded {
+			t.Fatal("no refund for an open payment")
 		}
-		if len(f.repo.refreshes) != 1 || f.repo.refreshes[0].CanceledAt == nil {
-			t.Fatalf("refreshes = %+v, want one with a canceledAt timestamp", f.repo.refreshes)
+		if u := settled.StatusUpdate; u == nil || u.Status != domain.PaymentStatusCanceled || u.CanceledAt == nil {
+			t.Fatalf("status update = %+v, want canceled with a canceledAt timestamp", u)
+		}
+		if got := f.repo.payments["tr_1"].Status; got != domain.PaymentStatusOpen {
+			t.Fatalf("stored status = %q, want it untouched (open) until the order is saved", got)
+		}
+		if len(f.repo.refreshes) != 0 {
+			t.Fatalf("the settlement wrote the status: %+v", f.repo.refreshes)
 		}
 	})
 
-	t.Run("failing to record the cancellation does not fail it", func(t *testing.T) {
-		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
-		f.svc.repo = refreshFailingRepo{f.repo}
+	t.Run("already cancelled / expired / failed at Mollie: our row catches up with Mollie's status", func(t *testing.T) {
+		for _, st := range []string{"canceled", "expired", "failed"} {
+			f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
+			f.mollie.status = st
 
-		if _, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"]); err != nil {
-			t.Fatalf("the payment is cancelled at Mollie, the webhook records it: %v", err)
+			settled, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+
+			if err != nil || settled.Refunded {
+				t.Fatalf("%s: settled=%+v err=%v", st, settled, err)
+			}
+			if u := settled.StatusUpdate; u == nil || string(u.Status) != st {
+				t.Fatalf("%s: status update = %+v", st, u)
+			}
+		}
+	})
+
+	t.Run("nothing to record when nothing changed at the payment", func(t *testing.T) {
+		for name, setup := range map[string]func(*flowMollie){
+			"refunded":          func(m *flowMollie) { m.status = "paid" },
+			"not cancelable":    func(m *flowMollie) { m.notCancelable = true },
+		} {
+			f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
+			setup(f.mollie)
+
+			settled, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+
+			if err != nil || settled.StatusUpdate != nil {
+				t.Fatalf("%s: settled=%+v err=%v", name, settled, err)
+			}
 		}
 	})
 
@@ -1352,7 +1389,8 @@ func TestSettleCancelledOrderPayment_FollowsMollie(t *testing.T) {
 		f.mollie.remaining = "0.00"
 		f.svc.repo = f.repo
 
-		refunded, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+		settled, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+		refunded := settled.Refunded
 
 		if err != nil || refunded {
 			t.Fatalf("retry: refunded=%v err=%v, want false nil", refunded, err)
@@ -1364,15 +1402,6 @@ func TestSettleCancelledOrderPayment_FollowsMollie(t *testing.T) {
 			t.Fatalf("recorded amount_refunded = %s, want 20.00 after the retry", got)
 		}
 	})
-}
-
-// refreshFailingRepo fails RefreshStatus.
-type refreshFailingRepo struct {
-	*memRepo
-}
-
-func (refreshFailingRepo) RefreshStatus(context.Context, string, *domain.PaymentStatusUpdate) (*uuid.UUID, error) {
-	return nil, errors.New("db down")
 }
 
 // ---------------------------------------------------------------------------

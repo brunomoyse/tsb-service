@@ -29,6 +29,11 @@ import (
 // sequence runs under the advisory lock of the payment, the one the Mollie webhook takes: the order
 // is read again inside it, and a caller that finds the order already cancelled does not settle again.
 //
+// The payment's new status ("canceled") is recorded only after the order is saved. Were it recorded
+// before, a failed save would leave the order active with a row that already says "canceled", and
+// Mollie's canceled webhook (which compares the status with that row) would answer "already processed"
+// instead of cancelling the order.
+//
 // It returns the order as it was when this call took over (the caller compares it with the saved one
 // to decide on notifications) and the whether a refund was issued.
 func (r *Resolver) cancelOrder(ctx context.Context, orderID uuid.UUID, input model.UpdateOrderInput, seen *orderDomain.Order) (*orderDomain.Order, bool, error) {
@@ -64,13 +69,26 @@ func (r *Resolver) cancelOrder(ctx context.Context, orderID uuid.UUID, input mod
 			if current != nil {
 				payment = current
 			}
-			if refunded, err = r.PaymentService.SettleCancelledOrderPayment(ctx, payment); err != nil {
+			settlement, err := r.PaymentService.SettleCancelledOrderPayment(ctx, payment)
+			if err != nil {
 				zap.L().Error("cannot cancel the order: payment settlement failed",
 					zap.String("order_id", orderID.String()), zap.String("payment_id", payment.MolliePaymentID), zap.Error(err))
 				return apperr.New(apperr.CodePaymentSettlementFailed,
 					"the payment of this order could not be refunded or cancelled, so the order was NOT cancelled; please try again")
 			}
-			return r.saveOrder(ctx, orderID, input)
+			if err := r.saveOrder(ctx, orderID, input); err != nil {
+				return err
+			}
+			refunded = settlement.Refunded
+			// Recorded only now that the order is saved: if saving failed, our row still says "open" and
+			// Mollie's canceled webhook cancels the order (the idempotency check compares with that row).
+			if u := settlement.StatusUpdate; u != nil {
+				if err := r.PaymentService.PersistPaymentStatus(ctx, payment.MolliePaymentID, u); err != nil {
+					zap.L().Warn("failed to record the settled payment status, Mollie's webhook will",
+						zap.String("payment_id", payment.MolliePaymentID), zap.String("status", string(u.Status)), zap.Error(err))
+				}
+			}
+			return nil
 		}()
 		return inner
 	})

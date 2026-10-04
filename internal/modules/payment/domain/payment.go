@@ -43,6 +43,18 @@ type PaymentStatusUpdate struct {
 	FailedAt     *time.Time
 }
 
+// CancelSettlement is the outcome of undoing the payment of an order that staff cancelled.
+type CancelSettlement struct {
+	// Refunded reports whether a refund was issued by this settlement.
+	Refunded bool
+	// StatusUpdate is the payment status to record once the cancelled order is saved (see
+	// PaymentService.PersistPaymentStatus), nil when there is nothing to record. It is returned
+	// rather than written by the settlement: recording "canceled" before the order is saved would
+	// make Mollie's own canceled webhook look "already processed" and leave an order that could not
+	// be saved active with a payment that can no longer be paid.
+	StatusUpdate *PaymentStatusUpdate
+}
+
 type MolliePayment struct {
 	ID                              uuid.UUID       `db:"id" json:"id"`
 	Resource                        *string         `db:"resource" json:"resource,omitempty"`

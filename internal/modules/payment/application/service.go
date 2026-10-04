@@ -31,8 +31,9 @@ type PaymentService interface {
 	CreateFullRefund(ctx context.Context, externalPaymentID string) error
 	// SettleCancelledOrderPayment undoes the payment of an order that staff
 	// just cancelled: a paid payment is refunded, an open one is cancelled at
-	// Mollie so it can no longer be paid. Reports whether a refund was issued.
-	SettleCancelledOrderPayment(ctx context.Context, payment *domain.MolliePayment) (refunded bool, err error)
+	// Mollie so it can no longer be paid. It does not record the payment's new
+	// status itself: the caller does so (PersistPaymentStatus) once the cancelled order is saved.
+	SettleCancelledOrderPayment(ctx context.Context, payment *domain.MolliePayment) (domain.CancelSettlement, error)
 	// FetchMollieStatus fetches the authoritative payment status from Mollie
 	// without touching the local DB. The webhook handler persists it only after
 	// the order business logic succeeds (see PersistPaymentStatus).
@@ -337,12 +338,12 @@ func refundableAmount(payment *domain.MolliePayment, current *mollie.Payment) (a
 	return alreadyRefunded, remaining, nil
 }
 
-func (s *paymentService) SettleCancelledOrderPayment(ctx context.Context, payment *domain.MolliePayment) (bool, error) {
+func (s *paymentService) SettleCancelledOrderPayment(ctx context.Context, payment *domain.MolliePayment) (domain.CancelSettlement, error) {
 	switch payment.Status {
 	case domain.PaymentStatusPaid, domain.PaymentStatusOpen, domain.PaymentStatusPending, domain.PaymentStatusAuthorized:
 	default:
 		// canceled, expired, failed: nothing was charged and nothing can be paid any more.
-		return false, nil
+		return domain.CancelSettlement{}, nil
 	}
 
 	// Decide on Mollie's state, not on our row: the customer may have paid since the last webhook, a
@@ -350,11 +351,12 @@ func (s *paymentService) SettleCancelledOrderPayment(ctx context.Context, paymen
 	// the cancellation is retried until it works, so every step has to be safe to repeat.
 	current, err := s.fetchMolliePayment(ctx, payment.MolliePaymentID)
 	if err != nil {
-		return false, err
+		return domain.CancelSettlement{}, err
 	}
 	switch domain.PaymentStatus(current.Status) {
 	case domain.PaymentStatusPaid:
-		return s.refundRemainingOf(ctx, payment, current)
+		refunded, err := s.refundRemainingOf(ctx, payment, current)
+		return domain.CancelSettlement{Refunded: refunded}, err
 	case domain.PaymentStatusOpen, domain.PaymentStatusPending, domain.PaymentStatusAuthorized:
 		// Not paid yet: cancel it at Mollie so the customer cannot pay for a
 		// cancelled order. If Mollie no longer allows cancelling, a later
@@ -362,28 +364,25 @@ func (s *paymentService) SettleCancelledOrderPayment(ctx context.Context, paymen
 		if !current.IsCancelable {
 			zap.L().Warn("open payment of a cancelled order is not cancelable at Mollie",
 				zap.String("payment_id", payment.MolliePaymentID))
-			return false, nil
+			return domain.CancelSettlement{}, nil
 		}
 		_, cancelled, err := s.mollieClient.Payments.Cancel(ctx, payment.MolliePaymentID)
 		if err != nil {
-			return false, fmt.Errorf("failed to cancel payment: %w", err)
+			return domain.CancelSettlement{}, fmt.Errorf("failed to cancel payment: %w", err)
 		}
-		// Record it now rather than waiting for Mollie's webhook: the order must not be reopened
-		// as awaiting a payment that can no longer be made. A failure here is repaired by that webhook.
+		// The caller records it after saving the order, so that a failed save leaves our row "open"
+		// and Mollie's canceled webhook still cancels the order. Until then nobody can pay it.
 		update := statusUpdateFrom(cancelled)
 		update.Status = domain.PaymentStatusCanceled
 		if update.CanceledAt == nil {
 			now := time.Now()
 			update.CanceledAt = &now
 		}
-		if _, persistErr := s.repo.RefreshStatus(ctx, payment.MolliePaymentID, update); persistErr != nil {
-			zap.L().Warn("failed to record the cancelled payment, the webhook will",
-				zap.String("payment_id", payment.MolliePaymentID), zap.Error(persistErr))
-		}
-		return false, nil
+		return domain.CancelSettlement{StatusUpdate: update}, nil
 	default:
-		// Already canceled / expired / failed at Mollie (an earlier attempt got that far).
-		return false, nil
+		// Already canceled / expired / failed at Mollie (an earlier attempt got that far, or the
+		// customer let it expire): our row catches up once the order is saved.
+		return domain.CancelSettlement{StatusUpdate: statusUpdateFrom(current)}, nil
 	}
 }
 

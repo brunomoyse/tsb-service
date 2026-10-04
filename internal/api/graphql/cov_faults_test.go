@@ -45,6 +45,15 @@ type faultyPayments struct {
 	paymentApplication.PaymentService
 	lookupErr error
 	noPayment bool
+	// persistErr makes recording the new status of a payment fail.
+	persistErr error
+}
+
+func (f faultyPayments) PersistPaymentStatus(ctx context.Context, id string, u *paymentDomain.PaymentStatusUpdate) error {
+	if f.persistErr != nil {
+		return f.persistErr
+	}
+	return f.PaymentService.PersistPaymentStatus(ctx, id, u)
 }
 
 func (f faultyPayments) GetPaymentByOrderID(ctx context.Context, id uuid.UUID) (*paymentDomain.MolliePayment, error) {

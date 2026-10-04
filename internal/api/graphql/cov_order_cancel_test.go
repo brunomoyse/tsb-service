@@ -497,3 +497,91 @@ func TestUpdateOrderPaymentLookupFaults(t *testing.T) {
 		assert.Equal(t, "CANCELLED", status(id))
 	})
 }
+
+// The payment of an open order is cancelled at Mollie before the order is saved, but our row only
+// learns of it after the save: were it recorded before, a failed save would leave the order active
+// with a row that already says "canceled", and Mollie's canceled webhook (which compares its status
+// with that row) would answer "already processed" and never cancel the order.
+func TestCancelSettledButNotSaved(t *testing.T) {
+	env := setupCovEnv(t, covOptions{})
+	logs := captureLogs(t)
+	ctx := env.ctxFor(env.Fixtures.AdminUser.ID.String(), true, "fr")
+	cancelled := orderDomain.OrderStatusCanceled
+	cancel := func(r *resolver.Resolver, id string) error {
+		_, err := r.Mutation().UpdateOrder(ctx, uuid.MustParse(id), model.UpdateOrderInput{Status: &cancelled})
+		return err
+	}
+	failingSave := env.with(func(r *resolver.Resolver) {
+		f := newFaultyOrders(env.Resolver.OrderService)
+		f.failUpdate = true
+		r.OrderService = f
+	})
+	historyRows := func(id string) int {
+		return countRows(t, env.TestContext, `SELECT count(*) FROM order_status_history WHERE order_id = $1 AND status = 'CANCELLED'`, id)
+	}
+
+	t.Run("the canceled webhook repairs an order whose save failed", func(t *testing.T) {
+		order := env.placeOnlineOrder(t, env.newPushCustomer(t, "save-failed", false))
+		payID := order.Payment.MolliePaymentID
+
+		require.Error(t, cancel(failingSave, order.ID))
+
+		assert.Equal(t, []string{"DELETE /v2/payments/" + payID}, env.Mollie.CallsMatching("DELETE /v2/payments/"+payID), "cancelled at Mollie")
+		assert.Equal(t, "PENDING", env.orderStatus(t, order.ID))
+		assert.Equal(t, "open", env.paymentCol(t, "status", payID), "not recorded: the webhook has to see a change")
+
+		w := env.webhook()(payID) // Mollie's webhook for the cancellation
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		assert.Contains(t, w.Body.String(), "processed")
+		assert.NotContains(t, w.Body.String(), "already processed")
+		assert.Equal(t, "CANCELLED", env.orderStatus(t, order.ID))
+		assert.Equal(t, "canceled", env.paymentCol(t, "status", payID))
+		assert.Equal(t, 1, historyRows(order.ID))
+	})
+
+	t.Run("so does a retry of the cancel, which only records what Mollie already did", func(t *testing.T) {
+		order := env.placeOnlineOrder(t, env.newPushCustomer(t, "save-retry", false))
+		payID := order.Payment.MolliePaymentID
+		require.Error(t, cancel(failingSave, order.ID))
+		require.Equal(t, "open", env.paymentCol(t, "status", payID))
+
+		require.NoError(t, cancel(env.Resolver, order.ID))
+
+		assert.Len(t, env.Mollie.CallsMatching("DELETE /v2/payments/"+payID), 1, "not cancelled a second time")
+		assert.Equal(t, "CANCELLED", env.orderStatus(t, order.ID))
+		assert.Equal(t, "canceled", env.paymentCol(t, "status", payID))
+	})
+
+	t.Run("a refund whose save failed stays refunded and the retry saves the order", func(t *testing.T) {
+		order := env.placeOnlineOrder(t, env.newPushCustomer(t, "refund-save-failed", false))
+		env.markPaid(t, order.ID)
+		payID := order.Payment.MolliePaymentID
+
+		require.Error(t, cancel(failingSave, order.ID))
+		assert.Equal(t, "PENDING", env.orderStatus(t, order.ID))
+		assert.Equal(t, env.paymentCol(t, "amount", payID), env.paymentCol(t, "amount_refunded", payID))
+
+		require.NoError(t, cancel(env.Resolver, order.ID))
+		assert.Equal(t, "CANCELLED", env.orderStatus(t, order.ID))
+		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID), 1, "refunded once")
+	})
+
+	t.Run("failing to record the status after a successful save is only logged, the webhook records it", func(t *testing.T) {
+		order := env.placeOnlineOrder(t, env.newPushCustomer(t, "record-failed", false))
+		payID := order.Payment.MolliePaymentID
+		failingRecord := env.with(func(r *resolver.Resolver) {
+			r.PaymentService = faultyPayments{PaymentService: env.Resolver.PaymentService, persistErr: errBoom}
+		})
+
+		require.NoError(t, cancel(failingRecord, order.ID))
+
+		waitLog(t, logs, "failed to record the settled payment status, Mollie's webhook will")
+		assert.Equal(t, "CANCELLED", env.orderStatus(t, order.ID))
+		assert.Equal(t, "open", env.paymentCol(t, "status", payID))
+		w := env.webhook()(payID)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		assert.Equal(t, "canceled", env.paymentCol(t, "status", payID))
+		assert.Equal(t, "CANCELLED", env.orderStatus(t, order.ID))
+		assert.Equal(t, 1, historyRows(order.ID), "the webhook does not record a second cancellation")
+	})
+}

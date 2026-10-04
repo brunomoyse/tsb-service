@@ -101,9 +101,7 @@ func TestConcurrentCancelsOfAnOpenPaymentCancelItOnce(t *testing.T) {
 // the order cancelled and refunded, and never announces it to staff as a newly paid order.
 func TestPaidWebhookDuringACancelDoesNotAnnounceTheOrder(t *testing.T) {
 	env := setupCovEnv(t, covOptions{})
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.POST("/webhook", paymentInterfaces.NewPaymentHandler(env.Resolver.PaymentService, env.Resolver.Broker, nil).UpdatePaymentStatusHandler)
+	deliver := env.webhook()
 	announced := env.Resolver.Broker.Subscribe("orderCreated")
 
 	c := env.newPushCustomer(t, "paid-mid-cancel", false)
@@ -121,10 +119,7 @@ func TestPaidWebhookDuringACancelDoesNotAnnounceTheOrder(t *testing.T) {
 		return len(env.Mollie.CallsMatching("GET /v2/payments/"+payID)) > 0
 	}, 5*time.Second, time.Millisecond)
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader("id="+payID))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+	w := deliver(payID)
 
 	require.NoError(t, (<-cancelDone)[0])
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -145,4 +140,18 @@ func (e *covEnv) orderStatus(t *testing.T, id string) string {
 	var s string
 	require.NoError(t, e.DB.DB.GetContext(t.Context(), &s, `SELECT order_status FROM orders WHERE id = $1`, id))
 	return s
+}
+
+// webhook returns a function that delivers a Mollie webhook for a payment id to the real handler.
+func (e *covEnv) webhook() func(payID string) *httptest.ResponseRecorder {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/webhook", paymentInterfaces.NewPaymentHandler(e.Resolver.PaymentService, e.Resolver.Broker, nil).UpdatePaymentStatusHandler)
+	return func(payID string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader("id="+payID))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w
+	}
 }
