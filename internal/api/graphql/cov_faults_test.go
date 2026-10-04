@@ -14,6 +14,8 @@ import (
 	couponDomain "tsb-service/internal/modules/coupon/domain"
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderDomain "tsb-service/internal/modules/order/domain"
+	paymentApplication "tsb-service/internal/modules/payment/application"
+	paymentDomain "tsb-service/internal/modules/payment/domain"
 	productApplication "tsb-service/internal/modules/product/application"
 	productDomain "tsb-service/internal/modules/product/domain"
 	restaurantApplication "tsb-service/internal/modules/restaurant/application"
@@ -36,6 +38,23 @@ func (f faultyUsers) GetUserByID(ctx context.Context, id string) (*userDomain.Us
 		return nil, errBoom
 	}
 	return f.UserService.GetUserByID(ctx, id)
+}
+
+// faultyPayments fails the payment lookup of an order (or reports no payment without an error).
+type faultyPayments struct {
+	paymentApplication.PaymentService
+	lookupErr error
+	noPayment bool
+}
+
+func (f faultyPayments) GetPaymentByOrderID(ctx context.Context, id uuid.UUID) (*paymentDomain.MolliePayment, error) {
+	if f.lookupErr != nil {
+		return nil, f.lookupErr
+	}
+	if f.noPayment {
+		return nil, nil
+	}
+	return f.PaymentService.GetPaymentByOrderID(ctx, id)
 }
 
 type faultyProducts struct {

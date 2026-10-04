@@ -2,12 +2,18 @@ package graphql_test
 
 import (
 	"encoding/json"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"tsb-service/internal/api/graphql/apperr"
+	"tsb-service/internal/api/graphql/model"
+	"tsb-service/internal/api/graphql/resolver"
+	orderDomain "tsb-service/internal/modules/order/domain"
 )
 
 // Cancelling an order settles its payment: a paid one is refunded in full, an open one is cancelled
@@ -145,58 +151,120 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		assert.Equal(t, 1, logs.FilterMessage("open payment of a cancelled order is not cancelable at Mollie").Len())
 	})
 
-	// BUG(product decision pending): the CANCELLED status is saved BEFORE the payment is settled
-	// (resolver/order.go UpdateOrder persists, then calls SettleCancelledOrderPayment). When Mollie
-	// refuses, the staff member gets an error but the order is already CANCELLED with the money not
-	// refunded, and because only the transition into CANCELLED settles the payment, saving the
-	// order again never retries the refund. The customer paid and was neither refunded nor told.
-	// Flip these assertions (status stays PAID/previous, or a re-save retries) once the owner decides.
-	t.Run("a refund that Mollie refuses fails the update, the failure is not hidden", func(t *testing.T) {
+	// Cancelling settles the payment first and saves CANCELLED only when that worked. A refund or a
+	// cancel that Mollie refuses leaves the order exactly as it was, with a clear typed error, so
+	// staff just retry; the money is never refunded twice.
+	cancelRefused := func(t *testing.T, oerr *orderErr) {
+		t.Helper()
+		require.NotNil(t, oerr)
+		assert.Equal(t, "PAYMENT_SETTLEMENT_FAILED", oerr.Extensions["code"])
+		assert.Contains(t, oerr.Message, "the order was NOT cancelled", "the staff member is told what state the order is in")
+		assert.NotContains(t, oerr.Message, "Mollie refused", "provider details stay in the logs")
+	}
+	orderState := func(t *testing.T, id string) string {
+		t.Helper()
+		var s string
+		require.NoError(t, env.DB.DB.GetContext(t.Context(), &s, `SELECT order_status FROM orders WHERE id = $1`, id))
+		return s
+	}
+
+	t.Run("a refund that Mollie refuses leaves the order unchanged, and the retry refunds it", func(t *testing.T) {
 		c := env.newPushCustomer(t, "norefund", true)
 		order := env.placeOnlineOrder(t, c)
 		env.markPaid(t, order.ID)
 		payID := order.Payment.MolliePaymentID
+		before := orderState(t, order.ID)
 		env.Mollie.SetFail(false, true, false)
 		t.Cleanup(func() { env.Mollie.SetFail(false, false, false) })
 
-		_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "CANCELLED"})
-		require.NotNil(t, oerr)
-		assert.Equal(t, "Internal server error", oerr.Message)
-		assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM mollie_payments WHERE mollie_payment_id = $1 AND amount_refunded > 0`, payID))
+		_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "CANCELLED", "cancellationReason": "OTHER"})
+
+		cancelRefused(t, oerr)
 		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID+"/refunds"), 1, "Mollie was asked once")
+		assert.Equal(t, before, orderState(t, order.ID), "the order is NOT cancelled")
+		assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM order_status_history WHERE order_id = $1 AND status = 'CANCELLED'`, order.ID))
+		assert.Equal(t, "0.00", env.paymentCol(t, "amount_refunded", payID))
+		require.Never(t, func() bool { return env.Mail.CountSubject(t, c.email, "Order canceled") > 0 }, 300*time.Millisecond, 20*time.Millisecond)
 
-		// KNOWN BUG: the order is CANCELLED although the refund failed.
-		assert.Equal(t, 1, countRows(t, env.TestContext, `SELECT count(*) FROM orders WHERE id = $1 AND order_status = 'CANCELLED'`, order.ID))
-
-		// KNOWN BUG: with Mollie healthy again, saving the order again does not retry the refund.
+		// With Mollie healthy again the same call goes through and refunds once.
 		env.Mollie.SetFail(false, false, false)
-		again := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
-		assert.Equal(t, "CANCELLED", again.Status)
-		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID+"/refunds"), 1, "no retry on re-save")
-		assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM mollie_payments WHERE mollie_payment_id = $1 AND amount_refunded > 0`, payID), "the customer is still not refunded")
+		got := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED", "cancellationReason": "OTHER"})
+		assert.Equal(t, "CANCELLED", got.Status)
+		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID+"/refunds"), 2, "the refused call and the retry")
+		assert.Equal(t, env.paymentCol(t, "amount", payID), env.paymentCol(t, "amount_refunded", payID))
+		env.Mail.WaitSubject(t, c.email, "Your refund has been issued")
+		env.Mail.WaitSubject(t, c.email, "Order canceled")
 	})
 
-	// BUG(product decision pending): same ordering problem for an open payment: the order is
-	// CANCELLED and the payment is still open (payable) at Mollie after the refused cancel, and a
-	// re-save does not retry the cancel.
-	t.Run("an open payment that Mollie refuses to cancel fails the update", func(t *testing.T) {
+	t.Run("an open payment that Mollie refuses to cancel leaves the order unchanged, and the retry cancels it", func(t *testing.T) {
 		c := env.newPushCustomer(t, "nocancel", true)
 		order := env.placeOnlineOrder(t, c)
 		payID := order.Payment.MolliePaymentID
+		before := orderState(t, order.ID)
 		env.Mollie.SetFail(false, false, true)
 		t.Cleanup(func() { env.Mollie.SetFail(false, false, false) })
 
 		_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "CANCELLED"})
-		require.NotNil(t, oerr)
+
+		cancelRefused(t, oerr)
 		assert.Len(t, env.Mollie.CallsMatching("DELETE /v2/payments/"+payID), 1)
+		assert.Equal(t, before, orderState(t, order.ID), "the order is NOT cancelled")
+		assert.Equal(t, "open", env.paymentCol(t, "status", payID))
 
-		// KNOWN BUG: CANCELLED is persisted although the payment could not be cancelled.
-		assert.Equal(t, 1, countRows(t, env.TestContext, `SELECT count(*) FROM orders WHERE id = $1 AND order_status = 'CANCELLED'`, order.ID))
-
-		// KNOWN BUG: no retry of the Mollie cancel when the order is saved again.
 		env.Mollie.SetFail(false, false, false)
+		got := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
+		assert.Equal(t, "CANCELLED", got.Status)
+		assert.Len(t, env.Mollie.CallsMatching("DELETE /v2/payments/"+payID), 2, "the refused call and the retry")
+		assert.Equal(t, "canceled", env.paymentCol(t, "status", payID), "recorded at once, not only when Mollie's webhook arrives")
+	})
+
+	t.Run("a Mollie lookup failure leaves the order unchanged too", func(t *testing.T) {
+		c := env.newPushCustomer(t, "nolookup", true)
+		order := env.placeOnlineOrder(t, c)
+		env.markPaid(t, order.ID)
+		payID := order.Payment.MolliePaymentID
+		before := orderState(t, order.ID)
+		env.Mollie.SetFailLookup(true)
+		t.Cleanup(func() { env.Mollie.SetFailLookup(false) })
+
+		_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "CANCELLED"})
+
+		cancelRefused(t, oerr)
+		assert.Empty(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID), "no money moved")
+		assert.Equal(t, before, orderState(t, order.ID))
+
+		env.Mollie.SetFailLookup(false)
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
-		assert.Len(t, env.Mollie.CallsMatching("DELETE /v2/payments/"+payID), 1, "no retry on re-save")
+		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID), 1)
+	})
+
+	t.Run("a payment already cancelled at Mollie by an earlier attempt is not cancelled again", func(t *testing.T) {
+		c := env.newPushCustomer(t, "twice", true)
+		order := env.placeOnlineOrder(t, c)
+		payID := order.Payment.MolliePaymentID
+		// The earlier attempt cancelled it at Mollie, then failed before the order was saved.
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, env.Mollie.Server.URL+"/v2/payments/"+payID, nil)
+		require.NoError(t, err)
+		res, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		_ = res.Body.Close()
+
+		got := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
+
+		assert.Equal(t, "CANCELLED", got.Status)
+		assert.Len(t, env.Mollie.CallsMatching("DELETE /v2/payments/"+payID), 1, "only the earlier attempt's cancel; Mollie would refuse a second one")
+	})
+
+	t.Run("a payment paid at Mollie since our last webhook is refunded rather than cancelled", func(t *testing.T) {
+		c := env.newPushCustomer(t, "latepay", true)
+		order := env.placeOnlineOrder(t, c)
+		payID := order.Payment.MolliePaymentID
+		env.Mollie.MarkPaid(payID) // our row still says open: the webhook has not arrived yet
+
+		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
+
+		assert.Empty(t, env.Mollie.CallsMatching("DELETE /v2/payments/"+payID))
+		assert.Equal(t, []string{env.paymentCol(t, "amount", payID)}, env.Mollie.RefundAmounts(t, payID))
 	})
 
 	// BUG(product decision pending): order status transitions are not validated
@@ -271,5 +339,36 @@ func TestUpdatePaymentStatusMutation(t *testing.T) {
 		var status string
 		require.NoError(t, env.DB.DB.GetContext(t.Context(), &status, `SELECT status FROM mollie_payments WHERE order_id = $1`, order.ID))
 		assert.Equal(t, "payed", status)
+	})
+}
+
+// When the payment of an order cannot even be looked up, the order is not touched: cancelling
+// without knowing whether it must be refunded would lose the customer's money, and reopening
+// without knowing whether it was refunded could revive a refunded order.
+func TestUpdateOrderPaymentLookupFaults(t *testing.T) {
+	env := setupCovEnv(t, covOptions{})
+	logs := captureLogs(t)
+	c := env.newPushCustomer(t, "lookup", false)
+	ctx := env.ctxFor(env.Fixtures.AdminUser.ID.String(), true, "fr")
+	status := func(id uuid.UUID) string {
+		var s string
+		require.NoError(t, env.DB.DB.GetContext(t.Context(), &s, `SELECT order_status FROM orders WHERE id = $1`, id))
+		return s
+	}
+
+	t.Run("cancelling with a failing payment lookup is refused and leaves the order alone", func(t *testing.T) {
+		id := env.seedOrderRow(t, c.id, "CONFIRMED", "PICKUP", "en")
+		r := env.with(func(r *resolver.Resolver) {
+			r.PaymentService = faultyPayments{PaymentService: env.Resolver.PaymentService, lookupErr: errBoom}
+		})
+		cancelled := orderDomain.OrderStatusCanceled
+
+		_, err := r.Mutation().UpdateOrder(ctx, id, model.UpdateOrderInput{Status: &cancelled})
+
+		appErr, ok := apperr.From(err)
+		require.True(t, ok, "%v", err)
+		assert.Equal(t, apperr.CodePaymentSettlementFailed, appErr.Code)
+		assert.Equal(t, "CONFIRMED", status(id))
+		waitLog(t, logs, "cannot cancel the order: payment lookup failed")
 	})
 }

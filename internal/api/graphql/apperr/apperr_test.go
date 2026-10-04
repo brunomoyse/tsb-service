@@ -59,6 +59,8 @@ func TestIsExpected(t *testing.T) {
 		apperr.CodeUnauthenticated, apperr.CodeForbidden, apperr.CodeNotFound, apperr.CodeUserError,
 		apperr.CodeSlotTooSoon, apperr.CodeLunchSlotRequired, apperr.CodeProductNotFound,
 		apperr.CodeSelectionInvalid, apperr.CodeDeliveryMinimumNotMet, apperr.CodeCouponAlreadyActive,
+		// A provider outage while cancelling: not a bug of ours, and the message is for the staff member who retries.
+		apperr.CodePaymentSettlementFailed,
 	} {
 		assert.True(t, apperr.IsExpected(code), "%s should be expected", code)
 	}

@@ -116,6 +116,11 @@ const (
 	CodePaymentFailed Code = "PAYMENT_FAILED"
 	// CodeInvalidAmount: a malformed order amount in validateCoupon.
 	CodeInvalidAmount Code = "INVALID_AMOUNT"
+	// CodePaymentSettlementFailed: staff cancelled an order but its payment could not be refunded /
+	// cancelled at the payment provider (or looked up). The order is left UNCHANGED, so the same
+	// updateOrder can simply be retried. Dashboard only (customers cannot cancel); the message is
+	// shown to staff as is, so it is kept clear and free of provider details (those are in the logs).
+	CodePaymentSettlementFailed Code = "PAYMENT_SETTLEMENT_FAILED"
 )
 
 // WeChat assistant (dashboard).
@@ -163,6 +168,9 @@ var expected = map[Code]bool{
 	CodeInvalidAmount:         true,
 	CodeRateLimited:           true,
 	CodeAssistantDisabled:     true,
+	// A provider outage is not a bug of ours and the message is for the staff member who must retry;
+	// the resolver logs the cause at error level itself.
+	CodePaymentSettlementFailed: true,
 }
 
 // IsExpected reports whether the code is a user-side error (warn log, no Sentry event).
