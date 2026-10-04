@@ -139,6 +139,24 @@ func TestGeneratePDFUnsupportedLanguageFallsBackToFrench(t *testing.T) {
 	}
 }
 
+func TestGeneratePDFNormalisesLanguage(t *testing.T) {
+	for _, lang := range []string{"EN", " en ", "en-GB", "en_US"} {
+		d := baseInvoice()
+		d.Language = lang
+		lines := generate(t, d)
+		require.Contains(t, lines, "Invoice", lang)
+		require.Contains(t, lines, "Thank you for your order!", lang)
+		require.Contains(t, lines, "Date: 07/01/2026 7:30 PM", lang+": English 12h format")
+	}
+	for _, lang := range []string{"FR", "fr-BE", "nl-BE", "zh-Hans", "de-DE", "garbage"} {
+		d := baseInvoice()
+		d.Language = lang
+		lines := generate(t, d)
+		require.Contains(t, lines, "Facture", lang)
+		require.Contains(t, lines, "Date: 01/07/2026 19:30", lang)
+	}
+}
+
 func TestGeneratePDFOrderTypeLabels(t *testing.T) {
 	cases := map[string]string{
 		"DELIVERY": "Type de commande: Livraison",
@@ -320,6 +338,8 @@ func TestLabelsAndFilePrefix(t *testing.T) {
 		require.Equal(t, "facture", FilePrefix(lang), lang)
 	}
 	require.Equal(t, translations["fr"], getLabels("unknown"))
+	require.Equal(t, "invoice", FilePrefix("EN-gb"))
+	require.Equal(t, "facture", FilePrefix("fr-BE"))
 	require.Equal(t, translations["en"], getLabels("en"))
 }
 
