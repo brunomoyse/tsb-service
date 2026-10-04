@@ -32,13 +32,11 @@ jobs:
       - name: Verify dependencies
         run: go mod verify
 
-      - name: Run tests
+      - name: Run tests with coverage gate
+        # Fails below 98 % statement coverage (generated code, test support and cmd/ excluded).
         run: |
-          go test -v -race \
-            ./internal/... \
-            ./cmd/... \
-            ./pkg/... \
-            -skip="TestUpdateProduct"
+          go test -race ./cmd/...
+          scripts/coverage-check.sh 98 -skip="TestUpdateProduct"
         env:
           JWT_SECRET: test-jwt-secret-for-ci
           MOLLIE_API_TOKEN: test_dummy_token
