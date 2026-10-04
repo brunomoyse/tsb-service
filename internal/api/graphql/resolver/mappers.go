@@ -589,6 +589,11 @@ func parseHHMMToMinutes(hhmm string) (int, bool) {
 		return 0, false
 	}
 
+	// "24:00" closes at midnight, as the slot generator and the assistant accept it.
+	if hhmm == "24:00" {
+		return 24 * 60, true
+	}
+
 	hour, err := time.Parse("15:04", hhmm)
 	if err != nil {
 		return 0, false

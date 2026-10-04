@@ -181,19 +181,19 @@ func TestIsSlotInAllowedInterval(t *testing.T) {
 	assert.False(t, isSlotInAllowedInterval(12*60, broken))
 }
 
-// BUG(product decision pending): "24:00" as a closing time is understood by the slot generator
-// (restaurant domain parseHHMM) and accepted by the assistant (mcp/actions), but this order-time
-// check parses with time.Parse("15:04"), which refuses hour 24. A weekly schedule or an override that
-// closes at "24:00" therefore skips the interval here and EVERY preferred ready time is refused with
-// SLOT_OUTSIDE_HOURS, although the slot list offers them. "23:59" works, which is why the tests use
-// it. When the parser accepts "24:00" (1440), flip both assertions.
-func TestOrderSlotCheckRefusesAClosingTimeOfMidnight(t *testing.T) {
-	_, ok := parseHHMMToMinutes("24:00")
-	assert.False(t, ok, "24:00 is not understood")
+// "24:00" closes at midnight: the slot generator offers slots up to it, so the order-time check must
+// accept them too ("23:59" stays valid).
+func TestOrderSlotCheckAcceptsAClosingTimeOfMidnight(t *testing.T) {
+	minutes, ok := parseHHMMToMinutes("24:00")
+	assert.True(t, ok)
+	assert.Equal(t, 24*60, minutes)
+	_, ok = parseHHMMToMinutes("24:30")
+	assert.False(t, ok, "only midnight may use hour 24")
 
 	s := &restaurantDomain.DaySchedule{Open: "00:00", Close: "24:00"}
-	assert.False(t, isSlotInAllowedInterval(12*60, s), "midday is refused although the restaurant is open all day")
-	assert.True(t, isSlotInAllowedInterval(12*60, &restaurantDomain.DaySchedule{Open: "00:00", Close: "23:59"}), "23:59 is the working spelling")
+	assert.True(t, isSlotInAllowedInterval(12*60, s), "midday is accepted when the restaurant closes at midnight")
+	assert.True(t, isSlotInAllowedInterval(23*60+45, s))
+	assert.True(t, isSlotInAllowedInterval(12*60, &restaurantDomain.DaySchedule{Open: "00:00", Close: "23:59"}), "23:59 still works")
 }
 
 func TestResolveSchedule(t *testing.T) {
