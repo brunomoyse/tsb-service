@@ -43,12 +43,14 @@ func (e *covEnv) newPushCustomer(t *testing.T, label string, mail bool) *pushCus
 		require.NoError(t, e.DB.DB.GetContext(t.Context(), &c.email, `SELECT email FROM users WHERE id = $1`, c.id))
 	}
 	c.ios, c.android = "ios-"+label, "android-"+label
-	c.deadIOS, c.refusedIOS = "dead-ios-"+label, "refused-ios-"+label
+	c.deadIOS, c.refusedIOS = "dead-ios-"+label, "broken-ios-"+label
 	c.deadAndroid, c.refusedAndroid = "dead-android-"+label, "refused-android-"+label
 	return c
 }
 
-// registerDevices registers the working iOS and Android devices (and, with bad, the rejected ones).
+// registerDevices registers the working iOS and Android devices (and, with bad, the rejected ones:
+// APNs answers a "refused" token with a rejection that is only logged, so the iOS one is a broken
+// connection instead).
 func (e *covEnv) registerDevices(t *testing.T, c *pushCustomer, bad bool) {
 	t.Helper()
 	reg := func(tok, platform string) {
@@ -266,9 +268,15 @@ func TestUpdateOrderLifecycleNotifications(t *testing.T) {
 			}
 		}
 		assert.Equal(t, 1, ends)
-		_, data := env.FCM.messagesFor(c.android, order.ID)
-		last, _ := data[len(data)-1].Payload["data"].(map[string]any)
-		assert.Equal(t, "stop", last["event"])
+		require.Eventually(t, func() bool {
+			_, data := env.FCM.messagesFor(c.android, order.ID)
+			for _, m := range data {
+				if d, _ := m.Payload["data"].(map[string]any); d["event"] == "stop" {
+					return true
+				}
+			}
+			return false
+		}, 20*time.Second, 20*time.Millisecond, "the Android Live Update is ended too")
 	})
 
 	t.Run("a delivery on its way sends the on-its-way e-mail", func(t *testing.T) {

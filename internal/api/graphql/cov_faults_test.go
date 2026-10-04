@@ -53,6 +53,7 @@ func (f faultyProducts) GetProductNamesForInvoice(ctx context.Context, ids []str
 type faultyOrders struct {
 	orderApplication.OrderService
 	failUpdate      bool
+	failCreate      bool
 	getFailsAfter   int
 	getCalls        *atomic.Int32
 	failDelete      bool
@@ -60,6 +61,8 @@ type faultyOrders struct {
 	failLanguage    bool
 	failStatusHist  bool
 	failOrdersQuery bool
+	nilOrder        bool
+	failHistory     bool
 }
 
 func newFaultyOrders(base orderApplication.OrderService) *faultyOrders {
@@ -74,6 +77,9 @@ func (f *faultyOrders) UpdateOrder(ctx context.Context, id uuid.UUID, s *orderDo
 }
 
 func (f *faultyOrders) GetOrderByID(ctx context.Context, id uuid.UUID) (*orderDomain.Order, *[]orderDomain.OrderProductRaw, error) {
+	if f.nilOrder {
+		return nil, nil, nil
+	}
 	n := f.getCalls.Add(1)
 	if f.getFailsAfter >= 0 && int(n) > f.getFailsAfter {
 		return nil, nil, errBoom
@@ -90,6 +96,9 @@ func (f *faultyOrders) DeleteOrder(ctx context.Context, id uuid.UUID) error {
 
 // CreateOrder returns the saved order with its lines pointing at a product the pricer never saw.
 func (f *faultyOrders) CreateOrder(ctx context.Context, o *orderDomain.Order, items *[]orderDomain.OrderProductRaw) (*orderDomain.Order, *[]orderDomain.OrderProductRaw, error) {
+	if f.failCreate {
+		return nil, nil, errBoom
+	}
 	order, saved, err := f.OrderService.CreateOrder(ctx, o, items)
 	if err != nil || !f.wrongItems {
 		return order, saved, err
@@ -138,4 +147,11 @@ func (f faultyCoupons) DecrementUsageAtomic(ctx context.Context, id, user uuid.U
 		return f.decrementErr
 	}
 	return f.CouponService.DecrementUsageAtomic(ctx, id, user)
+}
+
+func (f *faultyOrders) GetOrderHistory(ctx context.Context, filter orderDomain.OrderHistoryFilter) ([]*orderDomain.Order, *orderDomain.OrderHistorySummary, error) {
+	if f.failHistory {
+		return nil, nil, errBoom
+	}
+	return f.OrderService.GetOrderHistory(ctx, filter)
 }

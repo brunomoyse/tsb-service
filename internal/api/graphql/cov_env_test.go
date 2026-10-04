@@ -677,7 +677,11 @@ func (e *covEnv) brokenResolver(t *testing.T) *resolver.Resolver {
 // ctxFor is a request context for a direct call of a resolver: the caller, the language and the
 // data loaders, as the HTTP layer would set them up.
 func (e *covEnv) ctxFor(userID string, admin bool, lang string) context.Context {
-	r := e.Resolver
+	return loadersFor(e.Resolver, userID, admin, lang)
+}
+
+// loadersFor is ctxFor for any resolver (the loaders read through that resolver's services).
+func loadersFor(r *resolver.Resolver, userID string, admin bool, lang string) context.Context {
 	ctx := t0()
 	ctx = productApplication.AttachDataLoaders(ctx, r.ProductService)
 	ctx = paymentApplication.AttachDataLoaders(ctx, r.PaymentService)
