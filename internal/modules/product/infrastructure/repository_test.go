@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -122,6 +123,30 @@ func TestProductRepositoryProducts(t *testing.T) {
 		require.ErrorContains(t, e.repo.Create(ctx, p), "failed to insert product")
 		p = &domain.Product{ID: uuid.New(), Price: dec("1"), CategoryID: sushi, VatCategory: "bogus", Translations: []domain.Translation{tr("en", "x")}}
 		require.ErrorContains(t, e.repo.Create(ctx, p), "failed to insert product")
+	})
+
+	// BUG(product decision pending): the slug is derived from "<category> <name>" and is UNIQUE, so
+	// two products with the same French name in the same category collide. The repository returns
+	// the raw driver error (wrapped as "failed to insert product") instead of a typed, user-facing
+	// "name already used" error, so the API reports it as "Internal server error". Replace the
+	// pq assertions with the typed error once the owner decides how to report duplicates.
+	t.Run("Create with a duplicate slug fails with a raw unique violation", func(t *testing.T) {
+		first := e.newProduct(t, sushi, func(p *domain.Product) {
+			p.Translations = []domain.Translation{tr("fr", "Doublon")}
+		})
+		require.Equal(t, "sushi-doublon", *first.Slug)
+
+		dup := &domain.Product{ID: uuid.New(), Price: dec("1"), Code: sp("DUP1"), CategoryID: sushi, VatCategory: domain.VatCategoryFood,
+			Translations: []domain.Translation{tr("fr", "Doublon"), tr("en", "Duplicate")}}
+		err := e.repo.Create(ctx, dup)
+		require.ErrorContains(t, err, "failed to insert product")
+		var pqErr *pq.Error
+		require.ErrorAs(t, err, &pqErr, "the driver error leaks through untyped")
+		assert.Equal(t, pq.ErrorCode("23505"), pqErr.Code)
+		assert.Equal(t, "products_slug_unique", pqErr.Constraint)
+
+		_, ferr := e.repo.FindByID(ctx, dup.ID)
+		assert.ErrorContains(t, ferr, "product not found", "nothing of the duplicate was stored")
 	})
 
 	t.Run("Update changes fields, regenerates the slug and upserts translations without dropping others", func(t *testing.T) {
@@ -470,10 +495,7 @@ func TestProductRepositoryChoices(t *testing.T) {
 		require.NoError(t, err)
 		bad := *g2
 		bad.MinSelections = -1
-		err = e.repo.UpdateChoiceGroup(ctx, &bad)
-		if err == nil {
-			t.Skip("BUG?: the schema accepts negative min_selections")
-		}
+		err = e.repo.UpdateChoiceGroup(ctx, &bad) // CHECK (min_selections >= 0) rejects it
 		require.ErrorContains(t, err, "update product choice group")
 		after, err := e.repo.FindChoiceGroupByID(ctx, g2.ID)
 		require.NoError(t, err)
