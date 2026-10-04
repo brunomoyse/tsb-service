@@ -1,14 +1,12 @@
 package interfaces
 
 import (
-	"bufio"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,6 +14,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"tsb-service/pkg/email/scaleway/scalewaytest"
+	"tsb-service/pkg/email/smtptest"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/gin-gonic/gin"
@@ -35,7 +36,6 @@ import (
 	productDomain "tsb-service/internal/modules/product/domain"
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
-	es "tsb-service/pkg/email/scaleway"
 	"tsb-service/pkg/pubsub"
 )
 
@@ -101,84 +101,13 @@ func (f *fakeMollie) counts() (gets, refunds int) {
 	return f.getCalls, f.refunds
 }
 
-type smtpSink struct {
-	mu       sync.Mutex
-	messages []string
-}
-
-func startSMTPSink(t *testing.T) *smtpSink {
+// startSMTPSink starts a fake SMTP server and routes the e-mail backend to it for this test (the
+// previous backend is restored when the test ends).
+func startSMTPSink(t *testing.T) *smtptest.Server {
 	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	s := &smtpSink{}
-	t.Cleanup(func() { _ = ln.Close() })
-	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				return
-			}
-			go s.serve(conn)
-		}
-	}()
-	host, port, _ := net.SplitHostPort(ln.Addr().String())
-	t.Setenv("SMTP_HOST", host)
-	t.Setenv("SMTP_PORT", port)
-	t.Setenv("SCW_SENDER_EMAIL", "noreply@example.test")
-	t.Setenv("SCW_SENDER_NAME", "Test")
-	if err := es.InitService(); err != nil {
-		t.Fatalf("email init: %v", err)
-	}
+	s := smtptest.Start(t)
+	scalewaytest.Use(t, s)
 	return s
-}
-
-func (s *smtpSink) serve(conn net.Conn) {
-	defer func() { _ = conn.Close() }()
-	rd := bufio.NewReader(conn)
-	write := func(line string) { _, _ = conn.Write([]byte(line + "\r\n")) }
-	write("220 sink ready")
-	var data strings.Builder
-	inData := false
-	for {
-		line, err := rd.ReadString('\n')
-		if err != nil {
-			return
-		}
-		if inData {
-			if line == ".\r\n" {
-				inData = false
-				s.mu.Lock()
-				s.messages = append(s.messages, data.String())
-				s.mu.Unlock()
-				data.Reset()
-				write("250 queued")
-				continue
-			}
-			data.WriteString(line)
-			continue
-		}
-		cmd := strings.ToUpper(strings.TrimSpace(line))
-		switch {
-		case strings.HasPrefix(cmd, "EHLO"), strings.HasPrefix(cmd, "HELO"):
-			write("250 sink")
-		case strings.HasPrefix(cmd, "DATA"):
-			inData = true
-			write("354 go")
-		case strings.HasPrefix(cmd, "QUIT"):
-			write("221 bye")
-			return
-		default:
-			write("250 ok")
-		}
-	}
-}
-
-func (s *smtpSink) count() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.messages)
 }
 
 // memPayments is an in-memory PaymentRepository with a per-payment lock and
@@ -443,7 +372,7 @@ type webhookEnv struct {
 	notifier *countingNotifier
 	topics   *topicRecorder
 	order    *orderDomain.Order
-	smtp     *smtpSink
+	smtp     *smtptest.Server
 }
 
 func newWebhookEnv(t *testing.T, orderStatus orderDomain.OrderStatus, paymentStatus paymentDomain.PaymentStatus) *webhookEnv {
@@ -577,7 +506,7 @@ func TestWebhook_UnknownPaymentIsAckedWithoutSideEffects(t *testing.T) {
 	if gets, _ := e.mollie.counts(); gets != 0 {
 		t.Fatal("must not call Mollie for an unknown payment")
 	}
-	if e.smtp.count() != 0 || e.notifier.count() != 0 || e.payments.refreshed != 0 {
+	if e.smtp.Count() != 0 || e.notifier.count() != 0 || e.payments.refreshed != 0 {
 		t.Fatal("side effects for an unknown payment")
 	}
 }
@@ -618,8 +547,8 @@ func TestWebhook_TransientFailuresReturn500SoMollieRetries(t *testing.T) {
 		if e.payments.status("tr_1") != paymentDomain.PaymentStatusPaid {
 			t.Fatal("paid not persisted after the retry")
 		}
-		if e.smtp.count() != 1 {
-			t.Fatalf("emails = %d", e.smtp.count())
+		if e.smtp.Count() != 1 {
+			t.Fatalf("emails = %d", e.smtp.Count())
 		}
 	})
 }
@@ -648,7 +577,7 @@ func TestWebhook_NonTerminalStatusesOnlyPersist(t *testing.T) {
 			if st != orderDomain.OrderStatusPending || len(hist) != 0 || e.orders.updates != 0 {
 				t.Fatalf("order touched: %s %v", st, hist)
 			}
-			if e.smtp.count() != 0 || e.notifier.count() != 0 || e.coupons.count() != 0 {
+			if e.smtp.Count() != 0 || e.notifier.count() != 0 || e.coupons.count() != 0 {
 				t.Fatal("side effects on a non-terminal status")
 			}
 			if e.topics.get("orderCreated")+e.topics.get("orderUpdated") != 0 {
@@ -670,8 +599,8 @@ func TestWebhook_Paid(t *testing.T) {
 	if st != orderDomain.OrderStatusPending || len(hist) != 0 {
 		t.Fatalf("paid must leave the order PENDING for staff to confirm: %s %v", st, hist)
 	}
-	if e.smtp.count() != 1 {
-		t.Fatalf("confirmation emails = %d, want 1", e.smtp.count())
+	if e.smtp.Count() != 1 {
+		t.Fatalf("confirmation emails = %d, want 1", e.smtp.Count())
 	}
 	if e.notifier.count() != 1 {
 		t.Fatalf("pushes = %d, want 1", e.notifier.count())
@@ -691,8 +620,8 @@ func TestWebhook_Paid_NoEmailWhenOptedOut(t *testing.T) {
 	e.users.user.NotifyOrderUpdates = false
 	e.mollie.set("paid")
 	e.expect(e.deliver("tr_1"), http.StatusOK, "processed")
-	if e.smtp.count() != 0 {
-		t.Fatalf("emails = %d", e.smtp.count())
+	if e.smtp.Count() != 0 {
+		t.Fatalf("emails = %d", e.smtp.Count())
 	}
 	if e.notifier.count() != 1 {
 		t.Fatal("staff push must not depend on the customer's email preference")
@@ -761,8 +690,8 @@ func TestWebhook_FailedCanceledExpired(t *testing.T) {
 			if e.notifier.count() != 0 {
 				t.Fatal("no push for a failed payment")
 			}
-			if e.smtp.count() != 0 {
-				t.Fatalf("emails = %d, a failed attempt must not email the customer", e.smtp.count())
+			if e.smtp.Count() != 0 {
+				t.Fatalf("emails = %d, a failed attempt must not email the customer", e.smtp.Count())
 			}
 		})
 	}
@@ -789,8 +718,8 @@ func TestWebhook_ReplayedPaidIsIdempotent(t *testing.T) {
 	for range 4 {
 		e.expect(e.deliver("tr_1"), http.StatusOK, "already processed")
 	}
-	if e.smtp.count() != 1 || e.notifier.count() != 1 {
-		t.Fatalf("emails=%d pushes=%d, want 1/1", e.smtp.count(), e.notifier.count())
+	if e.smtp.Count() != 1 || e.notifier.count() != 1 {
+		t.Fatalf("emails=%d pushes=%d, want 1/1", e.smtp.Count(), e.notifier.count())
 	}
 	if n := e.topics.get("orderCreated"); n != 1 {
 		t.Fatalf("orderCreated published %d times", n)
@@ -845,7 +774,7 @@ func TestWebhook_OpenThenPendingThenPaid(t *testing.T) {
 		e.mollie.set(st)
 		e.expect(e.deliver("tr_1"), http.StatusOK, "processed")
 	}
-	if e.payments.status("tr_1") != paymentDomain.PaymentStatusPaid || e.smtp.count() != 1 || e.notifier.count() != 1 {
+	if e.payments.status("tr_1") != paymentDomain.PaymentStatusPaid || e.smtp.Count() != 1 || e.notifier.count() != 1 {
 		t.Fatal("full progression must end paid with one email and one push")
 	}
 }
@@ -883,8 +812,8 @@ func TestWebhook_PaidForCancelledOrderIsRefundedNotAnnounced(t *testing.T) {
 			}
 			// Only the refund email, exactly once, even across replays.
 			e.expect(e.deliver("tr_1"), http.StatusOK, "already processed")
-			if e.smtp.count() != 1 {
-				t.Fatalf("emails = %d, want 1 refund email", e.smtp.count())
+			if e.smtp.Count() != 1 {
+				t.Fatalf("emails = %d, want 1 refund email", e.smtp.Count())
 			}
 			if _, refunds := e.mollie.counts(); refunds != 1 {
 				t.Fatalf("refunds after replay = %d", refunds)
@@ -920,14 +849,14 @@ func TestWebhook_PaidBusinessLogicFailureIsRetried(t *testing.T) {
 	if e.payments.status("tr_1") != paymentDomain.PaymentStatusOpen {
 		t.Fatal("stored status must not move to paid while the order was not processed")
 	}
-	if e.notifier.count() != 0 || e.topics.get("orderCreated") != 0 || e.smtp.count() != 0 {
+	if e.notifier.count() != 0 || e.topics.get("orderCreated") != 0 || e.smtp.Count() != 0 {
 		t.Fatal("must not announce or email an order that failed to process")
 	}
 	e.orders.mu.Lock()
 	e.orders.failFind = false
 	e.orders.mu.Unlock()
 	e.expect(e.deliver("tr_1"), http.StatusOK, "processed")
-	if e.payments.status("tr_1") != paymentDomain.PaymentStatusPaid || e.notifier.count() != 1 || e.smtp.count() != 1 {
+	if e.payments.status("tr_1") != paymentDomain.PaymentStatusPaid || e.notifier.count() != 1 || e.smtp.Count() != 1 {
 		t.Fatal("retry did not complete the work")
 	}
 }
@@ -942,7 +871,7 @@ func TestWebhook_ProductLookupFailureDoesNotBlockPaid(t *testing.T) {
 	if e.payments.status("tr_1") != paymentDomain.PaymentStatusPaid || e.notifier.count() != 1 {
 		t.Fatal("order not committed/announced")
 	}
-	if e.smtp.count() != 0 {
+	if e.smtp.Count() != 0 {
 		t.Fatal("no email can be built without product names")
 	}
 }
@@ -1011,23 +940,20 @@ func TestWebhook_PaidPersistFailureDoesNotEmailTwice(t *testing.T) {
 	e.mollie.set("paid")
 	e.payments.refreshErrs = 1
 	e.expect(e.deliver("tr_1"), http.StatusInternalServerError, "")
-	if e.smtp.count() != 0 {
-		t.Fatalf("emails = %d before the status is committed, want 0", e.smtp.count())
+	if e.smtp.Count() != 0 {
+		t.Fatalf("emails = %d before the status is committed, want 0", e.smtp.Count())
 	}
 	e.expect(e.deliver("tr_1"), http.StatusOK, "processed")
 	e.expect(e.deliver("tr_1"), http.StatusOK, "already processed")
-	if e.smtp.count() != 1 {
-		t.Fatalf("emails = %d, want exactly 1", e.smtp.count())
+	if e.smtp.Count() != 1 {
+		t.Fatalf("emails = %d, want exactly 1", e.smtp.Count())
 	}
 }
 
 func TestWebhook_ConfirmationEmailFailureStillAcksAndIsNotRetried(t *testing.T) {
 	e := newWebhookEnv(t, orderDomain.OrderStatusPending, paymentDomain.PaymentStatusOpen)
 	// Point the email backend at a closed port: the send fails after the commit.
-	t.Setenv("SMTP_PORT", "1")
-	if err := es.InitService(); err != nil {
-		t.Fatal(err)
-	}
+	scalewaytest.UseDead(t)
 	e.mollie.set("paid")
 	e.expect(e.deliver("tr_1"), http.StatusOK, "processed")
 	if e.payments.status("tr_1") != paymentDomain.PaymentStatusPaid {
@@ -1039,8 +965,8 @@ func TestWebhook_ConfirmationEmailFailureStillAcksAndIsNotRetried(t *testing.T) 
 	// Mollie replay: already processed, no second attempt, and a healthy backend gets nothing.
 	healthy := startSMTPSink(t)
 	e.expect(e.deliver("tr_1"), http.StatusOK, "already processed")
-	if healthy.count() != 0 {
-		t.Fatalf("replay sent %d emails", healthy.count())
+	if healthy.Count() != 0 {
+		t.Fatalf("replay sent %d emails", healthy.Count())
 	}
 }
 
@@ -1050,16 +976,16 @@ func TestWebhook_EmailOnlyAfterPersistAndNeverForCancelledOrders(t *testing.T) {
 		e.orders.order.IsTest = true
 		e.mollie.set("paid")
 		e.expect(e.deliver("tr_1"), http.StatusOK, "processed")
-		if e.smtp.count() != 1 {
-			t.Fatalf("emails = %d, want 1", e.smtp.count())
+		if e.smtp.Count() != 1 {
+			t.Fatalf("emails = %d, want 1", e.smtp.Count())
 		}
 	})
 	t.Run("sold-out product still gets the confirmation", func(t *testing.T) {
 		e := newWebhookEnv(t, orderDomain.OrderStatusPending, paymentDomain.PaymentStatusOpen)
 		e.mollie.set("paid")
 		e.expect(e.deliver("tr_1"), http.StatusOK, "processed")
-		if e.smtp.count() != 1 {
-			t.Fatalf("emails = %d", e.smtp.count())
+		if e.smtp.Count() != 1 {
+			t.Fatalf("emails = %d", e.smtp.Count())
 		}
 	})
 }
@@ -1078,7 +1004,7 @@ func TestWebhook_AmountMismatchIsLoggedAndOrderStillProcessed(t *testing.T) {
 	e.mollie.set("paid")
 	e.expect(e.deliver("tr_1"), http.StatusOK, "processed")
 
-	if e.notifier.count() != 1 || e.smtp.count() != 1 {
+	if e.notifier.count() != 1 || e.smtp.Count() != 1 {
 		t.Fatal("a mismatch must not block the order")
 	}
 	found := false
@@ -1142,8 +1068,8 @@ func TestWebhook_ConcurrentDeliveriesForTheSamePaymentRunOnce(t *testing.T) {
 				}
 			}
 			if st == "paid" {
-				if e.smtp.count() != 1 || e.notifier.count() != 1 || e.topics.get("orderCreated") != 1 {
-					t.Fatalf("emails=%d pushes=%d created=%d, want 1/1/1", e.smtp.count(), e.notifier.count(), e.topics.get("orderCreated"))
+				if e.smtp.Count() != 1 || e.notifier.count() != 1 || e.topics.get("orderCreated") != 1 {
+					t.Fatalf("emails=%d pushes=%d created=%d, want 1/1/1", e.smtp.Count(), e.notifier.count(), e.topics.get("orderCreated"))
 				}
 			} else {
 				_, hist := e.orders.snapshot()

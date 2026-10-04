@@ -35,3 +35,28 @@ func TestDate(t *testing.T) {
 		})
 	}
 }
+
+func TestInConvertsTheWallClockButNotTheInstant(t *testing.T) {
+	utc := time.Date(2026, 7, 1, 10, 30, 0, 0, time.UTC) // summer: Brussels is UTC+2
+	got := In(utc)
+	if !got.Equal(utc) {
+		t.Fatalf("In changed the instant: %s != %s", got, utc)
+	}
+	if got.Location() != Location {
+		t.Errorf("location = %s, want %s", got.Location(), Location)
+	}
+	if got.Format("15:04") != "12:30" {
+		t.Errorf("summer wall clock = %s, want 12:30", got.Format("15:04"))
+	}
+
+	winter := In(time.Date(2026, 12, 1, 10, 30, 0, 0, time.UTC))
+	if winter.Format("15:04") != "11:30" {
+		t.Errorf("winter wall clock = %s, want 11:30", winter.Format("15:04"))
+	}
+}
+
+func TestRestaurantLocationIsBrussels(t *testing.T) {
+	if RestaurantTZ != "Europe/Brussels" || Location.String() != RestaurantTZ {
+		t.Fatalf("Location = %v, want %s (is tzdata installed?)", Location, RestaurantTZ)
+	}
+}

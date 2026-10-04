@@ -10,6 +10,7 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     services:
       docker:
@@ -32,13 +33,11 @@ jobs:
       - name: Verify dependencies
         run: go mod verify
 
-      - name: Run tests
+      - name: Run tests with coverage gate
+        # Fails below 98 % statement coverage (generated code, test support and cmd/ excluded).
         run: |
-          go test -v -race \
-            ./internal/... \
-            ./cmd/... \
-            ./pkg/... \
-            -skip="TestUpdateProduct"
+          go test -race -timeout 30m ./cmd/...
+          scripts/coverage-check.sh 98 -timeout 30m -skip="TestUpdateProduct"
         env:
           JWT_SECRET: test-jwt-secret-for-ci
           MOLLIE_API_TOKEN: test_dummy_token

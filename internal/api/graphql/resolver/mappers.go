@@ -179,6 +179,7 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		CouponCode:         o.CouponCode,
 		// Denormalized address fields for Address() resolver
 		AddressID:          o.AddressID,
+		AddressPlaceID:     o.AddressPlaceID,
 		StreetName:         o.StreetName,
 		HouseNumber:        o.HouseNumber,
 		BoxNumber:          o.BoxNumber,
@@ -586,6 +587,11 @@ func isSlotInAllowedInterval(slotMins int, schedule *restaurantDomain.DaySchedul
 func parseHHMMToMinutes(hhmm string) (int, bool) {
 	if _, _, ok := strings.Cut(hhmm, ":"); !ok {
 		return 0, false
+	}
+
+	// "24:00" closes at midnight, as the slot generator and the assistant accept it.
+	if hhmm == "24:00" {
+		return 24 * 60, true
 	}
 
 	hour, err := time.Parse("15:04", hhmm)

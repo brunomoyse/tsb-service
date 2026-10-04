@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"tsb-service/internal/modules/assistant/domain"
@@ -64,4 +65,66 @@ func TestAgentClient(t *testing.T) {
 	if _, err := c.Connection(ctx); !errors.Is(err, domain.ErrUnavailable) {
 		t.Errorf("agent down: %v", err)
 	}
+}
+
+func TestAgentClientProblems(t *testing.T) {
+	serve := func(h http.HandlerFunc) *httptest.Server {
+		srv := httptest.NewServer(h)
+		t.Cleanup(srv.Close)
+		return srv
+	}
+
+	t.Run("a 5xx answer is unavailable and names the request", func(t *testing.T) {
+		srv := serve(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusBadGateway) })
+		_, err := NewAgentClient(srv.URL, "t", nil).Connection(t.Context())
+		if !errors.Is(err, domain.ErrUnavailable) || !strings.Contains(err.Error(), "HTTP 502") {
+			t.Fatalf("err = %v", err)
+		}
+	})
+
+	t.Run("an undecodable body is unavailable, not a half-filled struct", func(t *testing.T) {
+		srv := serve(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`<html>`)) })
+		conn, err := NewAgentClient(srv.URL, "t", nil).Connection(t.Context())
+		if !errors.Is(err, domain.ErrUnavailable) || !strings.Contains(err.Error(), "decode agent response") {
+			t.Fatalf("err = %v", err)
+		}
+		if conn.State != "" {
+			t.Fatalf("conn = %+v", conn)
+		}
+	})
+
+	t.Run("a body that breaks off mid-way is unavailable", func(t *testing.T) {
+		srv := serve(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Length", "100")
+			_, _ = w.Write([]byte(`{"state":`))
+		})
+		_, err := NewAgentClient(srv.URL, "t", nil).Connection(t.Context())
+		if !errors.Is(err, domain.ErrUnavailable) {
+			t.Fatalf("err = %v", err)
+		}
+	})
+
+	t.Run("an invalid base URL is an error before any request", func(t *testing.T) {
+		_, err := NewAgentClient("http://bad host", "t", nil).Connection(t.Context())
+		if err == nil || errors.Is(err, domain.ErrUnavailable) {
+			t.Fatalf("err = %v, want a request-construction error", err)
+		}
+	})
+
+	t.Run("the login id is escaped into one path segment and the body is JSON only when present", func(t *testing.T) {
+		var gotPath, gotCT string
+		srv := serve(func(w http.ResponseWriter, r *http.Request) {
+			gotPath, gotCT = r.URL.EscapedPath(), r.Header.Get("Content-Type")
+			_, _ = w.Write([]byte(`{}`))
+		})
+		c := NewAgentClient(srv.URL, "t", nil)
+		_, _ = c.LoginStatus(t.Context(), "../disconnect?x")
+		if gotPath != "/admin/login/..%2Fdisconnect%3Fx" || gotCT != "" {
+			t.Errorf("path=%q content-type=%q", gotPath, gotCT)
+		}
+		_, _ = c.StartLogin(t.Context(), false)
+		if gotCT != "application/json" {
+			t.Errorf("content-type = %q", gotCT)
+		}
+	})
 }
