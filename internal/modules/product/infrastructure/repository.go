@@ -104,7 +104,7 @@ func (r *ProductRepository) Create(ctx context.Context, product *domain.Product)
 		product.CategoryID.String(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to insert product: %w", err)
+		return productWriteError("failed to insert product", err)
 	}
 
 	// Insert each translation.
@@ -128,6 +128,16 @@ func (r *ProductRepository) Create(ctx context.Context, product *domain.Product)
 
 	// Commit the transaction.
 	return tx.Commit()
+}
+
+// productWriteError wraps the failure of the INSERT / UPDATE of a product row. A unique violation on
+// the slug (category + French name) becomes domain.ErrDuplicateProductName, which the API reports as
+// a readable error instead of the driver's.
+func productWriteError(action string, err error) error {
+	if pqErr, ok := errors.AsType[*pq.Error](err); ok && pqErr.Code == "23505" && pqErr.Constraint == "products_slug_unique" {
+		return fmt.Errorf("%s: %w", action, domain.ErrDuplicateProductName)
+	}
+	return fmt.Errorf("%s: %w", action, err)
 }
 
 // Update modifies a product and its translations.
@@ -212,7 +222,7 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 		product.CategoryID.String(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update product: %w", err)
+		return productWriteError("failed to update product", err)
 	}
 
 	// Upsert translations for the provided languages.

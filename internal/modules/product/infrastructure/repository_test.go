@@ -124,12 +124,9 @@ func TestProductRepositoryProducts(t *testing.T) {
 		require.ErrorContains(t, e.repo.Create(ctx, p), "failed to insert product")
 	})
 
-	// BUG(product decision pending): the slug is derived from "<category> <name>" and is UNIQUE, so
-	// two products with the same French name in the same category collide. The repository returns
-	// the raw driver error (wrapped as "failed to insert product") instead of a typed, user-facing
-	// "name already used" error, so the API reports it as "Internal server error". Replace the
-	// pq assertions with the typed error once the owner decides how to report duplicates.
-	t.Run("Create with a duplicate slug fails with a raw unique violation", func(t *testing.T) {
+	// The slug is derived from "<category> <name>" and is UNIQUE, so two products with the same
+	// French name in one category collide: a typed error the API can report as "name already used".
+	t.Run("Create with a duplicate slug fails with ErrDuplicateProductName", func(t *testing.T) {
 		first := e.newProduct(t, sushi, func(p *domain.Product) {
 			p.Translations = []domain.Translation{tr("fr", "Doublon")}
 		})
@@ -138,14 +135,40 @@ func TestProductRepositoryProducts(t *testing.T) {
 		dup := &domain.Product{ID: uuid.New(), Price: dec("1"), Code: sp("DUP1"), CategoryID: sushi, VatCategory: domain.VatCategoryFood,
 			Translations: []domain.Translation{tr("fr", "Doublon"), tr("en", "Duplicate")}}
 		err := e.repo.Create(ctx, dup)
+		require.ErrorIs(t, err, domain.ErrDuplicateProductName)
 		require.ErrorContains(t, err, "failed to insert product")
 		var pqErr *pq.Error
-		require.ErrorAs(t, err, &pqErr, "the driver error leaks through untyped")
-		assert.EqualValues(t, "23505", pqErr.Code, "unique_violation")
-		assert.Equal(t, "products_slug_unique", pqErr.Constraint)
+		assert.NotErrorAs(t, err, &pqErr, "the driver error does not leak through")
 
 		_, ferr := e.repo.FindByID(ctx, dup.ID)
 		assert.ErrorContains(t, ferr, "product not found", "nothing of the duplicate was stored")
+
+		// The same name in ANOTHER category is a different slug, so it is fine.
+		other := &domain.Product{ID: uuid.New(), Price: dec("1"), Code: sp("DUP2"), CategoryID: drinks, VatCategory: domain.VatCategoryFood,
+			Translations: []domain.Translation{tr("fr", "Doublon")}}
+		require.NoError(t, e.repo.Create(ctx, other))
+	})
+
+	t.Run("Update onto the slug of another product fails with ErrDuplicateProductName and changes nothing", func(t *testing.T) {
+		taken := e.newProduct(t, sushi, func(p *domain.Product) {
+			p.Translations = []domain.Translation{tr("fr", "Pris")}
+		})
+		mine := e.newProduct(t, sushi, nil)
+		slugBefore := *mine.Slug
+		mine.Translations = []domain.Translation{tr("fr", "Pris")}
+
+		err := e.repo.Update(ctx, mine)
+
+		require.ErrorIs(t, err, domain.ErrDuplicateProductName)
+		require.ErrorContains(t, err, "failed to update product")
+		got, ferr := e.repo.FindByID(ctx, mine.ID)
+		require.NoError(t, ferr)
+		assert.Equal(t, slugBefore, *got.Slug)
+		assert.NotEqual(t, *taken.Slug, *got.Slug)
+
+		// Saving a product under its own name is no collision.
+		taken.Price = dec("2.00")
+		require.NoError(t, e.repo.Update(ctx, taken))
 	})
 
 	t.Run("Update changes fields, regenerates the slug and upserts translations without dropping others", func(t *testing.T) {

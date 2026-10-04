@@ -208,23 +208,177 @@ func TestCustomerName(t *testing.T) {
 }
 
 func TestCheckDialAddress(t *testing.T) {
-	blocked := []string{"127.0.0.1:443", "[::1]:443", "10.0.0.5:80", "192.168.1.10:80", "172.16.0.1:80", "169.254.169.254:80", "0.0.0.0:80", "[::]:80", "224.0.0.1:80", "[fe80::1]:80", "[ff02::1]:80", "[fd00::1]:80", "localhost:80", "no-port",
-		// IPv4-mapped IPv6 literals are judged by their embedded IPv4 address.
-		"[::ffff:127.0.0.1]:80", "[::ffff:10.0.0.1]:80", "[::ffff:192.168.1.1]:80", "[::ffff:169.254.169.254]:80", "[::ffff:0.0.0.0]:80"}
-	for _, a := range blocked {
-		if err := checkDialAddress(a); err == nil {
-			t.Errorf("%s must be refused", a)
+	// The guard judges the address that is actually dialled: only public unicast addresses pass.
+	for _, tc := range []struct {
+		group     string
+		allowed   bool
+		addresses []string
+	}{
+		{"loopback", false, []string{"127.0.0.1:443", "127.255.255.254:80", "[::1]:443", "localhost:80"}},
+		{"private (RFC 1918 and unique-local)", false, []string{"10.0.0.5:80", "10.255.255.255:80", "192.168.1.10:80", "172.16.0.1:80", "172.31.255.255:80", "[fd00::1]:80", "[fc00::1]:80"}},
+		{"link-local, cloud metadata", false, []string{"169.254.169.254:80", "169.254.0.1:80", "[fe80::1]:80", "[fe80::1%eth0]:80", "[fd00:ec2::254]:80"}},
+		{"unspecified and 0.0.0.0/8", false, []string{"0.0.0.0:80", "[::]:80", "0.1.2.3:80", "0.255.255.255:80"}},
+		{"multicast", false, []string{"224.0.0.1:80", "239.255.255.255:80", "[ff02::1]:80"}},
+		{"carrier-grade NAT 100.64.0.0/10", false, []string{"100.64.0.1:80", "100.100.100.200:80", "100.127.255.255:80"}},
+		{"benchmarking 198.18.0.0/15", false, []string{"198.18.0.1:80", "198.19.255.255:80"}},
+		{"IETF protocol assignments 192.0.0.0/24", false, []string{"192.0.0.1:80", "192.0.0.255:80"}},
+		{"reserved 240.0.0.0/4 and broadcast", false, []string{"240.0.0.1:80", "250.1.1.1:80", "255.255.255.255:80"}},
+		{"IPv4-mapped IPv6 is judged by its IPv4 address", false, []string{
+			"[::ffff:127.0.0.1]:80", "[::ffff:10.0.0.1]:80", "[::ffff:192.168.1.1]:80", "[::ffff:169.254.169.254]:80",
+			"[::ffff:0.0.0.0]:80", "[::ffff:100.64.0.1]:80", "[::ffff:198.18.0.1]:80", "[::ffff:240.0.0.1]:80"}},
+		{"NAT64 64:ff9b::/96 is judged by the IPv4 address it carries", false, []string{
+			"[64:ff9b::7f00:1]:80", "[64:ff9b::a00:1]:80", "[64:ff9b::a9fe:a9fe]:80", "[64:ff9b::6440:1]:80", "[64:ff9b::]:80"}},
+		{"6to4 2002::/16 is judged by the IPv4 address it carries", false, []string{
+			"[2002:7f00:1::]:80", "[2002:a00:1::1]:80", "[2002:a9fe:a9fe::]:80", "[2002:6440:1::]:80", "[2002::]:80"}},
+		{"local-use NAT64, site-local, Teredo and documentation IPv6", false, []string{
+			"[64:ff9b:1::1]:80", "[64:ff9b:1:0:0:0:7f00:1]:80", "[fec0::1]:80", "[feff::1]:80", "[2001:0:4136:e378:8000:63bf:3fff:fdd2]:80", "[2001:db8::1]:80"}},
+		{"deprecated IPv4-compatible IPv6", false, []string{"[::7f00:1]:80", "[::a00:1]:80", "[::808:808]:80"}},
+		{"not an address, or no port", false, []string{"example.com:80", "no-port", "", "[::1]", "999.1.1.1:80"}},
+
+		{"public IPv4", true, []string{"93.184.216.34:443", "8.8.8.8:80", "1.1.1.1:443", "223.255.255.255:80",
+			// the ranges next to the blocked ones are not blocked
+			"100.63.255.255:80", "100.128.0.0:80", "198.17.255.255:80", "198.20.0.0:80", "192.0.1.1:80", "1.0.0.0:80", "126.255.255.255:80", "128.0.0.1:80", "172.32.0.1:80", "11.0.0.1:80"}},
+		{"public IPv6", true, []string{"[2606:2800:220:1:248:1893:25c8:1946]:443", "[2a00:1450:4001:81b::200e]:443", "[2001:4860:4860::8888]:443",
+			// next to the blocked 2001::/32, 2001:db8::/32 and 64:ff9b:1::/48
+			"[2001:1::1]:443", "[2001:db9::1]:443", "[2001:4860::1]:443"}},
+		{"IPv4-mapped public", true, []string{"[::ffff:8.8.8.8]:80", "[::ffff:93.184.216.34]:80"}},
+		{"NAT64 and 6to4 carrying a public IPv4", true, []string{"[64:ff9b::808:808]:80", "[2002:808:808::1]:80"}},
+	} {
+		for _, a := range tc.addresses {
+			err := checkDialAddress(a)
+			if tc.allowed && err != nil {
+				t.Errorf("%s: %s must be allowed: %v", tc.group, a, err)
+			}
+			if !tc.allowed && err == nil {
+				t.Errorf("%s: %s must be refused", tc.group, a)
+			}
 		}
 	}
-	for _, a := range []string{"93.184.216.34:443", "[2606:2800:220:1:248:1893:25c8:1946]:443", "8.8.8.8:80", "[::ffff:8.8.8.8]:80"} {
-		if err := checkDialAddress(a); err != nil {
-			t.Errorf("%s must be allowed: %v", a, err)
-		}
-	}
+
 	err := checkDialAddress("169.254.169.254:80")
 	if err == nil || !strings.Contains(err.Error(), "address 169.254.169.254 is not allowed") {
 		t.Errorf("message: %v", err)
 	}
+}
+
+func TestImageRedirectPolicy(t *testing.T) {
+	req := func(raw string) *http.Request {
+		r, err := http.NewRequest(http.MethodGet, raw, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	via := func(n int) []*http.Request { return make([]*http.Request, n) }
+	for _, tc := range []struct {
+		name      string
+		allowHTTP bool
+		to        string
+		hops      int
+		wantErr   string
+	}{
+		{"https to https", false, "https://cdn.example.com/a.png", 1, ""},
+		{"the third redirect is followed", false, "https://cdn.example.com/a.png", maxImageRedirects, ""},
+		{"the fourth is not", false, "https://cdn.example.com/a.png", maxImageRedirects + 1, "stopped after 3 redirects"},
+		{"https must not bounce to http", false, "http://cdn.example.com/a.png", 1, `redirect to "http" is not allowed`},
+		{"nor to another scheme", false, "ftp://cdn.example.com/a.png", 1, `redirect to "ftp" is not allowed`},
+		{"nor to file", true, "file:///etc/passwd", 1, `redirect to "file" is not allowed`},
+		{"http is followed only where plain http is allowed (tests)", true, "http://cdn.example.com/a.png", 1, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := imageRedirectPolicy(tc.allowHTTP)(req(tc.to), via(tc.hops))
+			switch {
+			case tc.wantErr == "" && err != nil:
+				t.Errorf("unexpected error: %v", err)
+			case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
+				t.Errorf("error = %v, want %q", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestDownloadImageRedirects(t *testing.T) {
+	png := []byte("\x89PNG\r\n\x1a\n" + strings.Repeat("x", 64))
+
+	t.Run("a short redirect chain is followed", func(t *testing.T) {
+		var srv *httptest.Server
+		srv, d := imageServer(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/a.png":
+				http.Redirect(w, r, "/b.png", http.StatusFound)
+			case "/b.png":
+				http.Redirect(w, r, srv.URL+"/c.png", http.StatusMovedPermanently)
+			default:
+				_, _ = w.Write(png)
+			}
+		})
+		defer srv.Close()
+
+		data, ct, name, err := d.downloadImage(t.Context(), srv.URL+"/a.png")
+
+		if err != nil || ct != "image/png" || name != "a.png" || len(data) != len(png) {
+			t.Fatalf("type %q name %q len %d err %v", ct, name, len(data), err)
+		}
+	})
+
+	t.Run("a redirect loop is cut after the cap", func(t *testing.T) {
+		var hits int
+		srv, d := imageServer(func(w http.ResponseWriter, r *http.Request) {
+			hits++
+			http.Redirect(w, r, "/again", http.StatusFound)
+		})
+		defer srv.Close()
+
+		_, _, _, err := d.downloadImage(t.Context(), srv.URL+"/again")
+
+		if ue, ok := errors.AsType[*actions.UserError](err); !ok || !strings.Contains(ue.Msg, "could not be downloaded") {
+			t.Fatalf("error = %v", err)
+		}
+		if hits != maxImageRedirects+1 {
+			t.Errorf("server was hit %d times, want the first request and %d redirects", hits, maxImageRedirects)
+		}
+	})
+
+	t.Run("the cap and the scheme rule hold for a client that has no policy of its own", func(t *testing.T) {
+		d, _ := testDeps()
+		d.ImageClient = &http.Client{} // what a caller might inject: unlimited redirects
+		var hits int
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits++
+			http.Redirect(w, r, "/again", http.StatusFound)
+		}))
+		defer srv.Close()
+		if _, _, _, err := d.downloadImage(t.Context(), srv.URL+"/again"); err == nil || hits != maxImageRedirects+1 {
+			t.Errorf("hits = %d, err = %v", hits, err)
+		}
+		if d.ImageClient.CheckRedirect != nil {
+			t.Error("the configured client must not be modified")
+		}
+	})
+
+	t.Run("an https image cannot redirect to plain http", func(t *testing.T) {
+		var plainHits int
+		plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			plainHits++
+			_, _ = w.Write(png)
+		}))
+		defer plain.Close()
+		secure := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, plain.URL+"/x.png", http.StatusFound)
+		}))
+		defer secure.Close()
+		d, _ := testDeps()
+		d.ImageClient, d.AllowHTTPImages = secure.Client(), false
+
+		_, _, _, err := d.downloadImage(t.Context(), secure.URL+"/x.png")
+
+		if ue, ok := errors.AsType[*actions.UserError](err); !ok || !strings.Contains(ue.Msg, "could not be downloaded") {
+			t.Fatalf("error = %v", err)
+		}
+		if plainHits != 0 {
+			t.Error("the plain http target was requested")
+		}
+	})
 }
 
 func TestSafeHTTPClientRefusesLocalServers(t *testing.T) {

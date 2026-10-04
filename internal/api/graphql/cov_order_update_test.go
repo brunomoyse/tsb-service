@@ -289,10 +289,8 @@ func TestUpdateOrderLifecycleNotifications(t *testing.T) {
 	t.Run("an unknown order is an error and publishes nothing", func(t *testing.T) {
 		_, oerr := env.updateOrderAs(t, uuid.New(), map[string]any{"status": "CONFIRMED"})
 		require.NotNil(t, oerr)
-		// NOTE(product decision pending): updating an unknown order is reported as a generic "Internal server error"
-		// although the client could be told NOT_FOUND / USER_ERROR. Pinned as it is today; change it
-		// together with the resolver when the owner decides.
-		assert.Equal(t, "Internal server error", oerr.Message)
+		assert.Equal(t, "NOT_FOUND", oerr.Extensions["code"])
+		assert.Equal(t, "order not found", oerr.Message)
 	})
 }
 

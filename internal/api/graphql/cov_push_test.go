@@ -228,11 +228,9 @@ func TestRegisterLiveActivityToken(t *testing.T) {
 	t.Run("an order that does not exist is an error", func(t *testing.T) {
 		resp := gqlAs(t, env.TestContext, ownerTok, "fr", m, map[string]any{"o": uuid.NewString(), "t": "activity-3"})
 		require.Len(t, resp.Errors, 1)
-		// NOTE(product decision pending): a live-activity token for an unknown order is reported as a generic "Internal server error"
-		// although the client could be told NOT_FOUND / USER_ERROR. Pinned as it is today; change it
-		// together with the resolver when the owner decides.
-		// (Somebody else's order, above, is already a proper NOT_FOUND.)
-		assert.Equal(t, "Internal server error", resp.Errors[0].Message)
+		// Same answer as somebody else's order (above): NOT_FOUND, not the generic internal error.
+		assert.Equal(t, "NOT_FOUND", resp.Errors[0].Extensions["code"])
+		assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM live_activity_tokens WHERE push_token = 'activity-3'`))
 	})
 
 	t.Run("a storage failure is an internal error", func(t *testing.T) {
@@ -259,10 +257,8 @@ func TestUpdateMyOrdersLanguage(t *testing.T) {
 	t.Run("a language the shop does not speak is refused", func(t *testing.T) {
 		resp := gqlAs(t, env.TestContext, token, "fr", m, map[string]any{"l": "klingon"})
 		require.Len(t, resp.Errors, 1)
-		// NOTE(product decision pending): an unsupported language (bad input) is reported as a generic "Internal server error"
-		// although the client could be told NOT_FOUND / USER_ERROR. Pinned as it is today; change it
-		// together with the resolver when the owner decides.
-		assert.Equal(t, "Internal server error", resp.Errors[0].Message)
+		assert.Equal(t, "USER_ERROR", resp.Errors[0].Extensions["code"])
+		assert.Equal(t, `unsupported language: "klingon"`, resp.Errors[0].Message)
 	})
 
 	t.Run("without in-progress orders nothing is updated", func(t *testing.T) {

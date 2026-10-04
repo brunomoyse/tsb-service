@@ -52,6 +52,8 @@ type fakeMollie struct {
 	refunds    int
 	cancels    int
 	refundCode int
+	// noRemaining: the payment is reported without amountRemaining, as Mollie does for a payment it cannot refund.
+	noRemaining bool
 }
 
 func (f *fakeMollie) set(status string) {
@@ -73,8 +75,12 @@ func (f *fakeMollie) handler(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(`{"status":500,"title":"err","detail":"err"}`))
 			return
 		}
-		_, _ = fmt.Fprintf(w, `{"resource":"payment","id":%q,"status":%q,"amount":{"value":"20.00","currency":"EUR"}}`,
-			strings.TrimPrefix(r.URL.Path, "/v2/payments/"), f.status)
+		remaining := `,"amountRemaining":{"value":"20.00","currency":"EUR"}`
+		if f.noRemaining {
+			remaining = ""
+		}
+		_, _ = fmt.Fprintf(w, `{"resource":"payment","id":%q,"status":%q,"amount":{"value":"20.00","currency":"EUR"}%s}`,
+			strings.TrimPrefix(r.URL.Path, "/v2/payments/"), f.status, remaining)
 	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/refunds"):
 		if f.refundCode != 0 {
 			w.WriteHeader(f.refundCode)

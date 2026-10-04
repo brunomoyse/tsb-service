@@ -323,12 +323,9 @@ func TestDownloadInvoice_Success(t *testing.T) {
 			"Frais de livraison", "1,00 €", "Total", "22,00 €")
 	})
 
-	// BUG(product decision pending): when every stored line total is zero the invoice falls back to
-	// unit price x quantity for the subtotal and the total (21,00 / 22,00) but still prints the lines
-	// with their stored zero total ("0,00 €", quantity folded into the name), so the printed lines do
-	// not add up to the printed subtotal and no VAT is shown. Update this expectation when the
-	// owner decides how such a legacy order should be invoiced.
-	t.Run("lines with zero totals fall back to unit price times quantity for the totals only", func(t *testing.T) {
+	// A legacy order whose stored line totals are all zero is invoiced from unit price x quantity:
+	// on the printed lines as well as in the subtotal, the total and the VAT, so the lines add up.
+	t.Run("lines with zero totals are printed at unit price times quantity, like the totals", func(t *testing.T) {
 		e := newInvoiceEnv()
 		fee := d("1.00")
 		e.orders.order.TotalPrice = decimal.Zero
@@ -337,9 +334,33 @@ func TestDownloadInvoice_Success(t *testing.T) {
 		rec := e.do(t, e.userID.String(), e.orderID.String())
 		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
 		lines := invoiceLines(t, rec)
-		requireRun(t, lines, "A1 — 2 × Sushi", "1", "0,00 €", "0,00 €")
-		requireRun(t, lines, "Sous-total", "21,00 €", "Frais de livraison", "1,00 €", "Total", "22,00 €")
-		assert.NotContains(t, lines, "Total TVA")
+		requireRun(t, lines, "A1 — Sushi", "2", "10,50 €", "21,00 €")
+		assert.NotContains(t, lines, "0,00 €")
+		requireRun(t, lines, "Sous-total", "21,00 €", "TVA (6.00%)", "1,19 €", "Total TVA", "1,19 €",
+			"Frais de livraison", "1,00 €", "Total", "22,00 €")
+	})
+
+	t.Run("a stored order total is replaced too when the lines are priced from their unit prices", func(t *testing.T) {
+		e := newInvoiceEnv()
+		e.orders.order.TotalPrice = d("99.00") // stale
+		(*e.orders.products)[0].TotalPrice = decimal.Zero
+		rec := e.do(t, e.userID.String(), e.orderID.String())
+		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
+		requireRun(t, invoiceLines(t, rec), "Sous-total", "21,00 €", "TVA (6.00%)", "1,19 €", "Total TVA", "1,19 €", "Total", "21,00 €")
+	})
+
+	t.Run("an order with several lines, some of them zero, keeps the stored line totals", func(t *testing.T) {
+		e := newInvoiceEnv()
+		e.orders.order.TotalPrice = d("21.00")
+		*e.orders.products = append(*e.orders.products, domain.OrderProductRaw{
+			ID: uuid.New(), ProductID: e.prodID, Quantity: 1, UnitPrice: d("5.00"), TotalPrice: decimal.Zero, VatRateApplied: d("6"),
+		})
+		rec := e.do(t, e.userID.String(), e.orderID.String())
+		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
+		// The first line still carries its stored 21.00, so no line is repriced.
+		lines := invoiceLines(t, rec)
+		requireRun(t, lines, "A1 — 1 × Sushi", "1", "0,00 €", "0,00 €")
+		requireRun(t, lines, "Sous-total", "21,00 €", "TVA (6.00%)", "1,19 €", "Total TVA", "1,19 €", "Total", "21,00 €")
 	})
 
 	t.Run("lines with zero totals and no stored total are refused", func(t *testing.T) {
