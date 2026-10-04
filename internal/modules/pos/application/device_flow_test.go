@@ -133,6 +133,10 @@ func TestDeviceLogin(t *testing.T) {
 		assert.Empty(t, e.repo.touched)
 	})
 
+	// NOTE(product decision pending): any lookup failure, a database outage included, is reported as
+	// ErrDeviceNotEnrolled (-> 403 "device not authorized"). A handheld cannot tell an outage from
+	// having lost its enrolment, and may wipe its credentials on the first one. Pinned as it is today;
+	// an outage should become a retryable 5xx.
 	t.Run("a repository error is reported as not enrolled", func(t *testing.T) {
 		e := newDeviceEnv(t)
 		e.repo.findErr = errors.New("db down")
@@ -156,6 +160,21 @@ func TestDeviceLogin(t *testing.T) {
 		}
 		_, err := e.svc.DeviceLogin(t.Context(), e.loginInput(time.Now().Add(-30*time.Second).UnixMilli()))
 		assert.NoError(t, err, "within 60s is accepted")
+	})
+
+	// KNOWN LIMITATION (documented in verifyDeviceRequest, "_ = nonce"): the nonce is only part of the
+	// HMAC, it is never remembered. A captured login request replays successfully until its timestamp
+	// leaves the 60 s window; the rate limiter is the only mitigation. If replay protection is ever
+	// added (remember nonces for the window), this test must flip to expect ErrReplay or similar.
+	t.Run("a captured login request can be replayed inside the skew window", func(t *testing.T) {
+		e := newDeviceEnv(t)
+		in := e.loginInput(now())
+		first, err := e.svc.DeviceLogin(t.Context(), in)
+		require.NoError(t, err)
+		second, err := e.svc.DeviceLogin(t.Context(), in)
+		require.NoError(t, err, "the same nonce, timestamp and HMAC are accepted a second time")
+		assert.Equal(t, first.DeviceID, second.DeviceID)
+		assert.Len(t, e.repo.touched, 2, "and recorded as two visits")
 	})
 
 	t.Run("a signature made with another key, a tampered nonce or garbage is rejected", func(t *testing.T) {

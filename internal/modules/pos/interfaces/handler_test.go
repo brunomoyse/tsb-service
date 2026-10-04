@@ -61,7 +61,7 @@ func newEnv(t *testing.T) *env {
 	h := NewHandler(svc)
 	r := gin.New()
 	r.POST("/pos/auth/device-login", h.DeviceLogin)
-	r.POST("/pos/devices/fcm-token", h.UpdateFCMToken)
+	r.PATCH("/pos/devices/fcm-token", h.UpdateFCMToken) // PATCH, as cmd/app/main.go registers it
 	return &env{router: r, repo: repo, id: id, key: sum[:]}
 }
 
@@ -79,7 +79,11 @@ func (e *env) post(path string, body any) *httptest.ResponseRecorder {
 	default:
 		_ = json.NewEncoder(&buf).Encode(b)
 	}
-	req := httptest.NewRequest(http.MethodPost, path, &buf)
+	method := http.MethodPost
+	if path == fcmTokenPath {
+		method = http.MethodPatch
+	}
+	req := httptest.NewRequest(method, path, &buf)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
@@ -87,6 +91,8 @@ func (e *env) post(path string, body any) *httptest.ResponseRecorder {
 }
 
 const nonce = "0123456789abcdef-nonce"
+
+const fcmTokenPath = "/pos/devices/fcm-token"
 
 func (e *env) loginBody(ts int64) map[string]any {
 	return map[string]any{
@@ -140,6 +146,9 @@ func TestDeviceLoginHandler(t *testing.T) {
 		badSig["hmac"] = base64.StdEncoding.EncodeToString([]byte("nope"))
 		bad := e.post("/pos/auth/device-login", badSig)
 
+		// NOTE(product decision pending): a database outage is answered like an unknown device
+		// (403 "device not authorized"), so a handheld cannot tell an outage from a lost enrolment.
+		// See also application TestDeviceLogin. Pinned as it is today.
 		e.repo.findErr = errors.New("db down")
 		unknown := e.post("/pos/auth/device-login", e.loginBody(now()))
 		e.repo.findErr = nil
