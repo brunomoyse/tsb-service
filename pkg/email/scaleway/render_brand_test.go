@@ -2,11 +2,13 @@ package scaleway
 
 import (
 	"fmt"
+	"html"
 	"strings"
 	"testing"
 
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/brand"
+	"tsb-service/pkg/email/smtptest"
 )
 
 // TestWelcomeEmailBrandName verifies the {{restaurantName}} template function:
@@ -62,4 +64,48 @@ func TestWelcomeEmailBrandName(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestRestaurantPhoneTemplateFunc verifies {{restaurantPhone}} end to end: the e-mails that tell the
+// customer to call the restaurant (cancellation, refund, account linked) print the brand's own
+// number in every language, HTML and text, so a second brand never shows the first one's phone.
+func TestRestaurantPhoneTemplateFunc(t *testing.T) {
+	const defaultPhone, otherPhone = "+32 4 222 98 88", "+32 4 000 00 00"
+	user := sampleUser()
+	sends := map[string]func(lang string) error{
+		"order canceled": func(l string) error { return SendOrderCanceledEmail(user, l, testOrderID.String(), nil) },
+		"refund issued":  func(l string) error { return SendRefundIssuedEmail(user, l, testOrderID.String(), "12,50") },
+		"account linked": func(l string) error { return SendAccountLinkedEmail(user, l) },
+	}
+	for name, send := range sends {
+		for _, lang := range allLangs {
+			for phone, setup := range map[string]func(*testing.T){
+				defaultPhone: func(t *testing.T) { brand.Load() },
+				otherPhone: func(t *testing.T) {
+					t.Cleanup(func() { brand.Load() })
+					t.Setenv("RESTAURANT_PHONE", otherPhone)
+					brand.Load()
+				},
+			} {
+				t.Run(name+"/"+lang+"/"+phone, func(t *testing.T) {
+					setup(t)
+					srv := smtptest.Start(t)
+					useSMTP(t, srv)
+					if err := send(lang); err != nil {
+						t.Fatal(err)
+					}
+					m := srv.Only(t)
+					// html/template escapes "+" as &#43;; a mail client shows it as "+".
+					for part, body := range map[string]string{"text": m.Text, "html": html.UnescapeString(m.HTML)} {
+						if !strings.Contains(body, phone) {
+							t.Errorf("%s body lacks %s", part, phone)
+						}
+						if phone == otherPhone && strings.Contains(body, defaultPhone) {
+							t.Errorf("%s body still prints the default phone", part)
+						}
+					}
+				})
+			}
+		}
+	}
 }

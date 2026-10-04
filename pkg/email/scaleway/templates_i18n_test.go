@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"tsb-service/pkg/i18n/locale"
 )
 
 // customerTemplates are the emails a customer receives, in every language the shops offer.
@@ -38,6 +40,9 @@ func templateFields(src string) []string {
 
 // TestCustomerTemplatesExistInEveryLanguage: a missing language would silently fall back to French.
 func TestCustomerTemplatesExistInEveryLanguage(t *testing.T) {
+	if !slices.Equal(slices.Sorted(slices.Values(templateLanguages)), locale.Supported()) {
+		t.Fatalf("templateLanguages %v must be exactly the supported languages %v", templateLanguages, locale.Supported())
+	}
 	for _, name := range customerTemplates {
 		for _, lang := range templateLanguages {
 			base := fmt.Sprintf("templates/%s/%s", lang, name)
