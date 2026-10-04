@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 
+	addressApplication "tsb-service/internal/modules/address/application"
+	addressDomain "tsb-service/internal/modules/address/domain"
 	couponApplication "tsb-service/internal/modules/coupon/application"
 	couponDomain "tsb-service/internal/modules/coupon/domain"
 	orderApplication "tsb-service/internal/modules/order/application"
@@ -42,11 +44,49 @@ type faultyProducts struct {
 	emptyInvoiceNames bool
 	// nothing makes the lookups of one product / category answer (nil, nil).
 	nothing bool
+	// getCalls / getFailsAfter: GetProduct fails once that many calls went through.
+	getCalls      *atomic.Int32
+	getFailsAfter int
+	updateGroup   error
+	createChoice  error
+	updateChoice  error
+	failPricing   bool
+}
+
+func (f faultyProducts) UpdateChoiceGroup(ctx context.Context, g *productDomain.ProductChoiceGroup) error {
+	if f.updateGroup != nil {
+		return f.updateGroup
+	}
+	return f.ProductService.UpdateChoiceGroup(ctx, g)
+}
+
+func (f faultyProducts) CreateChoice(ctx context.Context, c *productDomain.ProductChoice) error {
+	if f.createChoice != nil {
+		return f.createChoice
+	}
+	return f.ProductService.CreateChoice(ctx, c)
+}
+
+func (f faultyProducts) UpdateChoice(ctx context.Context, c *productDomain.ProductChoice) error {
+	if f.updateChoice != nil {
+		return f.updateChoice
+	}
+	return f.ProductService.UpdateChoice(ctx, c)
+}
+
+func (f faultyProducts) GetProductsForPricing(ctx context.Context, ids []string) ([]*productDomain.ProductOrderDetails, error) {
+	if f.failPricing {
+		return nil, errBoom
+	}
+	return f.ProductService.GetProductsForPricing(ctx, ids)
 }
 
 func (f faultyProducts) GetProduct(ctx context.Context, id uuid.UUID) (*productDomain.Product, error) {
 	if f.nothing {
 		return nil, nil
+	}
+	if f.getCalls != nil && int(f.getCalls.Add(1)) > f.getFailsAfter {
+		return nil, errBoom
 	}
 	return f.ProductService.GetProduct(ctx, id)
 }
@@ -88,6 +128,8 @@ type faultyOrders struct {
 	orderApplication.OrderService
 	failUpdate      bool
 	failCreate      bool
+	createErr       error
+	failStats       bool
 	getFailsAfter   int
 	getCalls        *atomic.Int32
 	failDelete      bool
@@ -130,6 +172,9 @@ func (f *faultyOrders) DeleteOrder(ctx context.Context, id uuid.UUID) error {
 
 // CreateOrder returns the saved order with its lines pointing at a product the pricer never saw.
 func (f *faultyOrders) CreateOrder(ctx context.Context, o *orderDomain.Order, items *[]orderDomain.OrderProductRaw) (*orderDomain.Order, *[]orderDomain.OrderProductRaw, error) {
+	if f.createErr != nil {
+		return nil, nil, f.createErr
+	}
 	if f.failCreate {
 		return nil, nil, errBoom
 	}
@@ -253,3 +298,19 @@ func (f *faultyCouponStore) GetAllCoupons(ctx context.Context) ([]*couponDomain.
 
 // uniqueViolation is what Postgres answers when a coupon code is already taken.
 func uniqueViolation() error { return &pq.Error{Code: "23505", Message: "duplicate key"} }
+
+func (f *faultyOrders) GetCustomerStats(ctx context.Context, from, to *time.Time, orderType *string, minOrders *int) ([]*orderDomain.CustomerStatsRow, error) {
+	if f.failStats {
+		return nil, errBoom
+	}
+	return f.OrderService.GetCustomerStats(ctx, from, to, orderType, minOrders)
+}
+
+// faultyAddresses fails the cache-only lookup the User.address field uses.
+type faultyAddresses struct {
+	addressApplication.AddressService
+}
+
+func (faultyAddresses) GetByPlaceID(context.Context, string) (*addressDomain.Address, error) {
+	return nil, errBoom
+}

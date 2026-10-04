@@ -56,6 +56,13 @@ func subscriptionContract[T any](t *testing.T, r *resolver.Resolver, subscribe f
 	cancel()
 	waitClosed(t, ch, "the channel stayed open after the request ended")
 
+	// A request that ends before anything was published closes its channel as well.
+	idle, stop := context.WithCancel(t.Context())
+	ch3, err := subscribe(idle, r)
+	require.NoError(t, err)
+	stop()
+	waitClosed(t, ch3, "the channel of an idle subscription stayed open after the request ended")
+
 	// Shutting the broker down closes the subscription too.
 	other := pubsub.NewBroker()
 	copied := *r

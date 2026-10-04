@@ -15,6 +15,7 @@ import (
 	"time"
 
 	coderws "github.com/coder/websocket"
+	"github.com/getsentry/sentry-go"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -100,6 +101,12 @@ type endpoint struct {
 
 func newEndpoint(t *testing.T, env *covEnv, r *resolver.Resolver) *endpoint {
 	t.Helper()
+	return newEndpointWith(t, env, r, false)
+}
+
+// newEndpointWith can put a Sentry hub on every request, as the Sentry gin middleware does.
+func newEndpointWith(t *testing.T, env *covEnv, r *resolver.Resolver, withHub bool) *endpoint {
+	t.Helper()
 	key, internalURL := fakeIdentityProvider(t)
 	verifier, err := middleware.NewOIDCVerifier(t.Context(), "https://"+handlerIssuerHost, internalURL, handlerClientID, handlerProjectID, r.UserService)
 	require.NoError(t, err)
@@ -108,6 +115,12 @@ func newEndpoint(t *testing.T, env *covEnv, r *resolver.Resolver) *endpoint {
 
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
+	if withHub {
+		engine.Use(func(c *gin.Context) {
+			c.Request = c.Request.WithContext(sentry.SetHubOnContext(c.Request.Context(), sentry.NewHub(nil, sentry.NewScope())))
+			c.Next()
+		})
+	}
 	handler := resolver.GraphQLHandler(r, []string{"https://shop.example.test/"}, verifier, audit.NewRecorder(env.DB.DB))
 	engine.Any("/api/v1/graphql", verifier.OptionalAuthMiddleware(), handler)
 	srv := httptest.NewServer(engine)
@@ -346,4 +359,56 @@ func TestNewResolverWiresItsServices(t *testing.T) {
 	assert.Same(t, r.PublicQueryLimiter, got.PublicQueryLimiter)
 	assert.NotNil(t, got.OrderService)
 	assert.Nil(t, got.AssistantService, "the assistant is attached after construction")
+}
+
+func TestGraphQLEndpointOptionsAndReporting(t *testing.T) {
+	env := setupCovEnv(t, covOptions{})
+
+	t.Run("introspection is only served when it is switched on", func(t *testing.T) {
+		const q = `{ __schema { queryType { name } } }`
+		off := newEndpoint(t, env, env.Resolver)
+		resp := off.post(t, "", q)
+		assert.NotEmpty(t, resp.Errors, "introspection is off by default")
+
+		t.Setenv("ENABLE_GQL_INTROSPECTION", "true")
+		on := newEndpoint(t, env, env.Resolver)
+		resp = on.post(t, "", q)
+		require.Empty(t, resp.Errors, "%+v", resp.Errors)
+		assert.JSONEq(t, `{"__schema":{"queryType":{"name":"Query"}}}`, string(resp.Data))
+	})
+
+	t.Run("panics and server faults are reported to Sentry's hub of the request, and hidden from the client", func(t *testing.T) {
+		panicking := newEndpointWith(t, env, env.with(func(r *resolver.Resolver) { r.RestaurantService = nil }), true)
+		resp := panicking.post(t, "", `{ restaurantConfig { preparationMinutes } }`)
+		require.NotEmpty(t, resp.Errors)
+
+		broken := newEndpointWith(t, env, env.brokenResolver(t), true)
+		resp = broken.post(t, "", `{ restaurantConfig { preparationMinutes } }`)
+		require.Len(t, resp.Errors, 1)
+		assert.Equal(t, "Internal server error", resp.Errors[0].Message)
+	})
+
+	t.Run("a socket authenticated by the upgrade request alone stays authenticated, and ends with its token", func(t *testing.T) {
+		ep := newEndpoint(t, env, env.Resolver)
+		admin := signZitadelToken(t, ep.key, env.Fixtures.AdminUser.ID.String(), true, time.Hour)
+		_, read := ep.subscribe(t, "", `subscription { couponUpdated { code } }`, http.Header{"Authorization": {"Bearer " + admin}})
+		got := make(chan wsMessage, 1)
+		go func() { m, _ := read(); got <- m }()
+		require.Eventually(t, func() bool {
+			env.Resolver.Broker.Publish("couponUpdated", &model.Coupon{Code: "HEADER"})
+			return len(got) == 1
+		}, 10*time.Second, 50*time.Millisecond)
+		assert.Contains(t, string((<-got).Payload), `"code":"HEADER"`)
+
+		short := signZitadelToken(t, ep.key, env.Fixtures.AdminUser.ID.String(), true, 3*time.Second)
+		_, read = ep.subscribe(t, "", `subscription { couponUpdated { code } }`, http.Header{"Authorization": {"Bearer " + short}})
+		start := time.Now()
+		for {
+			m, err := read()
+			if err != nil || m.Type == "complete" || m.Type == "error" {
+				break
+			}
+		}
+		assert.Less(t, time.Since(start), 15*time.Second)
+	})
 }
