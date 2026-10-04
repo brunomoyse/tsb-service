@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -17,9 +16,7 @@ import (
 
 func closedPool(t *testing.T) *db.DBPool {
 	t.Helper()
-	conn, err := sqlx.Open("postgres", "host=127.0.0.1 port=1 user=x dbname=x sslmode=disable")
-	require.NoError(t, err)
-	require.NoError(t, conn.Close())
+	conn := testhelpers.ClosedDB(t)
 	return &db.DBPool{Customer: conn, Admin: conn}
 }
 

@@ -10,7 +10,6 @@ import (
 	"tsb-service/pkg/timezone/timezonetest"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -353,14 +352,12 @@ func TestFailedCouponAttempts(t *testing.T) {
 }
 
 func TestCouponRepositoryClosedConnection(t *testing.T) {
-	conn, err := sqlx.Open("postgres", "host=127.0.0.1 port=1 user=x dbname=x sslmode=disable")
-	require.NoError(t, err)
-	require.NoError(t, conn.Close())
+	conn := testhelpers.ClosedDB(t)
 	repo := NewCouponRepository(&db.DBPool{Customer: conn, Admin: conn})
 	ctx := t.Context()
 	id, user := uuid.New(), uuid.New()
 
-	_, err = repo.FindByCode(ctx, "X")
+	_, err := repo.FindByCode(ctx, "X")
 	assert.ErrorContains(t, err, "coupon not found")
 	_, err = repo.FindByID(ctx, id)
 	assert.ErrorContains(t, err, "coupon not found")
@@ -388,17 +385,7 @@ func TestRedeemAndRollbackDatabaseFailures(t *testing.T) {
 
 	failing := func(t *testing.T, table, when, event string, deferred bool) {
 		t.Helper()
-		_, err := e.tdb.DB.ExecContext(ctx, `CREATE OR REPLACE FUNCTION fail_it() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'forced failure'; END $$`)
-		require.NoError(t, err)
-		stmt := `CREATE TRIGGER fail_trg ` + when + ` ` + event + ` ON ` + table + ` FOR EACH ROW EXECUTE FUNCTION fail_it()`
-		if deferred {
-			stmt = `CREATE CONSTRAINT TRIGGER fail_trg AFTER ` + event + ` ON ` + table + ` DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION fail_it()`
-		}
-		_, err = e.tdb.DB.ExecContext(ctx, `DROP TRIGGER IF EXISTS fail_trg ON `+table)
-		require.NoError(t, err)
-		_, err = e.tdb.DB.ExecContext(ctx, stmt)
-		require.NoError(t, err)
-		t.Cleanup(func() { _, _ = e.tdb.DB.Exec(`DROP TRIGGER IF EXISTS fail_trg ON ` + table) })
+		testhelpers.FailTrigger(t, e.tdb.DB, table, when, event, deferred)
 	}
 
 	t.Run("a failure locking the coupon is reported", func(t *testing.T) {

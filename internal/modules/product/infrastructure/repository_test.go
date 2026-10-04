@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -600,9 +599,7 @@ func TestProductRepositoryChoices(t *testing.T) {
 
 func newEnvClosed(t *testing.T) domain.ProductRepository {
 	t.Helper()
-	conn, err := sqlx.Open("postgres", "host=127.0.0.1 port=1 user=x dbname=x sslmode=disable")
-	require.NoError(t, err)
-	require.NoError(t, conn.Close())
+	conn := testhelpers.ClosedDB(t)
 	return NewProductRepository(&db.DBPool{Customer: conn, Admin: conn})
 }
 

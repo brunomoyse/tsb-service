@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"tsb-service/internal/api/graphql/testhelpers"
 	"tsb-service/internal/modules/order/domain"
 )
 
@@ -55,14 +56,7 @@ func TestOrderRepositoryDatabaseFailures(t *testing.T) {
 
 	failingTrigger := func(t *testing.T, table, event string, deferred bool) {
 		t.Helper()
-		e.exec(t, `CREATE OR REPLACE FUNCTION fail_it() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'forced failure'; END $$`)
-		e.exec(t, `DROP TRIGGER IF EXISTS fail_trg ON `+table)
-		if deferred {
-			e.exec(t, `CREATE CONSTRAINT TRIGGER fail_trg AFTER `+event+` ON `+table+` DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION fail_it()`)
-		} else {
-			e.exec(t, `CREATE TRIGGER fail_trg BEFORE `+event+` ON `+table+` FOR EACH ROW EXECUTE FUNCTION fail_it()`)
-		}
-		t.Cleanup(func() { _, _ = e.tdb.DB.Exec(`DROP TRIGGER IF EXISTS fail_trg ON ` + table) })
+		testhelpers.FailTrigger(t, e.tdb.DB, table, "BEFORE", event, deferred)
 	}
 
 	t.Run("Save reports a failed commit and leaves nothing behind", func(t *testing.T) {

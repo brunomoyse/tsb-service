@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,9 +23,7 @@ var dec = decimal.RequireFromString
 // with a driver error: the way to exercise the error branches without a flaky database.
 func closedRepo(t *testing.T) domain.OrderRepository {
 	t.Helper()
-	conn, err := sqlx.Open("postgres", "host=127.0.0.1 port=1 user=x dbname=x sslmode=disable")
-	require.NoError(t, err)
-	require.NoError(t, conn.Close())
+	conn := testhelpers.ClosedDB(t)
 	return NewOrderRepository(&db.DBPool{Customer: conn, Admin: conn})
 }
 

@@ -1,26 +1,20 @@
 package graphql_test
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"mime"
-	"net"
-	"net/http"
-	"net/http/httptest"
-	"net/mail"
 	"net/url"
-	"os"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"tsb-service/pkg/apns/apnstest"
+	"tsb-service/pkg/fcm/fcmtest"
+
+	"tsb-service/pkg/email/smtptest"
+
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -53,7 +47,6 @@ import (
 	"tsb-service/internal/shared/middleware"
 	"tsb-service/pkg/apns"
 	"tsb-service/pkg/db"
-	es "tsb-service/pkg/email/scaleway"
 	"tsb-service/pkg/fcm"
 	"tsb-service/pkg/pubsub"
 	"tsb-service/pkg/utils"
@@ -66,442 +59,38 @@ import (
 
 // ---- SMTP --------------------------------------------------------------------------------------
 
-type sentMail struct {
-	From string
-	To   []string
-	Data string
-}
+// sharedSMTP is the one fake SMTP server of the test binary. The e-mail backend is process-wide
+// state, so it is installed once, unconditionally, by TestMain (main_test.go): no test depends on
+// which test configured it first. Tests use addresses of their own (newPushCustomer, ...).
+var sharedSMTP *smtptest.Server
 
-type fakeSMTP struct {
-	mu       sync.Mutex
-	mail     []sentMail
-	rejected map[string]bool
-}
-
-// reject makes the server refuse every message to the address (a mailbox that bounces).
-func (s *fakeSMTP) reject(addr string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.rejected == nil {
-		s.rejected = map[string]bool{}
-	}
-	s.rejected[strings.ToLower(addr)] = true
-}
-
-func (s *fakeSMTP) isRejected(addr string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.rejected[strings.ToLower(addr)]
-}
-
-var (
-	smtpOnce   sync.Once
-	sharedSMTP = &fakeSMTP{}
-)
-
-// startFakeSMTP points the e-mail package at an in-process SMTP server, once for the whole test
-// binary (the e-mail backend is process-wide state).
-func startFakeSMTP(t *testing.T) *fakeSMTP {
+// startFakeSMTP is the server every covEnv reads its mail from.
+func startFakeSMTP(t *testing.T) *smtptest.Server {
 	t.Helper()
-	smtpOnce.Do(func() {
-		ln, err := net.Listen("tcp", "127.0.0.1:0")
-		require.NoError(t, err)
-		host, port, err := net.SplitHostPort(ln.Addr().String())
-		require.NoError(t, err)
-		require.NoError(t, os.Setenv("SMTP_HOST", host))
-		require.NoError(t, os.Setenv("SMTP_PORT", port))
-		require.NoError(t, os.Setenv("SCW_SENDER_EMAIL", "noreply@example.test"))
-		require.NoError(t, os.Setenv("SCW_SENDER_NAME", "Test shop"))
-		require.NoError(t, es.InitService())
-		go func() {
-			for {
-				conn, err := ln.Accept()
-				if err != nil {
-					return
-				}
-				go sharedSMTP.serve(conn)
-			}
-		}()
-	})
+	require.NotNil(t, sharedSMTP, "TestMain installs the fake SMTP server")
 	return sharedSMTP
-}
-
-func (s *fakeSMTP) serve(conn net.Conn) {
-	defer func() { _ = conn.Close() }()
-	r := bufio.NewReader(conn)
-	say := func(line string) { _, _ = io.WriteString(conn, line+"\r\n") }
-	say("220 fake smtp")
-	var cur sentMail
-	for {
-		line, err := r.ReadString('\n')
-		if err != nil {
-			return
-		}
-		cmd := strings.ToUpper(strings.TrimSpace(line))
-		switch {
-		case strings.HasPrefix(cmd, "EHLO"), strings.HasPrefix(cmd, "HELO"):
-			say("250 fake")
-		case strings.HasPrefix(cmd, "MAIL FROM:"):
-			cur = sentMail{From: strings.TrimSpace(line[len("MAIL FROM:"):])}
-			say("250 ok")
-		case strings.HasPrefix(cmd, "RCPT TO:"):
-			rcpt := strings.ToLower(strings.Trim(strings.TrimSpace(line[len("RCPT TO:"):]), "<>"))
-			if s.isRejected(rcpt) {
-				say("550 mailbox unavailable")
-				continue
-			}
-			cur.To = append(cur.To, rcpt)
-			say("250 ok")
-		case cmd == "DATA":
-			say("354 go ahead")
-			var body strings.Builder
-			for {
-				l, err := r.ReadString('\n')
-				if err != nil {
-					return
-				}
-				if l == ".\r\n" {
-					break
-				}
-				body.WriteString(l)
-			}
-			cur.Data = body.String()
-			s.mu.Lock()
-			s.mail = append(s.mail, cur)
-			s.mu.Unlock()
-			say("250 queued")
-		case cmd == "QUIT":
-			say("221 bye")
-			return
-		default:
-			say("250 ok")
-		}
-	}
-}
-
-// mailTo lists the messages sent to the address so far.
-func (s *fakeSMTP) mailTo(addr string) []sentMail {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	var out []sentMail
-	for _, m := range s.mail {
-		for _, to := range m.To {
-			if to == strings.ToLower(addr) {
-				out = append(out, m)
-				break
-			}
-		}
-	}
-	return out
-}
-
-// subjectOf is the decoded Subject header of a message.
-func subjectOf(t *testing.T, m sentMail) string {
-	t.Helper()
-	msg, err := mail.ReadMessage(strings.NewReader(m.Data))
-	require.NoError(t, err)
-	subject, err := new(mime.WordDecoder).DecodeHeader(msg.Header.Get("Subject"))
-	require.NoError(t, err)
-	return subject
-}
-
-// subjectsTo lists the subjects of the messages sent to the address so far.
-func (s *fakeSMTP) subjectsTo(t *testing.T, addr string) []string {
-	t.Helper()
-	var out []string
-	for _, m := range s.mailTo(addr) {
-		out = append(out, subjectOf(t, m))
-	}
-	return out
-}
-
-// waitSubject waits until the address received a message with the subject and returns it.
-func (s *fakeSMTP) waitSubject(t *testing.T, addr, subject string) sentMail {
-	t.Helper()
-	var found sentMail
-	require.Eventually(t, func() bool {
-		for _, m := range s.mailTo(addr) {
-			if subjectOf(t, m) == subject {
-				found = m
-				return true
-			}
-		}
-		return false
-	}, 20*time.Second, 20*time.Millisecond, "no %q e-mail reached %s; got %v", subject, addr, s.subjectsTo(t, addr))
-	return found
-}
-
-// count of the messages with the subject sent to the address.
-func (s *fakeSMTP) countSubject(t *testing.T, addr, subject string) int {
-	t.Helper()
-	n := 0
-	for _, got := range s.subjectsTo(t, addr) {
-		if got == subject {
-			n++
-		}
-	}
-	return n
-}
-
-// waitMailTo waits until n messages reached the address and returns them.
-func (s *fakeSMTP) waitMailTo(t *testing.T, addr string, n int) []sentMail {
-	t.Helper()
-	require.Eventually(t, func() bool { return len(s.mailTo(addr)) >= n }, 20*time.Second, 20*time.Millisecond,
-		"expected %d e-mails to %s, got %d", n, addr, len(s.mailTo(addr)))
-	return s.mailTo(addr)
 }
 
 // ---- Mollie ------------------------------------------------------------------------------------
 
-// covMollie is api.mollie.com for the order flows: it creates payments, refunds them and cancels
-// them, and keeps every call. A failure can be switched on per call kind.
-type covMollie struct {
-	Server *httptest.Server
-
-	mu       sync.Mutex
-	calls    []string
-	bodies   []string // request body of calls[i]
-	seq      int
-	failPay  bool
-	failRef  bool
-	failCanc bool
-}
-
-func newCovMollie(t *testing.T) *covMollie {
-	t.Helper()
-	m := &covMollie{}
-	m.Server = httptest.NewServer(http.HandlerFunc(m.serve))
-	t.Cleanup(m.Server.Close)
-	return m
-}
-
-func (m *covMollie) setFail(pay, refund, cancel bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.failPay, m.failRef, m.failCanc = pay, refund, cancel
-}
-
-func (m *covMollie) callsMatching(prefix string) []string {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	var out []string
-	for _, c := range m.calls {
-		if strings.HasPrefix(c, prefix) {
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
-// bodiesMatching returns the request bodies of the calls whose "METHOD /path" starts with prefix.
-func (m *covMollie) bodiesMatching(prefix string) []string {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	var out []string
-	for i, c := range m.calls {
-		if strings.HasPrefix(c, prefix) {
-			out = append(out, m.bodies[i])
-		}
-	}
-	return out
-}
-
-// refundAmounts returns the "amount.value" asked for by each refund request of a payment.
-func (m *covMollie) refundAmounts(t *testing.T, paymentID string) []string {
-	t.Helper()
-	var out []string
-	for _, b := range m.bodiesMatching("POST /v2/payments/" + paymentID + "/refunds") {
-		var req struct {
-			Amount struct{ Value string } `json:"amount"`
-		}
-		require.NoError(t, json.Unmarshal([]byte(b), &req), b)
-		out = append(out, req.Amount.Value)
-	}
-	return out
-}
-
-func (m *covMollie) serve(w http.ResponseWriter, r *http.Request) {
-	body, _ := io.ReadAll(r.Body)
-	m.mu.Lock()
-	m.calls = append(m.calls, r.Method+" "+r.URL.Path)
-	m.bodies = append(m.bodies, string(body))
-	failPay, failRef, failCanc := m.failPay, m.failRef, m.failCanc
-	m.seq++
-	seq := m.seq
-	m.mu.Unlock()
-
-	w.Header().Set("Content-Type", "application/hal+json")
-	refuse := func() {
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		_, _ = w.Write([]byte(`{"status":422,"title":"Unprocessable Entity","detail":"refused","_links":{}}`))
-	}
-	switch {
-	case r.Method == http.MethodPost && r.URL.Path == "/v2/payments":
-		if failPay {
-			refuse()
-			return
-		}
-		var req struct {
-			Amount map[string]string `json:"amount"`
-		}
-		_ = json.Unmarshal(body, &req)
-		id := fmt.Sprintf("tr_cov%06d", seq)
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"resource": "payment", "id": id, "status": "open", "mode": "test", "isCancelable": true,
-			"createdAt": time.Now().UTC().Format(time.RFC3339), "amount": req.Amount,
-			"_links": map[string]any{"checkout": map[string]string{"href": "https://www.mollie.com/checkout/" + id, "type": "text/html"}},
-		})
-	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/refunds"):
-		if failRef {
-			refuse()
-			return
-		}
-		var req struct {
-			Amount map[string]string `json:"amount"`
-		}
-		_ = json.Unmarshal(body, &req)
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(map[string]any{"resource": "refund", "id": fmt.Sprintf("re_cov%06d", seq), "amount": req.Amount, "status": "pending"})
-	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/v2/payments/"):
-		if failCanc {
-			refuse()
-			return
-		}
-		id := strings.TrimPrefix(r.URL.Path, "/v2/payments/")
-		_ = json.NewEncoder(w).Encode(map[string]any{"resource": "payment", "id": id, "status": "canceled"})
-	default:
-		http.NotFound(w, r)
-	}
-}
+// The Mollie fake is testhelpers.MollieStub (payments, refunds and cancellations, with recorded
+// calls and bodies and failures that can be switched on per kind of call).
 
 // ---- push --------------------------------------------------------------------------------------
 
-type pushReq struct {
-	Token   string
-	Payload map[string]any
+// The push fakes are pkg/apns/apnstest and pkg/fcm/fcmtest servers that answer by device token: a
+// token starting with "dead-" is unregistered, "refused-" is refused for another reason and (APNs
+// only) "broken-" is a dropped connection.
+
+func apnsClient(f *apnstest.Server) *apns.Client {
+	return apns.NewWithEndpoint(f.URL, f.Client(), "be.test.app")
 }
 
-// fakeAPNs is Apple's push endpoint: a device token starting with "dead-" is answered as
-// unregistered, one starting with "refused-" as a payload the server refuses for another reason and
-// one starting with "broken-" as a dropped connection.
-type fakeAPNs struct {
-	Server *httptest.Server
-	mu     sync.Mutex
-	reqs   []pushReq
-}
-
-func newFakeAPNs(t *testing.T) *fakeAPNs {
+func fcmClient(t *testing.T, f *fcmtest.Server) *fcm.Client {
 	t.Helper()
-	f := &fakeAPNs{}
-	f.Server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		var payload map[string]any
-		_ = json.Unmarshal(body, &payload)
-		token := strings.TrimPrefix(r.URL.Path, "/3/device/")
-		f.mu.Lock()
-		f.reqs = append(f.reqs, pushReq{Token: token, Payload: payload})
-		f.mu.Unlock()
-		switch {
-		case strings.HasPrefix(token, "dead-"):
-			w.WriteHeader(http.StatusGone)
-			_, _ = io.WriteString(w, `{"reason":"Unregistered"}`)
-		case strings.HasPrefix(token, "refused-"):
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = io.WriteString(w, `{"reason":"PayloadEmpty"}`)
-		case strings.HasPrefix(token, "broken-"):
-			// A connection that dies: the client reports a transport error.
-			hj, ok := w.(http.Hijacker)
-			if !ok {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			conn, _, _ := hj.Hijack()
-			_ = conn.Close()
-		default:
-			w.WriteHeader(http.StatusOK)
-		}
-	}))
-	t.Cleanup(f.Server.Close)
-	return f
-}
-
-func (f *fakeAPNs) client() *apns.Client {
-	return apns.NewWithEndpoint(f.Server.URL, f.Server.Client(), "be.test.app")
-}
-
-func (f *fakeAPNs) pushesTo(token string) []pushReq {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	var out []pushReq
-	for _, r := range f.reqs {
-		if r.Token == token {
-			out = append(out, r)
-		}
-	}
-	return out
-}
-
-// fakeFCM is Google's push endpoint: a token starting with "dead-" is answered as unregistered, one
-// starting with "refused-" as a permission failure.
-type fakeFCM struct {
-	Server *httptest.Server
-	mu     sync.Mutex
-	reqs   []pushReq
-}
-
-func newFakeFCM(t *testing.T) *fakeFCM {
-	t.Helper()
-	f := &fakeFCM{}
-	f.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw, _ := io.ReadAll(r.Body)
-		var body struct {
-			Message map[string]any `json:"message"`
-		}
-		_ = json.Unmarshal(raw, &body)
-		token, _ := body.Message["token"].(string)
-		f.mu.Lock()
-		f.reqs = append(f.reqs, pushReq{Token: token, Payload: body.Message})
-		f.mu.Unlock()
-		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case strings.HasPrefix(token, "dead-"):
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = io.WriteString(w, `{"error":{"code":404,"status":"NOT_FOUND","message":"x","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"UNREGISTERED"}]}}`)
-		case strings.HasPrefix(token, "refused-"):
-			w.WriteHeader(http.StatusForbidden)
-			_, _ = io.WriteString(w, `{"error":{"code":403,"status":"PERMISSION_DENIED","message":"x"}}`)
-		default:
-			_, _ = io.WriteString(w, `{"name":"projects/test/messages/1"}`)
-		}
-	}))
-	t.Cleanup(f.Server.Close)
-	return f
-}
-
-func (f *fakeFCM) client(t *testing.T) *fcm.Client {
-	t.Helper()
-	c, err := fcm.NewWithEndpoint(t.Context(), "test", f.Server.URL)
+	c, err := fcm.NewWithEndpoint(t.Context(), "test", f.URL)
 	require.NoError(t, err)
 	return c
-}
-
-func (f *fakeFCM) pushesTo(token string) []pushReq {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	var out []pushReq
-	for _, r := range f.reqs {
-		if r.Token == token {
-			out = append(out, r)
-		}
-	}
-	return out
-}
-
-func (f *fakeFCM) count() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return len(f.reqs)
 }
 
 // ---- other boundaries --------------------------------------------------------------------------
@@ -579,19 +168,13 @@ func (a *fakeAgent) Disconnect(context.Context) (assistantDomain.Connection, err
 
 type fakePosDevices struct {
 	posDomain.DeviceRepository
-	tokens  []string
-	err     error
-	revoked bool
+	tokens []string
+	err    error
 }
 
-// FindByID answers any device id as an enrolled one (revoked when the flag is set).
+// FindByID answers any device id as an enrolled one.
 func (f *fakePosDevices) FindByID(_ context.Context, id uuid.UUID) (*posDomain.Device, error) {
-	d := &posDomain.Device{ID: id}
-	if f.revoked {
-		now := time.Now()
-		d.RevokedAt = &now
-	}
-	return d, nil
+	return &posDomain.Device{ID: id}, nil
 }
 
 func (f *fakePosDevices) FindActiveFCMTokens(context.Context) ([]string, error) {
@@ -616,13 +199,13 @@ type covOptions struct {
 type covEnv struct {
 	opts covOptions
 	*TestContext
-	Mollie   *covMollie
-	APNs     *fakeAPNs
-	FCM      *fakeFCM
+	Mollie   *testhelpers.MollieStub
+	APNs     *apnstest.Server
+	FCM      *fcmtest.Server
 	Zitadel  *fakeZitadel
 	Google   *fakeGoogle
 	Notif    notificationApplication.NotificationService
-	Mail     *fakeSMTP
+	Mail     *smtptest.Server
 	Pos      *fakePosDevices
 	Limiters struct{ Coupon, Public *middleware.RateLimiter }
 }
@@ -634,9 +217,9 @@ func setupCovEnv(t *testing.T, opts covOptions) *covEnv {
 
 	e := &covEnv{
 		opts:    opts,
-		Mollie:  newCovMollie(t),
-		APNs:    newFakeAPNs(t),
-		FCM:     newFakeFCM(t),
+		Mollie:  testhelpers.NewMollieStub(t),
+		APNs:    apnstest.ByToken(t),
+		FCM:     fcmtest.ByToken(t),
 		Zitadel: &fakeZitadel{},
 		Google:  &fakeGoogle{},
 		Mail:    startFakeSMTP(t),
@@ -694,8 +277,8 @@ func (e *covEnv) wire(t *testing.T, pool *db.DBPool, broker *pubsub.Broker) *res
 		PublicQueryLimiter:    e.Limiters.Public,
 	}
 	if e.opts.Push {
-		r.APNsClient = e.APNs.client()
-		r.FCMClient = e.FCM.client(t)
+		r.APNsClient = apnsClient(e.APNs)
+		r.FCMClient = fcmClient(t, e.FCM)
 	}
 	if e.opts.Agent != nil {
 		r.AssistantService = assistantApplication.NewService(e.opts.Agent, broker, nil, nil)
@@ -707,10 +290,7 @@ func (e *covEnv) wire(t *testing.T, pool *db.DBPool, broker *pubsub.Broker) *res
 // which reaches the "the store is down" branch of whatever it calls.
 func (e *covEnv) brokenResolver(t *testing.T) *resolver.Resolver {
 	t.Helper()
-	dsn := fmt.Sprintf("postgres://testuser:testpass@%s/testdb?sslmode=disable", e.DB.Resource.GetHostPort("5432/tcp"))
-	conn, err := sqlx.Connect("postgres", dsn)
-	require.NoError(t, err)
-	require.NoError(t, conn.Close())
+	conn := e.DB.ClosedConnection(t)
 	return e.wire(t, &db.DBPool{Customer: conn, Admin: conn}, pubsub.NewBroker())
 }
 

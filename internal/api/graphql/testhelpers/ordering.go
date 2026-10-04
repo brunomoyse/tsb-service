@@ -143,14 +143,22 @@ func SeedCustomer(t *testing.T, db *sqlx.DB, label string) (uuid.UUID, string) {
 	return id, token
 }
 
-// MollieStub stands in for api.mollie.com: it answers POST /v2/payments with a payment that has a
-// checkout link and keeps what was asked, so tests can check the amount and lines sent to Mollie.
+// MollieStub stands in for api.mollie.com. It answers POST /v2/payments with a cancelable payment
+// that has a checkout link, POST /v2/payments/{id}/refunds with a refund of the amount asked for
+// and DELETE /v2/payments/{id} with a canceled payment. It keeps every call and its body, so tests
+// can check the amount and lines sent to Mollie, how often Mollie was called and with what amount a
+// refund was asked. Failures can be switched on per kind of call.
 type MollieStub struct {
 	Server *httptest.Server
 
 	mu       sync.Mutex
 	requests []MolliePaymentRequest
+	calls    []string // "METHOD /path" of every call
+	bodies   []string // request body of calls[i]
 	failNext int
+	failRef  bool
+	failCanc bool
+	failPay  bool
 	seq      int
 }
 
@@ -198,43 +206,119 @@ func (s *MollieStub) Requests() []MolliePaymentRequest {
 	return append([]MolliePaymentRequest(nil), s.requests...)
 }
 
-func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost || r.URL.Path != "/v2/payments" {
-		http.NotFound(w, r)
-		return
-	}
-	body, _ := io.ReadAll(r.Body)
-	var req MolliePaymentRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
+// SetFail makes every payment creation, refund or cancellation (until switched off again) answer
+// 422, as Mollie does for a refused call.
+func (s *MollieStub) SetFail(pay, refund, cancel bool) {
 	s.mu.Lock()
-	if s.failNext > 0 {
-		s.failNext--
-		s.mu.Unlock()
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnprocessableEntity)
-		_, _ = w.Write([]byte(`{"status":422,"title":"Unprocessable Entity","detail":"The amount is invalid","_links":{}}`))
-		return
+	defer s.mu.Unlock()
+	s.failPay, s.failRef, s.failCanc = pay, refund, cancel
+}
+
+// CallsMatching lists the "METHOD /path" of the calls made so far that start with prefix.
+func (s *MollieStub) CallsMatching(prefix string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []string
+	for _, c := range s.calls {
+		if strings.HasPrefix(c, prefix) {
+			out = append(out, c)
+		}
 	}
-	s.requests = append(s.requests, req)
+	return out
+}
+
+// BodiesMatching lists the request bodies of the calls whose "METHOD /path" starts with prefix.
+func (s *MollieStub) BodiesMatching(prefix string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []string
+	for i, c := range s.calls {
+		if strings.HasPrefix(c, prefix) {
+			out = append(out, s.bodies[i])
+		}
+	}
+	return out
+}
+
+// RefundAmounts lists the amount.value asked for by each refund request of a payment.
+func (s *MollieStub) RefundAmounts(t *testing.T, paymentID string) []string {
+	t.Helper()
+	var out []string
+	for _, b := range s.BodiesMatching("POST /v2/payments/" + paymentID + "/refunds") {
+		var req struct {
+			Amount struct{ Value string } `json:"amount"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(b), &req), b)
+		out = append(out, req.Amount.Value)
+	}
+	return out
+}
+
+func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	s.mu.Lock()
+	s.calls = append(s.calls, r.Method+" "+r.URL.Path)
+	s.bodies = append(s.bodies, string(body))
+	failPay, failRef, failCanc := s.failPay, s.failRef, s.failCanc
 	s.seq++
-	id := fmt.Sprintf("tr_stub%06d", s.seq)
+	seq := s.seq
 	s.mu.Unlock()
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"resource":  "payment",
-		"id":        id,
-		"status":    "open",
-		"mode":      "test",
-		"createdAt": time.Now().UTC().Format(time.RFC3339),
-		"amount":    req.Amount,
-		"_links": map[string]any{
-			"checkout": map[string]string{"href": "https://www.mollie.com/checkout/select-method/" + id, "type": "text/html"},
-		},
-	})
+	w.Header().Set("Content-Type", "application/hal+json")
+	refuse := func(detail string) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"status":422,"title":"Unprocessable Entity","detail":"` + detail + `","_links":{}}`))
+	}
+	switch {
+	case r.Method == http.MethodPost && r.URL.Path == "/v2/payments":
+		var req MolliePaymentRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.mu.Lock()
+		fail := failPay
+		if s.failNext > 0 {
+			s.failNext--
+			fail = true
+		}
+		if !fail {
+			s.requests = append(s.requests, req)
+		}
+		s.mu.Unlock()
+		if fail {
+			refuse("The amount is invalid")
+			return
+		}
+		id := fmt.Sprintf("tr_stub%06d", seq)
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"resource": "payment", "id": id, "status": "open", "mode": "test", "isCancelable": true,
+			"createdAt": time.Now().UTC().Format(time.RFC3339),
+			"amount":    req.Amount,
+			"_links": map[string]any{
+				"checkout": map[string]string{"href": "https://www.mollie.com/checkout/select-method/" + id, "type": "text/html"},
+			},
+		})
+	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/refunds"):
+		if failRef {
+			refuse("refused")
+			return
+		}
+		var req struct {
+			Amount map[string]string `json:"amount"`
+		}
+		_ = json.Unmarshal(body, &req)
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{"resource": "refund", "id": fmt.Sprintf("re_stub%06d", seq), "amount": req.Amount, "status": "pending"})
+	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/v2/payments/"):
+		if failCanc {
+			refuse("refused")
+			return
+		}
+		id := strings.TrimPrefix(r.URL.Path, "/v2/payments/")
+		_ = json.NewEncoder(w).Encode(map[string]any{"resource": "payment", "id": id, "status": "canceled"})
+	default:
+		http.NotFound(w, r)
+	}
 }

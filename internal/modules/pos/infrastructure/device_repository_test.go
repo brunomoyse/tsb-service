@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -83,11 +82,9 @@ func TestDeviceRepository(t *testing.T) {
 	})
 
 	t.Run("a closed connection is reported by every method", func(t *testing.T) {
-		conn, err := sqlx.Open("postgres", "host=127.0.0.1 port=1 user=x dbname=x sslmode=disable")
-		require.NoError(t, err)
-		require.NoError(t, conn.Close())
+		conn := testhelpers.ClosedDB(t)
 		closed := NewDeviceRepository(&db.DBPool{Customer: conn, Admin: conn})
-		_, err = closed.FindByID(ctx, active)
+		_, err := closed.FindByID(ctx, active)
 		assert.Error(t, err)
 		assert.Error(t, closed.TouchLastSeen(ctx, active))
 		assert.Error(t, closed.UpdateFCMToken(ctx, active, "x"))

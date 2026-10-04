@@ -19,13 +19,13 @@ import (
 // pointAtDatabase sets the DB_* variables to the test container.
 func pointAtDatabase(t *testing.T, tdb *testhelpers.TestDatabase) {
 	t.Helper()
-	host, port, err := net.SplitHostPort(tdb.Resource.GetHostPort("5432/tcp"))
+	host, port, err := net.SplitHostPort(tdb.HostPort)
 	require.NoError(t, err)
 	t.Setenv("DB_HOST", host)
 	t.Setenv("DB_PORT", port)
-	t.Setenv("DB_DATABASE", "testdb")
-	t.Setenv("DB_USERNAME", "testuser")
-	t.Setenv("DB_PASSWORD", "testpass")
+	t.Setenv("DB_DATABASE", tdb.Name)
+	t.Setenv("DB_USERNAME", tdb.User)
+	t.Setenv("DB_PASSWORD", tdb.Password)
 	t.Setenv("DB_SSL_MODE", "disable")
 	t.Setenv("DB_ADMIN_USERNAME", "")
 	t.Setenv("DB_ADMIN_PASSWORD", "")
