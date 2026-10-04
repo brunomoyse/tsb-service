@@ -390,15 +390,22 @@ func TestUpdatePaymentStatusMutation(t *testing.T) {
 		assert.Equal(t, "paid", status)
 	})
 
-	// BUG(product decision pending): the staff override accepts any string as a payment status
-	// (payment/application UpdatePaymentStatusByOrderID casts it, the column is free text), so a typo
-	// such as "payed" is stored and no later refund/webhook logic recognises the payment.
-	t.Run("any string is accepted as a status", func(t *testing.T) {
-		resp := gqlAs(t, env.TestContext, adminToken(t, env.TestContext), "fr", m, map[string]any{"o": order.ID, "s": "payed"})
-		require.Empty(t, resp.Errors, "%+v", resp.Errors)
-		var status string
-		require.NoError(t, env.DB.DB.GetContext(t.Context(), &status, `SELECT status FROM mollie_payments WHERE order_id = $1`, order.ID))
-		assert.Equal(t, "payed", status)
+	// The column is free text and the refund / webhook logic only recognises Mollie's statuses, so a
+	// typo ("payed") must not be stored.
+	t.Run("only a known status is accepted", func(t *testing.T) {
+		for _, bad := range []string{"payed", "PAID", "", " paid"} {
+			resp := gqlAs(t, env.TestContext, adminToken(t, env.TestContext), "fr", m, map[string]any{"o": order.ID, "s": bad})
+			require.Len(t, resp.Errors, 1, "%q", bad)
+			assert.Equal(t, "USER_ERROR", resp.Errors[0].Extensions["code"], "%q", bad)
+			assert.Contains(t, resp.Errors[0].Message, "unknown payment status")
+			assert.Contains(t, resp.Errors[0].Message, "paid", "the message lists what is accepted")
+			assert.Equal(t, "paid", env.paymentCol(t, "status", order.Payment.MolliePaymentID), "%q must not be stored", bad)
+		}
+		for _, ok := range []string{"open", "canceled", "pending", "authorized", "expired", "failed", "paid"} {
+			resp := gqlAs(t, env.TestContext, adminToken(t, env.TestContext), "fr", m, map[string]any{"o": order.ID, "s": ok})
+			require.Empty(t, resp.Errors, "%s: %+v", ok, resp.Errors)
+			assert.Equal(t, ok, env.paymentCol(t, "status", order.Payment.MolliePaymentID))
+		}
 	})
 }
 

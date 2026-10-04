@@ -8,13 +8,26 @@ package resolver
 import (
 	"context"
 	"fmt"
+	"strings"
+	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/model"
+	paymentDomain "tsb-service/internal/modules/payment/domain"
 
 	"github.com/google/uuid"
 )
 
 // UpdatePaymentStatus is the resolver for the updatePaymentStatus field.
 func (r *mutationResolver) UpdatePaymentStatus(ctx context.Context, orderID uuid.UUID, status string) (*model.Payment, error) {
+	// The column is free text and the refund / webhook logic only recognises the known statuses,
+	// so a typo ("payed") would silently orphan the payment.
+	if !paymentDomain.PaymentStatus(status).IsValid() {
+		known := make([]string, len(paymentDomain.PaymentStatuses))
+		for i, s := range paymentDomain.PaymentStatuses {
+			known[i] = string(s)
+		}
+		return nil, apperr.Newf(apperr.CodeUserError, "unknown payment status %q, expected one of: %s", status, strings.Join(known, ", "))
+	}
+
 	// Update the payment status using the service layer
 	payment, err := r.PaymentService.UpdatePaymentStatusByOrderID(ctx, orderID, status)
 	if err != nil {

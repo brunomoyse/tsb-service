@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,6 +21,17 @@ const (
 	PaymentStatusFailed     PaymentStatus = "failed"
 	PaymentStatusPaid       PaymentStatus = "paid"
 )
+
+// PaymentStatuses lists every status a payment can have (Mollie's payment statuses).
+var PaymentStatuses = []PaymentStatus{
+	PaymentStatusOpen, PaymentStatusCanceled, PaymentStatusPending, PaymentStatusAuthorized,
+	PaymentStatusExpired, PaymentStatusFailed, PaymentStatusPaid,
+}
+
+// IsValid reports whether s is one of the known payment statuses (exact, lower-case match).
+func (s PaymentStatus) IsValid() bool {
+	return slices.Contains(PaymentStatuses, s)
+}
 
 // PaymentStatusUpdate carries the fields to update when refreshing a payment's status from Mollie.
 type PaymentStatusUpdate struct {
