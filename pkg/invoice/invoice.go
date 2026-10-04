@@ -12,6 +12,7 @@ import (
 	"github.com/go-pdf/fpdf"
 
 	"tsb-service/pkg/brand"
+	"tsb-service/pkg/i18n/locale"
 	"tsb-service/pkg/timezone"
 )
 
@@ -48,7 +49,7 @@ type InvoiceData struct {
 	OrderID   string
 	OrderDate time.Time
 	OrderType string // "DELIVERY", "PICKUP" or "DINE_IN"
-	Language  string // "fr", "en" or "zh"
+	Language  string // any tag; normalised via locale.Normalize (only "fr"/"en" have labels)
 
 	Items []InvoiceItem
 
@@ -161,7 +162,7 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 	orderRef := formatOrderRef(data.OrderID, data.OrderDate)
 
 	dateFormat := "02/01/2006 15:04"
-	if data.Language == "en" {
+	if locale.Normalize(data.Language) == "en" {
 		dateFormat = "01/02/2006 3:04 PM"
 	}
 

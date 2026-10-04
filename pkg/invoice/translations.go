@@ -1,5 +1,7 @@
 package invoice
 
+import "tsb-service/pkg/i18n/locale"
+
 type labels struct {
 	FilePrefix       string
 	InvoiceTitle     string
@@ -82,8 +84,10 @@ var translations = map[string]labels{
 	},
 }
 
+// getLabels returns the labels for the normalised language. Only French and
+// English are translated; nl and zh (and anything unsupported) read as French.
 func getLabels(lang string) labels {
-	if l, ok := translations[lang]; ok {
+	if l, ok := translations[locale.Normalize(lang)]; ok {
 		return l
 	}
 	return translations["fr"]
