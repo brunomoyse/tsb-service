@@ -159,6 +159,36 @@ func TestProductAdministration(t *testing.T) {
 		require.ErrorContains(t, err, "failed to create product")
 	})
 
+	t.Run("a second product with the same name in the category is a readable user error", func(t *testing.T) {
+		first := baseInput()
+		_, err := r.Mutation().CreateProduct(ctx, first)
+		require.NoError(t, err)
+
+		same := baseInput()
+		same.Translations = first.Translations // same French name, same category: same slug
+		_, err = r.Mutation().CreateProduct(ctx, same)
+
+		appErr, ok := apperr.From(err)
+		require.True(t, ok, "%v", err)
+		assert.Equal(t, apperr.CodeUserError, appErr.Code)
+		assert.Equal(t, "a product with this name already exists in this category, choose another name", err.Error())
+		assert.NotContains(t, err.Error(), "23505", "no driver text")
+
+		// Through HTTP the message reaches the dashboard as it is, not as "Internal server error".
+		resp := gqlAs(t, env.TestContext, adminToken(t, env.TestContext), "en",
+			`mutation ($i: CreateProductInput!) { createProduct(input: $i) { id } }`,
+			map[string]any{"i": map[string]any{
+				"categoryId": category.String(), "isAvailable": true, "isVisible": true, "isDiscountable": true, "isHalal": false, "isLunchOnly": false,
+				"isSpicy": false, "isVegetarian": false, "price": "5", "vatCategory": "food",
+				"translations": []map[string]string{
+					{"language": "en", "name": "x"}, {"language": "fr", "name": first.Translations[1].Name}, {"language": "zh", "name": "y"},
+				},
+			}})
+		require.Len(t, resp.Errors, 1)
+		assert.Equal(t, "USER_ERROR", resp.Errors[0].Extensions["code"])
+		assert.Contains(t, resp.Errors[0].Message, "already exists in this category")
+	})
+
 	created, err := r.Mutation().CreateProduct(ctx, baseInput())
 	require.NoError(t, err)
 
@@ -216,6 +246,20 @@ func TestProductAdministration(t *testing.T) {
 		unknown := uuid.New()
 		_, err = r.Mutation().UpdateProduct(ctx, created.ID, model.UpdateProductInput{CategoryID: &unknown})
 		require.ErrorContains(t, err, "failed to update product")
+	})
+
+	t.Run("renaming a product to the name of another one in its category is a readable user error", func(t *testing.T) {
+		other, err := r.Mutation().CreateProduct(ctx, baseInput())
+		require.NoError(t, err)
+		taken := baseInput()
+		_, err = r.Mutation().CreateProduct(ctx, taken)
+		require.NoError(t, err)
+
+		_, err = r.Mutation().UpdateProduct(ctx, other.ID, model.UpdateProductInput{Translations: taken.Translations})
+
+		appErr, ok := apperr.From(err)
+		require.True(t, ok, "%v", err)
+		assert.Equal(t, apperr.CodeUserError, appErr.Code)
 	})
 
 	t.Run("only an admin may change the menu", func(t *testing.T) {
