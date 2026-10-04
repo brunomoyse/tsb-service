@@ -36,6 +36,36 @@ type faultyProducts struct {
 	productApplication.ProductService
 	failInvoiceNames  bool
 	emptyInvoiceNames bool
+	// nothing makes the lookups of one product / category answer (nil, nil).
+	nothing bool
+}
+
+func (f faultyProducts) GetProduct(ctx context.Context, id uuid.UUID) (*productDomain.Product, error) {
+	if f.nothing {
+		return nil, nil
+	}
+	return f.ProductService.GetProduct(ctx, id)
+}
+
+func (f faultyProducts) GetCategory(ctx context.Context, id uuid.UUID) (*productDomain.Category, error) {
+	if f.nothing {
+		return nil, nil
+	}
+	return f.ProductService.GetCategory(ctx, id)
+}
+
+func (f faultyProducts) GetCategoryBySlug(ctx context.Context, slug string) (*productDomain.Category, error) {
+	if f.nothing {
+		return nil, nil
+	}
+	return f.ProductService.GetCategoryBySlug(ctx, slug)
+}
+
+func (f faultyProducts) GetChoiceByID(ctx context.Context, id uuid.UUID) (*productDomain.ProductChoice, error) {
+	if f.nothing {
+		return nil, nil
+	}
+	return f.ProductService.GetChoiceByID(ctx, id)
 }
 
 func (f faultyProducts) GetProductNamesForInvoice(ctx context.Context, ids []string) ([]*productDomain.ProductOrderDetails, error) {
