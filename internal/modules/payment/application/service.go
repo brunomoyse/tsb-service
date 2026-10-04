@@ -240,18 +240,19 @@ func (s *paymentService) CreateFullRefund(ctx context.Context, externalPaymentID
 		return fmt.Errorf("payment is not paid: %s", payment.Status)
 	}
 
-	_, err = s.refundRemaining(ctx, payment)
+	_, _, err = s.refundRemaining(ctx, payment)
 	return err
 }
 
 // refundRemaining refunds what is still refundable of a paid payment: its amount minus what Mollie
 // says was already returned (by an earlier cancel, a webhook retry or staff in the Mollie dashboard). Repeated
 // cancels or webhook retries therefore never refund twice, and a payment with nothing left is skipped
-// (refunded == false). The caller is responsible for knowing the payment is paid at Mollie.
-func (s *paymentService) refundRemaining(ctx context.Context, payment *domain.MolliePayment) (refunded bool, err error) {
+// (refunded is zero). It returns the amount this call refunded and the total returned to the customer
+// afterwards. The caller is responsible for knowing the payment is paid at Mollie.
+func (s *paymentService) refundRemaining(ctx context.Context, payment *domain.MolliePayment) (refunded, total decimal.Decimal, err error) {
 	current, err := s.fetchMolliePayment(ctx, payment.MolliePaymentID)
 	if err != nil {
-		return false, err
+		return decimal.Zero, decimal.Zero, err
 	}
 	return s.refundRemainingOf(ctx, payment, current)
 }
@@ -267,10 +268,10 @@ func (s *paymentService) fetchMolliePayment(ctx context.Context, molliePaymentID
 }
 
 // refundRemainingOf is refundRemaining for a payment that was just read from Mollie.
-func (s *paymentService) refundRemainingOf(ctx context.Context, payment *domain.MolliePayment, current *mollie.Payment) (bool, error) {
+func (s *paymentService) refundRemainingOf(ctx context.Context, payment *domain.MolliePayment, current *mollie.Payment) (refunded, total decimal.Decimal, err error) {
 	alreadyRefunded, remaining, err := refundableAmount(payment, current)
 	if err != nil {
-		return false, err
+		return decimal.Zero, decimal.Zero, err
 	}
 
 	if !remaining.IsPositive() {
@@ -282,7 +283,7 @@ func (s *paymentService) refundRemainingOf(ctx context.Context, payment *domain.
 					zap.String("payment_id", payment.MolliePaymentID), zap.Error(markErr))
 			}
 		}
-		return false, nil
+		return decimal.Zero, alreadyRefunded, nil
 	}
 
 	refundRequest := mollie.CreatePaymentRefund{
@@ -291,24 +292,25 @@ func (s *paymentService) refundRemainingOf(ctx context.Context, payment *domain.
 
 	res, refund, err := s.mollieClient.Refunds.CreatePaymentRefund(ctx, payment.MolliePaymentID, refundRequest, nil)
 	if err != nil {
-		return false, fmt.Errorf("failed to create refund: %w", err)
+		return decimal.Zero, decimal.Zero, fmt.Errorf("failed to create refund: %w", err)
 	}
 
 	if res.StatusCode != 200 && res.StatusCode != 201 {
-		return false, fmt.Errorf("failed to create refund: %s", res.Status)
+		return decimal.Zero, decimal.Zero, fmt.Errorf("failed to create refund: %s", res.Status)
 	}
 
 	refundedAmount, parseErr := decimal.NewFromString(refund.Amount.Value)
 	if parseErr != nil {
-		return false, fmt.Errorf("failed to parse refund amount: %w", parseErr)
+		return decimal.Zero, decimal.Zero, fmt.Errorf("failed to parse refund amount: %w", parseErr)
 	}
 
 	// amount_refunded is the running total of the payment, not the amount of this refund.
-	if err := s.repo.MarkAsRefund(ctx, payment.MolliePaymentID, alreadyRefunded.Add(refundedAmount)); err != nil {
-		return false, fmt.Errorf("failed to mark payment as refunded: %w", err)
+	total = alreadyRefunded.Add(refundedAmount)
+	if err := s.repo.MarkAsRefund(ctx, payment.MolliePaymentID, total); err != nil {
+		return decimal.Zero, decimal.Zero, fmt.Errorf("failed to mark payment as refunded: %w", err)
 	}
 
-	return true, nil
+	return refundedAmount, total, nil
 }
 
 // refundableAmount returns what was already refunded and what can still be refunded. Mollie's
@@ -355,8 +357,8 @@ func (s *paymentService) SettleCancelledOrderPayment(ctx context.Context, paymen
 	}
 	switch domain.PaymentStatus(current.Status) {
 	case domain.PaymentStatusPaid:
-		refunded, err := s.refundRemainingOf(ctx, payment, current)
-		return domain.CancelSettlement{Refunded: refunded}, err
+		refunded, total, err := s.refundRemainingOf(ctx, payment, current)
+		return domain.CancelSettlement{Refunded: refunded, TotalRefunded: total}, err
 	case domain.PaymentStatusOpen, domain.PaymentStatusPending, domain.PaymentStatusAuthorized:
 		// Not paid yet: cancel it at Mollie so the customer cannot pay for a
 		// cancelled order. If Mollie no longer allows cancelling, a later
@@ -559,20 +561,20 @@ func (s *paymentService) refundPaidCancelledOrder(ctx context.Context, order *or
 	if err != nil || payment == nil {
 		return fmt.Errorf("failed to find payment for cancelled order %s: %w", order.ID, err)
 	}
-	refunded, err := s.refundRemaining(ctx, payment)
+	refunded, _, err := s.refundRemaining(ctx, payment)
 	if err != nil {
 		return err
 	}
 	zap.L().Warn("payment completed for a cancelled order, refunded",
-		zap.String("order_id", order.ID.String()), zap.Bool("refund_issued", refunded))
-	if !refunded {
+		zap.String("order_id", order.ID.String()), zap.Bool("refund_issued", refunded.IsPositive()))
+	if !refunded.IsPositive() {
 		return nil
 	}
 	u, err := s.userService.GetUserByID(ctx, order.UserID.String())
 	if err != nil || u == nil || !u.NotifyOrderUpdates {
 		return nil
 	}
-	if emailErr := es.SendRefundIssuedEmail(*u, order.Language, order.ID.String(), utils.FormatDecimal(payment.Amount)); emailErr != nil {
+	if emailErr := es.SendRefundIssuedEmail(*u, order.Language, order.ID.String(), utils.FormatDecimal(refunded)); emailErr != nil {
 		zap.L().Error("failed to send refund issued email", zap.String("order_id", order.ID.String()), zap.Error(emailErr))
 	}
 	return nil

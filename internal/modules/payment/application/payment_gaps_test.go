@@ -55,7 +55,8 @@ func TestRefundRemaining_RefundResponseProblems(t *testing.T) {
 		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
 		f.svc.mollieClient = mollieAnswering(t, jsonReply(http.StatusAccepted, `{"resource":"refund","id":"re_1","amount":{"currency":"EUR","value":"20.00"}}`))
 
-		refunded, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+		refundedAmount, _, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+		refunded := refundedAmount.IsPositive()
 
 		require.ErrorContains(t, err, "failed to create refund")
 		assert.False(t, refunded)
@@ -66,7 +67,8 @@ func TestRefundRemaining_RefundResponseProblems(t *testing.T) {
 		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
 		f.svc.mollieClient = mollieAnswering(t, jsonReply(http.StatusCreated, `{"resource":"refund","id":"re_1","amount":{"currency":"EUR","value":"abc"}}`))
 
-		refunded, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+		refundedAmount, _, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+		refunded := refundedAmount.IsPositive()
 
 		require.ErrorContains(t, err, "failed to parse refund amount")
 		assert.False(t, refunded)
@@ -77,7 +79,8 @@ func TestRefundRemaining_RefundResponseProblems(t *testing.T) {
 		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
 		f.svc.repo = markFailingRepo{f.repo}
 
-		refunded, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+		refundedAmount, _, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+		refunded := refundedAmount.IsPositive()
 
 		require.ErrorContains(t, err, "failed to mark payment as refunded")
 		assert.False(t, refunded)

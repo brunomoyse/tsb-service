@@ -271,9 +271,9 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	// cancel that the payment provider refuses leaves the order untouched, so staff can retry. See cancelOrder.
 	cancelling := input.Status != nil && *input.Status == orderDomain.OrderStatusCanceled &&
 		oldOrder.OrderStatus != orderDomain.OrderStatusCanceled
-	var refundIssued bool
+	var settlement paymentDomain.CancelSettlement
 	if cancelling {
-		oldOrder, refundIssued, err = r.cancelOrder(ctx, id, input, oldOrder)
+		oldOrder, settlement, err = r.cancelOrder(ctx, id, input, oldOrder)
 		if err != nil {
 			return nil, err
 		}
@@ -427,9 +427,11 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 
 	// On the transition into CANCELLED: tell the customer about the refund (the payment was settled
 	// before the status was saved, see above) and send the cancellation email. Re-saving an order
-	// that was already cancelled does neither again.
+	// that was already cancelled does neither again. The refund e-mail is sent here, after the save,
+	// and not when the money moved: a refund whose order save failed is only mentioned once the retry
+	// saves the order, and it then states what is back with the customer (RefundNotice).
 	if o.OrderStatus == orderDomain.OrderStatusCanceled && oldOrder.OrderStatus != orderDomain.OrderStatusCanceled {
-		if refundIssued {
+		if refundNotice := settlement.RefundNotice(); refundNotice.IsPositive() {
 			go func() {
 				ctx, cancel := emailContext()
 				defer cancel()
@@ -442,7 +444,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 				if !user.NotifyOrderUpdates {
 					return
 				}
-				refundAmount := utils.FormatDecimal(o.TotalPrice)
+				refundAmount := utils.FormatDecimal(refundNotice)
 				err = es.SendRefundIssuedEmail(*user, lang, o.ID.String(), refundAmount)
 				if err != nil {
 					zap.L().Error("failed to send refund issued email", zap.String("order_id", o.ID.String()), zap.Error(err))

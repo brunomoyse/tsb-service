@@ -3,6 +3,7 @@ package graphql_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"tsb-service/internal/api/graphql/model"
 	"tsb-service/internal/api/graphql/resolver"
 	orderDomain "tsb-service/internal/modules/order/domain"
+	"tsb-service/pkg/email/smtptest"
 )
 
 // Cancelling an order settles its payment: a paid one is refunded in full, an open one is cancelled
@@ -106,6 +108,10 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 
 				assert.Equal(t, "CANCELLED", got.Status)
 				assert.Equal(t, []string{remaining}, env.Mollie.RefundAmounts(t, payID), "Mollie is asked for amount - 5.00, not for the full amount")
+				// ... and the customer is told what came back to them with this refund, not the order total.
+				text := smtptest.Parse(t, env.Mail.WaitSubject(t, c.email, "Your refund has been issued").Data).Text
+				assert.Contains(t, text, strings.ReplaceAll(remaining, ".", ","), "the amount refunded now")
+				assert.NotContains(t, text, strings.ReplaceAll(amount, ".", ","), "not the order total")
 				assert.Equal(t, amount, env.paymentCol(t, "amount_refunded", payID), "the running total is recorded: the payment is refunded in full")
 			})
 		}
@@ -552,18 +558,32 @@ func TestCancelSettledButNotSaved(t *testing.T) {
 		assert.Equal(t, "canceled", env.paymentCol(t, "status", payID))
 	})
 
-	t.Run("a refund whose save failed stays refunded and the retry saves the order", func(t *testing.T) {
-		order := env.placeOnlineOrder(t, env.newPushCustomer(t, "refund-save-failed", false))
+	// The money moved on the first attempt but the order was not saved, so nobody was told. The
+	// retry refunds nothing, and still sends the refund e-mail: exactly one in all, for the amount.
+	t.Run("a refund whose save failed stays refunded, the retry saves the order and sends the one refund e-mail", func(t *testing.T) {
+		c := env.newPushCustomer(t, "refund-save-failed", true)
+		order := env.placeOnlineOrder(t, c)
 		env.markPaid(t, order.ID)
 		payID := order.Payment.MolliePaymentID
+		amount := env.paymentCol(t, "amount", payID)
 
 		require.Error(t, cancel(failingSave, order.ID))
 		assert.Equal(t, "PENDING", env.orderStatus(t, order.ID))
-		assert.Equal(t, env.paymentCol(t, "amount", payID), env.paymentCol(t, "amount_refunded", payID))
+		assert.Equal(t, amount, env.paymentCol(t, "amount_refunded", payID))
+		assert.Zero(t, env.Mail.CountSubject(t, c.email, "Your refund has been issued"), "nothing is sent while the order is not cancelled")
 
 		require.NoError(t, cancel(env.Resolver, order.ID))
 		assert.Equal(t, "CANCELLED", env.orderStatus(t, order.ID))
 		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID), 1, "refunded once")
+		text := smtptest.Parse(t, env.Mail.WaitSubject(t, c.email, "Your refund has been issued").Data).Text
+		assert.Contains(t, text, strings.ReplaceAll(amount, ".", ","))
+
+		// Cancelling it yet again neither refunds nor writes again.
+		require.NoError(t, cancel(env.Resolver, order.ID))
+		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		require.Never(t, func() bool {
+			return env.Mail.CountSubject(t, c.email, "Your refund has been issued") > 1 || env.Mail.CountSubject(t, c.email, "Order canceled") > 1
+		}, 200*time.Millisecond, 20*time.Millisecond)
 	})
 
 	t.Run("failing to record the status after a successful save is only logged, the webhook records it", func(t *testing.T) {

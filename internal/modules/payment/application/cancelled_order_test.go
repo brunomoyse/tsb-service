@@ -191,7 +191,7 @@ func TestSettleCancelledOrderPayment(t *testing.T) {
 	t.Run("open payment is cancelled at Mollie", func(t *testing.T) {
 		svc, fm, _ := newTestService(t, dummyPayment(domain.PaymentStatusOpen), dummyOrder(orderDomain.OrderStatusCanceled))
 		settled, err := svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusOpen))
-		refunded := settled.Refunded
+		refunded := settled.Refunded.IsPositive()
 		if err != nil || refunded {
 			t.Fatalf("refunded=%v err=%v, want false nil", refunded, err)
 		}
@@ -203,12 +203,12 @@ func TestSettleCancelledOrderPayment(t *testing.T) {
 	t.Run("paid payment is refunded, already refunded is skipped", func(t *testing.T) {
 		svc, fm, repo := newTestService(t, dummyPayment(domain.PaymentStatusPaid), dummyOrder(orderDomain.OrderStatusCanceled))
 		settled, err := svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusPaid))
-		refunded := settled.Refunded
+		refunded := settled.Refunded.IsPositive()
 		if err != nil || !refunded {
 			t.Fatalf("refunded=%v err=%v, want true nil", refunded, err)
 		}
 		settledAgain, err := svc.SettleCancelledOrderPayment(t.Context(), repo.payment)
-		again := settledAgain.Refunded
+		again := settledAgain.Refunded.IsPositive()
 		if err != nil || again {
 			t.Fatalf("second refund: refunded=%v err=%v, want false nil", again, err)
 		}

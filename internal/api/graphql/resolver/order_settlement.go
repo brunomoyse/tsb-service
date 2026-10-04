@@ -35,20 +35,20 @@ import (
 // instead of cancelling the order.
 //
 // It returns the order as it was when this call took over (the caller compares it with the saved one
-// to decide on notifications) and the whether a refund was issued.
-func (r *Resolver) cancelOrder(ctx context.Context, orderID uuid.UUID, input model.UpdateOrderInput, seen *orderDomain.Order) (*orderDomain.Order, bool, error) {
+// to decide on notifications) and the what the settlement refunded.
+func (r *Resolver) cancelOrder(ctx context.Context, orderID uuid.UUID, input model.UpdateOrderInput, seen *orderDomain.Order) (*orderDomain.Order, paymentDomain.CancelSettlement, error) {
 	payment, err := r.PaymentService.GetPaymentByOrderID(ctx, orderID)
 	switch {
 	case errors.Is(err, sql.ErrNoRows), err == nil && payment == nil:
-		return seen, false, r.saveOrder(ctx, orderID, input) // cash order: nothing was charged
+		return seen, paymentDomain.CancelSettlement{}, r.saveOrder(ctx, orderID, input) // cash order: nothing was charged
 	case err != nil:
-		return nil, false, paymentLookupFailed(orderID, err)
+		return nil, paymentDomain.CancelSettlement{}, paymentLookupFailed(orderID, err)
 	}
 
 	var (
-		previous   = seen
-		refunded   bool
-		inner      error
+		previous = seen
+		settled  paymentDomain.CancelSettlement
+		inner    error
 	)
 	lockErr := r.PaymentService.WithPaymentLock(ctx, payment.MolliePaymentID, func(ctx context.Context) error {
 		inner = func() error {
@@ -79,7 +79,7 @@ func (r *Resolver) cancelOrder(ctx context.Context, orderID uuid.UUID, input mod
 			if err := r.saveOrder(ctx, orderID, input); err != nil {
 				return err
 			}
-			refunded = settlement.Refunded
+			settled = settlement
 			// Recorded only now that the order is saved: if saving failed, our row still says "open" and
 			// Mollie's canceled webhook cancels the order (the idempotency check compares with that row).
 			if u := settlement.StatusUpdate; u != nil {
@@ -94,14 +94,14 @@ func (r *Resolver) cancelOrder(ctx context.Context, orderID uuid.UUID, input mod
 	})
 	switch {
 	case inner != nil:
-		return nil, false, inner
+		return nil, paymentDomain.CancelSettlement{}, inner
 	case lockErr != nil:
 		zap.L().Error("cannot cancel the order: payment lock failed",
 			zap.String("order_id", orderID.String()), zap.String("payment_id", payment.MolliePaymentID), zap.Error(lockErr))
-		return nil, false, apperr.New(apperr.CodePaymentSettlementFailed,
+		return nil, paymentDomain.CancelSettlement{}, apperr.New(apperr.CodePaymentSettlementFailed,
 			"the payment of this order could not be refunded or cancelled, so the order was NOT cancelled; please try again")
 	}
-	return previous, refunded, nil
+	return previous, settled, nil
 }
 
 func (r *Resolver) saveOrder(ctx context.Context, orderID uuid.UUID, input model.UpdateOrderInput) error {
