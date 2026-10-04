@@ -4,6 +4,7 @@
 package scalewaytest
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -37,4 +38,39 @@ func use(t *testing.T, host, port string) {
 	t.Setenv("SCW_SENDER_EMAIL", "noreply@example.test")
 	t.Setenv("SCW_SENDER_NAME", "Test")
 	require.NoError(t, es.InitService())
+}
+
+// UseInMain is Use for a whole test binary, called from TestMain (before m.Run) where no *testing.T
+// exists: the backend stays on the server for every test of the package, so no test depends on
+// which test happened to configure it first. Call the returned function after m.Run.
+func UseInMain(s *smtptest.Server) (restore func(), err error) {
+	restoreBackend := es.SaveBackend()
+	set := map[string]string{
+		"SMTP_HOST": s.Host(), "SMTP_PORT": s.Port(), "SMTP_USER": "", "SMTP_PASSWORD": "",
+		"SCW_SENDER_EMAIL": "noreply@example.test", "SCW_SENDER_NAME": "Test shop",
+	}
+	prev := map[string]*string{}
+	for k, v := range set {
+		if old, ok := os.LookupEnv(k); ok {
+			prev[k] = &old
+		} else {
+			prev[k] = nil
+		}
+		if err := os.Setenv(k, v); err != nil {
+			return nil, err
+		}
+	}
+	if err := es.InitService(); err != nil {
+		return nil, err
+	}
+	return func() {
+		for k, old := range prev {
+			if old == nil {
+				_ = os.Unsetenv(k)
+			} else {
+				_ = os.Setenv(k, *old)
+			}
+		}
+		restoreBackend()
+	}, nil
 }

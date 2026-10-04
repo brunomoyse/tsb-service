@@ -41,11 +41,13 @@ type Server struct {
 	advertiseAuth bool
 }
 
-// Start listens on a free loopback port and serves until the test ends.
-func Start(t *testing.T) *Server {
-	t.Helper()
+// New listens on a free loopback port and serves until Close. Use it where there is no *testing.T
+// (a TestMain); tests call Start.
+func New() (*Server, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 	s := &Server{ln: ln}
 	go func() {
 		for {
@@ -56,7 +58,15 @@ func Start(t *testing.T) *Server {
 			go s.handle(c)
 		}
 	}()
-	t.Cleanup(func() { _ = ln.Close() })
+	return s, nil
+}
+
+// Start is New for a test: the server stops when the test ends.
+func Start(t *testing.T) *Server {
+	t.Helper()
+	s, err := New()
+	require.NoError(t, err)
+	t.Cleanup(s.Close)
 	return s
 }
 
