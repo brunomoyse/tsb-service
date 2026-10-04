@@ -4,7 +4,7 @@ Un remboursement de {{.RefundAmount}} € a été effectué pour votre commande 
 
 Veuillez compter quelques jours ouvrables pour que le montant apparaisse sur votre compte.
 
-Pour toute question, n'hésitez pas à contacter directement le restaurant au 04 222 98 88.
+Pour toute question, n'hésitez pas à contacter directement le restaurant au {{restaurantPhone}}.
 
 Cet e-mail est automatique, merci de ne pas y répondre.
 

@@ -6,4 +6,6 @@ Nos chefs ont préparé de nouveaux plats délicieux rien que pour vous. Venez d
 
 Découvrir le menu : {{.MenuLink}}
 
+Vous ne souhaitez plus recevoir ces e-mails ? Désactivez-les dans les préférences de votre compte.
+
 © 2026 {{restaurantName}}. Tous droits réservés.

@@ -1,6 +1,6 @@
 Bonjour {{.UserName}},
 
-Merci d'avoir passé commande chez {{restaurantName}} ! Nous vous confirmons la réception de votre commande, qui est actuellement en attente de validation par le restaurant. Vous recevrez prochainement un nouvel e-mail confirmant votre commande et précisant le délai estimé pour la livraison ou le retrait.
+Merci d'avoir passé commande chez {{restaurantName}} ! Nous vous confirmons la réception de votre commande, qui est actuellement en attente de confirmation par le restaurant. Vous recevrez prochainement un nouvel e-mail confirmant votre commande et précisant le délai estimé pour la livraison ou le retrait.
 
 ----------------------------
 Récapitulatif de la commande
@@ -17,14 +17,14 @@ Sous-total :               {{.SubtotalPrice}} €
 Frais de livraison :       {{.DeliveryFee}} €
 {{end}}
 {{if .HasTakeaway}}
-Remise à emporter (-10%) : -{{.TakeawayDiscount}} €
+Remise à emporter : -{{.TakeawayDiscount}} €
 {{end}}
 {{if .HasCoupon}}
-Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}} : -{{.CouponDiscount}} €
+Code promo{{if .CouponCode}} ({{.CouponCode}}){{end}} : -{{.CouponDiscount}} €
 {{end}}
 Total :                    {{.TotalPrice}} €
 
-Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions pour votre confiance et sommes impatients de vous faire découvrir notre expérience sushi authentique.
+Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter. Merci pour votre confiance !
 
 Si vous n'êtes pas à l'origine de cette commande, veuillez ignorer cet e-mail.
 

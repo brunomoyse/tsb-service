@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Commande Reçue | {{restaurantName}}</title>
+    <title>Commande reçue | {{restaurantName}}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#F6F5F2;font-family:'Helvetica Neue',Arial,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F6F5F2;">
@@ -18,7 +18,7 @@
     <!-- CONTENT -->
     <tr><td style="background-color:#ffffff;padding:36px;">
         <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">Bonjour {{.UserName}},</p>
-        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Merci d'avoir passé commande chez <strong>{{restaurantName}}</strong> ! Nous vous confirmons la réception de votre commande, qui est actuellement en attente de validation par le restaurant. Vous recevrez prochainement un nouvel e-mail confirmant votre commande et précisant le délai estimé pour la livraison ou le retrait.</p>
+        <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">Merci d'avoir passé commande chez <strong>{{restaurantName}}</strong> ! Nous vous confirmons la réception de votre commande, qui est actuellement en attente de confirmation par le restaurant. Vous recevrez prochainement un nouvel e-mail confirmant votre commande et précisant le délai estimé pour la livraison ou le retrait.</p>
         <p style="margin:0 0 8px;font-size:16px;font-weight:600;color:#2D2D2D;">Récapitulatif de la commande</p>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">
             <tr>
@@ -41,13 +41,13 @@
             </tr>
             {{if .HasTakeaway}}
             <tr>
-                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Remise à emporter (-10%) :</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Remise à emporter :</td>
                 <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">-{{.TakeawayDiscount}}&nbsp;&euro;</td>
             </tr>
             {{end}}
             {{if .HasCoupon}}
             <tr>
-                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}} :</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">Code promo{{if .CouponCode}} ({{.CouponCode}}){{end}} :</td>
                 <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">-{{.CouponDiscount}}&nbsp;&euro;</td>
             </tr>
             {{end}}
@@ -62,7 +62,7 @@
                 <td style="padding:12px 0 0;border-top:2px solid #E8E4DF;font-size:16px;font-weight:600;color:#2D2D2D;text-align:right;white-space:nowrap;">{{.TotalPrice}}&nbsp;&euro;</td>
             </tr>
         </table>
-        <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#2D2D2D;">Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter. Nous vous remercions pour votre confiance et sommes impatients de vous faire découvrir notre expérience sushi authentique.</p>
+        <p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#2D2D2D;">Si vous avez des questions concernant votre commande, n'hésitez pas à nous contacter. Merci pour votre confiance !</p>
     </td></tr>
     <!-- FOOTER -->
     <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:0 0 12px 12px;">

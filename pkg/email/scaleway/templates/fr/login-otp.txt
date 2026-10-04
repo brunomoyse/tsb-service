@@ -6,7 +6,6 @@ Voici votre code de connexion à {{restaurantName}}. Saisissez-le sur la page de
 
 Ce code est valable quelques minutes seulement. Si vous n'avez pas demandé à vous connecter, ignorez cet e-mail — votre compte reste sécurisé.
 
-À très bientôt chez {{restaurantName}}.
-お待ちしております！ (Nous vous attendons !)
+À très bientôt chez {{restaurantName}} !
 
 © 2026 {{restaurantName}}. Tous droits réservés.
