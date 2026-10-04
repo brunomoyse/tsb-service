@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +25,12 @@ import (
 type fakeMollie struct {
 	mu    sync.Mutex
 	calls []string
+	// What GET /v2/payments/tr_1 answers: the status, whether it can still be cancelled and, when
+	// set, the amountRefunded / amountRemaining Mollie reports.
+	status     string
+	cancelable bool
+	refunded   string
+	remaining  string
 }
 
 func (f *fakeMollie) handler(w http.ResponseWriter, r *http.Request) {
@@ -33,6 +40,21 @@ func (f *fakeMollie) handler(w http.ResponseWriter, r *http.Request) {
 	f.mu.Unlock()
 	w.Header().Set("Content-Type", "application/hal+json")
 	switch r.Method {
+	case http.MethodGet:
+		f.mu.Lock()
+		status, cancelable, refunded, remaining := f.status, f.cancelable, f.refunded, f.remaining
+		f.mu.Unlock()
+		extra := ""
+		if refunded != "" {
+			extra += `,"amountRefunded":{"currency":"EUR","value":"` + refunded + `"}`
+		}
+		if remaining == "" {
+			remaining = "20.00"
+		}
+		if remaining != "" {
+			extra += `,"amountRemaining":{"currency":"EUR","value":"` + remaining + `"}`
+		}
+		_, _ = fmt.Fprintf(w, `{"resource":"payment","id":"tr_1","status":%q,"isCancelable":%t,"amount":{"currency":"EUR","value":"20.00"}%s}`, status, cancelable, extra)
 	case http.MethodPost: // create refund
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"resource":"refund","id":"re_1","amount":{"currency":"EUR","value":"20.00"},"status":"pending"}`))
@@ -77,6 +99,12 @@ func (r *fakePaymentRepo) MarkAsRefund(_ context.Context, _ string, amount decim
 	return nil
 }
 
+func (r *fakePaymentRepo) RefreshStatus(_ context.Context, _ string, u *domain.PaymentStatusUpdate) (*uuid.UUID, error) {
+	r.payment.Status = u.Status
+	r.payment.CanceledAt = u.CanceledAt
+	return &r.payment.OrderID, nil
+}
+
 type fakeOrders struct {
 	orderApplication.OrderService
 	order *orderDomain.Order
@@ -96,7 +124,7 @@ func (fakeUsers) GetUserByID(_ context.Context, id string) (*userDomain.User, er
 
 func newTestService(t *testing.T, payment *domain.MolliePayment, order *orderDomain.Order) (*paymentService, *fakeMollie, *fakePaymentRepo) {
 	t.Helper()
-	fm := &fakeMollie{}
+	fm := &fakeMollie{status: string(payment.Status), cancelable: payment.IsCancelable}
 	srv := httptest.NewServer(http.HandlerFunc(fm.handler))
 	t.Cleanup(srv.Close)
 
@@ -165,7 +193,8 @@ func TestHandlePaymentPaid_CancelledOrderIsRefundedOnce(t *testing.T) {
 func TestSettleCancelledOrderPayment(t *testing.T) {
 	t.Run("open payment is cancelled at Mollie", func(t *testing.T) {
 		svc, fm, _ := newTestService(t, dummyPayment(domain.PaymentStatusOpen), dummyOrder(orderDomain.OrderStatusCanceled))
-		refunded, err := svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusOpen))
+		settled, err := svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusOpen))
+		refunded := settled.Refunded.IsPositive()
 		if err != nil || refunded {
 			t.Fatalf("refunded=%v err=%v, want false nil", refunded, err)
 		}
@@ -176,11 +205,13 @@ func TestSettleCancelledOrderPayment(t *testing.T) {
 
 	t.Run("paid payment is refunded, already refunded is skipped", func(t *testing.T) {
 		svc, fm, repo := newTestService(t, dummyPayment(domain.PaymentStatusPaid), dummyOrder(orderDomain.OrderStatusCanceled))
-		refunded, err := svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusPaid))
+		settled, err := svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusPaid))
+		refunded := settled.Refunded.IsPositive()
 		if err != nil || !refunded {
 			t.Fatalf("refunded=%v err=%v, want true nil", refunded, err)
 		}
-		again, err := svc.SettleCancelledOrderPayment(t.Context(), repo.payment)
+		settledAgain, err := svc.SettleCancelledOrderPayment(t.Context(), repo.payment)
+		again := settledAgain.Refunded.IsPositive()
 		if err != nil || again {
 			t.Fatalf("second refund: refunded=%v err=%v, want false nil", again, err)
 		}

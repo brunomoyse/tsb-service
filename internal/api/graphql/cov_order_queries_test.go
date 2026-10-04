@@ -106,10 +106,14 @@ func TestOrderReadQueries(t *testing.T) {
 
 		resp = gqlAs(t, env.TestContext, admin, "en", `query ($id: ID!) { order(id: $id) { id } }`, map[string]any{"id": uuid.NewString()})
 		require.Len(t, resp.Errors, 1)
-		// NOTE(product decision pending): a missing order is reported as a generic "Internal server error"
-		// although the client could be told NOT_FOUND / USER_ERROR. Pinned as it is today; change it
-		// together with the resolver when the owner decides.
-		assert.Equal(t, "Internal server error", resp.Errors[0].Message)
+		assert.Equal(t, "NOT_FOUND", resp.Errors[0].Extensions["code"])
+		assert.Equal(t, "order not found", resp.Errors[0].Message, "a client error keeps its message, it is not the generic internal one")
+	})
+
+	t.Run("a customer asking for an order that does not exist gets NOT_FOUND", func(t *testing.T) {
+		resp := gqlAs(t, env.TestContext, aliceTok, "en", `query ($id: ID!) { myOrder(id: $id) { id } }`, map[string]any{"id": uuid.NewString()})
+		require.Len(t, resp.Errors, 1)
+		assert.Equal(t, "NOT_FOUND", resp.Errors[0].Extensions["code"])
 	})
 
 	const customerOrders = `query ($u: ID!, $first: Int, $page: Int) { customerOrders(userId: $u, first: $first, page: $page) { id } }`

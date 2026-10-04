@@ -111,10 +111,28 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 		}{Name: p.Name, Code: code}
 	}
 
+	// Legacy orders may have every stored line total at zero. The amount of each line is then unit
+	// price x quantity, on the printed line as well as in the subtotal, the total and the VAT, so the
+	// document adds up.
+	storedLinesTotal := decimal.Zero
+	for _, op := range *orderProducts {
+		storedLinesTotal = storedLinesTotal.Add(op.TotalPrice)
+	}
+	linesFromUnitPrices := storedLinesTotal.IsZero()
+	lineTotalOf := func(op domain.OrderProductRaw) decimal.Decimal {
+		if linesFromUnitPrices {
+			return op.UnitPrice.Mul(decimal.NewFromInt(op.Quantity))
+		}
+		return op.TotalPrice
+	}
+
 	// 8. Build invoice items with choice names
 	items := make([]invoice.InvoiceItem, 0, len(*orderProducts))
 	vatByRate := map[string]decimal.Decimal{}
+	itemsSubtotal := decimal.Zero
 	for _, op := range *orderProducts {
+		lineTotal := lineTotalOf(op)
+		itemsSubtotal = itemsSubtotal.Add(lineTotal)
 		prod := productMap[op.ProductID]
 		name := prod.Name
 
@@ -129,17 +147,17 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 			}
 		}
 
-		itemName, itemQty, itemUnit := invoiceLineAmounts(name, op.Quantity, op.UnitPrice, op.TotalPrice)
+		itemName, itemQty, itemUnit := invoiceLineAmounts(name, op.Quantity, op.UnitPrice, lineTotal)
 		items = append(items, invoice.InvoiceItem{
 			Name:      itemName,
 			Code:      prod.Code,
 			Quantity:  itemQty,
 			UnitPrice: utils.FormatDecimal(itemUnit),
-			LineTotal: utils.FormatDecimal(op.TotalPrice),
+			LineTotal: utils.FormatDecimal(lineTotal),
 		})
 
 		vatRate := op.VatRateApplied
-		vatAmount := vatAmountFromGross(op.TotalPrice, vatRate)
+		vatAmount := vatAmountFromGross(lineTotal, vatRate)
 		if vatAmount.IsZero() {
 			continue
 		}
@@ -155,35 +173,16 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 		return
 	}
 
-	// 10. Compute subtotal from line items (sum of item totals before discounts/fees)
-	itemsSubtotal := decimal.Zero
-	for _, op := range *orderProducts {
-		itemsSubtotal = itemsSubtotal.Add(op.TotalPrice)
-	}
-
-	// Use order.TotalPrice if available, otherwise compute from items
+	// 10. The subtotal is the sum of the line items (before discounts/fees), computed above.
+	// Use order.TotalPrice if available, otherwise (or when the lines had to be priced from their
+	// unit prices) compute it from the items.
 	totalPrice := order.TotalPrice
-	if totalPrice.IsZero() && !itemsSubtotal.IsZero() {
+	if (totalPrice.IsZero() || linesFromUnitPrices) && !itemsSubtotal.IsZero() {
 		totalPrice = itemsSubtotal.
 			Sub(order.TakeawayDiscount).
 			Sub(order.CouponDiscount)
 		if order.DeliveryFee != nil {
 			totalPrice = totalPrice.Add(*order.DeliveryFee)
-		}
-	}
-
-	// If both are zero but items have unit prices, compute from unit_price * quantity
-	if itemsSubtotal.IsZero() {
-		for _, op := range *orderProducts {
-			itemsSubtotal = itemsSubtotal.Add(op.UnitPrice.Mul(decimal.NewFromInt(op.Quantity)))
-		}
-		if !itemsSubtotal.IsZero() {
-			totalPrice = itemsSubtotal.
-				Sub(order.TakeawayDiscount).
-				Sub(order.CouponDiscount)
-			if order.DeliveryFee != nil {
-				totalPrice = totalPrice.Add(*order.DeliveryFee)
-			}
 		}
 	}
 

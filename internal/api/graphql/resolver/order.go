@@ -260,12 +260,25 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input model.UpdateOrderInput) (*model.Order, error) {
 	oldOrder, _, err := r.OrderService.GetOrderByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get order: %w", err)
+		return nil, orderLookupError(err)
 	}
 
-	err = r.OrderService.UpdateOrder(ctx, id, input.Status, input.EstimatedReadyTime, input.CancellationReason)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update order status: %w", err)
+	if err := r.refuseReopeningSettledOrder(ctx, oldOrder, input.Status); err != nil {
+		return nil, err
+	}
+
+	// Cancelling settles the payment FIRST and saves CANCELLED only when that worked: a refund or
+	// cancel that the payment provider refuses leaves the order untouched, so staff can retry. See cancelOrder.
+	cancelling := input.Status != nil && *input.Status == orderDomain.OrderStatusCanceled &&
+		oldOrder.OrderStatus != orderDomain.OrderStatusCanceled
+	var settlement paymentDomain.CancelSettlement
+	if cancelling {
+		oldOrder, settlement, err = r.cancelOrder(ctx, id, input, oldOrder)
+		if err != nil {
+			return nil, err
+		}
+	} else if err = r.saveOrder(ctx, id, input); err != nil {
+		return nil, err
 	}
 
 	// Fetch the updated order
@@ -412,38 +425,31 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		}()
 	}
 
-	// On the transition into CANCELLED: refund a paid payment (or cancel an
-	// open one at Mollie) and send the cancellation email. Re-saving an order
-	// that was already cancelled does neither again.
+	// On the transition into CANCELLED: tell the customer about the refund (the payment was settled
+	// before the status was saved, see above) and send the cancellation email. Re-saving an order
+	// that was already cancelled does neither again. The refund e-mail is sent here, after the save,
+	// and not when the money moved: a refund whose order save failed is only mentioned once the retry
+	// saves the order, and it then states what is back with the customer (RefundNotice).
 	if o.OrderStatus == orderDomain.OrderStatusCanceled && oldOrder.OrderStatus != orderDomain.OrderStatusCanceled {
-		payment, err := r.PaymentService.GetPaymentByOrderID(ctx, o.ID)
-		if err == nil && payment != nil {
-			refunded, refundErr := r.PaymentService.SettleCancelledOrderPayment(ctx, payment)
-			if refundErr != nil {
-				return nil, fmt.Errorf("failed to initiate refund: %w", refundErr)
-			}
+		if refundNotice := settlement.RefundNotice(); refundNotice.IsPositive() {
+			go func() {
+				ctx, cancel := emailContext()
+				defer cancel()
+				user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
+				if err != nil {
+					zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
+					return
+				}
 
-			// Send refund issued email
-			if refunded {
-				go func() {
-					ctx, cancel := emailContext()
-					defer cancel()
-					user, err := r.UserService.GetUserByID(ctx, o.UserID.String())
-					if err != nil {
-						zap.L().Error("failed to retrieve user", zap.String("order_id", o.ID.String()), zap.Error(err))
-						return
-					}
-
-					if !user.NotifyOrderUpdates {
-						return
-					}
-					refundAmount := utils.FormatDecimal(o.TotalPrice)
-					err = es.SendRefundIssuedEmail(*user, lang, o.ID.String(), refundAmount)
-					if err != nil {
-						zap.L().Error("failed to send refund issued email", zap.String("order_id", o.ID.String()), zap.Error(err))
-					}
-				}()
-			}
+				if !user.NotifyOrderUpdates {
+					return
+				}
+				refundAmount := utils.FormatDecimal(refundNotice)
+				err = es.SendRefundIssuedEmail(*user, lang, o.ID.String(), refundAmount)
+				if err != nil {
+					zap.L().Error("failed to send refund issued email", zap.String("order_id", o.ID.String()), zap.Error(err))
+				}
+			}()
 		}
 
 		go func() {
@@ -705,7 +711,7 @@ func (r *mutationResolver) RegisterLiveActivityToken(ctx context.Context, orderI
 
 	order, _, err := r.OrderService.GetOrderByID(ctx, orderID)
 	if err != nil {
-		return false, fmt.Errorf("failed to load order: %w", err)
+		return false, orderLookupError(err)
 	}
 	if order == nil || order.UserID != uid {
 		return false, apperr.New(apperr.CodeNotFound, "order not found")
@@ -725,7 +731,7 @@ func (r *mutationResolver) RegisterLiveActivityToken(ctx context.Context, orderI
 func (r *mutationResolver) UpdateMyOrdersLanguage(ctx context.Context, language string) (int, error) {
 	lang := normalizeOrderLanguage(language)
 	if lang == "" {
-		return 0, fmt.Errorf("unsupported language: %q", language)
+		return 0, apperr.Newf(apperr.CodeUserError, "unsupported language: %q", language)
 	}
 
 	uid, err := uuid.Parse(utils.GetUserID(ctx))
@@ -1009,7 +1015,7 @@ func (r *queryResolver) Orders(ctx context.Context) ([]*model.Order, error) {
 func (r *queryResolver) Order(ctx context.Context, id uuid.UUID) (*model.Order, error) {
 	o, _, err := r.OrderService.GetOrderByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get order: %w", err)
+		return nil, orderLookupError(err)
 	}
 
 	if o == nil {
@@ -1136,7 +1142,7 @@ func (r *queryResolver) MyOrder(ctx context.Context, id uuid.UUID) (*model.Order
 	// @TODO: Check if the user is the owner of the order in the service layer.
 	o, _, err := r.OrderService.GetOrderByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get order: %w", err)
+		return nil, orderLookupError(err)
 	}
 
 	if o == nil {

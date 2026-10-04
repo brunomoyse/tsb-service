@@ -8,6 +8,7 @@ import (
 
 	"tsb-service/pkg/email/smtptest"
 
+	temv1alpha1 "github.com/scaleway/scaleway-sdk-go/api/tem/v1alpha1"
 	"github.com/stretchr/testify/require"
 )
 
@@ -196,4 +197,29 @@ func TestOrderThreadHeaders(t *testing.T) {
 	require.Equal(t, root, byKey["References"])
 	require.Regexp(t, `^<email-order-42-\d+@`+domain+`>$`, byKey["Message-ID"])
 	require.NotEqual(t, root, byKey["Message-ID"], "each email has its own id; the root is never sent")
+}
+
+// A send builds its request on a copy of baseReq: nothing a Send*Email function does to the copy
+// (appending a recipient, changing the sender) may reach the shared request or the next send.
+func TestCopyBaseReqIsIndependentOfTheSharedRequest(t *testing.T) {
+	isolateGlobals(t)
+	name := "Tokyo Sushi Bar"
+	spare := make([]*temv1alpha1.CreateEmailRequestAddress, 0, 4) // room to append in place: a shallow copy would write into it
+	baseReq = &temv1alpha1.CreateEmailRequest{
+		From: &temv1alpha1.CreateEmailRequestAddress{Email: "noreply@tsb.test", Name: &name},
+		To:   spare,
+	}
+
+	first, err := copyBaseReq()
+	require.NoError(t, err)
+	first.To = append(first.To, &temv1alpha1.CreateEmailRequestAddress{Email: "a@example.test"})
+	first.From.Email = "changed@example.test"
+	second, err := copyBaseReq()
+	require.NoError(t, err)
+
+	require.Empty(t, second.To, "the recipient of the first send is not in the second")
+	require.Empty(t, baseReq.To)
+	require.Equal(t, "noreply@tsb.test", baseReq.From.Email, "the sender of the shared request is untouched")
+	require.Equal(t, "noreply@tsb.test", second.From.Email)
+	require.Nil(t, spare[:1][0], "the shared backing array was not written to")
 }

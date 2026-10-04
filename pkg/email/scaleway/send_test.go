@@ -277,6 +277,33 @@ func TestEveryEmailFailsWhenATemplateHalfIsMissing(t *testing.T) {
 	}
 }
 
+// TestEveryEmailFailsCleanlyWhenTheServiceIsNotInitialized: without InitService there is no sender,
+// region or project. A send must return an error (the callers log it or answer 500), not
+// dereference a nil request: most of them run in goroutines where a panic ends the process.
+func TestEveryEmailFailsCleanlyWhenTheServiceIsNotInitialized(t *testing.T) {
+	extra := []sendCase{
+		{name: "feedback", send: func(string) error { return SendFeedbackEmail("A", "a@x.test", "svc", "typ", "msg", "en") }},
+		{name: "assistant disconnected", send: func(string) error {
+			return SendAssistantDisconnectedEmail("owner@x.test", "https://dash.test", time.Now())
+		}},
+	}
+	for _, tc := range append(sendCases(), extra...) {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := smtptest.Start(t)
+			useSMTP(t, srv)
+			t.Setenv("FEEDBACK_RECIPIENT_EMAIL", "admin@x.test")
+			baseReq = nil // useSMTP installed one; isolateGlobals (in useSMTP) restores it afterwards
+			require.False(t, IsInitialized())
+
+			var err error
+			require.NotPanics(t, func() { err = tc.send("en") })
+
+			require.ErrorIs(t, err, ErrNotInitialized)
+			require.Empty(t, srv.Messages(), "nothing is sent")
+		})
+	}
+}
+
 // TestEveryEmailSurfacesDeliveryFailure: a rejected send is wrapped, not swallowed.
 func TestEveryEmailSurfacesDeliveryFailure(t *testing.T) {
 	extra := []sendCase{

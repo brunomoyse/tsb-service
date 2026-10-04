@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -62,7 +63,7 @@ func (m *memDevices) FindActiveFCMTokens(context.Context) ([]string, error) {
 	return m.activeFCM, m.activeErr
 }
 
-var errNoRows = fmt.Errorf("not found")
+var errNoRows = fmt.Errorf("pos device: %w", sql.ErrNoRows) // what the sqlx repository answers for an unknown id
 
 type deviceEnv struct {
 	svc  *Service
@@ -133,15 +134,21 @@ func TestDeviceLogin(t *testing.T) {
 		assert.Empty(t, e.repo.touched)
 	})
 
-	// NOTE(product decision pending): any lookup failure, a database outage included, is reported as
-	// ErrDeviceNotEnrolled (-> 403 "device not authorized"). A handheld cannot tell an outage from
-	// having lost its enrolment, and may wipe its credentials on the first one. Pinned as it is today;
-	// an outage should become a retryable 5xx.
-	t.Run("a repository error is reported as not enrolled", func(t *testing.T) {
+	// A database outage is not "not enrolled": the handheld could not tell it from having lost its
+	// enrolment (403) and may wipe its credentials on the first outage. It is a server fault.
+	t.Run("a repository error is a server fault, not 'not enrolled'", func(t *testing.T) {
 		e := newDeviceEnv(t)
 		e.repo.findErr = errors.New("db down")
 		_, err := e.svc.DeviceLogin(t.Context(), e.loginInput(now()))
-		assert.ErrorIs(t, err, ErrDeviceNotEnrolled)
+		require.ErrorContains(t, err, "load pos device: db down")
+		assert.NotErrorIs(t, err, ErrDeviceNotEnrolled)
+		assert.Empty(t, e.repo.touched)
+
+		// The same for the other calls that authenticate the device.
+		in := FCMTokenInput{DeviceID: e.id, FCMToken: "t", Timestamp: now(), Nonce: "n"}
+		err = e.svc.UpdateDeviceFCMToken(t.Context(), in)
+		require.ErrorContains(t, err, "load pos device")
+		assert.NotErrorIs(t, err, ErrDeviceNotEnrolled)
 	})
 
 	t.Run("revoked device", func(t *testing.T) {

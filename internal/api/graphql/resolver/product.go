@@ -57,7 +57,7 @@ func (r *mutationResolver) CreateProduct(ctx context.Context, input model.Create
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create product: %w", err)
+		return nil, productWriteFailure("failed to create product", err)
 	}
 
 	// 2. If an image was supplied, forward it to the file‑service
@@ -137,7 +137,7 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 
 	// 3. Persist the update with the single domain object.
 	if err := r.ProductService.UpdateProduct(ctx, prod); err != nil {
-		return nil, fmt.Errorf("failed to update product: %w", err)
+		return nil, productWriteFailure("failed to update product", err)
 	}
 
 	// 4. Refetch to get latest DB state (e.g. regenerated slug).
