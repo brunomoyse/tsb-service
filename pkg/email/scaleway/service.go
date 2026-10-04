@@ -191,7 +191,7 @@ func SendVerificationEmail(user userDomain.User, lang string, verificationURL st
 	subjects := map[string]string{
 		"en": "Please verify your email",
 		"fr": "Veuillez vérifier votre adresse e-mail",
-		"zh": "验证您的邮箱",
+		"zh": "请验证您的邮箱",
 		"nl": "Bevestig uw e-mailadres",
 	}
 
@@ -246,7 +246,7 @@ func SendWelcomeEmail(user userDomain.User, lang, menuURL string) error {
 	subjects := map[string]string{
 		"en": "Welcome to " + brandCfg().Name,
 		"fr": "Bienvenue chez " + brandCfg().Name,
-		"zh": "欢迎光临 " + brandCfg().Name,
+		"zh": "欢迎来到 " + brandCfg().Name,
 		"nl": "Welkom bij " + brandCfg().Name,
 	}
 
@@ -299,10 +299,10 @@ func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.
 	}
 
 	subjects := map[string]string{
-		"en": "Order pending validation",
-		"fr": "Commande en attente de validation",
-		"zh": "订单待验证",
-		"nl": "Bestelling wacht op bevestiging",
+		"en": "Order received, awaiting confirmation",
+		"fr": "Commande reçue, en attente de confirmation",
+		"zh": "已收到订单，等待餐厅确认",
+		"nl": "Bestelling ontvangen, wacht op bevestiging",
 	}
 
 	subject, ok := subjects[lang]
@@ -415,7 +415,7 @@ func SendLoginOtpEmail(user userDomain.User, lang string, code string) error {
 	}
 
 	subjects := map[string]string{
-		"en": fmt.Sprintf("Your sign-in code: %s", code),
+		"en": fmt.Sprintf("Your login code: %s", code),
 		"fr": fmt.Sprintf("Votre code de connexion : %s", code),
 		"zh": fmt.Sprintf("您的登录验证码：%s", code),
 		"nl": fmt.Sprintf("Uw inlogcode: %s", code),
@@ -457,11 +457,11 @@ var cancellationReasonLabels = map[string]map[orderDomain.OrderCancellationReaso
 	"nl": {
 		orderDomain.OrderCancellationReasonOutOfStock:    "uitverkocht",
 		orderDomain.OrderCancellationReasonKitchenClosed: "keuken gesloten",
-		orderDomain.OrderCancellationReasonDeliveryArea:  "buiten bezorggebied",
+		orderDomain.OrderCancellationReasonDeliveryArea:  "buiten de leveringszone",
 	},
 	"zh": {
 		orderDomain.OrderCancellationReasonOutOfStock:    "缺货",
-		orderDomain.OrderCancellationReasonKitchenClosed: "厨房已关闭",
+		orderDomain.OrderCancellationReasonKitchenClosed: "厨房已停止接单",
 		orderDomain.OrderCancellationReasonDeliveryArea:  "超出配送范围",
 	},
 }
@@ -510,7 +510,7 @@ func SendOrderCanceledEmail(user userDomain.User, lang string, orderID string, r
 	}
 
 	subjects := map[string]string{
-		"en": "Order canceled",
+		"en": "Order cancelled",
 		"fr": "Commande annulée",
 		"zh": "订单已取消",
 		"nl": "Bestelling geannuleerd",
@@ -621,7 +621,7 @@ func SendOrderCompletedEmail(user userDomain.User, lang string) error {
 	subjects := map[string]string{
 		"en": "Thank you for your order!",
 		"fr": "Merci pour votre commande !",
-		"zh": "感谢您的订单！",
+		"zh": "感谢您的惠顾！",
 		"nl": "Bedankt voor uw bestelling!",
 	}
 
@@ -716,7 +716,7 @@ func SendAccountLinkedEmail(user userDomain.User, lang string) error {
 	subjects := map[string]string{
 		"en": "Google account linked",
 		"fr": "Compte Google associé",
-		"zh": "Google 帐户已关联",
+		"zh": "Google 账户已关联",
 		"nl": "Google-account gekoppeld",
 	}
 
@@ -761,10 +761,10 @@ func SendReadyTimeUpdatedEmail(user userDomain.User, lang string, order orderDom
 	}
 
 	subjects := map[string]string{
-		"en": "Updated estimated time",
-		"fr": "Horaire estimé modifié",
-		"zh": "预计时间已更新",
-		"nl": "Geschatte tijd bijgewerkt",
+		"en": "Your order's estimated time has changed",
+		"fr": "Nouvelle heure estimée pour votre commande",
+		"zh": "您的订单预计时间已更新",
+		"nl": "Nieuwe geschatte tijd voor uw bestelling",
 	}
 
 	subject, ok := subjects[lang]
@@ -812,7 +812,7 @@ func SendReengagementEmail(user userDomain.User, lang string) error {
 		"en": "We miss you at " + brandCfg().Name + "!",
 		"fr": "Vous nous manquez chez " + brandCfg().Name + " !",
 		"zh": brandCfg().Name + " 想念您！",
-		"nl": "Wij missen u bij " + brandCfg().Name + "!",
+		"nl": "We missen u, tot snel bij " + brandCfg().Name + "!",
 	}
 
 	subject, ok := subjects[lang]
