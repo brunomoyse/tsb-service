@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/scaleway/scaleway-sdk-go/logger"
 	"os"
+	"slices"
 	"time"
 	addressDomain "tsb-service/internal/modules/address/domain"
 	orderDomain "tsb-service/internal/modules/order/domain"
@@ -105,12 +106,24 @@ func InitService() error {
 // failed): there is no sender, region or project to build a request from.
 var ErrNotInitialized = errors.New("email service is not initialized")
 
-// copyBaseReq returns a copy of baseReq for one send, so the shared request is never modified.
+// copyBaseReq returns a copy of baseReq for one send, so the shared request is never modified: the
+// slices and the sender are copied too, so that appending a recipient or changing the sender of one
+// send cannot show up in another, whatever a Send*Email function does with the request.
 func copyBaseReq() (temv1alpha1.CreateEmailRequest, error) {
 	if baseReq == nil {
 		return temv1alpha1.CreateEmailRequest{}, ErrNotInitialized
 	}
-	return *baseReq, nil
+	req := *baseReq
+	if baseReq.From != nil {
+		from := *baseReq.From
+		req.From = &from
+	}
+	req.To = slices.Clone(baseReq.To)
+	req.Cc = slices.Clone(baseReq.Cc)
+	req.Bcc = slices.Clone(baseReq.Bcc)
+	req.Attachments = slices.Clone(baseReq.Attachments)
+	req.AdditionalHeaders = slices.Clone(baseReq.AdditionalHeaders)
+	return req, nil
 }
 
 // IsInitialized returns true if either email backend has been initialized.
