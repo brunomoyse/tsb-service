@@ -20,22 +20,22 @@ Subtotaal:                 {{.SubtotalPrice}} €
 Leveringskosten:           {{.DeliveryFee}} €
 {{end}}
 {{if .HasTakeaway}}
-Afhaalkorting (-10%):      -{{.TakeawayDiscount}} €
+Afhaalkorting:      -{{.TakeawayDiscount}} €
 {{end}}
 {{if .HasCoupon}}
-Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}}: -{{.CouponDiscount}} €
+Kortingscode{{if .CouponCode}} ({{.CouponCode}}){{end}}: -{{.CouponDiscount}} €
 {{end}}
 Totaal:                    {{.TotalPrice}} €
 
 {{if .Address}}
 Leveringsadres:
 {{.Address.StreetName}} {{.Address.HouseNumber}}{{if .Address.BoxNumber}} (Bus {{.Address.BoxNumber}}){{end}}
-{{.Address.MunicipalityName}}, {{.Address.Postcode}}
+{{.Address.Postcode}} {{.Address.MunicipalityName}}
 {{end}}
 
 Om de status van uw bestelling te volgen, klikt u op de volgende link: {{.StatusLink}}
 
-Hebt u vragen over uw bestelling? Neem gerust contact met ons op. Wij danken u voor uw vertrouwen en kijken ernaar uit u te verwennen met onze authentieke sushi-ervaring.
+Hebt u vragen over uw bestelling? Neem gerust contact met ons op. Bedankt voor uw vertrouwen, en smakelijk!
 
 Als u deze bestelling niet hebt geplaatst, kunt u deze e-mail negeren.
 

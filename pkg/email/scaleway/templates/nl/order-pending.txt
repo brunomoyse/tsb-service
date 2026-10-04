@@ -17,14 +17,14 @@ Subtotaal:                 {{.SubtotalPrice}} €
 Leveringskosten:           {{.DeliveryFee}} €
 {{end}}
 {{if .HasTakeaway}}
-Afhaalkorting (-10%):      -{{.TakeawayDiscount}} €
+Afhaalkorting:      -{{.TakeawayDiscount}} €
 {{end}}
 {{if .HasCoupon}}
-Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}}: -{{.CouponDiscount}} €
+Kortingscode{{if .CouponCode}} ({{.CouponCode}}){{end}}: -{{.CouponDiscount}} €
 {{end}}
 Totaal:                    {{.TotalPrice}} €
 
-Hebt u vragen over uw bestelling? Neem gerust contact met ons op. Wij danken u voor uw vertrouwen en kijken ernaar uit u te laten genieten van onze authentieke sushi-ervaring.
+Hebt u vragen over uw bestelling? Neem gerust contact met ons op. Bedankt voor uw vertrouwen!
 
 Als u deze bestelling niet hebt geplaatst, kunt u deze e-mail negeren.
 

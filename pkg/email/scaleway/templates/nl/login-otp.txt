@@ -6,7 +6,6 @@ Hier is uw inlogcode voor {{restaurantName}}. Voer hem in op de inlogpagina om t
 
 Deze code is slechts enkele minuten geldig. Hebt u niet geprobeerd in te loggen? Negeer deze e-mail — uw account blijft veilig.
 
-Tot snel bij {{restaurantName}}.
-お待ちしております！ (Wij verwachten u!)
+Tot snel bij {{restaurantName}}!
 
 © 2026 {{restaurantName}}. Alle rechten voorbehouden.

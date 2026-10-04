@@ -1,9 +1,11 @@
 Hallo {{.UserName}},
 
-Het is al een tijdje geleden dat wij u bij {{restaurantName}} hebben gezien, en wij missen u!
+We hebben u al een tijdje niet meer gezien bij {{restaurantName}}, en we missen u!
 
 Onze chefs hebben heerlijke nieuwe gerechten bereid speciaal voor u. Kom de nieuwigheden op ons menu ontdekken.
 
 Menu ontdekken: {{.MenuLink}}
+
+Wilt u deze e-mails niet meer ontvangen? Schakel ze uit in de voorkeuren van uw account.
 
 © 2026 {{restaurantName}}. Alle rechten voorbehouden.
