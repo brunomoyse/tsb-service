@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -165,10 +166,14 @@ func (e *endpoint) subscribe(t *testing.T, token, query string, header http.Head
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.CloseNow() })
 
-	send := func(m wsMessage) {
+	// send and read are also called from helper goroutines, so they return errors instead of
+	// failing the test (require would call FailNow off the test goroutine).
+	send := func(m wsMessage) error {
 		raw, err := json.Marshal(m)
-		require.NoError(t, err)
-		require.NoError(t, conn.Write(ctx, coderws.MessageText, raw))
+		if err != nil {
+			return err
+		}
+		return conn.Write(ctx, coderws.MessageText, raw)
 	}
 	read := func() (wsMessage, error) {
 		for {
@@ -177,9 +182,13 @@ func (e *endpoint) subscribe(t *testing.T, token, query string, header http.Head
 				return wsMessage{}, err
 			}
 			var m wsMessage
-			require.NoError(t, json.Unmarshal(raw, &m))
+			if err := json.Unmarshal(raw, &m); err != nil {
+				return wsMessage{}, fmt.Errorf("bad frame %q: %w", raw, err)
+			}
 			if m.Type == "ping" {
-				send(wsMessage{Type: "pong"})
+				if err := send(wsMessage{Type: "pong"}); err != nil {
+					return wsMessage{}, err
+				}
 				continue
 			}
 			return m, nil
@@ -190,14 +199,152 @@ func (e *endpoint) subscribe(t *testing.T, token, query string, header http.Head
 		init["Authorization"] = "Bearer " + token
 	}
 	payload, _ := json.Marshal(init)
-	send(wsMessage{Type: "connection_init", Payload: payload})
+	require.NoError(t, send(wsMessage{Type: "connection_init", Payload: payload}))
 	ack, err := read()
 	require.NoError(t, err)
 	require.Equal(t, "connection_ack", ack.Type)
 
 	sub, _ := json.Marshal(map[string]string{"query": query})
-	send(wsMessage{ID: "1", Type: "subscribe", Payload: sub})
+	require.NoError(t, send(wsMessage{ID: "1", Type: "subscribe", Payload: sub}))
 	return conn, read
+}
+
+// tokenExp reads the exp claim back from a signed token, so assertions are made against the
+// token's own deadline and not against a duration guessed in the test.
+func tokenExp(t *testing.T, token string) time.Time {
+	t.Helper()
+	claims := jwt.MapClaims{}
+	_, _, err := jwt.NewParser().ParseUnverified(token, claims)
+	require.NoError(t, err)
+	exp, err := claims.GetExpirationTime()
+	require.NoError(t, err)
+	require.NotNil(t, exp, "the token carries an exp claim")
+	return exp.Time
+}
+
+// socketLife is what happened to one admin socket whose token expires.
+type socketLife struct {
+	exp     time.Time
+	liveAt  time.Time // arrival of the `next` frame that proves the socket was authenticated
+	endedAt time.Time
+	ending  wsMessage // the last frame before the socket ended (zero when it was just closed)
+	endErr  error     // the read error that ended the socket, if no `complete` frame did
+}
+
+// socketUntilExpiry opens a coupon subscription as an admin with a token that lives ttl (to the
+// second, as exp is whole seconds), proves the socket is live by receiving a published event as a
+// `next` frame BEFORE the token's exp, then waits for the socket to end. The token is either sent
+// in connection_init or, with viaHeader, on the upgrade request. A socket that was rejected at
+// once, or whose setup took longer than the token lived, never reaches "live": that attempt is
+// discarded and retried with a fresh token, so a loaded runner cannot turn into a false pass or
+// a flaky failure.
+func (e *endpoint) socketUntilExpiry(t *testing.T, ttl time.Duration, viaHeader bool) socketLife {
+	t.Helper()
+	const attempts = 3
+	for attempt := 1; attempt <= attempts; attempt++ {
+		token := signZitadelToken(t, e.key, e.env.Fixtures.AdminUser.ID.String(), true, ttl)
+		exp := tokenExp(t, token)
+		var life socketLife
+		life.exp = exp
+
+		var conn *coderws.Conn
+		var read func() (wsMessage, error)
+		if viaHeader {
+			conn, read = e.subscribe(t, "", `subscription { couponUpdated { code } }`, http.Header{"Authorization": {"Bearer " + token}})
+		} else {
+			conn, read = e.subscribe(t, token, `subscription { couponUpdated { code } }`, nil)
+		}
+
+		type frame struct {
+			m   wsMessage
+			err error
+			at  time.Time
+		}
+		frames := make(chan frame, 64)
+		go func() {
+			defer close(frames)
+			for {
+				m, err := read()
+				frames <- frame{m, err, time.Now()}
+				if err != nil || m.Type == "complete" || m.Type == "error" {
+					return
+				}
+			}
+		}()
+
+		// Publish until the event comes back as a `next` frame (live), a frame ends the socket
+		// early (rejected), or the token is about to expire (setup too slow).
+		liveDeadline := exp.Add(-time.Second)
+		tick := time.NewTicker(50 * time.Millisecond)
+		live, over := false, false
+		for !live && !over && time.Now().Before(liveDeadline) {
+			e.env.Resolver.Broker.Publish("couponUpdated", &model.Coupon{Code: "ALIVE"})
+			select {
+			case f, ok := <-frames:
+				switch {
+				case !ok:
+					over = true
+				case f.err == nil && f.m.Type == "next":
+					live, life.liveAt = true, f.at
+				default:
+					// An immediate rejection ("error"/"complete"/read error) is never "live".
+					require.Failf(t, "socket ended before its token expired",
+						"the socket was rejected %s before exp: %q %s (read error: %v)", time.Until(exp).Round(time.Millisecond), f.m.Type, f.m.Payload, f.err)
+				}
+			case <-tick.C:
+			}
+		}
+		tick.Stop()
+		if !live {
+			t.Logf("attempt %d: setup took too long for a %s token, retrying", attempt, ttl)
+			_ = conn.CloseNow()
+			continue
+		}
+		require.True(t, life.liveAt.Before(exp), "live frame arrived before exp")
+
+		// Now wait for the end, bounded relative to the token's exp.
+		timeout := time.After(time.Until(exp) + 15*time.Second)
+		for {
+			select {
+			case f, ok := <-frames:
+				if !ok {
+					return life
+				}
+				if f.err != nil {
+					life.endedAt, life.endErr = f.at, f.err
+					return life
+				}
+				life.ending = f.m
+				if f.m.Type == "complete" || f.m.Type == "error" {
+					life.endedAt = f.at
+					return life
+				}
+			case <-timeout:
+				require.Fail(t, "the socket outlived its token", "exp was %s", exp)
+			}
+		}
+	}
+	require.FailNow(t, "could not keep a socket live before its token expired", "tried %d times with a %s token", attempts, ttl)
+	return socketLife{}
+}
+
+// requireEndedWithToken asserts that the socket ended in an orderly way once the token expired,
+// not before it and not long after.
+func requireEndedWithToken(t *testing.T, life socketLife) {
+	t.Helper()
+	require.False(t, life.endedAt.IsZero(), "the socket ended")
+	assert.False(t, life.endedAt.Before(life.exp.Add(-time.Second)),
+		"it lived until the token expired: ended %s before exp", life.exp.Sub(life.endedAt))
+	assert.WithinDuration(t, life.exp, life.endedAt, 10*time.Second, "and not long past it")
+	// The server ends the subscription either with a `complete` frame or, when the connection
+	// context is cancelled first, with a normal-closure close frame ("terminated"); which of the two
+	// the client sees first is a race inside gqlgen. An `error` frame or an abnormal close would be
+	// a different, unintended ending.
+	if life.endErr != nil {
+		assert.Equal(t, coderws.StatusNormalClosure, coderws.CloseStatus(life.endErr), "ended by: %v", life.endErr)
+	} else {
+		assert.Equal(t, "complete", life.ending.Type, "payload: %s", life.ending.Payload)
+	}
 }
 
 func TestGraphQLEndpointOverHTTP(t *testing.T) {
@@ -314,18 +461,8 @@ func TestGraphQLEndpointSubscriptions(t *testing.T) {
 	})
 
 	t.Run("a socket ends when its token expires", func(t *testing.T) {
-		short := signZitadelToken(t, ep.key, env.Fixtures.AdminUser.ID.String(), true, 3*time.Second)
-		_, read := ep.subscribe(t, short, couponSub, nil)
-		start := time.Now()
-		for {
-			m, err := read()
-			if err != nil || m.Type == "complete" || m.Type == "error" {
-				break
-			}
-		}
-		elapsed := time.Since(start)
-		assert.GreaterOrEqual(t, elapsed, time.Second, "it lived until the token expired")
-		assert.Less(t, elapsed, 15*time.Second, "and not past it")
+		life := ep.socketUntilExpiry(t, 5*time.Second, false)
+		requireEndedWithToken(t, life)
 	})
 
 	t.Run("a browser origin must be on the allowlist, a native app sends none", func(t *testing.T) {
@@ -400,15 +537,7 @@ func TestGraphQLEndpointOptionsAndReporting(t *testing.T) {
 		}, 10*time.Second, 50*time.Millisecond)
 		assert.Contains(t, string((<-got).Payload), `"code":"HEADER"`)
 
-		short := signZitadelToken(t, ep.key, env.Fixtures.AdminUser.ID.String(), true, 3*time.Second)
-		_, read = ep.subscribe(t, "", `subscription { couponUpdated { code } }`, http.Header{"Authorization": {"Bearer " + short}})
-		start := time.Now()
-		for {
-			m, err := read()
-			if err != nil || m.Type == "complete" || m.Type == "error" {
-				break
-			}
-		}
-		assert.Less(t, time.Since(start), 15*time.Second)
+		life := ep.socketUntilExpiry(t, 5*time.Second, true)
+		requireEndedWithToken(t, life)
 	})
 }
