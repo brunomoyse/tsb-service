@@ -113,6 +113,26 @@ func (e *authEnv) run(t *testing.T, mw gin.HandlerFunc, configure func(*http.Req
 	return rec, s
 }
 
+// unsignedToken is a JWT with alg "none" and an empty signature.
+func unsignedToken(t *testing.T, claims jwt.MapClaims) string {
+	t.Helper()
+	tok := jwt.NewWithClaims(jwt.SigningMethodNone, claims)
+	tok.Header["kid"] = testKeyID
+	s, err := tok.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	require.NoError(t, err)
+	return s
+}
+
+// hmacToken is an HS256 JWT signed with the given secret, carrying the identity provider's key id.
+func hmacToken(t *testing.T, secret []byte, claims jwt.MapClaims) string {
+	t.Helper()
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tok.Header["kid"] = testKeyID
+	s, err := tok.SignedString(secret)
+	require.NoError(t, err)
+	return s
+}
+
 func bearer(tok string) func(*http.Request) {
 	return func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+tok) }
 }
@@ -166,6 +186,7 @@ func TestStrictAuthMiddleware_ZitadelTokens(t *testing.T) {
 			"wrong scheme": func(r *http.Request) { r.Header.Set("Authorization", "Basic abc") },
 			"bare token":   func(r *http.Request) { r.Header.Set("Authorization", e.token(t, jwt.MapClaims{"sub": testSub})) },
 			"empty cookie": func(r *http.Request) { r.AddCookie(&http.Cookie{Name: "access_token", Value: ""}) },
+			"empty bearer": func(r *http.Request) { r.Header.Set("Authorization", "Bearer ") },
 			"lowercase bearer": func(r *http.Request) {
 				r.Header.Set("Authorization", "bearer "+e.token(t, jwt.MapClaims{"sub": testSub}))
 			},
@@ -189,6 +210,11 @@ func TestStrictAuthMiddleware_ZitadelTokens(t *testing.T) {
 			"wrong audience":             e.token(t, jwt.MapClaims{"sub": testSub, "aud": []string{"someone-else"}}),
 			"wrong issuer":               e.token(t, jwt.MapClaims{"sub": testSub, "iss": "https://evil.example"}),
 			"empty subject":              e.token(t, jwt.MapClaims{"sub": ""}),
+			// Algorithm confusion: the token claims to be unsigned, or HMAC-signed with a value an
+			// attacker can know (a made-up secret, the public modulus), instead of RS256.
+			"alg none":                    unsignedToken(t, jwt.MapClaims{"sub": testSub, "aud": []string{testClientID}, "iss": "https://" + testIssuerHost, "exp": now.Add(time.Hour).Unix()}),
+			"HS256 with a guessed secret": hmacToken(t, []byte("secret"), jwt.MapClaims{"sub": testSub, "aud": []string{testClientID}, "iss": "https://" + testIssuerHost, "exp": now.Add(time.Hour).Unix()}),
+			"HS256 with the public key":   hmacToken(t, e.key.N.Bytes(), jwt.MapClaims{"sub": testSub, "aud": []string{testClientID}, "iss": "https://" + testIssuerHost, "exp": now.Add(time.Hour).Unix()}),
 		}
 		for name, tok := range cases {
 			rec, s := e.run(t, e.v.StrictAuthMiddleware(), bearer(tok))
@@ -197,6 +223,19 @@ func TestStrictAuthMiddleware_ZitadelTokens(t *testing.T) {
 			assert.False(t, s.reached, name)
 		}
 		assert.Zero(t, e.lookup.calls, "no account is provisioned for a rejected token")
+	})
+
+	// BUG(product decision pending): the verifier does not check "nbf" (not before). A token whose
+	// nbf lies an hour in the future is accepted, although it says it must not be used yet. Zitadel
+	// does not issue such tokens, so the exposure is low (the signature, issuer, audience and exp
+	// are still enforced), but RFC 7519 asks verifiers to reject them. When the verifier starts
+	// checking nbf, move this case into the rejected table of the test above.
+	t.Run("a token that is not valid yet (nbf in the future) is currently accepted", func(t *testing.T) {
+		e := newAuthEnv(t)
+		tok := e.token(t, jwt.MapClaims{"sub": testSub, "nbf": time.Now().Add(time.Hour).Unix()})
+		rec, s := e.run(t, e.v.StrictAuthMiddleware(), bearer(tok))
+		assert.Equal(t, http.StatusNoContent, rec.Code)
+		assert.True(t, s.reached)
 	})
 
 	t.Run("a user that cannot be resolved is refused, not let in under the raw sub", func(t *testing.T) {
