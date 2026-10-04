@@ -1071,13 +1071,31 @@ func TestRefundRemaining_Failures(t *testing.T) {
 		}
 	})
 
+	// BUG(product decision pending): refundRemaining only skips a payment that is fully refunded. A
+	// partially refunded one (5.00 of 20.00 already returned, e.g. by staff in the Mollie dashboard)
+	// is refunded for the FULL amount again, so Mollie is asked for 20.00 although at most 15.00 is
+	// left, and the call is refused or over-refunds. Flip the expectation to Amount - AmountRefunded
+	// ("15.00") once the owner decides.
 	t.Run("partially refunded payment is refunded for the full amount again", func(t *testing.T) {
-		// Documents current behaviour: only a fully refunded payment is skipped.
 		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
 		f.repo.payments["tr_1"].AmountRefunded = decimal.RequireFromString("5.00")
 		refunded, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
 		if err != nil || !refunded {
 			t.Fatalf("refunded=%v err=%v", refunded, err)
+		}
+		reqs := f.mollie.find(http.MethodPost, "/v2/payments/tr_1/refunds")
+		if len(reqs) != 1 {
+			t.Fatalf("want exactly one refund request, got %d", len(reqs))
+		}
+		var body struct {
+			Amount struct{ Value, Currency string } `json:"amount"`
+		}
+		if err := json.Unmarshal(reqs[0].Body, &body); err != nil {
+			t.Fatalf("refund body %q: %v", reqs[0].Body, err)
+		}
+		// Currently the whole payment amount; the correct remaining amount would be "15.00".
+		if body.Amount.Value != "20.00" || body.Amount.Currency != "EUR" {
+			t.Fatalf("refund amount sent to Mollie = %+v, want the full 20.00 EUR (current behaviour)", body.Amount)
 		}
 	})
 }

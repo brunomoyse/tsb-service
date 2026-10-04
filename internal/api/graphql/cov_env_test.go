@@ -260,6 +260,7 @@ type covMollie struct {
 
 	mu       sync.Mutex
 	calls    []string
+	bodies   []string // request body of calls[i]
 	seq      int
 	failPay  bool
 	failRef  bool
@@ -292,10 +293,38 @@ func (m *covMollie) callsMatching(prefix string) []string {
 	return out
 }
 
+// bodiesMatching returns the request bodies of the calls whose "METHOD /path" starts with prefix.
+func (m *covMollie) bodiesMatching(prefix string) []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []string
+	for i, c := range m.calls {
+		if strings.HasPrefix(c, prefix) {
+			out = append(out, m.bodies[i])
+		}
+	}
+	return out
+}
+
+// refundAmounts returns the "amount.value" asked for by each refund request of a payment.
+func (m *covMollie) refundAmounts(t *testing.T, paymentID string) []string {
+	t.Helper()
+	var out []string
+	for _, b := range m.bodiesMatching("POST /v2/payments/" + paymentID + "/refunds") {
+		var req struct {
+			Amount struct{ Value string } `json:"amount"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(b), &req), b)
+		out = append(out, req.Amount.Value)
+	}
+	return out
+}
+
 func (m *covMollie) serve(w http.ResponseWriter, r *http.Request) {
 	body, _ := io.ReadAll(r.Body)
 	m.mu.Lock()
 	m.calls = append(m.calls, r.Method+" "+r.URL.Path)
+	m.bodies = append(m.bodies, string(body))
 	failPay, failRef, failCanc := m.failPay, m.failRef, m.failCanc
 	m.seq++
 	seq := m.seq

@@ -51,6 +51,7 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		var amount string
 		require.NoError(t, env.DB.DB.GetContext(t.Context(), &amount, `SELECT amount::text FROM mollie_payments WHERE mollie_payment_id = $1`, payID))
 		assert.Equal(t, amount, refunded, "the whole payment is refunded")
+		assert.Equal(t, []string{amount}, env.Mollie.refundAmounts(t, payID), "Mollie is asked for the whole payment amount")
 
 		env.Mail.waitSubject(t, c.email, "Your refund has been issued")
 		env.Mail.waitSubject(t, c.email, "Order canceled")
@@ -62,6 +63,24 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		require.Never(t, func() bool {
 			return env.Mail.countSubject(t, c.email, "Order canceled") > 1 || env.Mail.countSubject(t, c.email, "Your refund has been issued") > 1
 		}, 400*time.Millisecond, 20*time.Millisecond)
+	})
+
+	// BUG(product decision pending): a payment that is already partially refunded (staff refunded
+	// part of it in the Mollie dashboard) is refunded for its FULL amount again on cancellation,
+	// instead of Amount - AmountRefunded; see also payment/application TestRefundRemaining_Failures.
+	// Flip the expectation to the remaining amount ("amount - 5.00") once the owner decides.
+	t.Run("a partially refunded payment is refunded for the full amount again", func(t *testing.T) {
+		c := env.newPushCustomer(t, "partial", true)
+		order := env.placeOnlineOrder(t, c)
+		env.markPaid(t, order.ID)
+		payID := order.Payment.MolliePaymentID
+		_, err := env.DB.DB.ExecContext(t.Context(), `UPDATE mollie_payments SET amount_refunded = 5.00 WHERE mollie_payment_id = $1`, payID)
+		require.NoError(t, err)
+		var amount string
+		require.NoError(t, env.DB.DB.GetContext(t.Context(), &amount, `SELECT amount::text FROM mollie_payments WHERE mollie_payment_id = $1`, payID))
+
+		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
+		assert.Equal(t, []string{amount}, env.Mollie.refundAmounts(t, payID), "currently the full amount, not amount - 5.00")
 	})
 
 	t.Run("an open payment is cancelled at Mollie, no refund is issued", func(t *testing.T) {
@@ -88,27 +107,58 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		assert.Equal(t, 1, logs.FilterMessage("open payment of a cancelled order is not cancelable at Mollie").Len())
 	})
 
+	// BUG(product decision pending): the CANCELLED status is saved BEFORE the payment is settled
+	// (resolver/order.go UpdateOrder persists, then calls SettleCancelledOrderPayment). When Mollie
+	// refuses, the staff member gets an error but the order is already CANCELLED with the money not
+	// refunded, and because only the transition into CANCELLED settles the payment, saving the
+	// order again never retries the refund. The customer paid and was neither refunded nor told.
+	// Flip these assertions (status stays PAID/previous, or a re-save retries) once the owner decides.
 	t.Run("a refund that Mollie refuses fails the update, the failure is not hidden", func(t *testing.T) {
 		c := env.newPushCustomer(t, "norefund", true)
 		order := env.placeOnlineOrder(t, c)
 		env.markPaid(t, order.ID)
+		payID := order.Payment.MolliePaymentID
 		env.Mollie.setFail(false, true, false)
 		t.Cleanup(func() { env.Mollie.setFail(false, false, false) })
 
 		_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "CANCELLED"})
 		require.NotNil(t, oerr)
 		assert.Equal(t, "Internal server error", oerr.Message)
-		assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM mollie_payments WHERE mollie_payment_id = $1 AND amount_refunded > 0`, order.Payment.MolliePaymentID))
+		assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM mollie_payments WHERE mollie_payment_id = $1 AND amount_refunded > 0`, payID))
+		assert.Len(t, env.Mollie.callsMatching("POST /v2/payments/"+payID+"/refunds"), 1, "Mollie was asked once")
+
+		// KNOWN BUG: the order is CANCELLED although the refund failed.
+		assert.Equal(t, 1, countRows(t, env.TestContext, `SELECT count(*) FROM orders WHERE id = $1 AND order_status = 'CANCELLED'`, order.ID))
+
+		// KNOWN BUG: with Mollie healthy again, saving the order again does not retry the refund.
+		env.Mollie.setFail(false, false, false)
+		again := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
+		assert.Equal(t, "CANCELLED", again.Status)
+		assert.Len(t, env.Mollie.callsMatching("POST /v2/payments/"+payID+"/refunds"), 1, "no retry on re-save")
+		assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM mollie_payments WHERE mollie_payment_id = $1 AND amount_refunded > 0`, payID), "the customer is still not refunded")
 	})
 
+	// BUG(product decision pending): same ordering problem for an open payment: the order is
+	// CANCELLED and the payment is still open (payable) at Mollie after the refused cancel, and a
+	// re-save does not retry the cancel.
 	t.Run("an open payment that Mollie refuses to cancel fails the update", func(t *testing.T) {
 		c := env.newPushCustomer(t, "nocancel", true)
 		order := env.placeOnlineOrder(t, c)
+		payID := order.Payment.MolliePaymentID
 		env.Mollie.setFail(false, false, true)
 		t.Cleanup(func() { env.Mollie.setFail(false, false, false) })
 
 		_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "CANCELLED"})
 		require.NotNil(t, oerr)
+		assert.Len(t, env.Mollie.callsMatching("DELETE /v2/payments/"+payID), 1)
+
+		// KNOWN BUG: CANCELLED is persisted although the payment could not be cancelled.
+		assert.Equal(t, 1, countRows(t, env.TestContext, `SELECT count(*) FROM orders WHERE id = $1 AND order_status = 'CANCELLED'`, order.ID))
+
+		// KNOWN BUG: no retry of the Mollie cancel when the order is saved again.
+		env.Mollie.setFail(false, false, false)
+		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
+		assert.Len(t, env.Mollie.callsMatching("DELETE /v2/payments/"+payID), 1, "no retry on re-save")
 	})
 
 	t.Run("a cash order has no payment to settle", func(t *testing.T) {
