@@ -30,7 +30,7 @@ require (
 	github.com/sideshow/apns2 v0.25.0
 	github.com/stretchr/testify v1.12.1
 	github.com/vektah/gqlparser/v2 v2.5.58
-	github.com/zitadel/zitadel-go/v3 v3.29.5
+	github.com/zitadel/zitadel-go/v3 v3.30.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/text v0.42.0
