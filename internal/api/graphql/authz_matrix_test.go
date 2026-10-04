@@ -14,6 +14,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
+	coderws "github.com/coder/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vektah/gqlparser/v2/ast"
@@ -99,21 +100,53 @@ func zeroLiteral(schema *ast.Schema, t *ast.Type) string {
 	}
 }
 
+// publicFields is the explicit allowlist of root fields that are meant to be reachable without a
+// directive (anonymous callers included). A new Query, Mutation or Subscription field with neither
+// @auth, @admin or @staff nor an entry here fails TestEveryRootFieldIsProtectedOrExplicitlyPublic.
+// Adding a name here is a conscious decision that the field is public: say why in the commit.
+var publicFields = map[string]string{
+	"query autocompleteAddresses":           "address search of the checkout form, rate limited, no personal data",
+	"query product":                         "public catalog",
+	"query productCategories":               "public catalog",
+	"query productCategory":                 "public catalog",
+	"query productCategoryBySlug":           "public catalog",
+	"query products":                        "public catalog",
+	"query quoteOrder":                      "price quote before login; the resolver rejects an expired token itself (order_quote.go)",
+	"query resolveAddress":                  "address lookup of the checkout form, rate limited, no personal data",
+	"query restaurantConfig":                "opening hours and status shown on the public site",
+	"subscription productUpdated":           "live public catalog",
+	"subscription restaurantConfigUpdated":  "live public opening hours and status",
+	"subscription scheduleOverridesUpdated": "live public schedule overrides",
+}
+
+func rootFields(schema *ast.Schema) map[string]*ast.Definition {
+	roots := map[string]*ast.Definition{"query": schema.Query, "mutation": schema.Mutation}
+	if schema.Subscription != nil {
+		roots["subscription"] = schema.Subscription
+	}
+	return roots
+}
+
+func fieldDirective(f *ast.FieldDefinition) string {
+	var directive string
+	for _, d := range f.Directives {
+		switch d.Name {
+		case "auth", "admin", "staff":
+			directive = d.Name
+		}
+	}
+	return directive
+}
+
 func protectedFields(t *testing.T, schema *ast.Schema) []protectedField {
 	t.Helper()
 	var out []protectedField
-	for opName, root := range map[string]*ast.Definition{"query": schema.Query, "mutation": schema.Mutation} {
+	for opName, root := range rootFields(schema) {
 		for _, f := range root.Fields {
 			if strings.HasPrefix(f.Name, "__") {
 				continue
 			}
-			var directive string
-			for _, d := range f.Directives {
-				switch d.Name {
-				case "auth", "admin", "staff":
-					directive = d.Name
-				}
-			}
+			directive := fieldDirective(f)
 			if directive == "" {
 				continue
 			}
@@ -168,6 +201,60 @@ func authzServer() (http.Handler, *ast.Schema) {
 	}), exec.Schema()
 }
 
+// applyCaller sets the headers that stand in for the auth middleware for one caller.
+func (c caller) applyTo(h http.Header) {
+	if c.userID != "" {
+		h.Set("X-Test-User", c.userID)
+	}
+	if c.admin {
+		h.Set("X-Test-Admin", "1")
+	}
+	if c.pos {
+		h.Set("X-Test-POS", "1")
+	}
+	if c.expired {
+		h.Set("X-Test-Expired", "1")
+	}
+}
+
+func (f protectedField) wantFor(c caller) string {
+	return map[string]string{"auth": c.wantAuth, "admin": c.wantAdmin, "staff": c.wantStaff}[f.directive]
+}
+
+type authzErrors struct {
+	Errors []struct {
+		Message    string         `json:"message"`
+		Extensions map[string]any `json:"extensions"`
+	} `json:"errors"`
+}
+
+func TestEveryRootFieldIsProtectedOrExplicitlyPublic(t *testing.T) {
+	_, schema := authzServer()
+	seen := map[string]bool{}
+	var unprotected []string
+	for opName, root := range rootFields(schema) {
+		for _, f := range root.Fields {
+			if strings.HasPrefix(f.Name, "__") {
+				continue
+			}
+			key := opName + " " + f.Name
+			if fieldDirective(f) != "" {
+				continue
+			}
+			seen[key] = true
+			if _, ok := publicFields[key]; !ok {
+				unprotected = append(unprotected, key)
+			}
+		}
+	}
+	sort.Strings(unprotected)
+	assert.Empty(t, unprotected, "these root fields have no @auth/@admin/@staff and are not in publicFields: protect them or list them as public on purpose")
+	for key, why := range publicFields {
+		assert.True(t, seen[key], "publicFields lists %q, which is not an unprotected root field of the schema (renamed, removed or protected since?)", key)
+		assert.NotEmpty(t, why, "say why %q is public", key)
+	}
+}
+
 func TestSchemaDirectivesAuthorizeEveryProtectedField(t *testing.T) {
 	h, schema := authzServer()
 	fields := protectedFields(t, schema)
@@ -175,46 +262,84 @@ func TestSchemaDirectivesAuthorizeEveryProtectedField(t *testing.T) {
 
 	counts := map[string]int{}
 	for _, f := range fields {
-		counts[f.directive]++
+		counts[f.op+" "+f.directive]++
 	}
-	require.NotZero(t, counts["auth"])
-	require.NotZero(t, counts["admin"])
-	require.NotZero(t, counts["staff"])
+	require.NotZero(t, counts["query auth"])
+	require.NotZero(t, counts["query admin"])
+	require.NotZero(t, counts["mutation staff"])
+	require.NotZero(t, counts["subscription staff"], "subscriptions are part of the matrix")
+	require.NotZero(t, counts["subscription admin"])
+	require.NotZero(t, counts["subscription auth"])
+
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
 
 	for _, f := range fields {
 		for _, c := range authzCallers {
 			t.Run(fmt.Sprintf("%s %s as %s", f.op, f.name, c.name), func(t *testing.T) {
-				body, err := json.Marshal(map[string]string{"query": f.doc})
-				require.NoError(t, err)
-				req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
-				req.Header.Set("Content-Type", "application/json")
-				if c.userID != "" {
-					req.Header.Set("X-Test-User", c.userID)
+				var resp authzErrors
+				if f.op == "subscription" {
+					resp = askOverWebSocket(t, srv, c, f.doc)
+				} else {
+					body, err := json.Marshal(map[string]string{"query": f.doc})
+					require.NoError(t, err)
+					req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+					req.Header.Set("Content-Type", "application/json")
+					c.applyTo(req.Header)
+					rec := httptest.NewRecorder()
+					h.ServeHTTP(rec, req)
+					require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp), rec.Body.String())
 				}
-				if c.admin {
-					req.Header.Set("X-Test-Admin", "1")
-				}
-				if c.pos {
-					req.Header.Set("X-Test-POS", "1")
-				}
-				if c.expired {
-					req.Header.Set("X-Test-Expired", "1")
-				}
-				rec := httptest.NewRecorder()
-				h.ServeHTTP(rec, req)
-
-				var resp struct {
-					Errors []struct {
-						Message    string         `json:"message"`
-						Extensions map[string]any `json:"extensions"`
-					} `json:"errors"`
-				}
-				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp), rec.Body.String())
-				require.Len(t, resp.Errors, 1, "operation %q: %s", f.doc, rec.Body.String())
-
-				want := map[string]string{"auth": c.wantAuth, "admin": c.wantAdmin, "staff": c.wantStaff}[f.directive]
-				assert.Equal(t, want, resp.Errors[0].Extensions["code"], "@%s on %s: %s", f.directive, f.name, resp.Errors[0].Message)
+				require.Len(t, resp.Errors, 1, "operation %q", f.doc)
+				assert.Equal(t, f.wantFor(c), resp.Errors[0].Extensions["code"], "@%s on %s: %s", f.directive, f.name, resp.Errors[0].Message)
 			})
+		}
+	}
+}
+
+// askOverWebSocket runs one subscription document as the caller and returns the errors of the
+// first frame that carries any (the directive refusal, or the marker that replaces the resolver).
+func askOverWebSocket(t *testing.T, srv *httptest.Server, c caller, doc string) authzErrors {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+	defer cancel()
+	header := http.Header{}
+	c.applyTo(header)
+	conn, _, err := coderws.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http"), &coderws.DialOptions{
+		Subprotocols: []string{"graphql-transport-ws"}, HTTPHeader: header,
+	})
+	require.NoError(t, err)
+	defer func() { _ = conn.CloseNow() }()
+
+	write := func(m wsMessage) {
+		raw, err := json.Marshal(m)
+		require.NoError(t, err)
+		require.NoError(t, conn.Write(ctx, coderws.MessageText, raw))
+	}
+	write(wsMessage{Type: "connection_init"})
+	sub, _ := json.Marshal(map[string]string{"query": doc})
+	write(wsMessage{ID: "1", Type: "subscribe", Payload: sub})
+	for {
+		_, raw, err := conn.Read(ctx)
+		require.NoError(t, err)
+		var m wsMessage
+		require.NoError(t, json.Unmarshal(raw, &m), string(raw))
+		switch m.Type {
+		case "connection_ack", "ping", "pong":
+			continue
+		case "next":
+			var resp authzErrors
+			require.NoError(t, json.Unmarshal(m.Payload, &resp))
+			return resp
+		case "error":
+			var errs []struct {
+				Message    string         `json:"message"`
+				Extensions map[string]any `json:"extensions"`
+			}
+			require.NoError(t, json.Unmarshal(m.Payload, &errs), string(m.Payload))
+			return authzErrors{Errors: errs}
+		default:
+			require.Failf(t, "unexpected frame", "%s %s", m.Type, m.Payload)
 		}
 	}
 }
