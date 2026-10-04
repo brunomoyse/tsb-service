@@ -1,6 +1,6 @@
-您好 {{.UserName}}，
+{{.UserName}}，您好！
 
-感谢您选择 {{restaurantName}}！希望您享受了这顿美餐。期待再次为您服务。
+感谢您选择 {{restaurantName}}！希望您用餐愉快。期待再次为您服务。
 
 再次点餐：{{.MenuLink}}
 

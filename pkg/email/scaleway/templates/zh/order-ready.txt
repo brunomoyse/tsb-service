@@ -1,4 +1,4 @@
-您好 {{.UserName}}，
+{{.UserName}}，您好！
 
 {{if eq .OrderType "DELIVERY"}}
 好消息！您的订单正在配送中，配送员已出发。

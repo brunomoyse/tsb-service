@@ -17,7 +17,7 @@
     <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
     <!-- CONTENT -->
     <tr><td style="background-color:#ffffff;padding:36px;">
-        <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">您好 {{.UserName}}，</p>
+        <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">{{.UserName}}，您好！</p>
         {{if eq .OrderType "DELIVERY"}}
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">好消息！您的订单正在配送中，配送员已出发。</p>
         {{else if eq .OrderType "PICKUP"}}

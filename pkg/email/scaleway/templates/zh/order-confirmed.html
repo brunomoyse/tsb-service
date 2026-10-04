@@ -17,7 +17,7 @@
     <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
     <!-- CONTENT -->
     <tr><td style="background-color:#ffffff;padding:36px;">
-        <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">您好 {{.UserName}}，</p>
+        <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">{{.UserName}}，您好！</p>
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">感谢您在 <strong>{{restaurantName}}</strong> 下单！我们很高兴地通知您，您的订单已由餐厅确认。</p>
         {{if .EstimatedReadyTime}}
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">
@@ -30,7 +30,7 @@
         {{else}}
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">预计时间确定后，我们会及时通知您。</p>
         {{end}}
-        <p style="margin:0 0 12px;font-size:16px;font-weight:600;color:#2D2D2D;">订单摘要</p>
+        <p style="margin:0 0 12px;font-size:16px;font-weight:600;color:#2D2D2D;">订单明细</p>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 16px;">
             <tr>
                 <td style="background-color:#F0EBE3;padding:10px 12px;font-size:13px;font-weight:600;color:#2D2D2D;border-bottom:1px solid #E8E4DF;">商品</td>
@@ -52,13 +52,13 @@
             </tr>
             {{if .HasTakeaway}}
             <tr>
-                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">自取折扣 (-10%)：</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">自取优惠：</td>
                 <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">-{{.TakeawayDiscount}}&nbsp;&euro;</td>
             </tr>
             {{end}}
             {{if .HasCoupon}}
             <tr>
-                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">优惠券{{if .CouponCode}}（{{.CouponCode}}）{{end}}：</td>
+                <td style="padding:6px 0;font-size:14px;color:#2D2D2D;font-weight:600;">优惠码{{if .CouponCode}}（{{.CouponCode}}）{{end}}：</td>
                 <td style="padding:6px 0;font-size:14px;color:#2D2D2D;text-align:right;white-space:nowrap;">-{{.CouponDiscount}}&nbsp;&euro;</td>
             </tr>
             {{end}}
@@ -85,7 +85,7 @@
             <a href="{{.StatusLink}}" style="color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;display:inline-block;">跟踪订单状态</a>
         </td></tr>
         </table>
-        <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">如果您对订单有任何疑问，请随时联系我们。我们感谢您的信任，并期待为您提供正宗的寿司体验！</p>
+        <p style="margin:0;font-size:14px;line-height:1.6;color:#2D2D2D;">如果您对订单有任何疑问，请随时联系我们。感谢您的信任，祝您用餐愉快！</p>
     </td></tr>
     <!-- FOOTER -->
     <tr><td style="background-color:#F0EBE3;padding:24px 36px;text-align:center;border-radius:0 0 12px 12px;">
