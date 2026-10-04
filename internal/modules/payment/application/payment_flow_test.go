@@ -1069,6 +1069,54 @@ func TestRefundRemaining_UsesMolliesView(t *testing.T) {
 		}
 	})
 
+	// A refund can fail or be cancelled at Mollie after it was accepted: Mollie then reports less as
+	// refunded than our row, and the difference is refundable again.
+	t.Run("a smaller amountRefunded at Mollie than in our row wins: the failed refund is made again", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
+		f.repo.payments["tr_1"].AmountRefunded = d("20.00")
+		f.mollie.refunded = "5.00"
+
+		refunded, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+
+		if err != nil || !refunded {
+			t.Fatalf("refunded=%v err=%v", refunded, err)
+		}
+		if got := f.mollie.refundAmounts(t); len(got) != 1 || got[0] != "15.00" {
+			t.Fatalf("refund amounts = %v, want [15.00]", got)
+		}
+		if got := f.repo.payments["tr_1"].AmountRefunded; !got.Equal(d("20.00")) {
+			t.Fatalf("recorded amount_refunded = %s, want 5.00 + 15.00", got)
+		}
+	})
+
+	t.Run("a row that says fully refunded is corrected when Mollie says part of it came back", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
+		f.repo.payments["tr_1"].AmountRefunded = d("20.00")
+		f.mollie.refunded = "12.00"
+		f.mollie.remaining = "0.00" // e.g. a chargeback took the rest: nothing can be refunded
+
+		refunded, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+
+		if err != nil || refunded {
+			t.Fatalf("refunded=%v err=%v, want false nil", refunded, err)
+		}
+		if got := f.repo.payments["tr_1"].AmountRefunded; !got.Equal(d("12.00")) {
+			t.Fatalf("recorded amount_refunded = %s, want Mollie's 12.00", got)
+		}
+	})
+
+	t.Run("without amountRefunded from Mollie, our row is used", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
+		f.repo.payments["tr_1"].AmountRefunded = d("8.00")
+
+		if _, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"]); err != nil {
+			t.Fatal(err)
+		}
+		if got := f.mollie.refundAmounts(t); len(got) != 1 || got[0] != "12.00" {
+			t.Fatalf("refund amounts = %v, want [12.00]", got)
+		}
+	})
+
 	t.Run("amountRemaining caps the refund (chargebacks)", func(t *testing.T) {
 		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
 		f.mollie.remaining = "12.50"
@@ -1501,8 +1549,12 @@ func TestHandlePaymentPaid_CancelledOrderEdgeCases(t *testing.T) {
 		if _, err := f.svc.HandlePaymentPaid(t.Context(), f.order.ID); err != nil {
 			t.Fatal(err)
 		}
-		if sink.Count() != 0 || len(f.mollie.requests) != 0 {
-			t.Fatalf("emails=%d mollie=%v", sink.Count(), f.mollie.requests)
+		f.mollie.refunded = "20.00" // and Mollie agrees
+		if _, err := f.svc.HandlePaymentPaid(t.Context(), f.order.ID); err != nil {
+			t.Fatal(err)
+		}
+		if sink.Count() != 0 || len(f.mollie.refundAmounts(t)) != 0 {
+			t.Fatalf("emails=%d refunds=%v", sink.Count(), f.mollie.refundAmounts(t))
 		}
 	})
 }

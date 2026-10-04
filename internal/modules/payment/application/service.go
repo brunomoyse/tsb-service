@@ -243,14 +243,11 @@ func (s *paymentService) CreateFullRefund(ctx context.Context, externalPaymentID
 	return err
 }
 
-// refundRemaining refunds what is still refundable of a paid payment: its amount minus what was
-// already returned (by an earlier cancel, a webhook retry or staff in the Mollie dashboard). Repeated
+// refundRemaining refunds what is still refundable of a paid payment: its amount minus what Mollie
+// says was already returned (by an earlier cancel, a webhook retry or staff in the Mollie dashboard). Repeated
 // cancels or webhook retries therefore never refund twice, and a payment with nothing left is skipped
 // (refunded == false). The caller is responsible for knowing the payment is paid at Mollie.
 func (s *paymentService) refundRemaining(ctx context.Context, payment *domain.MolliePayment) (refunded bool, err error) {
-	if payment.AmountRefunded.GreaterThanOrEqual(payment.Amount) {
-		return false, nil
-	}
 	current, err := s.fetchMolliePayment(ctx, payment.MolliePaymentID)
 	if err != nil {
 		return false, err
@@ -276,9 +273,9 @@ func (s *paymentService) refundRemainingOf(ctx context.Context, payment *domain.
 	}
 
 	if !remaining.IsPositive() {
-		// Nothing left to return. If Mollie knows of a refund we never recorded (a refund whose
-		// bookkeeping failed, or one made in the Mollie dashboard), record it so the row is right.
-		if alreadyRefunded.GreaterThan(payment.AmountRefunded) {
+		// Nothing left to return. If Mollie's total differs from our row (a refund whose bookkeeping
+		// failed, one made in the Mollie dashboard, or one that failed later), record Mollie's.
+		if !alreadyRefunded.Equal(payment.AmountRefunded) {
 			if markErr := s.repo.MarkAsRefund(ctx, payment.MolliePaymentID, alreadyRefunded); markErr != nil {
 				zap.L().Warn("failed to record a refund Mollie already made",
 					zap.String("payment_id", payment.MolliePaymentID), zap.Error(markErr))
@@ -313,9 +310,11 @@ func (s *paymentService) refundRemainingOf(ctx context.Context, payment *domain.
 	return true, nil
 }
 
-// refundableAmount returns what was already refunded and what can still be refunded. The larger of
-// our record and Mollie's amountRefunded counts as refunded, and Mollie's amountRemaining (which also
-// accounts for chargebacks) caps the remainder when it reports one.
+// refundableAmount returns what was already refunded and what can still be refunded. Mollie's
+// amountRefunded is the truth whenever it reports one: our row is only written after Mollie accepted
+// a refund, so it can only be higher than Mollie's when a refund failed or was cancelled later, which
+// gives that money back to "refundable". Our row is the fallback when Mollie omits the field. Mollie's
+// amountRemaining (which also accounts for chargebacks) caps the remainder when it reports one.
 func refundableAmount(payment *domain.MolliePayment, current *mollie.Payment) (alreadyRefunded, remaining decimal.Decimal, err error) {
 	alreadyRefunded = payment.AmountRefunded
 	if current.AmountRefunded != nil {
@@ -323,9 +322,7 @@ func refundableAmount(payment *domain.MolliePayment, current *mollie.Payment) (a
 		if parseErr != nil {
 			return decimal.Zero, decimal.Zero, fmt.Errorf("failed to parse amountRefunded: %w", parseErr)
 		}
-		if fromMollie.GreaterThan(alreadyRefunded) {
-			alreadyRefunded = fromMollie
-		}
+		alreadyRefunded = fromMollie
 	}
 	remaining = payment.Amount.Sub(alreadyRefunded)
 	if current.AmountRemaining != nil {
