@@ -263,6 +263,10 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
 
+	if err := r.refuseReopeningSettledOrder(ctx, oldOrder, input.Status); err != nil {
+		return nil, err
+	}
+
 	// Cancelling settles the payment FIRST and saves CANCELLED only when that worked: a refund or
 	// cancel that the payment provider refuses leaves the order untouched, so staff can retry.
 	cancelling := input.Status != nil && *input.Status == orderDomain.OrderStatusCanceled &&

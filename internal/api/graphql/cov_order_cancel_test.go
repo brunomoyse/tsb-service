@@ -267,11 +267,10 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		assert.Equal(t, []string{env.paymentCol(t, "amount", payID)}, env.Mollie.RefundAmounts(t, payID))
 	})
 
-	// BUG(product decision pending): order status transitions are not validated
-	// (orderService.UpdateOrder accepts any status). A cancelled order that was refunded in full can
-	// be put back to CONFIRMED: the kitchen would then prepare an order the customer got their money
-	// back for. Replace the assertions with a refusal once the owner defines the allowed transitions.
-	t.Run("a cancelled and refunded order can be moved back to CONFIRMED", func(t *testing.T) {
+	// The one transition rule: a CANCELLED order whose payment was given back (even partly) or can
+	// no longer be paid cannot be reopened, or the kitchen would prepare food the customer got their
+	// money back for. Every other transition stays free (see TestUpdateOrderOtherTransitionsStayFree).
+	t.Run("a cancelled and refunded order cannot be moved back", func(t *testing.T) {
 		c := env.newPushCustomer(t, "revive", true)
 		order := env.placeOnlineOrder(t, c)
 		env.markPaid(t, order.ID)
@@ -279,10 +278,71 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
 		require.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID+"/refunds"), 1)
 
-		got := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CONFIRMED"})
-		assert.Equal(t, "CONFIRMED", got.Status, "currently accepted")
+		for _, status := range []string{"CONFIRMED", "PENDING", "PREPARING", "FAILED"} {
+			_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": status})
+			require.NotNil(t, oerr, status)
+			assert.Equal(t, "USER_ERROR", oerr.Extensions["code"], status)
+			assert.Contains(t, oerr.Message, "cannot be reopened")
+		}
+		assert.Equal(t, 1, countRows(t, env.TestContext, `SELECT count(*) FROM orders WHERE id = $1 AND order_status = 'CANCELLED'`, order.ID))
 		assert.Equal(t, 1, countRows(t, env.TestContext, `SELECT count(*) FROM mollie_payments WHERE mollie_payment_id = $1 AND amount_refunded = amount`, payID),
 			"and the payment stays refunded")
+
+		// Saving it again as CANCELLED, or only touching its ready time, is not a reopening.
+		assert.Equal(t, "CANCELLED", env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"}).Status)
+		assert.Equal(t, "CANCELLED", env.mustUpdateOrder(t, order.ID, map[string]any{"estimatedReadyTime": inMinutes(30)}).Status)
+	})
+
+	t.Run("a cancelled order whose open payment was cancelled cannot be moved back either", func(t *testing.T) {
+		c := env.newPushCustomer(t, "revive-open", true)
+		order := env.placeOnlineOrder(t, c)
+		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
+		require.Equal(t, "canceled", env.paymentCol(t, "status", order.Payment.MolliePaymentID))
+
+		_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "PENDING"})
+
+		require.NotNil(t, oerr)
+		assert.Equal(t, "USER_ERROR", oerr.Extensions["code"])
+		assert.Equal(t, 1, countRows(t, env.TestContext, `SELECT count(*) FROM orders WHERE id = $1 AND order_status = 'CANCELLED'`, order.ID))
+	})
+
+	t.Run("a payment that expired or failed can not be paid any more: no reopening", func(t *testing.T) {
+		for _, status := range []string{"expired", "failed"} {
+			c := env.newPushCustomer(t, "revive-"+status, true)
+			order := env.placeOnlineOrder(t, c)
+			env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
+			_, err := env.DB.DB.ExecContext(t.Context(), `UPDATE mollie_payments SET status = $2 WHERE order_id = $1`, order.ID, status)
+			require.NoError(t, err)
+
+			_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "CONFIRMED"})
+
+			require.NotNil(t, oerr, status)
+			assert.Equal(t, "USER_ERROR", oerr.Extensions["code"], status)
+		}
+	})
+
+	t.Run("a cancelled cash order has nothing to protect and may be reopened", func(t *testing.T) {
+		c := env.newPushCustomer(t, "revive-cash", true)
+		order := env.placeOrder(t, c, "en")
+		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED", "cancellationReason": "OTHER"})
+
+		got := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CONFIRMED"})
+
+		assert.Equal(t, "CONFIRMED", got.Status)
+	})
+
+	t.Run("a cancelled order whose open payment could not be cancelled may be reopened", func(t *testing.T) {
+		// The customer is in the middle of paying: Mollie no longer lets the payment be cancelled, so
+		// it stays open (payable) and nothing was given back.
+		c := env.newPushCustomer(t, "revive-locked", true)
+		order := env.placeOnlineOrder(t, c)
+		env.Mollie.LockPayment(order.Payment.MolliePaymentID)
+		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
+		require.Equal(t, "open", env.paymentCol(t, "status", order.Payment.MolliePaymentID))
+
+		got := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "PENDING"})
+
+		assert.Equal(t, "PENDING", got.Status)
 	})
 
 	t.Run("a cash order has no payment to settle", func(t *testing.T) {
@@ -342,6 +402,33 @@ func TestUpdatePaymentStatusMutation(t *testing.T) {
 	})
 }
 
+// NOTE(product decision pending): apart from "a CANCELLED order whose payment was settled stays
+// cancelled" there is no order state machine, on purpose: staff correct mistakes by moving orders
+// back and forth (CONFIRMED back to PENDING, a delivered order back to preparing, a FAILED one
+// re-confirmed), and the notification side effects are driven by the status that results. These
+// transitions are accepted today; pinned here so that tightening them is a conscious decision.
+func TestUpdateOrderOtherTransitionsStayFree(t *testing.T) {
+	env := setupCovEnv(t, covOptions{})
+	c := env.newPushCustomer(t, "free", false)
+
+	for _, tc := range []struct{ from, to string }{
+		{"CONFIRMED", "PENDING"},
+		{"DELIVERED", "PREPARING"},
+		{"DELIVERED", "PENDING"},
+		{"AWAITING_PICK_UP", "CONFIRMED"},
+		{"FAILED", "CONFIRMED"},
+		{"PENDING", "DELIVERED"},
+	} {
+		t.Run(tc.from+" to "+tc.to, func(t *testing.T) {
+			id := env.seedOrderRow(t, c.id, tc.from, "PICKUP", "en")
+
+			got := env.mustUpdateOrder(t, id, map[string]any{"status": tc.to})
+
+			assert.Equal(t, tc.to, got.Status)
+		})
+	}
+}
+
 // When the payment of an order cannot even be looked up, the order is not touched: cancelling
 // without knowing whether it must be refunded would lose the customer's money, and reopening
 // without knowing whether it was refunded could revive a refunded order.
@@ -370,5 +457,38 @@ func TestUpdateOrderPaymentLookupFaults(t *testing.T) {
 		assert.Equal(t, apperr.CodePaymentSettlementFailed, appErr.Code)
 		assert.Equal(t, "CONFIRMED", status(id))
 		waitLog(t, logs, "cannot cancel the order: payment lookup failed")
+	})
+
+	t.Run("an order the payment service reports no payment for is cancelled as a cash order", func(t *testing.T) {
+		id := env.seedOrderRow(t, c.id, "CONFIRMED", "PICKUP", "en")
+		r := env.with(func(r *resolver.Resolver) {
+			r.PaymentService = faultyPayments{PaymentService: env.Resolver.PaymentService, noPayment: true}
+		})
+		cancelled := orderDomain.OrderStatusCanceled
+
+		_, err := r.Mutation().UpdateOrder(ctx, id, model.UpdateOrderInput{Status: &cancelled})
+
+		require.NoError(t, err)
+		assert.Equal(t, "CANCELLED", status(id))
+		// ... and reopened: there is no payment that was given back.
+		confirmed := orderDomain.OrderStatusConfirmed
+		_, err = r.Mutation().UpdateOrder(ctx, id, model.UpdateOrderInput{Status: &confirmed})
+		require.NoError(t, err)
+		assert.Equal(t, "CONFIRMED", status(id))
+	})
+
+	t.Run("reopening with a failing payment lookup is refused and leaves the order cancelled", func(t *testing.T) {
+		id := env.seedOrderRow(t, c.id, "CANCELLED", "PICKUP", "en")
+		r := env.with(func(r *resolver.Resolver) {
+			r.PaymentService = faultyPayments{PaymentService: env.Resolver.PaymentService, lookupErr: errBoom}
+		})
+		confirmed := orderDomain.OrderStatusConfirmed
+
+		_, err := r.Mutation().UpdateOrder(ctx, id, model.UpdateOrderInput{Status: &confirmed})
+
+		require.ErrorIs(t, err, errBoom)
+		_, typed := apperr.From(err)
+		assert.False(t, typed, "an internal error, not a message that blames the staff member")
+		assert.Equal(t, "CANCELLED", status(id))
 	})
 }
