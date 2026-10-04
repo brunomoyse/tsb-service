@@ -41,6 +41,32 @@ func TestGetOrderStatusNotification(t *testing.T) {
 		require.Equal(t, "En préparation", msg.Title)
 	})
 
+	t.Run("language is normalised: case, region tags, unsupported values", func(t *testing.T) {
+		for in, want := range pushLanguageVariants {
+			for _, orderType := range []string{"DELIVERY", "PICKUP"} {
+				for _, s := range []orderDomain.OrderStatus{orderDomain.OrderStatusConfirmed, orderDomain.OrderStatusAwaitingUp, orderDomain.OrderStatusCanceled} {
+					require.Equal(t,
+						GetOrderStatusNotification(s, want, orderType, nil),
+						GetOrderStatusNotification(s, in, orderType, nil),
+						"%q must read as %q (%s/%s)", in, want, s, orderType)
+				}
+			}
+		}
+	})
+
+	t.Run("pickup wording also applies when the language falls back to French", func(t *testing.T) {
+		msg := GetOrderStatusNotification(orderDomain.OrderStatusAwaitingUp, "de", "PICKUP", nil)
+		require.Equal(t, "Venez la retirer au comptoir.", msg.Body)
+		msg = GetOrderStatusNotification(orderDomain.OrderStatusAwaitingUp, "", "PICKUP", nil)
+		require.Equal(t, "Venez la retirer au comptoir.", msg.Body)
+	})
+
+	t.Run("cancellation reason follows the normalised language", func(t *testing.T) {
+		r := orderDomain.OrderCancellationReasonOutOfStock
+		require.Equal(t, "Your order has been canceled: out of stock.", GetOrderStatusNotification(orderDomain.OrderStatusCanceled, "EN-us", "DELIVERY", &r).Body)
+		require.Equal(t, "Votre commande a été annulée : rupture de stock.", GetOrderStatusNotification(orderDomain.OrderStatusCanceled, "", "DELIVERY", &r).Body)
+	})
+
 	t.Run("status without a message yields the brand name and an empty body", func(t *testing.T) {
 		msg := GetOrderStatusNotification(orderDomain.OrderStatusPending, "en", "DELIVERY", nil)
 		require.Equal(t, brand.Current().Name, msg.Title)
@@ -116,6 +142,13 @@ func TestGetReadyTimeUpdatedNotification(t *testing.T) {
 		require.Equal(t, "Nouvelle heure estimée : 19:05.", GetReadyTimeUpdatedNotification("de", &summer).Body)
 	})
 
+	t.Run("language is normalised: case, region tags, unsupported values", func(t *testing.T) {
+		for in, want := range pushLanguageVariants {
+			require.Equal(t, GetReadyTimeUpdatedNotification(want, &summer), GetReadyTimeUpdatedNotification(in, &summer), "%q must read as %q", in, want)
+		}
+		require.Equal(t, "New estimated ready time: 7:05 PM.", GetReadyTimeUpdatedNotification("EN-GB", &summer).Body, "12h clock follows the normalised language")
+	})
+
 	t.Run("English uses a 12h clock", func(t *testing.T) {
 		cases := []struct {
 			utc  time.Time
@@ -135,6 +168,13 @@ func TestGetReadyTimeUpdatedNotification(t *testing.T) {
 	})
 }
 
+// pushLanguageVariants maps raw language values to the language push texts must use.
+var pushLanguageVariants = map[string]string{
+	"EN": "en", " fr ": "fr", "NL": "nl", "Zh": "zh",
+	"fr-BE": "fr", "en-US": "en", "en_GB": "en", "nl-BE": "nl", "zh-CN": "zh", "zh-Hans": "zh",
+	"de": "fr", "de-DE": "fr", "": "fr", "  ": "fr", "xx": "fr", "english": "fr", "%%": "fr",
+}
+
 func TestGetNewOrderNotification(t *testing.T) {
 	require.Equal(t, notificationText{Title: "Nouvelle commande", Body: "En attente de confirmation"}, GetNewOrderNotification("fr", "DELIVERY", "12.50"))
 	require.Equal(t, notificationText{Title: "New order", Body: "Awaiting confirmation"}, GetNewOrderNotification("en", "PICKUP", "1.00"))
@@ -144,6 +184,11 @@ func TestGetNewOrderNotification(t *testing.T) {
 		msg := GetNewOrderNotification("de", "DELIVERY", "99.99")
 		require.Equal(t, "Nouvelle commande", msg.Title)
 		require.NotContains(t, msg.Body, "99.99")
+	})
+	t.Run("language is normalised: case, region tags, unsupported values", func(t *testing.T) {
+		for in, want := range pushLanguageVariants {
+			require.Equal(t, GetNewOrderNotification(want, "", ""), GetNewOrderNotification(in, "", ""), "%q must read as %q", in, want)
+		}
 	})
 	t.Run("returned value is a copy", func(t *testing.T) {
 		m := GetNewOrderNotification("en", "", "")
