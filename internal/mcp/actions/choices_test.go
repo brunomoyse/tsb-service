@@ -570,7 +570,7 @@ func TestChoiceNamesSortedInSummaries(t *testing.T) {
 	f := newFixture(t)
 	p := f.propose(t, KindChoiceUpsert, ChoiceParams{ChoiceID: "c-soja", Names: map[string]string{"zh": "酱油", "en": "Soy", "nl": "Soja NL"}})
 	en, nl, zh := strings.Index(p.Summary, "(en)"), strings.Index(p.Summary, "(nl)"), strings.Index(p.Summary, "(zh)")
-	if en < 0 || !(en < nl && nl < zh) {
+	if en < 0 || en >= nl || nl >= zh {
 		t.Errorf("summary order: %s", p.Summary)
 	}
 }

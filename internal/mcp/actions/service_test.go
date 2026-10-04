@@ -201,7 +201,7 @@ func TestApplyNowStillReportsSuccessWhenTheAuditWriteFails(t *testing.T) {
 	// The change reached upstream, so the owner must be told it was applied
 	// even though the audit row could not be written (it is logged).
 	f := newFixture(t)
-	f.svc.store.Close()
+	_ = f.svc.store.Close()
 	// Prepare/execute do not need the store; only the audit append does.
 	r, err := f.svc.ApplyNow(f.ctx, "t", KindProductAvailability, ProductToggleParams{ProductID: "p-maki-saumon", Value: false}, "", nil)
 	if err != nil || !r.Applied || r.AuditID != 0 {

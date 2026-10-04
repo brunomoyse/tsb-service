@@ -256,7 +256,10 @@ func TestDownloadImage(t *testing.T) {
 	jpg := append([]byte("\xff\xd8\xff\xe0\x00\x10JFIF"), make([]byte, 64)...)
 	webp := append([]byte("RIFF\x24\x00\x00\x00WEBPVP8 "), make([]byte, 64)...)
 
+	// Some WebP files are not recognised by content sniffing: RIFF....WEBP is enough.
+	webpOther := append([]byte("RIFF\x24\x00\x00\x00WEBPXXXX"), make([]byte, 64)...)
 	routes := map[string]func(w http.ResponseWriter){
+		"/other.webp":   func(w http.ResponseWriter) { _, _ = w.Write(webpOther) },
 		"/box.png":      func(w http.ResponseWriter) { _, _ = w.Write(png) },
 		"/shot.jpeg":    func(w http.ResponseWriter) { _, _ = w.Write(jpg) },
 		"/drink.webp":   func(w http.ResponseWriter) { _, _ = w.Write(webp) },
@@ -289,6 +292,7 @@ func TestDownloadImage(t *testing.T) {
 		{"/box.png", "image/png", "box.png", len(png)},
 		{"/shot.jpeg", "image/jpeg", "shot.jpg", len(jpg)},
 		{"/drink.webp", "image/webp", "drink.webp", len(webp)},
+		{"/other.webp", "image/webp", "other.webp", len(webpOther)},
 		{"/", "image/png", "photo.png", len(png)},
 		{"/noext", "image/png", "noext.png", len(png)},
 		{"/exact.png", "image/png", "exact.png", maxImageBytes},

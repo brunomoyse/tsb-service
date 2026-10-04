@@ -50,10 +50,12 @@ func TestSendFailureModes(t *testing.T) {
 		wantMsg  string
 		wantLogs string
 	}{
-		{"401", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "token expired for user bob", 401) }, upstream.KindUnauthorized, "not allowed", "token expired for user bob"},
-		{"403", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "nope", 403) }, upstream.KindUnauthorized, "not allowed", "nope"},
+		{"401", func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "token expired for user bob", http.StatusUnauthorized)
+		}, upstream.KindUnauthorized, "not allowed", "token expired for user bob"},
+		{"403", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "nope", http.StatusForbidden) }, upstream.KindUnauthorized, "not allowed", "nope"},
 		{"500", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "pq: connection refused 10.1.2.3", 500) }, upstream.KindUnavailable, "had a problem", "10.1.2.3"},
-		{"503", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "busy", 503) }, upstream.KindUnavailable, "had a problem", "busy"},
+		{"503", func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "busy", http.StatusServiceUnavailable) }, upstream.KindUnavailable, "had a problem", "busy"},
 		{"not json", func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "<html>gateway</html>") }, upstream.KindUnavailable, "unexpected answer", "gateway"},
 		{"wrong shape", func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = io.WriteString(w, `{"data":{"products":"not a list"}}`)
@@ -108,7 +110,7 @@ func TestTokenFailureIsUnauthorized(t *testing.T) {
 		t.Error("writes need a token too")
 	}
 	err = c.Upload(t.Context(), "McpUpdateProduct", nil, "variables.input.image", "a.png", "image/png", []byte("x"), nil)
-	asUpstream(t, err, upstream.KindUnauthorized)
+	_ = asUpstream(t, err, upstream.KindUnauthorized)
 }
 
 func TestMapErrors(t *testing.T) {
@@ -214,7 +216,7 @@ func TestEncodeFailuresNeverReachTheNetwork(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, err := c.Products(ctx)
-	asUpstream(t, err, upstream.KindUnavailable)
+	_ = asUpstream(t, err, upstream.KindUnavailable)
 	if hits != 0 {
 		t.Errorf("hits = %d", hits)
 	}
@@ -349,7 +351,7 @@ func TestEveryMethodSurfacesUpstreamFailures(t *testing.T) {
 			f.FailOps[op] = "BOOM"
 			f.Unlock()
 			err := call(c)
-			asUpstream(t, err, upstream.KindRejected)
+			_ = asUpstream(t, err, upstream.KindRejected)
 		})
 	}
 	// Writes that return data return nothing on failure.
@@ -471,7 +473,9 @@ func TestScopesAndTokenFailure(t *testing.T) {
 	if got := sa.Scopes(); strings.Join(got, " ") != strings.Join(want, " ") {
 		t.Errorf("scopes = %v", got)
 	}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { http.Error(w, `{"error":"invalid_client"}`, 401) }))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"error":"invalid_client"}`, http.StatusUnauthorized)
+	}))
 	defer srv.Close()
 	bad := upstream.ServiceAccount{Issuer: srv.URL, ClientID: "a", ClientSecret: "b", ProjectID: "1"}
 	if _, err := bad.TokenSource(t.Context()).Token(); err == nil {

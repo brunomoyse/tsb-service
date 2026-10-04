@@ -321,7 +321,7 @@ func TestScheduleOverrideToolVariants(t *testing.T) {
 	}
 
 	// A single date with two periods, no note.
-	r = h.proposeAndApply("propose_schedule_override", map[string]any{"date": "2026-12-24", "open": "11:00", "close": "14:00", "dinner_open": "17:00", "dinner_close": "20:00"}, nil)
+	h.proposeAndApply("propose_schedule_override", map[string]any{"date": "2026-12-24", "open": "11:00", "close": "14:00", "dinner_open": "17:00", "dinner_close": "20:00"}, nil)
 	if s := h.fake.Overrides["2026-12-24"].Schedule; s.DinnerOpen != "17:00" || h.fake.Overrides["2026-12-24"].Note != nil {
 		t.Errorf("override: %+v", h.fake.Overrides["2026-12-24"])
 	}
