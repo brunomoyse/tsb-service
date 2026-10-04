@@ -4,7 +4,7 @@ Een terugbetaling van {{.RefundAmount}} € is uitgevoerd voor uw geannuleerde b
 
 Het kan enkele werkdagen duren voordat het bedrag op uw rekening verschijnt.
 
-Voor vragen kunt u rechtstreeks contact opnemen met het restaurant op 04 222 98 88.
+Voor vragen kunt u rechtstreeks contact opnemen met het restaurant op {{restaurantPhone}}.
 
 Dit is een geautomatiseerde e-mail — gelieve niet te antwoorden.
 

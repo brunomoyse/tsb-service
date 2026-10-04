@@ -1,6 +1,6 @@
 Hello {{.UserName}},
 
-Thank you for ordering at {{restaurantName}}! We are pleased to inform you that your order has been confirmed by the restaurant.
+Thank you for ordering from {{restaurantName}}! We are pleased to inform you that your order has been confirmed by the restaurant.
 
 {{if .EstimatedReadyTime}}
 {{if eq .OrderType "DELIVERY"}}Your order will be delivered on {{.EstimatedReadyTime}} (estimated time).{{else if eq .OrderType "PICKUP"}}Your order will be available for pickup on {{.EstimatedReadyTime}} (estimated time).{{end}}
@@ -8,7 +8,7 @@ Thank you for ordering at {{restaurantName}}! We are pleased to inform you that 
 We will notify you once the estimated time is set.
 {{end}}
 
-Order Summary:
+Order summary:
 {{range .OrderItems}}
 Product:  {{.Name}}
 Quantity: {{.Quantity}}
@@ -17,25 +17,25 @@ Price:    {{.TotalPrice}} €
 {{end}}
 Subtotal:              {{.SubtotalPrice}} €
 {{if eq .OrderType "DELIVERY"}}
-Delivery Fee:          {{.DeliveryFee}} €
+Delivery fee:          {{.DeliveryFee}} €
 {{end}}
 {{if .HasTakeaway}}
-Takeaway Discount:     -{{.TakeawayDiscount}} €
+Pickup discount:     -{{.TakeawayDiscount}} €
 {{end}}
 {{if .HasCoupon}}
-Coupon{{if .CouponCode}} ({{.CouponCode}}){{end}}:  -{{.CouponDiscount}} €
+Promo code{{if .CouponCode}} ({{.CouponCode}}){{end}}:  -{{.CouponDiscount}} €
 {{end}}
 Total:                 {{.TotalPrice}} €
 
 {{if .Address}}
-Delivery Address:
+Delivery address:
 {{.Address.StreetName}} {{.Address.HouseNumber}}{{if .Address.BoxNumber}} (Box {{.Address.BoxNumber}}){{end}}
-{{.Address.MunicipalityName}}, {{.Address.Postcode}}
+{{.Address.Postcode}} {{.Address.MunicipalityName}}
 {{end}}
 
 Follow your order status: {{.StatusLink}}
 
-If you have any questions about your order, please do not hesitate to contact us. We appreciate your trust and look forward to delighting you with our authentic sushi experience.
+If you have any questions about your order, please do not hesitate to contact us. Thank you for your trust, and enjoy your meal!
 
 If you did not place this order, please disregard this email.
 

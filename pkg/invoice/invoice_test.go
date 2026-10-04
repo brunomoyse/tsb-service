@@ -8,14 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"tsb-service/pkg/brand"
-	"tsb-service/pkg/i18n/locale"
 	"tsb-service/pkg/invoice/invoicetest"
 )
 
@@ -32,7 +30,6 @@ func baseInvoice() InvoiceData {
 		// 17:30 UTC on 1 July is 19:30 in Brussels (CEST).
 		OrderDate: time.Date(2026, 7, 1, 17, 30, 0, 0, time.UTC),
 		OrderType: "DELIVERY",
-		Language:  "fr",
 		Items: []InvoiceItem{
 			{Name: "Sushi au Saumon", Code: "S01", Quantity: 2, UnitPrice: "12.50", LineTotal: "25.00"},
 			{Name: "Thé vert", Quantity: 1, UnitPrice: "3.00", LineTotal: "3.00"},
@@ -79,7 +76,7 @@ func TestGeneratePDFFullInvoiceFrench(t *testing.T) {
 		"Tokyo Sushi Bar — SRL",
 		"Facture",
 		"Rue de la Cathédrale 59, 4000 Liège, Belgique",
-		"Tél: +32 4 222 98 88  |  Email: tokyosushibar888@gmail.com",
+		"Tél: +32 4 222 98 88  |  E-mail: tokyosushibar888@gmail.com",
 		"N° d'entreprise: BE0772.499.585",
 		"Réf. commande: TSB-2026-2C3D4E5F",
 		"Date: 01/07/2026 19:30",
@@ -96,7 +93,7 @@ func TestGeneratePDFFullInvoiceFrench(t *testing.T) {
 		"TVA (6%)", "1.58 €",
 		"TVA (21%)", "0.00 €",
 		"Total TVA", "1.58 €",
-		"Coupon (WELCOME10)", "- 2.80 €",
+		"Code promo (WELCOME10)", "- 2.80 €",
 		"Frais de livraison", "2.50 €",
 		"Total", "27.70 €",
 		"TVA comprise",
@@ -104,65 +101,21 @@ func TestGeneratePDFFullInvoiceFrench(t *testing.T) {
 	}, lines)
 }
 
-func TestGeneratePDFEnglishLabelsAndDateFormat(t *testing.T) {
-	d := baseInvoice()
-	d.Language = "en"
-	d.OrderType = "PICKUP"
-	d.Address = nil
-	d.CouponCode = nil
-	d.DeliveryFee = nil
-	lines := generate(t, d)
-
-	require.Contains(t, lines, "Invoice")
-	require.Contains(t, lines, "Phone: +32 4 222 98 88  |  Email: tokyosushibar888@gmail.com")
-	require.Contains(t, lines, "Company no.: BE0772.499.585")
-	require.Contains(t, lines, "Order ref.: TSB-2026-2C3D4E5F")
-	// English uses MM/DD/YYYY and a 12-hour clock, in the restaurant timezone.
-	require.Contains(t, lines, "Date: 07/01/2026 7:30 PM")
-	require.Contains(t, lines, "Order type: Pickup")
-	require.Contains(t, lines, "Customer")
-	require.Contains(t, lines, "Product")
-	require.Contains(t, lines, "Unit price")
-	require.Contains(t, lines, "Subtotal")
-	require.Contains(t, lines, "Total VAT")
-	require.Contains(t, lines, "Coupon")
-	require.Contains(t, lines, "VAT included")
-	require.Contains(t, lines, "Thank you for your order!")
-	require.NotContains(t, lines, "Delivery fee")
-	require.NotContains(t, lines, "Delivery address: Rue Saint-Gilles 12 / 3B, 4000 Liège")
-}
-
-// BUG(product decision pending): the invoice only has French and English labels, while the shop
-// ships in fr, en, nl and zh. A Dutch or Chinese customer currently gets a French invoice. The
-// nl/zh entries below pin that gap: when Dutch (or Chinese) labels are added, move "nl" / "zh" out
-// of this list and assert the new labels instead.
-func TestGeneratePDFUnsupportedLanguageFallsBackToFrench(t *testing.T) {
-	for _, lang := range []string{"nl", "zh", "", "xx"} {
-		d := baseInvoice()
-		d.Language = lang
-		lines := generate(t, d)
-		require.Contains(t, lines, "Facture", lang)
-		require.Contains(t, lines, "Date: 01/07/2026 19:30", lang+": non-English keeps the 24h dd/mm format")
-		require.Contains(t, lines, "Merci pour votre commande !", lang)
+// Invoices are always in French, whatever language the customer ordered in (owner decision), so the
+// language is not an input of GeneratePDF. The handler test TestDownloadInvoice_AlwaysFrench pins that an
+// order in any language reaches this single rendering.
+func TestGeneratePDFIsAlwaysFrench(t *testing.T) {
+	french := generate(t, baseInvoice())
+	require.Contains(t, french, "Facture")
+	require.Contains(t, french, "Date: 01/07/2026 19:30", "dd/mm/yyyy, 24 h clock, restaurant timezone")
+	require.Contains(t, french, "Merci pour votre commande !")
+	for _, forbidden := range []string{"Invoice", "Factuur", "Thank you for your order!", "Bedankt voor uw bestelling!", "Date: 07/01/2026 7:30 PM"} {
+		require.NotContains(t, french, forbidden)
 	}
 }
 
-func TestGeneratePDFNormalisesLanguage(t *testing.T) {
-	for _, lang := range []string{"EN", " en ", "en-GB", "en_US"} {
-		d := baseInvoice()
-		d.Language = lang
-		lines := generate(t, d)
-		require.Contains(t, lines, "Invoice", lang)
-		require.Contains(t, lines, "Thank you for your order!", lang)
-		require.Contains(t, lines, "Date: 07/01/2026 7:30 PM", lang+": English 12h format")
-	}
-	for _, lang := range []string{"FR", "fr-BE", "nl-BE", "zh-Hans", "de-DE", "garbage"} {
-		d := baseInvoice()
-		d.Language = lang
-		lines := generate(t, d)
-		require.Contains(t, lines, "Facture", lang)
-		require.Contains(t, lines, "Date: 01/07/2026 19:30", lang)
-	}
+func TestFilePrefixIsAlwaysFrench(t *testing.T) {
+	require.Equal(t, "facture", FilePrefix())
 }
 
 func TestGeneratePDFOrderTypeLabels(t *testing.T) {
@@ -194,7 +147,7 @@ func TestGeneratePDFOptionalBlocksAreOmitted(t *testing.T) {
 	require.Equal(t, []string{
 		"Tokyo Sushi Bar — SRL", "Facture",
 		"Rue de la Cathédrale 59, 4000 Liège, Belgique",
-		"Tél: +32 4 222 98 88  |  Email: tokyosushibar888@gmail.com",
+		"Tél: +32 4 222 98 88  |  E-mail: tokyosushibar888@gmail.com",
 		"N° d'entreprise: BE0772.499.585",
 		"Réf. commande: TSB-2026-2C3D4E5F",
 		"Date: 01/07/2026 19:30",
@@ -239,9 +192,9 @@ func TestGeneratePDFTakeawayDiscountAndCoupon(t *testing.T) {
 	d.Total = "24.20"
 	lines := generate(t, d)
 
-	i := indexOf(lines, "Remise emporter (-10%)")
+	i := indexOf(lines, "Remise à emporter")
 	require.GreaterOrEqual(t, i, 0)
-	require.Equal(t, []string{"Remise emporter (-10%)", "- 2.80 €", "Coupon", "- 1.00 €", "Total", "24.20 €"}, lines[i:i+6])
+	require.Equal(t, []string{"Remise à emporter", "- 2.80 €", "Code promo", "- 1.00 €", "Total", "24.20 €"}, lines[i:i+6])
 }
 
 func TestGeneratePDFVatLineWithoutRateHasNoPercent(t *testing.T) {
@@ -313,7 +266,7 @@ func TestGeneratePDFUsesBrandIdentity(t *testing.T) {
 	lines := generate(t, baseInvoice())
 	require.Contains(t, lines, "Yangguofu Liège SRL")
 	require.Contains(t, lines, "Rue Test 1, 4000 Liège")
-	require.Contains(t, lines, "Tél: +32 4 000 00 00  |  Email: hello@ygf.test")
+	require.Contains(t, lines, "Tél: +32 4 000 00 00  |  E-mail: hello@ygf.test")
 	require.Contains(t, lines, "N° d'entreprise: BE0123.456.789")
 	require.Contains(t, lines, "Réf. commande: YGF-2026-2C3D4E5F")
 	require.NotContains(t, lines, "Tokyo Sushi Bar — SRL")
@@ -339,25 +292,11 @@ func TestInvoiceAddressFormat(t *testing.T) {
 	require.Equal(t, "Rue X 5 / 2A, 4000 Liège", a.Format())
 }
 
-func TestLabelsAndFilePrefix(t *testing.T) {
-	require.Equal(t, "facture", FilePrefix("fr"))
-	require.Equal(t, "invoice", FilePrefix("en"))
-	for _, lang := range []string{"nl", "zh", "", "de"} {
-		require.Equal(t, "facture", FilePrefix(lang), lang)
-	}
-	require.Equal(t, translations["fr"], getLabels("unknown"))
-	require.Equal(t, "invoice", FilePrefix("EN-gb"))
-	require.Equal(t, "facture", FilePrefix("fr-BE"))
-	require.Equal(t, translations["en"], getLabels("en"))
-}
-
-func TestLabelsAreCompleteInEveryLanguage(t *testing.T) {
+func TestLabelsAreComplete(t *testing.T) {
 	// Enumerate the label fields by reflection so a field added to labels is checked automatically.
-	for lang, l := range translations {
-		v := reflect.ValueOf(l)
-		for i := 0; i < v.NumField(); i++ {
-			require.NotEmpty(t, v.Field(i).String(), "%s.%s", lang, v.Type().Field(i).Name)
-		}
+	v := reflect.ValueOf(fr)
+	for i := 0; i < v.NumField(); i++ {
+		require.NotEmpty(t, v.Field(i).String(), v.Type().Field(i).Name)
 	}
 }
 
@@ -402,25 +341,4 @@ func TestGeneratePDFFailsOnCorruptLogo(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, pdf)
 	require.ErrorContains(t, err, "failed to generate PDF")
-}
-
-// Every invoice language must be a supported language, and the gap with the supported set is
-// pinned: BUG(product decision pending) only fr and en have labels (see
-// TestGeneratePDFUnsupportedLanguageFallsBackToFrench). When nl/zh labels are added this test
-// fails until "missing" is emptied.
-func TestInvoiceLabelsVersusSupportedLanguages(t *testing.T) {
-	var have []string
-	for lang := range translations {
-		have = append(have, lang)
-	}
-	sort.Strings(have)
-	require.Subset(t, locale.Supported(), have, "an invoice language that locale does not support is unreachable")
-
-	var missing []string
-	for _, lang := range locale.Supported() {
-		if _, ok := translations[lang]; !ok {
-			missing = append(missing, lang)
-		}
-	}
-	require.Equal(t, []string{"nl", "zh"}, missing, "languages without invoice labels (known gap)")
 }

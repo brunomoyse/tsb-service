@@ -78,14 +78,14 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		assert.Equal(t, []string{amount}, env.Mollie.RefundAmounts(t, payID), "Mollie is asked for the whole payment amount")
 
 		env.Mail.WaitSubject(t, c.email, "Your refund has been issued")
-		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		env.Mail.WaitSubject(t, c.email, "Order cancelled")
 
 		// Saving the cancelled order again neither refunds nor writes to the customer again.
 		again := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
 		assert.Equal(t, "CANCELLED", again.Status)
 		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID), 1)
 		require.Never(t, func() bool {
-			return env.Mail.CountSubject(t, c.email, "Order canceled") > 1 || env.Mail.CountSubject(t, c.email, "Your refund has been issued") > 1
+			return env.Mail.CountSubject(t, c.email, "Order cancelled") > 1 || env.Mail.CountSubject(t, c.email, "Your refund has been issued") > 1
 		}, 400*time.Millisecond, 20*time.Millisecond)
 	})
 
@@ -144,7 +144,7 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
 		assert.Equal(t, []string{"DELETE /v2/payments/" + payID}, env.Mollie.CallsMatching("DELETE /v2/payments/"+payID))
 		assert.Empty(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID))
-		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		env.Mail.WaitSubject(t, c.email, "Order cancelled")
 		assert.Zero(t, env.Mail.CountSubject(t, c.email, "Your refund has been issued"))
 	})
 
@@ -192,7 +192,7 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		assert.Equal(t, before, orderState(t, order.ID), "the order is NOT cancelled")
 		assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM order_status_history WHERE order_id = $1 AND status = 'CANCELLED'`, order.ID))
 		assert.Equal(t, "0.00", env.paymentCol(t, "amount_refunded", payID))
-		require.Never(t, func() bool { return env.Mail.CountSubject(t, c.email, "Order canceled") > 0 }, 300*time.Millisecond, 20*time.Millisecond)
+		require.Never(t, func() bool { return env.Mail.CountSubject(t, c.email, "Order cancelled") > 0 }, 300*time.Millisecond, 20*time.Millisecond)
 
 		// With Mollie healthy again the same call goes through and refunds once.
 		env.Mollie.SetRefundOutage(false)
@@ -201,7 +201,7 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID+"/refunds"), 2, "the refused call and the retry")
 		assert.Equal(t, env.paymentCol(t, "amount", payID), env.paymentCol(t, "amount_refunded", payID))
 		env.Mail.WaitSubject(t, c.email, "Your refund has been issued")
-		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		env.Mail.WaitSubject(t, c.email, "Order cancelled")
 	})
 
 	// Retrying cannot help for a payment Mollie cannot refund (voucher, gift card, expired refund
@@ -238,7 +238,7 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		require.NotEmpty(t, entries, "logged for manual handling")
 		assert.Equal(t, zapcore.ErrorLevel, entries[0].Level)
 		assert.Equal(t, payID, entries[0].ContextMap()["payment_id"])
-		require.Never(t, func() bool { return env.Mail.CountSubject(t, c.email, "Order canceled") > 0 }, 200*time.Millisecond, 20*time.Millisecond)
+		require.Never(t, func() bool { return env.Mail.CountSubject(t, c.email, "Order cancelled") > 0 }, 200*time.Millisecond, 20*time.Millisecond)
 	})
 
 	t.Run("a refund Mollie refuses outright (422) is not refundable either", func(t *testing.T) {
@@ -412,7 +412,7 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		order := env.placeOrder(t, c, "en")
 		before := len(env.Mollie.CallsMatching(""))
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED", "cancellationReason": "OTHER"})
-		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		env.Mail.WaitSubject(t, c.email, "Order cancelled")
 		assert.Equal(t, before, len(env.Mollie.CallsMatching("")), "Mollie is not involved")
 	})
 }
@@ -636,9 +636,9 @@ func TestCancelSettledButNotSaved(t *testing.T) {
 
 		// Cancelling it yet again neither refunds nor writes again.
 		require.NoError(t, cancel(env.Resolver, order.ID))
-		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		env.Mail.WaitSubject(t, c.email, "Order cancelled")
 		require.Never(t, func() bool {
-			return env.Mail.CountSubject(t, c.email, "Your refund has been issued") > 1 || env.Mail.CountSubject(t, c.email, "Order canceled") > 1
+			return env.Mail.CountSubject(t, c.email, "Your refund has been issued") > 1 || env.Mail.CountSubject(t, c.email, "Order cancelled") > 1
 		}, 200*time.Millisecond, 20*time.Millisecond)
 	})
 

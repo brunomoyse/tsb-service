@@ -182,7 +182,7 @@ func TestUpdateOrderLifecycleNotifications(t *testing.T) {
 
 	order := env.placeOrder(t, c, "en")
 	orderID := uuid.MustParse(order.ID)
-	env.Mail.WaitSubject(t, c.email, "Order pending validation")
+	env.Mail.WaitSubject(t, c.email, "Order received, awaiting confirmation")
 	env.addActivityToken(t, orderID, "la-life")
 
 	all, stopAll := context.WithCancel(t.Context())
@@ -231,7 +231,7 @@ func TestUpdateOrderLifecycleNotifications(t *testing.T) {
 		d, _ := data[0].Payload["data"].(map[string]any)
 		assert.Equal(t, "update", d["event"])
 
-		assert.Zero(t, env.Mail.CountSubject(t, c.email, "Updated estimated time"), "the first estimate is not an update of it")
+		assert.Zero(t, env.Mail.CountSubject(t, c.email, "Your order's estimated time has changed"), "the first estimate is not an update of it")
 	})
 
 	t.Run("moving the estimate of a confirmed order tells the customer, without a status change", func(t *testing.T) {
@@ -239,7 +239,7 @@ func TestUpdateOrderLifecycleNotifications(t *testing.T) {
 		got := env.mustUpdateOrder(t, order.ID, map[string]any{"estimatedReadyTime": inMinutes(50)})
 		assert.Equal(t, "CONFIRMED", got.Status)
 
-		env.Mail.WaitSubject(t, c.email, "Updated estimated time")
+		env.Mail.WaitSubject(t, c.email, "Your order's estimated time has changed")
 		require.Eventually(t, func() bool {
 			var withETA int
 			for _, r := range alertsFor(env.APNs, c.ios, order.ID) {
@@ -318,7 +318,7 @@ func TestUpdateOrderQuietCases(t *testing.T) {
 
 		// A cancellation is news whenever it comes.
 		env.mustUpdateOrder(t, id, map[string]any{"status": "CANCELLED", "cancellationReason": "OUT_OF_STOCK"})
-		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		env.Mail.WaitSubject(t, c.email, "Order cancelled")
 		require.Eventually(t, func() bool { return len(alertsFor(env.APNs, c.ios, id.String())) == 1 }, 20*time.Second, 20*time.Millisecond)
 		aps, _ := alertsFor(env.APNs, c.ios, id.String())[0].Payload["aps"].(map[string]any)
 		assert.Contains(t, aps["alert"].(map[string]any)["body"], "out of stock")

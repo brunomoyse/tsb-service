@@ -1,11 +1,11 @@
 Hallo {{.UserName}},
 
-Welkom bij {{restaurantName}}! Wij zijn verheugd u bij ons te verwelkomen en kijken ernaar uit u onze authentieke sushi-ervaring te laten ontdekken.
+Welkom bij {{restaurantName}}! Fijn dat u erbij bent!
 
 Uw account is nu actief. Klik op de onderstaande link om ons menu te bekijken:
 {{.MenuLink}}
 
-Wij kijken ernaar uit u een uitzonderlijke sushi-ervaring te bieden.
+We hopen u snel te mogen verwennen!
 
 Als u dit account niet hebt aangemaakt, kunt u deze e-mail negeren.
 

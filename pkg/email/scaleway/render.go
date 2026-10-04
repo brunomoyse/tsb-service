@@ -68,6 +68,8 @@ type templateExecutor interface {
 func brandFuncs() map[string]any {
 	return map[string]any{
 		"restaurantName": func() string { return brandCfg().Name },
+		// The brand's own phone number (RESTAURANT_PHONE), so no template hardcodes one restaurant's number.
+		"restaurantPhone": func() string { return brandCfg().Phone },
 	}
 }
 

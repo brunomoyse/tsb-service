@@ -4,6 +4,6 @@ Uw Google-account is succesvol gekoppeld aan uw {{restaurantName}}-account.
 
 U kunt zich voortaan via Google aanmelden voor een snellere ervaring.
 
-Als u deze actie niet hebt uitgevoerd, neem dan onmiddellijk contact met ons op via 04 222 98 88.
+Als u deze actie niet hebt uitgevoerd, neem dan onmiddellijk contact met ons op via {{restaurantPhone}}.
 
 © 2026 {{restaurantName}}. Alle rechten voorbehouden.

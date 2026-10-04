@@ -206,7 +206,6 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 		OrderID:       order.ID.String(),
 		OrderDate:     order.CreatedAt,
 		OrderType:     string(order.OrderType),
-		Language:      order.Language,
 		Items:         items,
 		Subtotal:      utils.FormatDecimal(itemsSubtotal),
 		Total:         utils.FormatDecimal(totalPrice),
@@ -228,7 +227,7 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 			continue
 		}
 		data.VatBreakdown = append(data.VatBreakdown, invoice.InvoiceVatLine{
-			Label:  vatLabel(order.Language),
+			Label:  vatLabel,
 			Rate:   rate,
 			Amount: utils.FormatDecimal(amount),
 		})
@@ -273,8 +272,8 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 		return
 	}
 
-	// 13. Build localized filename: e.g. "facture-02-12-2025-bruno-moyse.pdf"
-	prefix := invoice.FilePrefix(order.Language)
+	// 13. Build the (always French) filename: e.g. "facture-02-12-2025-bruno-moyse.pdf"
+	prefix := invoice.FilePrefix()
 	datePart := timezone.In(order.CreatedAt).Format("02-01-2006")
 	namePart := strings.ToLower(strings.ReplaceAll(user.FirstName+"-"+user.LastName, " ", "-"))
 	filename := fmt.Sprintf("%s-%s-%s.pdf", prefix, datePart, namePart)
@@ -290,12 +289,8 @@ func deref(s *string) string {
 	return *s
 }
 
-func vatLabel(language string) string {
-	if language == "en" {
-		return "VAT"
-	}
-	return "TVA"
-}
+// vatLabel is the VAT line label printed on the (always French) invoice.
+const vatLabel = "TVA"
 
 func vatAmountFromGross(gross decimal.Decimal, rate decimal.Decimal) decimal.Decimal {
 	if rate.IsZero() {

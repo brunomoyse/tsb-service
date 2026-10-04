@@ -75,9 +75,9 @@ func TestConcurrentCancelsRefundOnce(t *testing.T) {
 		"the cancellation is recorded once")
 	// One e-mail of each kind, however many callers.
 	env.Mail.WaitSubject(t, c.email, "Your refund has been issued")
-	env.Mail.WaitSubject(t, c.email, "Order canceled")
+	env.Mail.WaitSubject(t, c.email, "Order cancelled")
 	require.Never(t, func() bool {
-		return env.Mail.CountSubject(t, c.email, "Your refund has been issued") > 1 || env.Mail.CountSubject(t, c.email, "Order canceled") > 1
+		return env.Mail.CountSubject(t, c.email, "Your refund has been issued") > 1 || env.Mail.CountSubject(t, c.email, "Order cancelled") > 1
 	}, 200*time.Millisecond, 20*time.Millisecond)
 }
 

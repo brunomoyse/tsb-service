@@ -1,13 +1,12 @@
 Hallo {{.UserName}},
 
-Bedankt voor uw registratie bij {{restaurantName}}! Wij zijn verheugd u onze verse en smakelijke creaties te laten ontdekken, geïnspireerd door de Japanse traditie.
+Bedankt voor uw registratie bij {{restaurantName}}! Fijn dat u erbij bent.
 
 Om uw registratie te voltooien en uw account te activeren, bevestigt u uw e-mailadres door op de onderstaande link te klikken:
 
 E-mailadres bevestigen: {{.VerifyLink}}
 
-Wij kijken ernaar uit u onze moderne benadering van traditionele sushi te laten ontdekken.
-お待ちしております！ (Wij verwachten u!)
+Tot snel!
 
 Als u dit verzoek niet hebt ingediend, kunt u deze e-mail gewoon negeren.
 

@@ -1,13 +1,12 @@
 Hello {{.UserName}},
 
-Thank you for joining {{restaurantName}}! We’re excited to have you explore our fresh, flavorful, and truly authentic sushi experience.
+Thank you for joining {{restaurantName}}! We’re delighted to have you with us.
 
 To complete your registration and activate your membership, please verify your email by clicking the link below:
 
-Verify My Email: {{.VerifyLink}}
+Verify my email: {{.VerifyLink}}
 
-We look forward to delighting you with our modern take on traditional sushi.
-お待ちしております！ (We’re waiting for you!)
+See you soon!
 
 If you did not request this email, please ignore it.
 

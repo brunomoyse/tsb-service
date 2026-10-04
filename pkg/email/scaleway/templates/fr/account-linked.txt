@@ -4,6 +4,6 @@ Votre compte Google a été associé avec succès à votre compte {{restaurantNa
 
 Vous pouvez désormais vous connecter via Google pour une expérience plus rapide.
 
-Si vous n'avez pas effectué cette action, veuillez nous contacter immédiatement au 04 222 98 88.
+Si vous n'avez pas effectué cette action, veuillez nous contacter immédiatement au {{restaurantPhone}}.
 
 © 2026 {{restaurantName}}. Tous droits réservés.

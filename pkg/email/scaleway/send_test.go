@@ -38,7 +38,7 @@ func TestEmailLanguagesAreTheSupportedLanguages(t *testing.T) {
 }
 
 // greeting is the salutation every customer-facing template opens with.
-var greeting = map[string]string{"fr": "Bonjour Jeanne Dupont", "en": "Hello Jeanne Dupont", "nl": "Hallo Jeanne Dupont", "zh": "您好"}
+var greeting = map[string]string{"fr": "Bonjour Jeanne Dupont", "en": "Hello Jeanne Dupont", "nl": "Hallo Jeanne Dupont", "zh": "Jeanne Dupont，您好！"}
 
 type sendCase struct {
 	name     string
@@ -57,28 +57,28 @@ func sendCases() []sendCase {
 			name: "verification",
 			send: func(l string) error { return SendVerificationEmail(user, l, "https://shop.test/verify?token=abc") },
 			subjects: map[string]string{"fr": "Veuillez vérifier votre adresse e-mail", "en": "Please verify your email",
-				"nl": "Bevestig uw e-mailadres", "zh": "验证您的邮箱"},
+				"nl": "Bevestig uw e-mailadres", "zh": "请验证您的邮箱"},
 			want: []string{"Jeanne Dupont", "https://shop.test/verify?token=abc"},
 		},
 		{
 			name: "welcome",
 			send: func(l string) error { return SendWelcomeEmail(user, l, "https://shop.test/menu") },
 			subjects: map[string]string{"fr": "Bienvenue chez Tokyo Sushi Bar", "en": "Welcome to Tokyo Sushi Bar",
-				"nl": "Welkom bij Tokyo Sushi Bar", "zh": "欢迎光临 Tokyo Sushi Bar"},
+				"nl": "Welkom bij Tokyo Sushi Bar", "zh": "欢迎来到 Tokyo Sushi Bar"},
 			want: []string{"Jeanne Dupont", "https://shop.test/menu", "Tokyo Sushi Bar"},
 		},
 		{
 			name: "login otp",
 			send: func(l string) error { return SendLoginOtpEmail(user, l, "483920") },
-			subjects: map[string]string{"fr": "Votre code de connexion : 483920", "en": "Your sign-in code: 483920",
+			subjects: map[string]string{"fr": "Votre code de connexion : 483920", "en": "Your login code: 483920",
 				"nl": "Uw inlogcode: 483920", "zh": "您的登录验证码：483920"},
 			want: []string{"Jeanne Dupont", "483920"},
 		},
 		{
 			name: "order pending",
 			send: func(l string) error { return SendOrderPendingEmail(user, l, deliveryOrder(), sampleItems()) },
-			subjects: map[string]string{"fr": "Commande en attente de validation", "en": "Order pending validation",
-				"nl": "Bestelling wacht op bevestiging", "zh": "订单待验证"},
+			subjects: map[string]string{"fr": "Commande reçue, en attente de confirmation", "en": "Order received, awaiting confirmation",
+				"nl": "Bestelling ontvangen, wacht op bevestiging", "zh": "已收到订单，等待餐厅确认"},
 			threaded: true,
 			want:     []string{"Jeanne Dupont", "Sushi - Saumon", "Boissons - Thé vert", "25,00", "3,00", "28,00", "2,50", "2,80", "WELCOME10", "27,70"},
 		},
@@ -96,7 +96,7 @@ func sendCases() []sendCase {
 		{
 			name: "order canceled",
 			send: func(l string) error { return SendOrderCanceledEmail(user, l, testOrderID.String(), &reason) },
-			subjects: map[string]string{"fr": "Commande annulée", "en": "Order canceled",
+			subjects: map[string]string{"fr": "Commande annulée", "en": "Order cancelled",
 				"nl": "Bestelling geannuleerd", "zh": "订单已取消"},
 			threaded: true,
 			want:     []string{"Jeanne Dupont"},
@@ -121,7 +121,7 @@ func sendCases() []sendCase {
 			name: "order completed",
 			send: func(l string) error { return SendOrderCompletedEmail(user, l) },
 			subjects: map[string]string{"fr": "Merci pour votre commande !", "en": "Thank you for your order!",
-				"nl": "Bedankt voor uw bestelling!", "zh": "感谢您的订单！"},
+				"nl": "Bedankt voor uw bestelling!", "zh": "感谢您的惠顾！"},
 			want: []string{"Jeanne Dupont", "https://shop.test"},
 		},
 		{
@@ -136,14 +136,14 @@ func sendCases() []sendCase {
 			name: "account linked",
 			send: func(l string) error { return SendAccountLinkedEmail(user, l) },
 			subjects: map[string]string{"fr": "Compte Google associé", "en": "Google account linked",
-				"nl": "Google-account gekoppeld", "zh": "Google 帐户已关联"},
+				"nl": "Google-account gekoppeld", "zh": "Google 账户已关联"},
 			want: []string{"Jeanne Dupont"},
 		},
 		{
 			name: "ready time updated",
 			send: func(l string) error { return SendReadyTimeUpdatedEmail(user, l, deliveryOrder()) },
-			subjects: map[string]string{"fr": "Horaire estimé modifié", "en": "Updated estimated time",
-				"nl": "Geschatte tijd bijgewerkt", "zh": "预计时间已更新"},
+			subjects: map[string]string{"fr": "Nouvelle heure estimée pour votre commande", "en": "Your order's estimated time has changed",
+				"nl": "Nieuwe geschatte tijd voor uw bestelling", "zh": "您的订单预计时间已更新"},
 			threaded: true,
 			want:     []string{"Jeanne Dupont", link},
 		},
@@ -151,7 +151,7 @@ func sendCases() []sendCase {
 			name: "reengagement",
 			send: func(l string) error { return SendReengagementEmail(user, l) },
 			subjects: map[string]string{"fr": "Vous nous manquez chez Tokyo Sushi Bar !", "en": "We miss you at Tokyo Sushi Bar!",
-				"nl": "Wij missen u bij Tokyo Sushi Bar!", "zh": "Tokyo Sushi Bar 想念您！"},
+				"nl": "We missen u, tot snel bij Tokyo Sushi Bar!", "zh": "Tokyo Sushi Bar 想念您！"},
 			want: []string{"Jeanne Dupont", "https://shop.test"},
 		},
 	}
@@ -373,8 +373,8 @@ func TestOrderEmailAmountsAndLines(t *testing.T) {
 		o := deliveryOrder()
 		o.CouponCode = nil
 		txt, _ := text(t, "en", o, sampleItems(), true, true)
-		require.Contains(t, txt, "Coupon")
-		require.NotContains(t, txt, "Coupon (")
+		require.Contains(t, txt, "Promo code")
+		require.NotContains(t, txt, "Promo code (")
 	})
 
 	t.Run("no discount lines when the order has none", func(t *testing.T) {
@@ -384,7 +384,7 @@ func TestOrderEmailAmountsAndLines(t *testing.T) {
 		o.DeliveryFee = nil
 		o.TotalPrice = dec("28.00")
 		txt, _ := text(t, "en", o, sampleItems(), true, true)
-		require.NotContains(t, txt, "Coupon")
+		require.NotContains(t, txt, "Promo code")
 		require.Contains(t, txt, "28,00")
 		require.Contains(t, txt, "0,00", "missing delivery fee renders as 0,00 on a delivery order")
 	})
@@ -405,7 +405,7 @@ func TestOrderEmailAmountsAndLines(t *testing.T) {
 		a.BoxNumber = nil
 		require.NoError(t, SendOrderConfirmedEmail(sampleUser(), "en", deliveryOrder(), sampleItems(), a))
 		txt := srv.Only(t).Text
-		require.Contains(t, txt, "Rue Saint-Gilles 12\r\nLiège, 4000")
+		require.Contains(t, txt, "Rue Saint-Gilles 12\r\n4000 Liège")
 		require.NotContains(t, txt, "Box")
 	})
 
@@ -482,7 +482,7 @@ func TestOrderReadyWordingByType(t *testing.T) {
 
 func TestCanceledEmailReasonPerLanguage(t *testing.T) {
 	reason := orderDomain.OrderCancellationReasonKitchenClosed
-	want := map[string]string{"fr": "cuisine fermée", "en": "kitchen closed", "nl": "keuken gesloten", "zh": "厨房已关闭"}
+	want := map[string]string{"fr": "cuisine fermée", "en": "kitchen closed", "nl": "keuken gesloten", "zh": "厨房已停止接单"}
 	for _, lang := range allLangs {
 		t.Run(lang, func(t *testing.T) {
 			srv := smtptest.Start(t)
@@ -514,7 +514,7 @@ func TestLocalizedCancellationReason(t *testing.T) {
 
 	require.Equal(t, "hors zone de livraison", LocalizedCancellationReason(&r, "fr"))
 	require.Equal(t, "outside delivery area", LocalizedCancellationReason(&r, "en"))
-	require.Equal(t, "buiten bezorggebied", LocalizedCancellationReason(&r, "nl"))
+	require.Equal(t, "buiten de leveringszone", LocalizedCancellationReason(&r, "nl"))
 	require.Equal(t, "超出配送范围", LocalizedCancellationReason(&r, "zh"))
 	for _, lang := range []string{"de", "", "  ", "xx-YY"} {
 		require.Equal(t, "hors zone de livraison", LocalizedCancellationReason(&r, lang), "unsupported language %q falls back to French", lang)

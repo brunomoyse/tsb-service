@@ -318,7 +318,7 @@ func TestCreateOrderStepsThatFail(t *testing.T) {
 		order := env.placeOrder(t, c, "en")
 		got := recvOrder(t, created)
 		assert.Equal(t, order.ID, got.ID.String())
-		env.Mail.WaitSubject(t, c.email, "Order pending validation")
+		env.Mail.WaitSubject(t, c.email, "Order received, awaiting confirmation")
 		require.Eventually(t, func() bool {
 			return len(env.APNs.PushesTo("admin-ios-new")) == 1 && len(env.FCM.PushesTo("pos-new-order")) == 1
 		}, 20*time.Second, 20*time.Millisecond)

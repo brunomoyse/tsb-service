@@ -6,6 +6,6 @@ Our chefs have been crafting new delicious dishes just for you. Come discover wh
 
 Discover the menu: {{.MenuLink}}
 
-If you no longer wish to receive these emails, please update your preferences.
+If you no longer wish to receive these emails, you can turn them off in your account settings.
 
 © 2026 {{restaurantName}}. All rights reserved.

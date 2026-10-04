@@ -12,7 +12,6 @@ import (
 	"github.com/go-pdf/fpdf"
 
 	"tsb-service/pkg/brand"
-	"tsb-service/pkg/i18n/locale"
 	"tsb-service/pkg/timezone"
 )
 
@@ -49,7 +48,6 @@ type InvoiceData struct {
 	OrderID   string
 	OrderDate time.Time
 	OrderType string // "DELIVERY", "PICKUP" or "DINE_IN"
-	Language  string // any tag; normalised via locale.Normalize (only "fr"/"en" have labels)
 
 	Items []InvoiceItem
 
@@ -106,9 +104,10 @@ func formatOrderRef(orderID string, orderDate time.Time) string {
 	return fmt.Sprintf("%s-%d-%s", cfg().InvoicePrefix, timezone.In(orderDate).Year(), strings.ToUpper(short))
 }
 
-// GeneratePDF generates a PDF invoice and returns the raw bytes.
+// GeneratePDF generates a PDF invoice and returns the raw bytes. Invoices are always in French
+// (labels, dd/mm/yyyy 24 h dates, "facture" file prefix), whatever language the customer ordered in.
 func GeneratePDF(data InvoiceData) ([]byte, error) {
-	l := getLabels(data.Language)
+	l := fr
 
 	pdf := fpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(20, 20, 20)
@@ -161,10 +160,7 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 	// === ORDER INFO ===
 	orderRef := formatOrderRef(data.OrderID, data.OrderDate)
 
-	dateFormat := "02/01/2006 15:04"
-	if locale.Normalize(data.Language) == "en" {
-		dateFormat = "01/02/2006 3:04 PM"
-	}
+	const dateFormat = "02/01/2006 15:04"
 
 	pdf.SetTextColor(30, 30, 30)
 	pdf.SetFont("DejaVu", "B", 10)

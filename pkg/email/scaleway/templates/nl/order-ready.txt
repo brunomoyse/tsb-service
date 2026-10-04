@@ -1,7 +1,7 @@
 Hallo {{.UserName}},
 
 {{if eq .OrderType "DELIVERY"}}
-Goed nieuws! Uw bestelling is onderweg. Onze bezorger is vertrokken.
+Goed nieuws! Uw bestelling is onderweg. Onze koerier is vertrokken.
 {{else if eq .OrderType "PICKUP"}}
 Goed nieuws! Uw bestelling is klaar om afgehaald te worden. U kunt langskomen in het restaurant wanneer het u uitkomt.
 {{end}}

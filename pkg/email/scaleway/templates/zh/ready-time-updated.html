@@ -17,7 +17,7 @@
     <tr><td style="background-color:#C41E24;height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
     <!-- CONTENT -->
     <tr><td style="background-color:#ffffff;padding:36px;">
-        <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">您好 {{.UserName}}，</p>
+        <p style="margin:0 0 16px;font-size:18px;font-weight:600;color:#2D2D2D;">{{.UserName}}，您好！</p>
         {{if .EstimatedReadyTime}}
         {{if eq .OrderType "DELIVERY"}}
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#2D2D2D;">您的订单预计配送时间已更新为：<strong>{{.EstimatedReadyTime}}</strong>。</p>
