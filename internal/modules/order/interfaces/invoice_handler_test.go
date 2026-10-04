@@ -222,12 +222,12 @@ func requireRun(t *testing.T, lines []string, want ...string) {
 func TestDownloadInvoice_Success(t *testing.T) {
 	d := decimal.RequireFromString
 
-	t.Run("delivered order returns a localized pdf and loads names in the order language", func(t *testing.T) {
+	t.Run("delivered order returns a French pdf and loads names in the order language", func(t *testing.T) {
 		e := newInvoiceEnv()
 		e.orders.order.Language = "en"
 		rec := e.do(t, e.userID.String(), e.orderID.String())
-		assertPDF(t, rec, "invoice-02-12-2025-jean-paul-dupont.pdf")
-		requireRun(t, invoiceLines(t, rec), "Invoice")
+		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
+		requireRun(t, invoiceLines(t, rec), "Facture")
 		assert.Equal(t, "en", e.products.gotLang)
 		assert.Equal(t, []string{e.prodID.String()}, e.products.gotIDs)
 	})
@@ -273,8 +273,8 @@ func TestDownloadInvoice_Success(t *testing.T) {
 			"TVA (21.00%)", "0,52 €",
 			"TVA (6.00%)", "1,19 €",
 			"Total TVA", "1,71 €",
-			"Remise emporter (-10%)", "- 1,00 €",
-			"Coupon (WELCOME)", "- 2,00 €",
+			"Remise à emporter", "- 1,00 €",
+			"Code promo (WELCOME)", "- 2,00 €",
 			"Frais de livraison", "2,50 €",
 			"Total", "24,50 €",
 		)
@@ -352,11 +352,29 @@ func TestDownloadInvoice_Success(t *testing.T) {
 	})
 }
 
+// The invoice is issued in French only (owner decision), whatever language the order was placed in:
+// labels, VAT line, dd/mm/yyyy 24 h date and the "facture" file name.
+func TestDownloadInvoice_AlwaysFrench(t *testing.T) {
+	for _, lang := range []string{"fr", "en", "nl", "zh", "de", ""} {
+		t.Run("order language "+lang, func(t *testing.T) {
+			e := newInvoiceEnv()
+			e.orders.order.Language = lang
+			rec := e.do(t, e.userID.String(), e.orderID.String())
+			assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
+			lines := invoiceLines(t, rec)
+			for _, want := range []string{"Facture", "Sous-total", "TVA (6.00%)", "Total TVA", "TVA comprise", "Merci pour votre commande !"} {
+				assert.Contains(t, lines, want)
+			}
+			for _, forbidden := range []string{"Invoice", "Factuur", "Subtotal", "Subtotaal", "VAT included", "Btw inbegrepen", "Total VAT", "Totaal btw"} {
+				assert.NotContains(t, lines, forbidden)
+			}
+		})
+	}
+}
+
 func TestVatHelpers(t *testing.T) {
 	d := decimal.RequireFromString
-	assert.Equal(t, "VAT", vatLabel("en"))
-	assert.Equal(t, "TVA", vatLabel("fr"))
-	assert.Equal(t, "TVA", vatLabel("nl"))
+	assert.Equal(t, "TVA", vatLabel)
 	assert.Equal(t, "", deref(nil))
 	s := "x"
 	assert.Equal(t, "x", deref(&s))

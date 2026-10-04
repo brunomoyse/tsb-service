@@ -1,7 +1,5 @@
 package invoice
 
-import "tsb-service/pkg/i18n/locale"
-
 type labels struct {
 	FilePrefix       string
 	InvoiceTitle     string
@@ -29,98 +27,37 @@ type labels struct {
 	VATIncluded      string
 }
 
-var translations = map[string]labels{
-	"fr": {
-		FilePrefix:       "facture",
-		InvoiceTitle:     "Facture",
-		Date:             "Date",
-		OrderRef:         "Réf. commande",
-		Customer:         "Client",
-		OrderType:        "Type de commande",
-		TypeDelivery:     "Livraison",
-		TypePickup:       "À emporter",
-		TypeDineIn:       "Sur place",
-		DeliveryAddress:  "Adresse de livraison",
-		Product:          "Produit",
-		Qty:              "Qté",
-		UnitPrice:        "Prix unit.",
-		Total:            "Total",
-		Subtotal:         "Sous-total",
-		TakeawayDiscount: "Remise à emporter",
-		CouponDiscount:   "Code promo",
-		DeliveryFee:      "Frais de livraison",
-		TotalVAT:         "Total TVA",
-		ThankYou:         "Merci pour votre commande !",
-		CompanyNumber:    "N° d'entreprise",
-		Phone:            "Tél",
-		Email:            "E-mail",
-		VATIncluded:      "TVA comprise",
-	},
-	// Belgian Dutch: the DejaVu font covers it (Chinese has no glyphs in it, so zh keeps the French fallback).
-	"nl": {
-		FilePrefix:       "factuur",
-		InvoiceTitle:     "Factuur",
-		Date:             "Datum",
-		OrderRef:         "Bestelref.",
-		Customer:         "Klant",
-		OrderType:        "Type bestelling",
-		TypeDelivery:     "Levering",
-		TypePickup:       "Afhalen",
-		TypeDineIn:       "Ter plaatse",
-		DeliveryAddress:  "Leveringsadres",
-		Product:          "Product",
-		Qty:              "Aantal",
-		UnitPrice:        "Eenheidsprijs",
-		Total:            "Totaal",
-		Subtotal:         "Subtotaal",
-		TakeawayDiscount: "Afhaalkorting",
-		CouponDiscount:   "Kortingscode",
-		DeliveryFee:      "Leveringskosten",
-		TotalVAT:         "Totaal btw",
-		ThankYou:         "Bedankt voor uw bestelling!",
-		CompanyNumber:    "Ondernemingsnr.",
-		Phone:            "Tel.",
-		Email:            "E-mail",
-		VATIncluded:      "Btw inbegrepen",
-	},
-	"en": {
-		FilePrefix:       "invoice",
-		InvoiceTitle:     "Invoice",
-		Date:             "Date",
-		OrderRef:         "Order ref.",
-		Customer:         "Customer",
-		OrderType:        "Order type",
-		TypeDelivery:     "Delivery",
-		TypePickup:       "Pickup",
-		TypeDineIn:       "Dine-in",
-		DeliveryAddress:  "Delivery address",
-		Product:          "Product",
-		Qty:              "Qty",
-		UnitPrice:        "Unit price",
-		Total:            "Total",
-		Subtotal:         "Subtotal",
-		TakeawayDiscount: "Pickup discount",
-		CouponDiscount:   "Promo code",
-		DeliveryFee:      "Delivery fee",
-		TotalVAT:         "Total VAT",
-		ThankYou:         "Thank you for your order!",
-		CompanyNumber:    "Company no.",
-		Phone:            "Phone",
-		Email:            "Email",
-		VATIncluded:      "VAT included",
-	},
+// fr is the only label set: invoices are always issued in French, whatever language the customer
+// ordered in (owner decision; also the PDF font has no CJK glyphs, so zh could not be printed).
+// The discount lines carry no rate: the pickup discount rate is a backend policy value.
+var fr = labels{
+	FilePrefix:       "facture",
+	InvoiceTitle:     "Facture",
+	Date:             "Date",
+	OrderRef:         "Réf. commande",
+	Customer:         "Client",
+	OrderType:        "Type de commande",
+	TypeDelivery:     "Livraison",
+	TypePickup:       "À emporter",
+	TypeDineIn:       "Sur place",
+	DeliveryAddress:  "Adresse de livraison",
+	Product:          "Produit",
+	Qty:              "Qté",
+	UnitPrice:        "Prix unit.",
+	Total:            "Total",
+	Subtotal:         "Sous-total",
+	TakeawayDiscount: "Remise à emporter",
+	CouponDiscount:   "Code promo",
+	DeliveryFee:      "Frais de livraison",
+	TotalVAT:         "Total TVA",
+	ThankYou:         "Merci pour votre commande !",
+	CompanyNumber:    "N° d'entreprise",
+	Phone:            "Tél",
+	Email:            "E-mail",
+	VATIncluded:      "TVA comprise",
 }
 
-// getLabels returns the labels for the normalised language. Only French and
-// English are translated; nl and zh (and anything unsupported) read as French.
-func getLabels(lang string) labels {
-	if l, ok := translations[locale.Normalize(lang)]; ok {
-		return l
-	}
-	return translations["fr"]
-}
-
-// FilePrefix returns the localized invoice file prefix (e.g. "facture", "invoice").
-func FilePrefix(lang string) string {
-	return getLabels(lang).FilePrefix
+// FilePrefix returns the invoice file name prefix, always "facture".
+func FilePrefix() string {
+	return fr.FilePrefix
 }
