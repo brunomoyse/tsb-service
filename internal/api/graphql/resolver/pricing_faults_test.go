@@ -13,7 +13,6 @@ import (
 
 	"tsb-service/internal/api/graphql/apperr"
 	addressDomain "tsb-service/internal/modules/address/domain"
-	couponDomain "tsb-service/internal/modules/coupon/domain"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
 	restaurantDomain "tsb-service/internal/modules/restaurant/domain"
@@ -195,7 +194,6 @@ func TestPricingServerFaults(t *testing.T) {
 		f := newPricingFixture(t)
 		res := f.price(pricingInput{Items: []pricingItem{item(salmonID, 2)}, CouponCode: new("NOPE")})
 		wantCodes(t, res.Issues, apperr.CodeCouponInvalid)
-		var _ = couponDomain.DiscountTypeFixed
 	})
 
 	t.Run("fail-fast stops at delivery being unavailable", func(t *testing.T) {

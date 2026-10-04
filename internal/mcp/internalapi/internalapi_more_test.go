@@ -78,13 +78,19 @@ func TestAuthRules(t *testing.T) {
 	// Only the Bearer scheme counts.
 	req, _ := http.NewRequest("GET", e.srv.URL+"/internal/changes/"+id, nil)
 	req.Header.Set("Authorization", "Basic "+token)
-	resp, _ := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
 	_ = resp.Body.Close()
 	if resp.StatusCode != 401 {
 		t.Errorf("Basic scheme: %d", resp.StatusCode)
 	}
 	req.Header.Set("Authorization", token)
-	resp, _ = http.DefaultClient.Do(req)
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
 	_ = resp.Body.Close()
 	if resp.StatusCode != 401 {
 		t.Errorf("bare token: %d", resp.StatusCode)
