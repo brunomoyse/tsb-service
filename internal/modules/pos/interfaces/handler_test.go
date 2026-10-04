@@ -19,10 +19,21 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"tsb-service/internal/modules/pos/application"
 	"tsb-service/internal/modules/pos/domain"
 )
+
+// observeLogs routes the global zap logger into an observer for the test.
+func observeLogs(t *testing.T) *observer.ObservedLogs {
+	t.Helper()
+	core, logs := observer.New(zapcore.DebugLevel)
+	t.Cleanup(zap.ReplaceGlobals(zap.New(core)))
+	return logs
+}
 
 type fakeDevices struct {
 	domain.DeviceRepository
@@ -146,12 +157,11 @@ func TestDeviceLoginHandler(t *testing.T) {
 		badSig["hmac"] = base64.StdEncoding.EncodeToString([]byte("nope"))
 		bad := e.post("/pos/auth/device-login", badSig)
 
-		// NOTE(product decision pending): a database outage is answered like an unknown device
-		// (403 "device not authorized"), so a handheld cannot tell an outage from a lost enrolment.
-		// See also application TestDeviceLogin. Pinned as it is today.
-		e.repo.findErr = errors.New("db down")
+		// Genuinely unknown device (no row).
+		known := e.repo.device
+		e.repo.device = nil
 		unknown := e.post("/pos/auth/device-login", e.loginBody(now()))
-		e.repo.findErr = nil
+		e.repo.device = known
 		at := time.Now()
 		e.repo.device.RevokedAt = &at
 		revoked := e.post("/pos/auth/device-login", e.loginBody(now()))
@@ -160,6 +170,23 @@ func TestDeviceLoginHandler(t *testing.T) {
 			assert.Equal(t, http.StatusForbidden, rec.Code, name)
 			assert.JSONEq(t, `{"error":"device not authorized"}`, rec.Body.String(), name)
 		}
+	})
+
+	// A database outage during the device lookup is NOT answered like an unknown device: the handheld
+	// must not read it as "not enrolled". Generic 500, the cause only in the log.
+	t.Run("a database outage is a 500 with a generic error, and logged", func(t *testing.T) {
+		e := newEnv(t)
+		logs := observeLogs(t)
+		e.repo.findErr = errors.New("db down: password authentication failed for user tsb")
+
+		rec := e.post("/pos/auth/device-login", e.loginBody(now()))
+
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		assert.JSONEq(t, `{"error":"internal error"}`, rec.Body.String(), "no database detail in the answer")
+		entries := logs.FilterMessage("pos auth error").All()
+		require.Len(t, entries, 1)
+		assert.Equal(t, zapcore.ErrorLevel, entries[0].Level)
+		assert.Contains(t, entries[0].ContextMap()["error"], "db down")
 	})
 }
 

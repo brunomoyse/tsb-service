@@ -108,7 +108,7 @@ func respondAuthError(c *gin.Context, err error) {
 		errors.Is(err, application.ErrStaleRequest):
 		c.JSON(http.StatusForbidden, gin.H{"error": "device not authorized"})
 	default:
-		zap.L().Warn("pos auth error", zap.Error(err))
+		zap.L().Error("pos auth error", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 	}
 }

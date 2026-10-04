@@ -116,8 +116,13 @@ func (s *Service) verifyDeviceRequest(
 	deviceID uuid.UUID, timestamp int64, nonce, hmacB64, payload string,
 ) (*domain.Device, error) {
 	device, err := s.devices.FindByID(ctx, deviceID)
-	if err != nil {
+	switch {
+	case errors.Is(err, sql.ErrNoRows) || (err == nil && device == nil):
 		return nil, ErrDeviceNotEnrolled
+	case err != nil:
+		// An outage is not "this device is not enrolled": answering 403 would make the handheld
+		// conclude it lost its enrolment. Surface it as the server fault it is (handler: 500).
+		return nil, fmt.Errorf("load pos device: %w", err)
 	}
 	if device.RevokedAt != nil {
 		return nil, ErrDeviceRevoked
