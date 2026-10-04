@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -129,6 +130,10 @@ func TestGeneratePDFEnglishLabelsAndDateFormat(t *testing.T) {
 	require.NotContains(t, lines, "Delivery address: Rue Saint-Gilles 12 / 3B, 4000 Liège")
 }
 
+// BUG(product decision pending): the invoice only has French and English labels, while the shop
+// ships in fr, en, nl and zh. A Dutch or Chinese customer currently gets a French invoice. The
+// nl/zh entries below pin that gap: when Dutch (or Chinese) labels are added, move "nl" / "zh" out
+// of this list and assert the new labels instead.
 func TestGeneratePDFUnsupportedLanguageFallsBackToFrench(t *testing.T) {
 	for _, lang := range []string{"nl", "zh", "", "xx"} {
 		d := baseInvoice()
@@ -345,31 +350,12 @@ func TestLabelsAndFilePrefix(t *testing.T) {
 }
 
 func TestLabelsAreCompleteInEveryLanguage(t *testing.T) {
+	// Enumerate the label fields by reflection so a field added to labels is checked automatically.
 	for lang, l := range translations {
-		require.NotEmpty(t, l.FilePrefix, lang)
-		require.NotEmpty(t, l.InvoiceTitle, lang)
-		require.NotEmpty(t, l.Date, lang)
-		require.NotEmpty(t, l.OrderRef, lang)
-		require.NotEmpty(t, l.Customer, lang)
-		require.NotEmpty(t, l.OrderType, lang)
-		require.NotEmpty(t, l.TypeDelivery, lang)
-		require.NotEmpty(t, l.TypePickup, lang)
-		require.NotEmpty(t, l.TypeDineIn, lang)
-		require.NotEmpty(t, l.DeliveryAddress, lang)
-		require.NotEmpty(t, l.Product, lang)
-		require.NotEmpty(t, l.Qty, lang)
-		require.NotEmpty(t, l.UnitPrice, lang)
-		require.NotEmpty(t, l.Total, lang)
-		require.NotEmpty(t, l.Subtotal, lang)
-		require.NotEmpty(t, l.TakeawayDiscount, lang)
-		require.NotEmpty(t, l.CouponDiscount, lang)
-		require.NotEmpty(t, l.DeliveryFee, lang)
-		require.NotEmpty(t, l.TotalVAT, lang)
-		require.NotEmpty(t, l.ThankYou, lang)
-		require.NotEmpty(t, l.CompanyNumber, lang)
-		require.NotEmpty(t, l.Phone, lang)
-		require.NotEmpty(t, l.Email, lang)
-		require.NotEmpty(t, l.VATIncluded, lang)
+		v := reflect.ValueOf(l)
+		for i := 0; i < v.NumField(); i++ {
+			require.NotEmpty(t, v.Field(i).String(), "%s.%s", lang, v.Type().Field(i).Name)
+		}
 	}
 }
 
