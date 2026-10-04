@@ -6,12 +6,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	couponApplication "tsb-service/internal/modules/coupon/application"
+	couponDomain "tsb-service/internal/modules/coupon/domain"
 	orderApplication "tsb-service/internal/modules/order/application"
 	orderDomain "tsb-service/internal/modules/order/domain"
 	productApplication "tsb-service/internal/modules/product/application"
 	productDomain "tsb-service/internal/modules/product/domain"
+	restaurantApplication "tsb-service/internal/modules/restaurant/application"
+	restaurantDomain "tsb-service/internal/modules/restaurant/domain"
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
 )
@@ -185,3 +189,67 @@ func (f *faultyOrders) GetOrderHistory(ctx context.Context, filter orderDomain.O
 	}
 	return f.OrderService.GetOrderHistory(ctx, filter)
 }
+
+// faultyRestaurant fails the reads that follow a successful change of the schedule.
+type faultyRestaurant struct {
+	restaurantApplication.RestaurantService
+	failList, failConfig, failWithOverrides bool
+}
+
+func (f faultyRestaurant) ListOverrides(ctx context.Context, from, to time.Time) ([]*restaurantDomain.ScheduleOverride, error) {
+	if f.failList {
+		return nil, errBoom
+	}
+	return f.RestaurantService.ListOverrides(ctx, from, to)
+}
+
+func (f faultyRestaurant) GetConfig(ctx context.Context) (*restaurantDomain.RestaurantConfig, error) {
+	if f.failConfig {
+		return nil, errBoom
+	}
+	return f.RestaurantService.GetConfig(ctx)
+}
+
+func (f faultyRestaurant) GetConfigWithOverrides(ctx context.Context) (*restaurantDomain.RestaurantConfig, map[string]*restaurantDomain.ScheduleOverride, error) {
+	if f.failWithOverrides {
+		return nil, nil, errBoom
+	}
+	return f.RestaurantService.GetConfigWithOverrides(ctx)
+}
+
+// faultyCouponStore makes CreateCoupon / UpdateCoupon / GetCoupon fail in the ways the resolver
+// tells apart: a unique violation (the code is taken) or anything else.
+type faultyCouponStore struct {
+	couponApplication.CouponService
+	createErrs []error // consumed one per CreateCoupon call, then delegated
+	updateErr  error
+	listErr    error
+}
+
+func (f *faultyCouponStore) CreateCoupon(ctx context.Context, c *couponDomain.Coupon) error {
+	if len(f.createErrs) > 0 {
+		err := f.createErrs[0]
+		f.createErrs = f.createErrs[1:]
+		if err != nil {
+			return err
+		}
+	}
+	return f.CouponService.CreateCoupon(ctx, c)
+}
+
+func (f *faultyCouponStore) UpdateCoupon(ctx context.Context, c *couponDomain.Coupon) error {
+	if f.updateErr != nil {
+		return f.updateErr
+	}
+	return f.CouponService.UpdateCoupon(ctx, c)
+}
+
+func (f *faultyCouponStore) GetAllCoupons(ctx context.Context) ([]*couponDomain.Coupon, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	return f.CouponService.GetAllCoupons(ctx)
+}
+
+// uniqueViolation is what Postgres answers when a coupon code is already taken.
+func uniqueViolation() error { return &pq.Error{Code: "23505", Message: "duplicate key"} }
