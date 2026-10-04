@@ -54,14 +54,14 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		assert.Equal(t, []string{amount}, env.Mollie.RefundAmounts(t, payID), "Mollie is asked for the whole payment amount")
 
 		env.Mail.WaitSubject(t, c.email, "Your refund has been issued")
-		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		env.Mail.WaitSubject(t, c.email, "Order cancelled")
 
 		// Saving the cancelled order again neither refunds nor writes to the customer again.
 		again := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
 		assert.Equal(t, "CANCELLED", again.Status)
 		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID), 1)
 		require.Never(t, func() bool {
-			return env.Mail.CountSubject(t, c.email, "Order canceled") > 1 || env.Mail.CountSubject(t, c.email, "Your refund has been issued") > 1
+			return env.Mail.CountSubject(t, c.email, "Order cancelled") > 1 || env.Mail.CountSubject(t, c.email, "Your refund has been issued") > 1
 		}, 400*time.Millisecond, 20*time.Millisecond)
 	})
 
@@ -91,7 +91,7 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
 		assert.Equal(t, []string{"DELETE /v2/payments/" + payID}, env.Mollie.CallsMatching("DELETE /v2/payments/"+payID))
 		assert.Empty(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID))
-		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		env.Mail.WaitSubject(t, c.email, "Order cancelled")
 		assert.Zero(t, env.Mail.CountSubject(t, c.email, "Your refund has been issued"))
 	})
 
@@ -184,7 +184,7 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		order := env.placeOrder(t, c, "en")
 		before := len(env.Mollie.CallsMatching(""))
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED", "cancellationReason": "OTHER"})
-		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		env.Mail.WaitSubject(t, c.email, "Order cancelled")
 		assert.Equal(t, before, len(env.Mollie.CallsMatching("")), "Mollie is not involved")
 	})
 }
