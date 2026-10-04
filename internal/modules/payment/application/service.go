@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
@@ -242,16 +243,52 @@ func (s *paymentService) CreateFullRefund(ctx context.Context, externalPaymentID
 	return err
 }
 
-// refundRemaining refunds the full payment amount unless it was already
-// refunded, so repeated cancels or webhook retries never refund twice. The
-// caller is responsible for knowing the payment is paid at Mollie.
+// refundRemaining refunds what is still refundable of a paid payment: its amount minus what was
+// already returned (by an earlier cancel, a webhook retry or staff in the Mollie dashboard). Repeated
+// cancels or webhook retries therefore never refund twice, and a payment with nothing left is skipped
+// (refunded == false). The caller is responsible for knowing the payment is paid at Mollie.
 func (s *paymentService) refundRemaining(ctx context.Context, payment *domain.MolliePayment) (refunded bool, err error) {
 	if payment.AmountRefunded.GreaterThanOrEqual(payment.Amount) {
 		return false, nil
 	}
+	current, err := s.fetchMolliePayment(ctx, payment.MolliePaymentID)
+	if err != nil {
+		return false, err
+	}
+	return s.refundRemainingOf(ctx, payment, current)
+}
+
+// fetchMolliePayment reads the payment from Mollie, the authority on its status and on how much of
+// it was already refunded (the local row is only as fresh as the last webhook or refund we made).
+func (s *paymentService) fetchMolliePayment(ctx context.Context, molliePaymentID string) (*mollie.Payment, error) {
+	_, current, err := s.mollieClient.Payments.Get(ctx, molliePaymentID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch payment from Mollie: %w", err)
+	}
+	return current, nil
+}
+
+// refundRemainingOf is refundRemaining for a payment that was just read from Mollie.
+func (s *paymentService) refundRemainingOf(ctx context.Context, payment *domain.MolliePayment, current *mollie.Payment) (bool, error) {
+	alreadyRefunded, remaining, err := refundableAmount(payment, current)
+	if err != nil {
+		return false, err
+	}
+
+	if !remaining.IsPositive() {
+		// Nothing left to return. If Mollie knows of a refund we never recorded (a refund whose
+		// bookkeeping failed, or one made in the Mollie dashboard), record it so the row is right.
+		if alreadyRefunded.GreaterThan(payment.AmountRefunded) {
+			if markErr := s.repo.MarkAsRefund(ctx, payment.MolliePaymentID, alreadyRefunded); markErr != nil {
+				zap.L().Warn("failed to record a refund Mollie already made",
+					zap.String("payment_id", payment.MolliePaymentID), zap.Error(markErr))
+			}
+		}
+		return false, nil
+	}
 
 	refundRequest := mollie.CreatePaymentRefund{
-		Amount: amt(payment.Amount),
+		Amount: amt(remaining),
 	}
 
 	res, refund, err := s.mollieClient.Refunds.CreatePaymentRefund(ctx, payment.MolliePaymentID, refundRequest, nil)
@@ -268,31 +305,87 @@ func (s *paymentService) refundRemaining(ctx context.Context, payment *domain.Mo
 		return false, fmt.Errorf("failed to parse refund amount: %w", parseErr)
 	}
 
-	if err := s.repo.MarkAsRefund(ctx, payment.MolliePaymentID, refundedAmount); err != nil {
+	// amount_refunded is the running total of the payment, not the amount of this refund.
+	if err := s.repo.MarkAsRefund(ctx, payment.MolliePaymentID, alreadyRefunded.Add(refundedAmount)); err != nil {
 		return false, fmt.Errorf("failed to mark payment as refunded: %w", err)
 	}
 
 	return true, nil
 }
 
+// refundableAmount returns what was already refunded and what can still be refunded. The larger of
+// our record and Mollie's amountRefunded counts as refunded, and Mollie's amountRemaining (which also
+// accounts for chargebacks) caps the remainder when it reports one.
+func refundableAmount(payment *domain.MolliePayment, current *mollie.Payment) (alreadyRefunded, remaining decimal.Decimal, err error) {
+	alreadyRefunded = payment.AmountRefunded
+	if current.AmountRefunded != nil {
+		fromMollie, parseErr := decimal.NewFromString(current.AmountRefunded.Value)
+		if parseErr != nil {
+			return decimal.Zero, decimal.Zero, fmt.Errorf("failed to parse amountRefunded: %w", parseErr)
+		}
+		if fromMollie.GreaterThan(alreadyRefunded) {
+			alreadyRefunded = fromMollie
+		}
+	}
+	remaining = payment.Amount.Sub(alreadyRefunded)
+	if current.AmountRemaining != nil {
+		fromMollie, parseErr := decimal.NewFromString(current.AmountRemaining.Value)
+		if parseErr != nil {
+			return decimal.Zero, decimal.Zero, fmt.Errorf("failed to parse amountRemaining: %w", parseErr)
+		}
+		if fromMollie.LessThan(remaining) {
+			remaining = fromMollie
+		}
+	}
+	return alreadyRefunded, remaining, nil
+}
+
 func (s *paymentService) SettleCancelledOrderPayment(ctx context.Context, payment *domain.MolliePayment) (bool, error) {
 	switch payment.Status {
+	case domain.PaymentStatusPaid, domain.PaymentStatusOpen, domain.PaymentStatusPending, domain.PaymentStatusAuthorized:
+	default:
+		// canceled, expired, failed: nothing was charged and nothing can be paid any more.
+		return false, nil
+	}
+
+	// Decide on Mollie's state, not on our row: the customer may have paid since the last webhook, a
+	// previous attempt may already have refunded or cancelled it before something later failed, and
+	// the cancellation is retried until it works, so every step has to be safe to repeat.
+	current, err := s.fetchMolliePayment(ctx, payment.MolliePaymentID)
+	if err != nil {
+		return false, err
+	}
+	switch domain.PaymentStatus(current.Status) {
 	case domain.PaymentStatusPaid:
-		return s.refundRemaining(ctx, payment)
+		return s.refundRemainingOf(ctx, payment, current)
 	case domain.PaymentStatusOpen, domain.PaymentStatusPending, domain.PaymentStatusAuthorized:
 		// Not paid yet: cancel it at Mollie so the customer cannot pay for a
 		// cancelled order. If Mollie no longer allows cancelling, a later
 		// paid webhook refunds it (see HandlePaymentPaid).
-		if !payment.IsCancelable {
+		if !current.IsCancelable {
 			zap.L().Warn("open payment of a cancelled order is not cancelable at Mollie",
 				zap.String("payment_id", payment.MolliePaymentID))
 			return false, nil
 		}
-		if _, _, err := s.mollieClient.Payments.Cancel(ctx, payment.MolliePaymentID); err != nil {
+		_, cancelled, err := s.mollieClient.Payments.Cancel(ctx, payment.MolliePaymentID)
+		if err != nil {
 			return false, fmt.Errorf("failed to cancel payment: %w", err)
+		}
+		// Record it now rather than waiting for Mollie's webhook: the order must not be reopened
+		// as awaiting a payment that can no longer be made. A failure here is repaired by that webhook.
+		update := statusUpdateFrom(cancelled)
+		update.Status = domain.PaymentStatusCanceled
+		if update.CanceledAt == nil {
+			now := time.Now()
+			update.CanceledAt = &now
+		}
+		if _, persistErr := s.repo.RefreshStatus(ctx, payment.MolliePaymentID, update); persistErr != nil {
+			zap.L().Warn("failed to record the cancelled payment, the webhook will",
+				zap.String("payment_id", payment.MolliePaymentID), zap.Error(persistErr))
 		}
 		return false, nil
 	default:
+		// Already canceled / expired / failed at Mollie (an earlier attempt got that far).
 		return false, nil
 	}
 }
@@ -308,14 +401,19 @@ func (s *paymentService) FetchMollieStatus(ctx context.Context, externalMolliePa
 		return nil, fmt.Errorf("failed to fetch payment from Mollie: %w", err)
 	}
 
+	return statusUpdateFrom(externalPayment), nil
+}
+
+// statusUpdateFrom maps the status and timestamps of a Mollie payment.
+func statusUpdateFrom(p *mollie.Payment) *domain.PaymentStatusUpdate {
 	return &domain.PaymentStatusUpdate{
-		Status:       domain.PaymentStatus(externalPayment.Status),
-		PaidAt:       externalPayment.PaidAt,
-		AuthorizedAt: externalPayment.AuthorizedAt,
-		CanceledAt:   externalPayment.CanceledAt,
-		ExpiredAt:    externalPayment.ExpiredAt,
-		FailedAt:     externalPayment.FailedAt,
-	}, nil
+		Status:       domain.PaymentStatus(p.Status),
+		PaidAt:       p.PaidAt,
+		AuthorizedAt: p.AuthorizedAt,
+		CanceledAt:   p.CanceledAt,
+		ExpiredAt:    p.ExpiredAt,
+		FailedAt:     p.FailedAt,
+	}
 }
 
 // PersistPaymentStatus writes the status + timestamps to the local DB.

@@ -22,12 +22,26 @@ func (e *covEnv) placeOnlineOrder(t *testing.T, c *pushCustomer) *createdOrder {
 	return order
 }
 
-// markPaid is what the Mollie webhook does: the payment of the order becomes paid.
+// markPaid is what the Mollie webhook does: the payment of the order becomes paid, at Mollie (the
+// stub) and in our database.
 func (e *covEnv) markPaid(t *testing.T, orderID string) {
 	t.Helper()
 	resp := gqlAs(t, e.TestContext, adminToken(t, e.TestContext), "fr",
 		`mutation ($o: ID!) { updatePaymentStatus(orderId: $o, status: "paid") { status molliePaymentId } }`, map[string]any{"o": orderID})
 	require.Empty(t, resp.Errors, "%+v", resp.Errors)
+	var data struct {
+		UpdatePaymentStatus struct{ MolliePaymentID string }
+	}
+	require.NoError(t, json.Unmarshal(resp.Data, &data))
+	e.Mollie.MarkPaid(data.UpdatePaymentStatus.MolliePaymentID)
+}
+
+// paymentCol reads one column of the payment of a Mollie payment id, as text.
+func (e *covEnv) paymentCol(t *testing.T, col, payID string) string {
+	t.Helper()
+	var v string
+	require.NoError(t, e.DB.DB.GetContext(t.Context(), &v, `SELECT `+col+`::text FROM mollie_payments WHERE mollie_payment_id = $1`, payID))
+	return v
 }
 
 func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
@@ -65,22 +79,47 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		}, 400*time.Millisecond, 20*time.Millisecond)
 	})
 
-	// BUG(product decision pending): a payment that is already partially refunded (staff refunded
-	// part of it in the Mollie dashboard) is refunded for its FULL amount again on cancellation,
-	// instead of Amount - AmountRefunded; see also payment/application TestRefundRemaining_Failures.
-	// Flip the expectation to the remaining amount ("amount - 5.00") once the owner decides.
-	t.Run("a partially refunded payment is refunded for the full amount again", func(t *testing.T) {
-		c := env.newPushCustomer(t, "partial", true)
+	// Part of the payment may already be back with the customer (staff refunded it in the Mollie
+	// dashboard): only what is left is refunded, whether or not our own row knows about it.
+	t.Run("a partially refunded payment is refunded for what is left only", func(t *testing.T) {
+		for name, recordedHere := range map[string]bool{"known to us": true, "known to Mollie only": false} {
+			t.Run(name, func(t *testing.T) {
+				c := env.newPushCustomer(t, "partial", true)
+				order := env.placeOnlineOrder(t, c)
+				env.markPaid(t, order.ID)
+				payID := order.Payment.MolliePaymentID
+				env.Mollie.SetRefunded(payID, "5.00")
+				if recordedHere {
+					_, err := env.DB.DB.ExecContext(t.Context(), `UPDATE mollie_payments SET amount_refunded = 5.00 WHERE mollie_payment_id = $1`, payID)
+					require.NoError(t, err)
+				}
+				amount := env.paymentCol(t, "amount", payID)
+				remaining := env.paymentCol(t, "(amount - 5.00)", payID)
+
+				got := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
+
+				assert.Equal(t, "CANCELLED", got.Status)
+				assert.Equal(t, []string{remaining}, env.Mollie.RefundAmounts(t, payID), "Mollie is asked for amount - 5.00, not for the full amount")
+				assert.Equal(t, amount, env.paymentCol(t, "amount_refunded", payID), "the running total is recorded: the payment is refunded in full")
+			})
+		}
+	})
+
+	t.Run("a payment that is already refunded in full is not refunded again, our row catches up", func(t *testing.T) {
+		c := env.newPushCustomer(t, "allback", true)
 		order := env.placeOnlineOrder(t, c)
 		env.markPaid(t, order.ID)
 		payID := order.Payment.MolliePaymentID
-		_, err := env.DB.DB.ExecContext(t.Context(), `UPDATE mollie_payments SET amount_refunded = 5.00 WHERE mollie_payment_id = $1`, payID)
-		require.NoError(t, err)
-		var amount string
-		require.NoError(t, env.DB.DB.GetContext(t.Context(), &amount, `SELECT amount::text FROM mollie_payments WHERE mollie_payment_id = $1`, payID))
+		amount := env.paymentCol(t, "amount", payID)
+		// What a refund looks like whose bookkeeping failed on an earlier attempt: Mollie has paid
+		// the money back, our row does not know.
+		env.Mollie.SetRefunded(payID, amount)
 
-		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
-		assert.Equal(t, []string{amount}, env.Mollie.RefundAmounts(t, payID), "currently the full amount, not amount - 5.00")
+		got := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
+
+		assert.Equal(t, "CANCELLED", got.Status)
+		assert.Empty(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID), "nothing is left to refund")
+		assert.Equal(t, amount, env.paymentCol(t, "amount_refunded", payID))
 	})
 
 	t.Run("an open payment is cancelled at Mollie, no refund is issued", func(t *testing.T) {
@@ -98,8 +137,7 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 	t.Run("an open payment that Mollie no longer lets us cancel is left alone", func(t *testing.T) {
 		c := env.newPushCustomer(t, "locked", true)
 		order := env.placeOnlineOrder(t, c)
-		_, err := env.DB.DB.ExecContext(t.Context(), `UPDATE mollie_payments SET is_cancelable = false WHERE mollie_payment_id = $1`, order.Payment.MolliePaymentID)
-		require.NoError(t, err)
+		env.Mollie.LockPayment(order.Payment.MolliePaymentID) // Mollie decides: the customer is in the middle of paying
 
 		got := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
 		assert.Equal(t, "CANCELLED", got.Status)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
 
@@ -144,8 +145,10 @@ func SeedCustomer(t *testing.T, db *sqlx.DB, label string) (uuid.UUID, string) {
 }
 
 // MollieStub stands in for api.mollie.com. It answers POST /v2/payments with a cancelable payment
-// that has a checkout link, POST /v2/payments/{id}/refunds with a refund of the amount asked for
-// and DELETE /v2/payments/{id} with a canceled payment. It keeps every call and its body, so tests
+// that has a checkout link, GET /v2/payments/{id} with the payment as it currently stands (open until
+// MarkPaid, with what was refunded so far), POST /v2/payments/{id}/refunds with a refund of the amount
+// asked for (refused beyond what is refundable) and DELETE /v2/payments/{id} with a canceled payment
+// (refused unless the payment is open). It keeps every call and its body, so tests
 // can check the amount and lines sent to Mollie, how often Mollie was called and with what amount a
 // refund was asked. Failures can be switched on per kind of call.
 type MollieStub struct {
@@ -159,7 +162,18 @@ type MollieStub struct {
 	failRef  bool
 	failCanc bool
 	failPay  bool
+	failGet  bool
 	seq      int
+	payments map[string]*stubPayment
+}
+
+// stubPayment is what the stub remembers of a payment it created.
+type stubPayment struct {
+	amount   decimal.Decimal
+	status   string
+	refunded decimal.Decimal
+	// locked: Mollie no longer lets the payment be cancelled (the customer is in the middle of paying).
+	locked bool
 }
 
 // MolliePaymentRequest is the part of a Create Payment call the tests look at.
@@ -183,7 +197,7 @@ type MolliePaymentRequest struct {
 // NewMollieStub starts the stub; it is closed with the test.
 func NewMollieStub(t *testing.T) *MollieStub {
 	t.Helper()
-	stub := &MollieStub{}
+	stub := &MollieStub{payments: map[string]*stubPayment{}}
 	stub.Server = httptest.NewServer(http.HandlerFunc(stub.serve))
 	t.Cleanup(stub.Server.Close)
 	return stub
@@ -191,6 +205,35 @@ func NewMollieStub(t *testing.T) *MollieStub {
 
 // BaseURL is the value for mollie.Client.BaseURL (with the trailing slash the client requires).
 func (s *MollieStub) BaseURL() string { return s.Server.URL + "/" }
+
+// MarkPaid makes the payment paid at Mollie, as the customer's checkout does.
+func (s *MollieStub) MarkPaid(paymentID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.payments[paymentID].status = "paid"
+}
+
+// LockPayment makes an open payment not cancelable any more, as when the customer is paying right now.
+func (s *MollieStub) LockPayment(paymentID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.payments[paymentID].locked = true
+}
+
+// SetRefunded sets how much of a payment Mollie considers refunded, as a refund made by staff in the
+// Mollie dashboard would (this service is not told about it).
+func (s *MollieStub) SetRefunded(paymentID, amount string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.payments[paymentID].refunded = decimal.RequireFromString(amount)
+}
+
+// SetFailLookup makes every GET of a payment answer 500 (until switched off again).
+func (s *MollieStub) SetFailLookup(fail bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.failGet = fail
+}
 
 // FailNext makes the next n payment creations answer 422, as Mollie does for a refused payment.
 func (s *MollieStub) FailNext(n int) {
@@ -259,7 +302,7 @@ func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.calls = append(s.calls, r.Method+" "+r.URL.Path)
 	s.bodies = append(s.bodies, string(body))
-	failPay, failRef, failCanc := s.failPay, s.failRef, s.failCanc
+	failPay, failRef, failCanc, failGet := s.failPay, s.failRef, s.failCanc, s.failGet
 	s.seq++
 	seq := s.seq
 	s.mu.Unlock()
@@ -291,6 +334,9 @@ func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id := fmt.Sprintf("tr_stub%06d", seq)
+		s.mu.Lock()
+		s.payments[id] = &stubPayment{amount: decimal.RequireFromString(req.Amount.Value), status: "open"}
+		s.mu.Unlock()
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"resource": "payment", "id": id, "status": "open", "mode": "test", "isCancelable": true,
@@ -300,6 +346,36 @@ func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
 				"checkout": map[string]string{"href": "https://www.mollie.com/checkout/select-method/" + id, "type": "text/html"},
 			},
 		})
+	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v2/payments/"):
+		if failGet {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"status":500,"title":"Internal Server Error","detail":"boom","_links":{}}`))
+			return
+		}
+		id := strings.TrimPrefix(r.URL.Path, "/v2/payments/")
+		s.mu.Lock()
+		p, ok := s.payments[id]
+		var snapshot stubPayment
+		if ok {
+			snapshot = *p
+		}
+		s.mu.Unlock()
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		eur := func(d decimal.Decimal) map[string]string {
+			return map[string]string{"currency": "EUR", "value": d.StringFixed(2)}
+		}
+		out := map[string]any{
+			"resource": "payment", "id": id, "status": snapshot.status, "mode": "test",
+			"isCancelable": snapshot.status == "open" && !snapshot.locked, "amount": eur(snapshot.amount),
+		}
+		if snapshot.status == "paid" {
+			out["amountRefunded"] = eur(snapshot.refunded)
+			out["amountRemaining"] = eur(snapshot.amount.Sub(snapshot.refunded))
+		}
+		_ = json.NewEncoder(w).Encode(out)
 	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/refunds"):
 		if failRef {
 			refuse("refused")
@@ -309,6 +385,23 @@ func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
 			Amount map[string]string `json:"amount"`
 		}
 		_ = json.Unmarshal(body, &req)
+		id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v2/payments/"), "/refunds")
+		s.mu.Lock()
+		p, known := s.payments[id]
+		over := false
+		if known {
+			asked, err := decimal.NewFromString(req.Amount["value"])
+			if err != nil || p.status != "paid" || p.refunded.Add(asked).GreaterThan(p.amount) {
+				over = true
+			} else {
+				p.refunded = p.refunded.Add(asked)
+			}
+		}
+		s.mu.Unlock()
+		if over {
+			refuse("The amount is higher than the refundable amount")
+			return
+		}
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]any{"resource": "refund", "id": fmt.Sprintf("re_stub%06d", seq), "amount": req.Amount, "status": "pending"})
 	case r.Method == http.MethodDelete && strings.HasPrefix(r.URL.Path, "/v2/payments/"):
@@ -317,6 +410,17 @@ func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id := strings.TrimPrefix(r.URL.Path, "/v2/payments/")
+		s.mu.Lock()
+		p, known := s.payments[id]
+		notOpen := known && (p.status != "open" || p.locked)
+		if known && !notOpen {
+			p.status = "canceled"
+		}
+		s.mu.Unlock()
+		if notOpen {
+			refuse("The payment cannot be canceled")
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"resource": "payment", "id": id, "status": "canceled"})
 	default:
 		http.NotFound(w, r)

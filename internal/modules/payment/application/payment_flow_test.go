@@ -44,6 +44,10 @@ type flowMollie struct {
 	createStatusCode int
 	createDelay      time.Duration
 	paidAt           string
+	// notCancelable makes GET report isCancelable=false; refunded / remaining are the
+	// amountRefunded / amountRemaining it reports when set.
+	notCancelable       bool
+	refunded, remaining string
 }
 
 type flowRequest struct {
@@ -57,6 +61,7 @@ func (f *flowMollie) handler(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	f.requests = append(f.requests, flowRequest{Method: r.Method, Path: r.URL.Path, Body: body})
 	status, getCode, createCode, delay, paidAt := f.status, f.getStatusCode, f.createStatusCode, f.createDelay, f.paidAt
+	notCancelable, refunded, remaining := f.notCancelable, f.refunded, f.remaining
 	f.mu.Unlock()
 
 	w.Header().Set("Content-Type", "application/hal+json")
@@ -84,11 +89,21 @@ func (f *flowMollie) handler(w http.ResponseWriter, r *http.Request) {
 		if paidAt != "" {
 			extra = fmt.Sprintf(`,"paidAt":%q`, paidAt)
 		}
-		_, _ = fmt.Fprintf(w, `{"resource":"payment","id":%q,"status":%q,"amount":{"value":"20.00","currency":"EUR"}%s}`,
-			strings.TrimPrefix(r.URL.Path, "/v2/payments/"), status, extra)
+		if refunded != "" {
+			extra += fmt.Sprintf(`,"amountRefunded":{"value":%q,"currency":"EUR"}`, refunded)
+		}
+		if remaining != "" {
+			extra += fmt.Sprintf(`,"amountRemaining":{"value":%q,"currency":"EUR"}`, remaining)
+		}
+		_, _ = fmt.Fprintf(w, `{"resource":"payment","id":%q,"status":%q,"isCancelable":%t,"amount":{"value":"20.00","currency":"EUR"}%s}`,
+			strings.TrimPrefix(r.URL.Path, "/v2/payments/"), status, !notCancelable, extra)
 	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/refunds"):
+		var req struct {
+			Amount struct{ Value string } `json:"amount"`
+		}
+		_ = json.Unmarshal(body, &req)
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"resource":"refund","id":"re_1","amount":{"currency":"EUR","value":"20.00"},"status":"pending"}`))
+		_, _ = fmt.Fprintf(w, `{"resource":"refund","id":"re_1","amount":{"currency":"EUR","value":%q},"status":"pending"}`, req.Amount.Value)
 	case r.Method == http.MethodDelete:
 		_, _ = w.Write([]byte(`{"resource":"payment","id":"tr_1","status":"canceled"}`))
 	default:
@@ -998,31 +1013,134 @@ func TestRefundRemaining_Failures(t *testing.T) {
 		}
 	})
 
-	// BUG(product decision pending): refundRemaining only skips a payment that is fully refunded. A
-	// partially refunded one (5.00 of 20.00 already returned, e.g. by staff in the Mollie dashboard)
-	// is refunded for the FULL amount again, so Mollie is asked for 20.00 although at most 15.00 is
-	// left, and the call is refused or over-refunds. Flip the expectation to Amount - AmountRefunded
-	// ("15.00") once the owner decides.
-	t.Run("partially refunded payment is refunded for the full amount again", func(t *testing.T) {
+	t.Run("partially refunded payment is refunded for what is left only", func(t *testing.T) {
 		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
 		f.repo.payments["tr_1"].AmountRefunded = decimal.RequireFromString("5.00")
 		refunded, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
 		if err != nil || !refunded {
 			t.Fatalf("refunded=%v err=%v", refunded, err)
 		}
-		reqs := f.mollie.find(http.MethodPost, "/v2/payments/tr_1/refunds")
-		if len(reqs) != 1 {
-			t.Fatalf("want exactly one refund request, got %d", len(reqs))
+		if got := f.mollie.refundAmounts(t); len(got) != 1 || got[0] != "15.00" {
+			t.Fatalf("refund amounts asked of Mollie = %v, want [15.00]", got)
 		}
+	})
+}
+
+// refundAmounts lists the amount asked by each refund request.
+func (f *flowMollie) refundAmounts(t *testing.T) []string {
+	t.Helper()
+	var out []string
+	for _, r := range f.find(http.MethodPost, "/v2/payments/tr_1/refunds") {
 		var body struct {
 			Amount struct{ Value, Currency string } `json:"amount"`
 		}
-		if err := json.Unmarshal(reqs[0].Body, &body); err != nil {
-			t.Fatalf("refund body %q: %v", reqs[0].Body, err)
+		if err := json.Unmarshal(r.Body, &body); err != nil {
+			t.Fatalf("refund body %q: %v", r.Body, err)
 		}
-		// Currently the whole payment amount; the correct remaining amount would be "15.00".
-		if body.Amount.Value != "20.00" || body.Amount.Currency != "EUR" {
-			t.Fatalf("refund amount sent to Mollie = %+v, want the full 20.00 EUR (current behaviour)", body.Amount)
+		if body.Amount.Currency != "EUR" {
+			t.Fatalf("refund currency = %q", body.Amount.Currency)
+		}
+		out = append(out, body.Amount.Value)
+	}
+	return out
+}
+
+// What is refundable comes from Mollie as well as from our row: the row only knows the refunds this
+// service made, while staff can also refund in the Mollie dashboard.
+func TestRefundRemaining_UsesMolliesView(t *testing.T) {
+	d := decimal.RequireFromString
+
+	t.Run("a larger amountRefunded at Mollie than in our row wins, and the running total is recorded", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
+		f.repo.payments["tr_1"].AmountRefunded = d("5.00")
+		f.mollie.refunded = "8.00"
+
+		refunded, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+
+		if err != nil || !refunded {
+			t.Fatalf("refunded=%v err=%v", refunded, err)
+		}
+		if got := f.mollie.refundAmounts(t); len(got) != 1 || got[0] != "12.00" {
+			t.Fatalf("refund amounts = %v, want [12.00]", got)
+		}
+		// 8.00 already returned + this 12.00 refund: the running total, not just the last refund.
+		if got := f.repo.payments["tr_1"].AmountRefunded; !got.Equal(d("20.00")) {
+			t.Fatalf("recorded amount_refunded = %s, want 20.00", got)
+		}
+	})
+
+	t.Run("amountRemaining caps the refund (chargebacks)", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
+		f.mollie.remaining = "12.50"
+
+		if _, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"]); err != nil {
+			t.Fatal(err)
+		}
+		if got := f.mollie.refundAmounts(t); len(got) != 1 || got[0] != "12.50" {
+			t.Fatalf("refund amounts = %v, want [12.50]", got)
+		}
+	})
+
+	t.Run("a payment Mollie reports as fully refunded is not refunded again and our row catches up", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
+		f.mollie.refunded = "20.00"
+		f.mollie.remaining = "0.00"
+
+		refunded, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+
+		if err != nil || refunded {
+			t.Fatalf("refunded=%v err=%v, want false nil", refunded, err)
+		}
+		if got := f.mollie.refundAmounts(t); len(got) != 0 {
+			t.Fatalf("Mollie was asked to refund %v", got)
+		}
+		if got := f.repo.payments["tr_1"].AmountRefunded; !got.Equal(d("20.00")) {
+			t.Fatalf("recorded amount_refunded = %s, want 20.00", got)
+		}
+	})
+
+	t.Run("failing to record a refund Mollie already made is not an error", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
+		f.mollie.refunded = "20.00"
+		f.svc.repo = markFailingRepo{f.repo}
+
+		refunded, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+
+		if err != nil || refunded {
+			t.Fatalf("refunded=%v err=%v, want false nil", refunded, err)
+		}
+	})
+
+	t.Run("a Mollie lookup failure stops the refund before any money moves", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
+		f.mollie.getStatusCode = http.StatusInternalServerError
+
+		refunded, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+
+		if err == nil || refunded {
+			t.Fatalf("refunded=%v err=%v, want an error", refunded, err)
+		}
+		if got := f.mollie.refundAmounts(t); len(got) != 0 {
+			t.Fatalf("Mollie was asked to refund %v", got)
+		}
+	})
+
+	t.Run("a malformed amount from Mollie is an error, not a guess", func(t *testing.T) {
+		for name, set := range map[string]func(*flowMollie){
+			"amountRefunded":  func(m *flowMollie) { m.refunded = "abc" },
+			"amountRemaining": func(m *flowMollie) { m.remaining = "abc" },
+		} {
+			f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
+			set(f.mollie)
+
+			_, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
+
+			if err == nil || !strings.Contains(err.Error(), name) {
+				t.Fatalf("%s: err = %v", name, err)
+			}
+			if got := f.mollie.refundAmounts(t); len(got) != 0 {
+				t.Fatalf("%s: Mollie was asked to refund %v", name, got)
+			}
 		}
 	})
 }
@@ -1030,14 +1148,13 @@ func TestRefundRemaining_Failures(t *testing.T) {
 func TestSettleCancelledOrderPayment_EdgeCases(t *testing.T) {
 	t.Run("non cancelable open payment is left alone", func(t *testing.T) {
 		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
-		p := dummyPayment(domain.PaymentStatusOpen)
-		p.IsCancelable = false
-		refunded, err := f.svc.SettleCancelledOrderPayment(t.Context(), p)
+		f.mollie.notCancelable = true
+		refunded, err := f.svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusOpen))
 		if err != nil || refunded {
 			t.Fatalf("refunded=%v err=%v", refunded, err)
 		}
-		if len(f.mollie.requests) != 0 {
-			t.Fatalf("unexpected Mollie calls %v", f.mollie.requests)
+		if len(f.mollie.requests) != 1 || f.mollie.requests[0].Method != http.MethodGet {
+			t.Fatalf("want the lookup only, got Mollie calls %v", f.mollie.requests)
 		}
 	})
 	for _, st := range []domain.PaymentStatus{domain.PaymentStatusPending, domain.PaymentStatusAuthorized} {
@@ -1061,17 +1178,153 @@ func TestSettleCancelledOrderPayment_EdgeCases(t *testing.T) {
 	}
 	t.Run("Mollie cancel failure is returned so the caller can retry", func(t *testing.T) {
 		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
-		f.svc.mollieClient = newFlowClient(t, &flowMollie{}, 0)
-		bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusInternalServerError) }))
+		// Mollie shows the payment as open and cancelable, then refuses the cancel.
+		bad := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				w.Header().Set("Content-Type", "application/hal+json")
+				_, _ = w.Write([]byte(`{"resource":"payment","id":"tr_1","status":"open","isCancelable":true,"amount":{"value":"20.00","currency":"EUR"}}`))
+				return
+			}
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
 		t.Cleanup(bad.Close)
 		c, _ := mollie.NewClient(bad.Client(), mollie.NewAPITestingConfig(false))
 		_ = c.WithAuthenticationValue("test_dummydummydummydummydummydummy")
 		c.BaseURL, _ = url.Parse(bad.URL + "/")
 		f.svc.mollieClient = *c
-		if _, err := f.svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusOpen)); err == nil {
-			t.Fatal("want error")
+		_, err := f.svc.SettleCancelledOrderPayment(t.Context(), dummyPayment(domain.PaymentStatusOpen))
+		if err == nil || !strings.Contains(err.Error(), "failed to cancel payment") {
+			t.Fatalf("err = %v, want the cancel failure", err)
+		}
+		if len(f.repo.refreshes) != 0 {
+			t.Fatal("a cancel Mollie refused must not be recorded")
 		}
 	})
+}
+
+// Settling is decided on Mollie's state and has to be safe to repeat: the caller retries the whole
+// cancellation until it works.
+func TestSettleCancelledOrderPayment_FollowsMollie(t *testing.T) {
+	d := decimal.RequireFromString
+
+	t.Run("paid at Mollie since the last webhook: refunded instead of cancelled", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
+		f.mollie.status = "paid"
+
+		refunded, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+
+		if err != nil || !refunded {
+			t.Fatalf("refunded=%v err=%v", refunded, err)
+		}
+		if got := f.mollie.refundAmounts(t); len(got) != 1 || got[0] != "20.00" {
+			t.Fatalf("refund amounts = %v", got)
+		}
+		if len(f.mollie.find(http.MethodDelete, "/v2/payments/tr_1")) != 0 {
+			t.Fatal("a paid payment cannot be cancelled")
+		}
+	})
+
+	t.Run("already cancelled at Mollie by an earlier attempt: nothing to do, no second cancel", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
+		f.mollie.status = "canceled"
+
+		refunded, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+
+		if err != nil || refunded {
+			t.Fatalf("refunded=%v err=%v", refunded, err)
+		}
+		if len(f.mollie.find(http.MethodDelete, "/v2/payments/tr_1")) != 0 {
+			t.Fatal("cancelling an already cancelled payment is refused by Mollie")
+		}
+	})
+
+	t.Run("not cancelable at Mollie although our row says it is: left alone", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
+		f.mollie.notCancelable = true
+
+		refunded, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+
+		if err != nil || refunded {
+			t.Fatalf("refunded=%v err=%v", refunded, err)
+		}
+		if len(f.mollie.find(http.MethodDelete, "/v2/payments/tr_1")) != 0 {
+			t.Fatal("no cancel call expected")
+		}
+	})
+
+	t.Run("a Mollie lookup failure is returned and nothing is changed", func(t *testing.T) {
+		for _, st := range []domain.PaymentStatus{domain.PaymentStatusPaid, domain.PaymentStatusOpen} {
+			f := newFlow(t, orderDomain.OrderStatusCanceled, st)
+			f.mollie.getStatusCode = http.StatusInternalServerError
+
+			_, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+
+			if err == nil {
+				t.Fatalf("%s: want an error", st)
+			}
+			if len(f.mollie.find(http.MethodDelete, "/v2/payments/tr_1"))+len(f.mollie.refundAmounts(t)) != 0 {
+				t.Fatalf("%s: money moved although Mollie could not be read", st)
+			}
+		}
+	})
+
+	t.Run("a cancelled open payment is recorded as cancelled at once", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
+
+		if _, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"]); err != nil {
+			t.Fatal(err)
+		}
+
+		if got := f.repo.payments["tr_1"].Status; got != domain.PaymentStatusCanceled {
+			t.Fatalf("stored status = %q, want canceled", got)
+		}
+		if len(f.repo.refreshes) != 1 || f.repo.refreshes[0].CanceledAt == nil {
+			t.Fatalf("refreshes = %+v, want one with a canceledAt timestamp", f.repo.refreshes)
+		}
+	})
+
+	t.Run("failing to record the cancellation does not fail it", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
+		f.svc.repo = refreshFailingRepo{f.repo}
+
+		if _, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"]); err != nil {
+			t.Fatalf("the payment is cancelled at Mollie, the webhook records it: %v", err)
+		}
+	})
+
+	t.Run("a refund Mollie accepted but we could not record is not repeated on the retry", func(t *testing.T) {
+		f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusPaid)
+		f.svc.repo = markFailingRepo{f.repo}
+
+		if _, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"]); err == nil {
+			t.Fatal("the first attempt reports the bookkeeping failure")
+		}
+		// Mollie now reports what the first attempt refunded; the database is healthy again.
+		f.mollie.refunded = "20.00"
+		f.mollie.remaining = "0.00"
+		f.svc.repo = f.repo
+
+		refunded, err := f.svc.SettleCancelledOrderPayment(t.Context(), f.repo.payments["tr_1"])
+
+		if err != nil || refunded {
+			t.Fatalf("retry: refunded=%v err=%v, want false nil", refunded, err)
+		}
+		if got := f.mollie.refundAmounts(t); len(got) != 1 {
+			t.Fatalf("refund requests = %v, want exactly the first one", got)
+		}
+		if got := f.repo.payments["tr_1"].AmountRefunded; !got.Equal(d("20.00")) {
+			t.Fatalf("recorded amount_refunded = %s, want 20.00 after the retry", got)
+		}
+	})
+}
+
+// refreshFailingRepo fails RefreshStatus.
+type refreshFailingRepo struct {
+	*memRepo
+}
+
+func (refreshFailingRepo) RefreshStatus(context.Context, string, *domain.PaymentStatusUpdate) (*uuid.UUID, error) {
+	return nil, errors.New("db down")
 }
 
 // ---------------------------------------------------------------------------
