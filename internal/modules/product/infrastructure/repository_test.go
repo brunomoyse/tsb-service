@@ -141,7 +141,7 @@ func TestProductRepositoryProducts(t *testing.T) {
 		require.ErrorContains(t, err, "failed to insert product")
 		var pqErr *pq.Error
 		require.ErrorAs(t, err, &pqErr, "the driver error leaks through untyped")
-		assert.Equal(t, pq.ErrorCode("23505"), pqErr.Code)
+		assert.EqualValues(t, "23505", pqErr.Code, "unique_violation")
 		assert.Equal(t, "products_slug_unique", pqErr.Constraint)
 
 		_, ferr := e.repo.FindByID(ctx, dup.ID)

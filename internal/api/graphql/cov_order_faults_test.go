@@ -29,13 +29,6 @@ func eta(minutes int) *time.Time {
 	return &t
 }
 
-// waitLogCount waits until the message was logged at least n times.
-func waitLogCount(t *testing.T, logs *observer.ObservedLogs, msg string, n int) {
-	t.Helper()
-	require.Eventually(t, func() bool { return logs.FilterMessage(msg).Len() >= n }, 20*time.Second, 20*time.Millisecond,
-		"log %q written %d times, want %d", msg, logs.FilterMessage(msg).Len(), n)
-}
-
 // waitOrderLogCount waits until the message was logged at least n times for that order. Filtering
 // by order_id keeps a line written for another order (the e-mail and push goroutines of earlier
 // subtests outlive them) from satisfying the wait.

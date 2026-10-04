@@ -13,7 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var streamRe = regexp.MustCompile(`(?s)stream\r?\n(.*?)\r?\nendstream`)
+// fpdf writes "stream\n", the data, "\nendstream". The newline before endstream is not optional-CR:
+// compressed data that happens to end in 0x0D would lose that byte to a "\r?\n" and fail to inflate
+// (one run in ~250), which showed up as an intermittently empty extraction.
+var streamRe = regexp.MustCompile(`(?s)stream\r?\n(.*?)\nendstream`)
 
 // PDFTextLines extracts, in drawing order, every string shown by the PDF's
 // text operators. fpdf writes UTF-8 (DejaVu) text as UTF-16BE inside a
