@@ -1,4 +1,6 @@
-package invoice
+// Package invoicetest is test support for code that renders invoices: it reads back the text of a
+// generated PDF so tests can assert on what a customer would actually see.
+package invoicetest
 
 import (
 	"bytes"
@@ -13,12 +15,12 @@ import (
 
 var streamRe = regexp.MustCompile(`(?s)stream\r?\n(.*?)\r?\nendstream`)
 
-// pdfTextLines extracts, in drawing order, every string shown by the PDF's
+// PDFTextLines extracts, in drawing order, every string shown by the PDF's
 // text operators. fpdf writes UTF-8 (DejaVu) text as UTF-16BE inside a
 // parenthesised literal followed by Tj (no space), in a Flate-compressed page stream, so
 // inflating the streams and decoding those literals yields exactly what the
 // reader sees, one entry per cell.
-func pdfTextLines(t *testing.T, pdf []byte) []string {
+func PDFTextLines(t *testing.T, pdf []byte) []string {
 	t.Helper()
 	require.True(t, bytes.HasPrefix(pdf, []byte("%PDF-")), "not a PDF")
 	require.True(t, bytes.HasSuffix(bytes.TrimSpace(pdf), []byte("%%EOF")), "PDF is truncated")
@@ -35,6 +37,7 @@ func pdfTextLines(t *testing.T, pdf []byte) []string {
 		}
 		out = append(out, shownStrings(content)...)
 	}
+	require.NotEmpty(t, out, "no text found in the PDF: did the content stream encoding change?")
 	return out
 }
 

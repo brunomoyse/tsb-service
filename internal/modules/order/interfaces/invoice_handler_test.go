@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ import (
 	productDomain "tsb-service/internal/modules/product/domain"
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/invoice/invoicetest"
 	"tsb-service/pkg/utils"
 )
 
@@ -200,6 +202,23 @@ func assertPDF(t *testing.T, rec *httptest.ResponseRecorder, wantFilename string
 	assert.True(t, strings.HasPrefix(rec.Body.String(), "%PDF-"), "body must be a PDF")
 }
 
+// invoiceLines returns, in drawing order, the text a reader sees on the PDF returned by the handler.
+func invoiceLines(t *testing.T, rec *httptest.ResponseRecorder) []string {
+	t.Helper()
+	return invoicetest.PDFTextLines(t, rec.Body.Bytes())
+}
+
+// requireRun asserts that want appears as one contiguous run of printed lines, in that order.
+func requireRun(t *testing.T, lines []string, want ...string) {
+	t.Helper()
+	for i := 0; i+len(want) <= len(lines); i++ {
+		if slices.Equal(lines[i:i+len(want)], want) {
+			return
+		}
+	}
+	require.Failf(t, "run of invoice lines not found", "want %q in %q", want, lines)
+}
+
 func TestDownloadInvoice_Success(t *testing.T) {
 	d := decimal.RequireFromString
 
@@ -208,6 +227,7 @@ func TestDownloadInvoice_Success(t *testing.T) {
 		e.orders.order.Language = "en"
 		rec := e.do(t, e.userID.String(), e.orderID.String())
 		assertPDF(t, rec, "invoice-02-12-2025-jean-paul-dupont.pdf")
+		requireRun(t, invoiceLines(t, rec), "Invoice")
 		assert.Equal(t, "en", e.products.gotLang)
 		assert.Equal(t, []string{e.prodID.String()}, e.products.gotIDs)
 	})
@@ -230,6 +250,7 @@ func TestDownloadInvoice_Success(t *testing.T) {
 		o.TakeawayDiscount = d("1.00")
 		o.CouponDiscount = d("2.00")
 		o.CouponCode = &coupon
+		o.TotalPrice = d("24.50") // 25.00 of lines - 1.00 - 2.00 + 2.50 delivery
 		o.StreetName, o.HouseNumber, o.MunicipalityName, o.Postcode, o.BoxNumber = &street, &num, &mun, &zip, &box
 		(*e.orders.products)[0].ProductChoiceID = &cid
 		*e.orders.products = append(*e.orders.products, domain.OrderProductRaw{
@@ -238,7 +259,25 @@ func TestDownloadInvoice_Success(t *testing.T) {
 			ID: uuid.New(), ProductID: e.prodID, Quantity: 1, UnitPrice: d("1.00"), TotalPrice: d("1.00"), VatRateApplied: d("0"),
 		})
 		e.products.choice = &productDomain.ProductChoice{Translations: []productDomain.ChoiceTranslation{{Locale: "fr", Name: "Piquant"}}}
-		assertPDF(t, e.do(t, e.userID.String(), e.orderID.String()), "facture-02-12-2025-jean-paul-dupont.pdf")
+		rec := e.do(t, e.userID.String(), e.orderID.String())
+		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
+		lines := invoiceLines(t, rec)
+		requireRun(t, lines, "Type de commande: Livraison", "Adresse de livraison: Rue Neuve 12 / 3B, 4000 Liège")
+		// Lines (choice name appended, 0 % VAT line printed without VAT), then the money block.
+		requireRun(t, lines,
+			"A1 — Sushi — Piquant", "2", "10,50 €", "21,00 €",
+			"A1 — Sushi", "1", "3,00 €", "3,00 €",
+			"A1 — Sushi", "1", "1,00 €", "1,00 €",
+			"Sous-total", "25,00 €",
+			// VAT is extracted from the gross: 3 × 21/121 = 0.52 and 21 × 6/106 = 1.19; 0 % adds none.
+			"TVA (21.00%)", "0,52 €",
+			"TVA (6.00%)", "1,19 €",
+			"Total TVA", "1,71 €",
+			"Remise emporter (-10%)", "- 1,00 €",
+			"Coupon (WELCOME)", "- 2,00 €",
+			"Frais de livraison", "2,50 €",
+			"Total", "24,50 €",
+		)
 	})
 
 	t.Run("choice lookup failure does not block the invoice", func(t *testing.T) {
@@ -246,7 +285,10 @@ func TestDownloadInvoice_Success(t *testing.T) {
 		cid := uuid.New()
 		(*e.orders.products)[0].ProductChoiceID = &cid
 		e.products.choiceErr = errors.New("gone")
-		assertPDF(t, e.do(t, e.userID.String(), e.orderID.String()), "facture-02-12-2025-jean-paul-dupont.pdf")
+		rec := e.do(t, e.userID.String(), e.orderID.String())
+		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
+		// The line is printed with the bare product name and the right amounts.
+		requireRun(t, invoiceLines(t, rec), "A1 — Sushi", "2", "10,50 €", "21,00 €")
 	})
 
 	t.Run("choice without translation keeps the bare product name", func(t *testing.T) {
@@ -254,13 +296,19 @@ func TestDownloadInvoice_Success(t *testing.T) {
 		cid := uuid.New()
 		(*e.orders.products)[0].ProductChoiceID = &cid
 		e.products.choice = &productDomain.ProductChoice{}
-		assertPDF(t, e.do(t, e.userID.String(), e.orderID.String()), "facture-02-12-2025-jean-paul-dupont.pdf")
+		rec := e.do(t, e.userID.String(), e.orderID.String())
+		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
+		requireRun(t, invoiceLines(t, rec), "A1 — Sushi", "2", "10,50 €", "21,00 €")
 	})
 
 	t.Run("product without code is accepted", func(t *testing.T) {
 		e := newInvoiceEnv()
 		e.products.names[0].Code = nil
-		assertPDF(t, e.do(t, e.userID.String(), e.orderID.String()), "facture-02-12-2025-jean-paul-dupont.pdf")
+		rec := e.do(t, e.userID.String(), e.orderID.String())
+		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
+		lines := invoiceLines(t, rec)
+		requireRun(t, lines, "Sushi", "2", "10,50 €", "21,00 €")
+		assert.NotContains(t, lines, "A1 — Sushi")
 	})
 
 	t.Run("zero stored total is recomputed from the line totals", func(t *testing.T) {
@@ -268,16 +316,30 @@ func TestDownloadInvoice_Success(t *testing.T) {
 		fee := d("1.00")
 		e.orders.order.TotalPrice = decimal.Zero
 		e.orders.order.DeliveryFee = &fee
-		assertPDF(t, e.do(t, e.userID.String(), e.orderID.String()), "facture-02-12-2025-jean-paul-dupont.pdf")
+		rec := e.do(t, e.userID.String(), e.orderID.String())
+		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
+		// 21.00 of lines + 1.00 delivery.
+		requireRun(t, invoiceLines(t, rec), "Sous-total", "21,00 €", "TVA (6.00%)", "1,19 €", "Total TVA", "1,19 €",
+			"Frais de livraison", "1,00 €", "Total", "22,00 €")
 	})
 
-	t.Run("lines with zero totals fall back to unit price times quantity", func(t *testing.T) {
+	// BUG(product decision pending): when every stored line total is zero the invoice falls back to
+	// unit price x quantity for the subtotal and the total (21,00 / 22,00) but still prints the lines
+	// with their stored zero total ("0,00 €", quantity folded into the name), so the printed lines do
+	// not add up to the printed subtotal and no VAT is shown. Update this expectation when the
+	// owner decides how such a legacy order should be invoiced.
+	t.Run("lines with zero totals fall back to unit price times quantity for the totals only", func(t *testing.T) {
 		e := newInvoiceEnv()
 		fee := d("1.00")
 		e.orders.order.TotalPrice = decimal.Zero
 		e.orders.order.DeliveryFee = &fee
 		(*e.orders.products)[0].TotalPrice = decimal.Zero
-		assertPDF(t, e.do(t, e.userID.String(), e.orderID.String()), "facture-02-12-2025-jean-paul-dupont.pdf")
+		rec := e.do(t, e.userID.String(), e.orderID.String())
+		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
+		lines := invoiceLines(t, rec)
+		requireRun(t, lines, "A1 — 2 × Sushi", "1", "0,00 €", "0,00 €")
+		requireRun(t, lines, "Sous-total", "21,00 €", "Frais de livraison", "1,00 €", "Total", "22,00 €")
+		assert.NotContains(t, lines, "Total TVA")
 	})
 
 	t.Run("lines with zero totals and no stored total are refused", func(t *testing.T) {

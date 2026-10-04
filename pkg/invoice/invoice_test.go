@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"tsb-service/pkg/brand"
+	"tsb-service/pkg/invoice/invoicetest"
 )
 
 func ptr[T any](v T) *T { return &v }
@@ -51,7 +52,7 @@ func generate(t *testing.T, d InvoiceData) []string {
 	t.Helper()
 	pdf, err := GeneratePDF(d)
 	require.NoError(t, err)
-	return pdfTextLines(t, pdf)
+	return invoicetest.PDFTextLines(t, pdf)
 }
 
 // setBrand points the invoice at a different restaurant identity for one test
@@ -286,7 +287,7 @@ func TestGeneratePDFManyItemsSpillOverPages(t *testing.T) {
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, bytes.Count(pdf, []byte("/Type /Page\n")), 2, "80 rows must paginate")
 
-	lines := pdfTextLines(t, pdf)
+	lines := invoicetest.PDFTextLines(t, pdf)
 	for i := range 80 {
 		require.Contains(t, lines, fmt.Sprintf("Plat %d", i), "row %d lost across the page break", i)
 	}
