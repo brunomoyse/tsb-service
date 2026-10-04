@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"tsb-service/pkg/timezone/timezonetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -83,6 +85,7 @@ func alwaysOpen(enabled bool) *domain.RestaurantConfig {
 }
 
 func TestGetConfigWithOverrides(t *testing.T) {
+	timezonetest.SkipNearMidnight(t, 10*time.Second) // "today" below must be the day the service sees
 	today := timezone.In(time.Now())
 	midnight := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
 

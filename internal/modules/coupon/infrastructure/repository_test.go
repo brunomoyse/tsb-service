@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"tsb-service/pkg/timezone/timezonetest"
+
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/shopspring/decimal"
@@ -318,6 +320,7 @@ func TestDecrementUsageAtomic(t *testing.T) {
 }
 
 func TestFailedCouponAttempts(t *testing.T) {
+	timezonetest.SkipNearMidnight(t, 30*time.Second) // the counter is per calendar day
 	e := newEnv(t)
 	ctx := t.Context()
 	u, other := e.user(t, "att"), e.user(t, "att2")
