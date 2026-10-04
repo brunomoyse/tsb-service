@@ -71,10 +71,7 @@ func (r *Resolver) cancelOrder(ctx context.Context, orderID uuid.UUID, input mod
 			}
 			settlement, err := r.PaymentService.SettleCancelledOrderPayment(ctx, payment)
 			if err != nil {
-				zap.L().Error("cannot cancel the order: payment settlement failed",
-					zap.String("order_id", orderID.String()), zap.String("payment_id", payment.MolliePaymentID), zap.Error(err))
-				return apperr.New(apperr.CodePaymentSettlementFailed,
-					"the payment of this order could not be refunded or cancelled, so the order was NOT cancelled; please try again")
+				return settlementFailure(orderID, payment, err)
 			}
 			if err := r.saveOrder(ctx, orderID, input); err != nil {
 				return err
@@ -109,6 +106,24 @@ func (r *Resolver) saveOrder(ctx context.Context, orderID uuid.UUID, input model
 		return fmt.Errorf("failed to update order status: %w", err)
 	}
 	return nil
+}
+
+// settlementFailure turns the error of a settlement into what the staff member sees, and logs it.
+func settlementFailure(orderID uuid.UUID, payment *paymentDomain.MolliePayment, err error) error {
+	if errors.Is(err, paymentDomain.ErrPaymentNotRefundable) {
+		// Permanent: retrying changes nothing, so say so instead of "try again". The order is left as
+		// it is; the customer has to be refunded by hand, which needs someone to look at it.
+		zap.L().Error("cannot cancel the order: its paid payment cannot be refunded through Mollie, refund the customer manually",
+			zap.String("order_id", orderID.String()), zap.String("payment_id", payment.MolliePaymentID),
+			zap.String("amount", payment.Amount.String()), zap.Error(err))
+		return apperr.New(apperr.CodePaymentNotRefundable,
+			"the payment of this order cannot be refunded through Mollie (for example a voucher or gift card payment, or the refund period has passed), "+
+				"so the order was NOT cancelled; refund the customer manually outside Mollie")
+	}
+	zap.L().Error("cannot cancel the order: payment settlement failed",
+		zap.String("order_id", orderID.String()), zap.String("payment_id", payment.MolliePaymentID), zap.Error(err))
+	return apperr.New(apperr.CodePaymentSettlementFailed,
+		"the payment of this order could not be refunded or cancelled, so the order was NOT cancelled; please try again")
 }
 
 func paymentLookupFailed(orderID uuid.UUID, err error) error {

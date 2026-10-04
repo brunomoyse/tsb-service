@@ -163,6 +163,7 @@ type MollieStub struct {
 	failCanc bool
 	failPay  bool
 	failGet  bool
+	refDown  bool
 	getDelay time.Duration
 	refDelay time.Duration
 	seq      int
@@ -250,6 +251,14 @@ func (s *MollieStub) SetNotRefundable(paymentID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.payments[paymentID].noRefundInfo = true
+}
+
+// SetRefundOutage makes every refund request answer 503, as when Mollie has an outage (unlike the
+// 422 of SetFail, which is Mollie refusing the refund for good).
+func (s *MollieStub) SetRefundOutage(down bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.refDown = down
 }
 
 // SetRefundDelay makes every refund request take that long to be answered (the refund is only
@@ -342,7 +351,7 @@ func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.calls = append(s.calls, r.Method+" "+r.URL.Path)
 	s.bodies = append(s.bodies, string(body))
-	failPay, failRef, failCanc, failGet, getDelay, refDelay := s.failPay, s.failRef, s.failCanc, s.failGet, s.getDelay, s.refDelay
+	failPay, failRef, failCanc, failGet, getDelay, refDelay, refDown := s.failPay, s.failRef, s.failCanc, s.failGet, s.getDelay, s.refDelay, s.refDown
 	s.seq++
 	seq := s.seq
 	s.mu.Unlock()
@@ -420,6 +429,11 @@ func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(out)
 	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/refunds"):
 		time.Sleep(refDelay)
+		if refDown {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"status":503,"title":"Service Unavailable","detail":"try again later","_links":{}}`))
+			return
+		}
 		if failRef {
 			refuse("refused")
 			return

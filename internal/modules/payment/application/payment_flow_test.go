@@ -48,6 +48,9 @@ type flowMollie struct {
 	// amountRefunded / amountRemaining it reports when set.
 	notCancelable       bool
 	refunded, remaining string
+	// noRemaining reports a payment without amountRemaining, as Mollie does when it cannot be
+	// refunded; otherwise amountRemaining defaults to the whole amount.
+	noRemaining bool
 }
 
 type flowRequest struct {
@@ -62,6 +65,9 @@ func (f *flowMollie) handler(w http.ResponseWriter, r *http.Request) {
 	f.requests = append(f.requests, flowRequest{Method: r.Method, Path: r.URL.Path, Body: body})
 	status, getCode, createCode, delay, paidAt := f.status, f.getStatusCode, f.createStatusCode, f.createDelay, f.paidAt
 	notCancelable, refunded, remaining := f.notCancelable, f.refunded, f.remaining
+	if remaining == "" && !f.noRemaining {
+		remaining = "20.00"
+	}
 	f.mu.Unlock()
 
 	w.Header().Set("Content-Type", "application/hal+json")

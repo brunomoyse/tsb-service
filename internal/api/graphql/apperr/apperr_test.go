@@ -61,6 +61,8 @@ func TestIsExpected(t *testing.T) {
 		apperr.CodeSelectionInvalid, apperr.CodeDeliveryMinimumNotMet, apperr.CodeCouponAlreadyActive,
 		// A provider outage while cancelling: not a bug of ours, and the message is for the staff member who retries.
 		apperr.CodePaymentSettlementFailed,
+		// A paid payment Mollie cannot refund: the staff member refunds by hand, the resolver logs it at error level itself.
+		apperr.CodePaymentNotRefundable,
 	} {
 		assert.True(t, apperr.IsExpected(code), "%s should be expected", code)
 	}

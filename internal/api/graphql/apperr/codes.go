@@ -121,6 +121,12 @@ const (
 	// updateOrder can simply be retried. Dashboard only (customers cannot cancel); the message is
 	// shown to staff as is, so it is kept clear and free of provider details (those are in the logs).
 	CodePaymentSettlementFailed Code = "PAYMENT_SETTLEMENT_FAILED"
+	// CodePaymentNotRefundable: staff cancelled a paid order whose payment Mollie cannot refund
+	// (a voucher / gift card payment, an expired refund window, a refund Mollie refuses). Retrying
+	// cannot help, unlike PAYMENT_SETTLEMENT_FAILED: the order is left UNCHANGED and the customer has
+	// to be refunded manually, outside Mollie. There is deliberately no "cancel anyway". Dashboard
+	// only; the message is shown to staff as is.
+	CodePaymentNotRefundable Code = "PAYMENT_NOT_REFUNDABLE"
 )
 
 // WeChat assistant (dashboard).
@@ -171,6 +177,8 @@ var expected = map[Code]bool{
 	// A provider outage is not a bug of ours and the message is for the staff member who must retry;
 	// the resolver logs the cause at error level itself.
 	CodePaymentSettlementFailed: true,
+	// Staff must act (refund by hand); the resolver logs the cause at error level itself.
+	CodePaymentNotRefundable: true,
 }
 
 // IsExpected reports whether the code is a user-side error (warn log, no Sentry event).

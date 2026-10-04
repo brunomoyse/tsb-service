@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"errors"
 	"slices"
 	"time"
 
@@ -21,6 +22,12 @@ const (
 	PaymentStatusFailed     PaymentStatus = "failed"
 	PaymentStatusPaid       PaymentStatus = "paid"
 )
+
+// ErrPaymentNotRefundable means a paid payment cannot be refunded through Mollie: Mollie reports no
+// refundable amount for it (vouchers, gift cards and other methods without API refunds, or an expired
+// refund window) or refuses the refund. Retrying cannot help; the customer has to be refunded by
+// other means. Returned wrapped, test with errors.Is.
+var ErrPaymentNotRefundable = errors.New("payment cannot be refunded through Mollie")
 
 // PaymentStatuses lists every status a payment can have (Mollie's payment statuses).
 var PaymentStatuses = []PaymentStatus{

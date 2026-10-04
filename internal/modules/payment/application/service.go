@@ -3,7 +3,9 @@ package application
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -286,12 +288,27 @@ func (s *paymentService) refundRemainingOf(ctx context.Context, payment *domain.
 		return decimal.Zero, alreadyRefunded, nil
 	}
 
+	// Mollie only reports amountRemaining "when refunds are available for this payment": a paid payment
+	// without it (voucher, gift card and other methods that cannot be refunded through the API, or an
+	// expired refund window) cannot be refunded here, however often it is retried.
+	if current.AmountRemaining == nil {
+		return decimal.Zero, decimal.Zero, fmt.Errorf("%w: Mollie reports no refundable amount for payment %s",
+			domain.ErrPaymentNotRefundable, payment.MolliePaymentID)
+	}
+
 	refundRequest := mollie.CreatePaymentRefund{
 		Amount: amt(remaining),
 	}
 
 	res, refund, err := s.mollieClient.Refunds.CreatePaymentRefund(ctx, payment.MolliePaymentID, refundRequest, nil)
 	if err != nil {
+		// 422: Mollie understood the request and refuses it (the method or the amount cannot be
+		// refunded). Anything else (5xx, network, rate limit) is worth retrying.
+		var apiErr *mollie.BaseError
+		if errors.As(err, &apiErr) && apiErr.Status == http.StatusUnprocessableEntity {
+			return decimal.Zero, decimal.Zero, fmt.Errorf("%w: Mollie refused the refund of payment %s: %w",
+				domain.ErrPaymentNotRefundable, payment.MolliePaymentID, err)
+		}
 		return decimal.Zero, decimal.Zero, fmt.Errorf("failed to create refund: %w", err)
 	}
 
@@ -562,6 +579,12 @@ func (s *paymentService) refundPaidCancelledOrder(ctx context.Context, order *or
 		return fmt.Errorf("failed to find payment for cancelled order %s: %w", order.ID, err)
 	}
 	refunded, _, err := s.refundRemaining(ctx, payment)
+	if errors.Is(err, domain.ErrPaymentNotRefundable) {
+		// Mollie's retries cannot change that: acknowledge the webhook and leave the refund to a person.
+		zap.L().Error("payment completed for a cancelled order but cannot be refunded through Mollie, refund the customer manually",
+			zap.String("order_id", order.ID.String()), zap.String("payment_id", payment.MolliePaymentID), zap.Error(err))
+		return nil
+	}
 	if err != nil {
 		return err
 	}

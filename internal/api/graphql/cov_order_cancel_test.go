@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"tsb-service/internal/api/graphql/apperr"
 	"tsb-service/internal/api/graphql/model"
@@ -180,8 +182,8 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		env.markPaid(t, order.ID)
 		payID := order.Payment.MolliePaymentID
 		before := orderState(t, order.ID)
-		env.Mollie.SetFail(false, true, false)
-		t.Cleanup(func() { env.Mollie.SetFail(false, false, false) })
+		env.Mollie.SetRefundOutage(true)
+		t.Cleanup(func() { env.Mollie.SetRefundOutage(false) })
 
 		_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "CANCELLED", "cancellationReason": "OTHER"})
 
@@ -193,13 +195,67 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		require.Never(t, func() bool { return env.Mail.CountSubject(t, c.email, "Order canceled") > 0 }, 300*time.Millisecond, 20*time.Millisecond)
 
 		// With Mollie healthy again the same call goes through and refunds once.
-		env.Mollie.SetFail(false, false, false)
+		env.Mollie.SetRefundOutage(false)
 		got := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED", "cancellationReason": "OTHER"})
 		assert.Equal(t, "CANCELLED", got.Status)
 		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID+"/refunds"), 2, "the refused call and the retry")
 		assert.Equal(t, env.paymentCol(t, "amount", payID), env.paymentCol(t, "amount_refunded", payID))
 		env.Mail.WaitSubject(t, c.email, "Your refund has been issued")
 		env.Mail.WaitSubject(t, c.email, "Order canceled")
+	})
+
+	// Retrying cannot help for a payment Mollie cannot refund (voucher, gift card, expired refund
+	// window): staff get a distinct code and a message that says to refund by hand. The order stays as
+	// it is, and there is no "cancel anyway": a cancelled order whose money was never returned would
+	// look settled to everybody.
+	notRefundable := func(t *testing.T, oerr *orderErr) {
+		t.Helper()
+		require.NotNil(t, oerr)
+		assert.Equal(t, "PAYMENT_NOT_REFUNDABLE", oerr.Extensions["code"])
+		assert.Contains(t, oerr.Message, "the order was NOT cancelled")
+		assert.Contains(t, oerr.Message, "refund the customer manually outside Mollie")
+		assert.NotContains(t, oerr.Message, "try again", "retrying does not help")
+	}
+	t.Run("a paid payment Mollie cannot refund leaves the order unchanged with a distinct, logged error", func(t *testing.T) {
+		c := env.newPushCustomer(t, "voucher", true)
+		order := env.placeOnlineOrder(t, c)
+		env.markPaid(t, order.ID)
+		payID := order.Payment.MolliePaymentID
+		env.Mollie.SetNotRefundable(payID) // Mollie reports no amountRemaining for it
+		before := orderState(t, order.ID)
+
+		for range 2 { // every retry gets the same answer
+			_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "CANCELLED", "cancellationReason": "OTHER"})
+			notRefundable(t, oerr)
+		}
+
+		assert.Empty(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID), "Mollie is not asked to refund what it cannot refund")
+		assert.Equal(t, before, orderState(t, order.ID), "the order is NOT cancelled")
+		assert.Equal(t, "paid", env.paymentCol(t, "status", payID))
+		assert.Equal(t, "0.00", env.paymentCol(t, "amount_refunded", payID))
+		assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM order_status_history WHERE order_id = $1 AND status = 'CANCELLED'`, order.ID))
+		entries := logs.FilterMessageSnippet("refund the customer manually").FilterField(zap.String("order_id", order.ID)).All()
+		require.NotEmpty(t, entries, "logged for manual handling")
+		assert.Equal(t, zapcore.ErrorLevel, entries[0].Level)
+		assert.Equal(t, payID, entries[0].ContextMap()["payment_id"])
+		require.Never(t, func() bool { return env.Mail.CountSubject(t, c.email, "Order canceled") > 0 }, 200*time.Millisecond, 20*time.Millisecond)
+	})
+
+	t.Run("a refund Mollie refuses outright (422) is not refundable either", func(t *testing.T) {
+		c := env.newPushCustomer(t, "window", true)
+		order := env.placeOnlineOrder(t, c)
+		env.markPaid(t, order.ID)
+		payID := order.Payment.MolliePaymentID
+		before := orderState(t, order.ID)
+		env.Mollie.SetFail(false, true, false)
+		t.Cleanup(func() { env.Mollie.SetFail(false, false, false) })
+
+		_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "CANCELLED"})
+
+		notRefundable(t, oerr)
+		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID+"/refunds"), 1)
+		assert.Equal(t, before, orderState(t, order.ID))
+		assert.Equal(t, "0.00", env.paymentCol(t, "amount_refunded", payID))
 	})
 
 	t.Run("an open payment that Mollie refuses to cancel leaves the order unchanged, and the retry cancels it", func(t *testing.T) {

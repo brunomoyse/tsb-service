@@ -48,6 +48,9 @@ func (f *fakeMollie) handler(w http.ResponseWriter, r *http.Request) {
 		if refunded != "" {
 			extra += `,"amountRefunded":{"currency":"EUR","value":"` + refunded + `"}`
 		}
+		if remaining == "" {
+			remaining = "20.00"
+		}
 		if remaining != "" {
 			extra += `,"amountRemaining":{"currency":"EUR","value":"` + remaining + `"}`
 		}
