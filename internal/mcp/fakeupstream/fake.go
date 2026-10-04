@@ -51,10 +51,14 @@ type Server struct {
 	Calls    []Call
 	// FailOps makes the named operations return a GraphQL error with this code.
 	FailOps map[string]string
+	// FailAfter[op] = n lets the first n calls (counted since the fake started) of op succeed before FailOps
+	// applies to it (to fail a later step of a multi-call flow).
+	FailAfter map[string]int
 	// TokenRequests counts /oauth/v2/token calls.
 	TokenRequests int
 
 	nextID int
+	seen   map[string]int
 }
 
 // New starts a fake seeded with a small realistic catalogue.
@@ -63,6 +67,8 @@ func New() *Server {
 		Overrides: map[string]*upstream.ScheduleOverride{},
 		Images:    map[string][]byte{},
 		FailOps:   map[string]string{},
+		FailAfter: map[string]int{},
+		seen:      map[string]int{},
 	}
 	s.seed()
 	mux := http.NewServeMux()
@@ -216,7 +222,8 @@ func (s *Server) graphql(w http.ResponseWriter, r *http.Request) {
 	s.Calls = append(s.Calls, Call{Op: req.OperationName, Vars: req.Variables})
 
 	w.Header().Set("Content-Type", "application/json")
-	if code, ok := s.FailOps[req.OperationName]; ok {
+	s.seen[req.OperationName]++
+	if code, ok := s.FailOps[req.OperationName]; ok && s.seen[req.OperationName] > s.FailAfter[req.OperationName] {
 		writeError(w, "injected failure", code)
 		return
 	}

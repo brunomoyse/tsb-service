@@ -154,6 +154,9 @@ func (v *OIDCVerifier) checkAuthorization(ctx context.Context, tokenStr string) 
 	for _, authZ := range v.authorizers {
 		authCtx, err := authZ.CheckAuthorization(ctx, "Bearer "+tokenStr)
 		if err == nil {
+			if err := checkNotBefore(authCtx.Claims, time.Now()); err != nil {
+				return nil, err
+			}
 			return authCtx, nil
 		}
 		if firstErr == nil {
@@ -164,6 +167,22 @@ func (v *OIDCVerifier) checkAuthorization(ctx context.Context, tokenStr string) 
 		firstErr = errors.New("no Zitadel authorizer configured")
 	}
 	return nil, firstErr
+}
+
+// notBeforeLeeway tolerates clock skew between Zitadel and this service.
+const notBeforeLeeway = time.Minute
+
+// checkNotBefore rejects a token whose "nbf" (not before) claim is still in the future
+// (RFC 7519 §4.1.5); the Zitadel SDK's local JWT check does not enforce it.
+func checkNotBefore(claims map[string]any, now time.Time) error {
+	nbf, ok := claims["nbf"].(float64)
+	if !ok {
+		return nil
+	}
+	if now.Add(notBeforeLeeway).Before(time.Unix(int64(nbf), 0)) {
+		return errors.New("token is not valid yet (nbf in the future)")
+	}
+	return nil
 }
 
 // SetAdminClientIDs restricts the admin role to tokens issued to these OIDC

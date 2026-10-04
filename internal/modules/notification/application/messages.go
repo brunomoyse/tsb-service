@@ -8,6 +8,7 @@ import (
 
 	orderDomain "tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/brand"
+	"tsb-service/pkg/i18n/locale"
 	"tsb-service/pkg/timezone"
 )
 
@@ -20,10 +21,8 @@ type notificationText struct {
 // When the status is CANCELLED and the cancellation reason is set to something other than
 // OTHER, the reason is appended to the body so the customer knows why.
 func GetOrderStatusNotification(status orderDomain.OrderStatus, language string, orderType string, cancellationReason *orderDomain.OrderCancellationReason) notificationText {
+	language = locale.Normalize(language)
 	texts := orderNotificationTexts[language]
-	if texts == nil {
-		texts = orderNotificationTexts["fr"]
-	}
 
 	msg, ok := texts[status]
 	if !ok {
@@ -39,12 +38,8 @@ func GetOrderStatusNotification(status orderDomain.OrderStatus, language string,
 
 	// Append localized cancellation reason when meaningful.
 	if status == orderDomain.OrderStatusCanceled && cancellationReason != nil && *cancellationReason != orderDomain.OrderCancellationReasonOther {
-		labelLang := language
-		if _, ok := cancellationReasonPushLabels[labelLang]; !ok {
-			labelLang = "fr"
-		}
-		if reasonLabel, ok := cancellationReasonPushLabels[labelLang][*cancellationReason]; ok && reasonLabel != "" {
-			msg.Body = fmt.Sprintf(cancellationReasonBodyFormat[labelLang], reasonLabel)
+		if reasonLabel, ok := cancellationReasonPushLabels[language][*cancellationReason]; ok && reasonLabel != "" {
+			msg.Body = fmt.Sprintf(cancellationReasonBodyFormat[language], reasonLabel)
 		}
 	}
 
@@ -90,10 +85,8 @@ func GetReadyTimeUpdatedNotification(language string, estimatedReadyTime *time.T
 		return notificationText{Title: brand.Current().Name, Body: ""}
 	}
 
+	language = locale.Normalize(language)
 	texts := readyTimeUpdatedTexts[language]
-	if texts == nil {
-		texts = readyTimeUpdatedTexts["fr"]
-	}
 
 	return notificationText{
 		Title: texts.Title,
@@ -155,11 +148,7 @@ var orderNotificationTexts = map[string]map[orderDomain.OrderStatus]notification
 // orderType/total are kept in the signature for callers but are intentionally
 // unused.
 func GetNewOrderNotification(language, _ /*orderType*/, _ /*total*/ string) notificationText {
-	texts := newOrderTexts[language]
-	if texts == nil {
-		texts = newOrderTexts["fr"]
-	}
-	return *texts
+	return *newOrderTexts[locale.Normalize(language)]
 }
 
 var newOrderTexts = map[string]*notificationText{
@@ -177,6 +166,7 @@ var readyTimeUpdatedTexts = map[string]*notificationText{
 }
 
 func formatReadyTimeForNotification(t time.Time, language string) string {
+	language = locale.Normalize(language)
 	local := timezone.In(t)
 	hour := local.Hour()
 	minute := local.Minute()

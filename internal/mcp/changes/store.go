@@ -183,7 +183,12 @@ func (s *Store) Close() error { return s.db.Close() }
 // Ping checks the database.
 func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
 
-func ts(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
+// tsLayout has a fixed-width fraction: RFC3339Nano trims trailing zeros, which
+// makes "12:00:00Z" sort after "12:00:00.000000001Z" when SQLite compares the
+// stored text. parseTS reads both layouts, so older rows stay readable.
+const tsLayout = "2006-01-02T15:04:05.000000000Z"
+
+func ts(t time.Time) string { return t.UTC().Format(tsLayout) }
 
 func parseTS(s string) time.Time {
 	t, _ := time.Parse(time.RFC3339Nano, s)

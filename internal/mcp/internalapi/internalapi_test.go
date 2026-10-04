@@ -44,7 +44,9 @@ func (e *env) advance(d time.Duration) {
 	e.mu.Unlock()
 }
 
-func setup(t *testing.T) *env {
+func setup(t *testing.T) *env { return setupWithToken(t, token) }
+
+func setupWithToken(t *testing.T, tok string) *env {
 	t.Helper()
 	e := &env{t: t, now: time.Date(2026, 10, 3, 13, 0, 0, 0, brussels)}
 	e.fake = fakeupstream.New()
@@ -58,7 +60,7 @@ func setup(t *testing.T) *env {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 	e.svc = actions.NewService(&actions.Env{Up: up, Loc: brussels, PriceMaxPct: 50, Now: e.Now}, store, 10*time.Minute, log)
-	e.srv = httptest.NewServer(internalapi.Handler(e.svc, token, brussels, log))
+	e.srv = httptest.NewServer(internalapi.Handler(e.svc, tok, brussels, log))
 	t.Cleanup(e.srv.Close)
 	return e
 }

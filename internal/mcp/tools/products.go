@@ -196,20 +196,26 @@ const maxImageBytes = 5 << 20
 
 var allowedImageTypes = map[string]string{"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 
+// checkDialAddress is the dialer's guard: only public unicast addresses are
+// allowed.
+func checkDialAddress(address string) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return err
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() {
+		return fmt.Errorf("address %s is not allowed", host)
+	}
+	return nil
+}
+
 // safeHTTPClient refuses to connect to loopback, private, link-local or
 // unspecified addresses, so an image URL cannot be used to reach cluster
 // internals.
 func safeHTTPClient() *http.Client {
 	dialer := &net.Dialer{Timeout: 10 * time.Second, Control: func(_, address string, _ syscall.RawConn) error {
-		host, _, err := net.SplitHostPort(address)
-		if err != nil {
-			return err
-		}
-		ip := net.ParseIP(host)
-		if ip == nil || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() {
-			return fmt.Errorf("address %s is not allowed", host)
-		}
-		return nil
+		return checkDialAddress(address)
 	}}
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.DialContext = dialer.DialContext

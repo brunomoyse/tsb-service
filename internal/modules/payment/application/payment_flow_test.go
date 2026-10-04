@@ -1,14 +1,12 @@
 package application
 
 import (
-	"bufio"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,6 +14,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"tsb-service/pkg/email/scaleway/scalewaytest"
+	"tsb-service/pkg/email/smtptest"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
@@ -30,7 +31,6 @@ import (
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/brand"
-	es "tsb-service/pkg/email/scaleway"
 )
 
 // flowMollie is a configurable fake of the Mollie REST API.
@@ -303,86 +303,13 @@ func (f *flowUsers) GetUserByID(_ context.Context, _ string) (*userDomain.User, 
 	return f.user, f.err
 }
 
-// smtpSink is a minimal SMTP server that counts delivered messages.
-type smtpSink struct {
-	mu       sync.Mutex
-	messages []string
-	ln       net.Listener
-}
-
-func startSMTPSink(t *testing.T) *smtpSink {
+// startSMTPSink starts a fake SMTP server and routes the e-mail backend to it for this test (the
+// previous backend is restored when the test ends).
+func startSMTPSink(t *testing.T) *smtptest.Server {
 	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	s := &smtpSink{ln: ln}
-	t.Cleanup(func() { _ = ln.Close() })
-	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				return
-			}
-			go s.serve(conn)
-		}
-	}()
-	host, port, _ := net.SplitHostPort(ln.Addr().String())
-	t.Setenv("SMTP_HOST", host)
-	t.Setenv("SMTP_PORT", port)
-	t.Setenv("SCW_SENDER_EMAIL", "noreply@example.test")
-	t.Setenv("SCW_SENDER_NAME", "Test")
-	if err := es.InitService(); err != nil {
-		t.Fatalf("email init: %v", err)
-	}
+	s := smtptest.Start(t)
+	scalewaytest.Use(t, s)
 	return s
-}
-
-func (s *smtpSink) serve(conn net.Conn) {
-	defer func() { _ = conn.Close() }()
-	rd := bufio.NewReader(conn)
-	write := func(line string) { _, _ = conn.Write([]byte(line + "\r\n")) }
-	write("220 sink ready")
-	var data strings.Builder
-	inData := false
-	for {
-		line, err := rd.ReadString('\n')
-		if err != nil {
-			return
-		}
-		if inData {
-			if line == ".\r\n" {
-				inData = false
-				s.mu.Lock()
-				s.messages = append(s.messages, data.String())
-				s.mu.Unlock()
-				data.Reset()
-				write("250 queued")
-				continue
-			}
-			data.WriteString(line)
-			continue
-		}
-		cmd := strings.ToUpper(strings.TrimSpace(line))
-		switch {
-		case strings.HasPrefix(cmd, "EHLO"), strings.HasPrefix(cmd, "HELO"):
-			write("250 sink")
-		case strings.HasPrefix(cmd, "DATA"):
-			inData = true
-			write("354 go")
-		case strings.HasPrefix(cmd, "QUIT"):
-			write("221 bye")
-			return
-		default:
-			write("250 ok")
-		}
-	}
-}
-
-func (s *smtpSink) count() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.messages)
 }
 
 type flowFixture struct {
@@ -1071,13 +998,31 @@ func TestRefundRemaining_Failures(t *testing.T) {
 		}
 	})
 
+	// BUG(product decision pending): refundRemaining only skips a payment that is fully refunded. A
+	// partially refunded one (5.00 of 20.00 already returned, e.g. by staff in the Mollie dashboard)
+	// is refunded for the FULL amount again, so Mollie is asked for 20.00 although at most 15.00 is
+	// left, and the call is refused or over-refunds. Flip the expectation to Amount - AmountRefunded
+	// ("15.00") once the owner decides.
 	t.Run("partially refunded payment is refunded for the full amount again", func(t *testing.T) {
-		// Documents current behaviour: only a fully refunded payment is skipped.
 		f := newFlow(t, orderDomain.OrderStatusConfirmed, domain.PaymentStatusPaid)
 		f.repo.payments["tr_1"].AmountRefunded = decimal.RequireFromString("5.00")
 		refunded, err := f.svc.refundRemaining(t.Context(), f.repo.payments["tr_1"])
 		if err != nil || !refunded {
 			t.Fatalf("refunded=%v err=%v", refunded, err)
+		}
+		reqs := f.mollie.find(http.MethodPost, "/v2/payments/tr_1/refunds")
+		if len(reqs) != 1 {
+			t.Fatalf("want exactly one refund request, got %d", len(reqs))
+		}
+		var body struct {
+			Amount struct{ Value, Currency string } `json:"amount"`
+		}
+		if err := json.Unmarshal(reqs[0].Body, &body); err != nil {
+			t.Fatalf("refund body %q: %v", reqs[0].Body, err)
+		}
+		// Currently the whole payment amount; the correct remaining amount would be "15.00".
+		if body.Amount.Value != "20.00" || body.Amount.Currency != "EUR" {
+			t.Fatalf("refund amount sent to Mollie = %+v, want the full 20.00 EUR (current behaviour)", body.Amount)
 		}
 	})
 }
@@ -1145,8 +1090,8 @@ func TestHandlePaymentPaid_SendsNothing(t *testing.T) {
 	if got == nil || got.ID != f.order.ID {
 		t.Fatalf("order = %+v", got)
 	}
-	if sink.count() != 0 {
-		t.Fatalf("emails = %d, the email is SendPaidOrderConfirmation's job", sink.count())
+	if sink.Count() != 0 {
+		t.Fatalf("emails = %d, the email is SendPaidOrderConfirmation's job", sink.Count())
 	}
 	if len(f.orders.updates) != 0 {
 		t.Fatalf("a paid payment must not change the order status here: %v", f.orders.updates)
@@ -1170,8 +1115,8 @@ func TestSendPaidOrderConfirmation(t *testing.T) {
 		if err := f.svc.SendPaidOrderConfirmation(t.Context(), f.order.ID); err != nil {
 			t.Fatal(err)
 		}
-		if sink.count() != 1 {
-			t.Fatalf("emails = %d, want 1", sink.count())
+		if sink.Count() != 1 {
+			t.Fatalf("emails = %d, want 1", sink.Count())
 		}
 	})
 	t.Run("no email when opted out", func(t *testing.T) {
@@ -1181,17 +1126,12 @@ func TestSendPaidOrderConfirmation(t *testing.T) {
 		if err := f.svc.SendPaidOrderConfirmation(t.Context(), f.order.ID); err != nil {
 			t.Fatal(err)
 		}
-		if sink.count() != 0 {
-			t.Fatalf("emails = %d", sink.count())
+		if sink.Count() != 0 {
+			t.Fatalf("emails = %d", sink.Count())
 		}
 	})
 	t.Run("email backend failure is returned, not panicked", func(t *testing.T) {
-		t.Setenv("SMTP_HOST", "127.0.0.1")
-		t.Setenv("SMTP_PORT", "1") // nothing listens here
-		t.Setenv("SCW_SENDER_EMAIL", "noreply@example.test")
-		if err := es.InitService(); err != nil {
-			t.Fatal(err)
-		}
+		scalewaytest.UseDead(t) // nothing listens on the SMTP port
 		f := newFlow(t, orderDomain.OrderStatusPending, domain.PaymentStatusOpen)
 		f.users.user.NotifyOrderUpdates = true
 		if err := f.svc.SendPaidOrderConfirmation(t.Context(), f.order.ID); err == nil {
@@ -1296,8 +1236,8 @@ func TestHandlePaymentPaid_CancelledOrderEdgeCases(t *testing.T) {
 		if _, err := f.svc.HandlePaymentPaid(t.Context(), f.order.ID); err != nil {
 			t.Fatal(err)
 		}
-		if sink.count() != 1 {
-			t.Fatalf("refund emails = %d, want 1", sink.count())
+		if sink.Count() != 1 {
+			t.Fatalf("refund emails = %d, want 1", sink.Count())
 		}
 	})
 	t.Run("no refund email when already refunded", func(t *testing.T) {
@@ -1308,8 +1248,8 @@ func TestHandlePaymentPaid_CancelledOrderEdgeCases(t *testing.T) {
 		if _, err := f.svc.HandlePaymentPaid(t.Context(), f.order.ID); err != nil {
 			t.Fatal(err)
 		}
-		if sink.count() != 0 || len(f.mollie.requests) != 0 {
-			t.Fatalf("emails=%d mollie=%v", sink.count(), f.mollie.requests)
+		if sink.Count() != 0 || len(f.mollie.requests) != 0 {
+			t.Fatalf("emails=%d mollie=%v", sink.Count(), f.mollie.requests)
 		}
 	})
 }
@@ -1357,8 +1297,8 @@ func TestHandlePaymentFailed(t *testing.T) {
 		if _, err := f.svc.HandlePaymentFailed(t.Context(), f.order.ID); err != nil {
 			t.Fatal(err)
 		}
-		if sink.count() != 0 {
-			t.Fatalf("emails = %d", sink.count())
+		if sink.Count() != 0 {
+			t.Fatalf("emails = %d", sink.Count())
 		}
 	})
 }
