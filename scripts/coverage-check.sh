@@ -9,6 +9,7 @@
 #
 # Excluded: gqlgen generated code, test support code and everything under cmd/.
 # Extra arguments after the threshold are passed to `go test` (e.g. -run, -p 2).
+# Set COVERAGE_PROFILE_OUT=path to keep the filtered profile (for `go tool cover -func`/-html).
 set -euo pipefail
 
 threshold="${1:-0}"
@@ -29,6 +30,10 @@ awk -v re="$exclude" 'NR == 1 || $0 !~ re' "$profile" > "$filtered"
 # Statement-weighted total over the filtered profile. Blocks listed several times (one per test
 # binary) count once, as covered when any binary covered them. This is what `go tool cover` does.
 total="$(go tool cover -func="$filtered" | awk '/^total:/ {gsub("%", "", $3); print $3}')"
+
+if [[ -n "${COVERAGE_PROFILE_OUT:-}" ]]; then
+  cp "$filtered" "$COVERAGE_PROFILE_OUT"
+fi
 
 echo "coverage (excluding generated, test support and cmd/): ${total}%  (threshold ${threshold}%)"
 
