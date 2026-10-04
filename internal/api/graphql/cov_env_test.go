@@ -18,6 +18,8 @@ import (
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
@@ -339,8 +341,8 @@ func (f *fakeAPNs) pushesTo(token string) []pushReq {
 	return out
 }
 
-// fakeFCM is Google's push endpoint: "dead-android" is answered as unregistered, "refused-android"
-// as a permission failure.
+// fakeFCM is Google's push endpoint: a token starting with "dead-" is answered as unregistered, one
+// starting with "refused-" as a permission failure.
 type fakeFCM struct {
 	Server *httptest.Server
 	mu     sync.Mutex
@@ -361,11 +363,11 @@ func newFakeFCM(t *testing.T) *fakeFCM {
 		f.reqs = append(f.reqs, pushReq{Token: token, Payload: body.Message})
 		f.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		switch token {
-		case "dead-android":
+		switch {
+		case strings.HasPrefix(token, "dead-"):
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = io.WriteString(w, `{"error":{"code":404,"status":"NOT_FOUND","message":"x","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"UNREGISTERED"}]}}`)
-		case "refused-android":
+		case strings.HasPrefix(token, "refused-"):
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = io.WriteString(w, `{"error":{"code":403,"status":"PERMISSION_DENIED","message":"x"}}`)
 		default:
@@ -500,6 +502,7 @@ type covOptions struct {
 }
 
 type covEnv struct {
+	opts covOptions
 	*TestContext
 	Mollie   *covMollie
 	APNs     *fakeAPNs
@@ -518,6 +521,7 @@ func setupCovEnv(t *testing.T, opts covOptions) *covEnv {
 	t.Setenv("MOLLIE_WEBHOOK_URL", "https://api.example.test/api/v1/payments/webhook")
 
 	e := &covEnv{
+		opts:    opts,
 		Mollie:  newCovMollie(t),
 		APNs:    newFakeAPNs(t),
 		FCM:     newFakeFCM(t),
@@ -526,21 +530,32 @@ func setupCovEnv(t *testing.T, opts covOptions) *covEnv {
 		Mail:    startFakeSMTP(t),
 		Pos:     &fakePosDevices{tokens: opts.PosTokens, err: opts.PosErr},
 	}
+	e.Limiters.Coupon = middleware.NewRateLimiter(rate.Every(time.Hour), 3)
+	e.Limiters.Public = middleware.NewRateLimiter(rate.Every(time.Hour), 2)
 
 	testDB := testhelpers.SetupTestDatabase(t)
 	fixtures := testhelpers.SeedTestData(t, testDB.DB)
-	pool := &db.DBPool{Customer: testDB.DB, Admin: testDB.DB}
 
-	mollieCfg := mollie.NewAPITestingConfig(true)
-	mollieClient, err := mollie.NewClient(nil, mollieCfg)
+	broker := pubsub.NewBroker()
+	t.Cleanup(broker.Shutdown)
+	r := e.wire(t, &db.DBPool{Customer: testDB.DB, Admin: testDB.DB}, broker)
+	e.Notif = r.NotificationService
+
+	client := testhelpers.NewGraphQLTestClient(r, testhelpers.TestJWTSecret)
+	t.Cleanup(client.Close)
+	e.TestContext = &TestContext{DB: testDB, Resolver: r, Client: client, Fixtures: fixtures}
+	return e
+}
+
+// wire builds a resolver with the real services over the pool and the environment's fakes.
+func (e *covEnv) wire(t *testing.T, pool *db.DBPool, broker *pubsub.Broker) *resolver.Resolver {
+	t.Helper()
+	mollieClient, err := mollie.NewClient(nil, mollie.NewAPITestingConfig(true))
 	require.NoError(t, err)
 	base, err := url.Parse(e.Mollie.Server.URL + "/")
 	require.NoError(t, err)
 	mollieClient.BaseURL = base
 	require.NoError(t, mollieClient.WithAuthenticationValue("test_dummy_token"))
-
-	broker := pubsub.NewBroker()
-	t.Cleanup(broker.Shutdown)
 
 	addressService := addressApplication.NewAddressService(addressInfrastructure.NewAddressCacheRepository(pool), e.Google, "fr")
 	couponService := couponApplication.NewCouponService(couponInfrastructure.NewCouponRepository(pool))
@@ -548,19 +563,15 @@ func setupCovEnv(t *testing.T, opts covOptions) *covEnv {
 	productService := productApplication.NewProductService(productInfrastructure.NewProductRepository(pool))
 	restaurantService := restaurantApplication.NewRestaurantService(
 		restaurantInfrastructure.NewRestaurantRepository(pool),
-		restaurantInfrastructure.NewScheduleOverrideRepository(pool), !opts.EnforceOrderingHours)
+		restaurantInfrastructure.NewScheduleOverrideRepository(pool), !e.opts.EnforceOrderingHours)
 	userService := userApplication.NewUserService(userInfrastructure.NewUserRepository(pool), e.Zitadel)
 	paymentService := paymentApplication.NewPaymentService(paymentInfrastructure.NewPaymentRepository(pool), *mollieClient, orderService, userService, productService)
-	e.Notif = notificationApplication.NewNotificationService(notificationInfrastructure.NewNotificationRepository(pool))
-
-	e.Limiters.Coupon = middleware.NewRateLimiter(rate.Every(time.Hour), 3)
-	e.Limiters.Public = middleware.NewRateLimiter(rate.Every(time.Hour), 2)
 
 	r := &resolver.Resolver{
 		Broker:                broker,
 		AddressService:        addressService,
 		CouponService:         couponService,
-		NotificationService:   e.Notif,
+		NotificationService:   notificationApplication.NewNotificationService(notificationInfrastructure.NewNotificationRepository(pool)),
 		OrderService:          orderService,
 		PaymentService:        paymentService,
 		ProductService:        productService,
@@ -570,18 +581,25 @@ func setupCovEnv(t *testing.T, opts covOptions) *covEnv {
 		CouponValidateLimiter: e.Limiters.Coupon,
 		PublicQueryLimiter:    e.Limiters.Public,
 	}
-	if opts.Push {
+	if e.opts.Push {
 		r.APNsClient = e.APNs.client()
 		r.FCMClient = e.FCM.client(t)
 	}
-	if opts.Agent != nil {
-		r.AssistantService = assistantApplication.NewService(opts.Agent, broker, nil, nil)
+	if e.opts.Agent != nil {
+		r.AssistantService = assistantApplication.NewService(e.opts.Agent, broker, nil, nil)
 	}
+	return r
+}
 
-	client := testhelpers.NewGraphQLTestClient(r, testhelpers.TestJWTSecret)
-	t.Cleanup(client.Close)
-	e.TestContext = &TestContext{DB: testDB, Resolver: r, Client: client, Fixtures: fixtures}
-	return e
+// brokenResolver is a resolver whose database connection is already closed: every query fails,
+// which reaches the "the store is down" branch of whatever it calls.
+func (e *covEnv) brokenResolver(t *testing.T) *resolver.Resolver {
+	t.Helper()
+	dsn := fmt.Sprintf("postgres://testuser:testpass@%s/testdb?sslmode=disable", e.DB.Resource.GetHostPort("5432/tcp"))
+	conn, err := sqlx.Connect("postgres", dsn)
+	require.NoError(t, err)
+	require.NoError(t, conn.Close())
+	return e.wire(t, &db.DBPool{Customer: conn, Admin: conn}, pubsub.NewBroker())
 }
 
 // ctxFor is a request context for a direct call of a resolver: the caller, the language and the
