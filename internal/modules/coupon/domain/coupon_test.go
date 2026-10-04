@@ -161,4 +161,3 @@ func TestCalculateDiscount(t *testing.T) {
 		})
 	}
 }
-

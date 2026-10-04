@@ -1,11 +1,11 @@
 package infrastructure
 
 import (
-	"strings"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"tsb-service/internal/modules/assistant/domain"

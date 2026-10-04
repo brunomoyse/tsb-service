@@ -219,4 +219,3 @@ func TestOrderDataLoaders(t *testing.T) {
 		assert.Nil(t, GetOrderItemLoader(t.Context()))
 	})
 }
-

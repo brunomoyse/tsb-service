@@ -94,11 +94,13 @@ func TestAutocomplete(t *testing.T) {
 			rt   http.RoundTripper
 			want string
 		}{
-			"transport error":   {roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, errors.New("dial tcp: refused") }), "http request"},
-			"unreadable body":   {roundTripFunc(func(r *http.Request) (*http.Response, error) { return &http.Response{StatusCode: 200, Body: failingBody{}, Request: r}, nil }), "read response"},
-			"non-200":           {reply(http.StatusForbidden, `{"error":"key"}`), "google API returned 403"},
-			"invalid JSON":      {reply(http.StatusOK, `not json`), "parse response"},
-			"server error":      {reply(http.StatusInternalServerError, ``), "google API returned 500"},
+			"transport error": {roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, errors.New("dial tcp: refused") }), "http request"},
+			"unreadable body": {roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: 200, Body: failingBody{}, Request: r}, nil
+			}), "read response"},
+			"non-200":      {reply(http.StatusForbidden, `{"error":"key"}`), "google API returned 403"},
+			"invalid JSON": {reply(http.StatusOK, `not json`), "parse response"},
+			"server error": {reply(http.StatusInternalServerError, ``), "google API returned 500"},
 		}
 		for name, tc := range cases {
 			t.Run(name, func(t *testing.T) {
@@ -172,9 +174,11 @@ func TestPlaceDetails(t *testing.T) {
 			want string
 		}{
 			"transport error": {roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, errors.New("refused") }), "http request"},
-			"unreadable body": {roundTripFunc(func(r *http.Request) (*http.Response, error) { return &http.Response{StatusCode: 200, Body: failingBody{}, Request: r}, nil }), "read response"},
-			"not found":       {reply(http.StatusNotFound, `{}`), "google API returned 404"},
-			"invalid JSON":    {reply(http.StatusOK, `{`), "parse response"},
+			"unreadable body": {roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: 200, Body: failingBody{}, Request: r}, nil
+			}), "read response"},
+			"not found":    {reply(http.StatusNotFound, `{}`), "google API returned 404"},
+			"invalid JSON": {reply(http.StatusOK, `{`), "parse response"},
 		}
 		for name, tc := range cases {
 			t.Run(name, func(t *testing.T) {
@@ -229,10 +233,12 @@ func TestComputeRoute(t *testing.T) {
 			want string
 		}{
 			"transport error": {roundTripFunc(func(*http.Request) (*http.Response, error) { return nil, errors.New("refused") }), "http request"},
-			"unreadable body": {roundTripFunc(func(r *http.Request) (*http.Response, error) { return &http.Response{StatusCode: 200, Body: failingBody{}, Request: r}, nil }), "read response"},
-			"quota":           {reply(http.StatusTooManyRequests, `{}`), "google API returned 429"},
-			"invalid JSON":    {reply(http.StatusOK, `[`), "parse response"},
-			"no route":        {reply(http.StatusOK, `{"routes":[]}`), "no route found"},
+			"unreadable body": {roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: 200, Body: failingBody{}, Request: r}, nil
+			}), "read response"},
+			"quota":        {reply(http.StatusTooManyRequests, `{}`), "google API returned 429"},
+			"invalid JSON": {reply(http.StatusOK, `[`), "parse response"},
+			"no route":     {reply(http.StatusOK, `{"routes":[]}`), "no route found"},
 		}
 		for name, tc := range cases {
 			t.Run(name, func(t *testing.T) {

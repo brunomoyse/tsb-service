@@ -62,8 +62,12 @@ func TestProfileHandlersIncludeTheDefaultAddress(t *testing.T) {
 	h := NewUserHandler(svc, addresses)
 
 	for name, fn := range map[string]func() *httptest.ResponseRecorder{
-		"profile": func() *httptest.ResponseRecorder { return call(h.GetUserProfileHandler, http.MethodGet, "", uid.String()) },
-		"update":  func() *httptest.ResponseRecorder { return call(h.UpdateMeHandler, http.MethodPatch, `{}`, uid.String()) },
+		"profile": func() *httptest.ResponseRecorder {
+			return call(h.GetUserProfileHandler, http.MethodGet, "", uid.String())
+		},
+		"update": func() *httptest.ResponseRecorder {
+			return call(h.UpdateMeHandler, http.MethodPatch, `{}`, uid.String())
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			w := fn()
