@@ -163,6 +163,10 @@ func (r *userResolver) Address(ctx context.Context, obj *model.User) (*model.Add
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch user's default address: %w", err)
 	}
+	// The place is no longer cached (a cache miss is not an error): there is no address to show.
+	if addr == nil {
+		return nil, nil
+	}
 
 	// Return the converted address
 	return ToGQLAddress(addr), nil

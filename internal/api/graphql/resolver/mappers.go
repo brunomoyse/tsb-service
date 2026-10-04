@@ -179,6 +179,7 @@ func ToGQLOrder(o *orderDomain.Order) *model.Order {
 		CouponCode:         o.CouponCode,
 		// Denormalized address fields for Address() resolver
 		AddressID:          o.AddressID,
+		AddressPlaceID:     o.AddressPlaceID,
 		StreetName:         o.StreetName,
 		HouseNumber:        o.HouseNumber,
 		BoxNumber:          o.BoxNumber,
