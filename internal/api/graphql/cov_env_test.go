@@ -550,8 +550,19 @@ func (a *fakeAgent) Disconnect(context.Context) (assistantDomain.Connection, err
 
 type fakePosDevices struct {
 	posDomain.DeviceRepository
-	tokens []string
-	err    error
+	tokens  []string
+	err     error
+	revoked bool
+}
+
+// FindByID answers any device id as an enrolled one (revoked when the flag is set).
+func (f *fakePosDevices) FindByID(_ context.Context, id uuid.UUID) (*posDomain.Device, error) {
+	d := &posDomain.Device{ID: id}
+	if f.revoked {
+		now := time.Now()
+		d.RevokedAt = &now
+	}
+	return d, nil
 }
 
 func (f *fakePosDevices) FindActiveFCMTokens(context.Context) ([]string, error) {
