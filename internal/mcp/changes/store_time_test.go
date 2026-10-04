@@ -49,3 +49,76 @@ func TestTimestampsSortChronologically(t *testing.T) {
 		t.Errorf("AppliedSince must include an entry exactly at the start: %+v", got)
 	}
 }
+
+// Rows written before the fixed-width layout carry timestamps like "…:00Z" and "…:00.5Z". They must
+// still be read back as the same instants through GetAudit, GetChange and the list queries.
+func TestRowsInTheOldTimestampLayoutStillRoundTrip(t *testing.T) {
+	s := openTest(t)
+	ctx := t.Context()
+	whole := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+	half := whole.Add(500 * time.Millisecond)
+
+	var ids []int64
+	for _, at := range []time.Time{whole, half} {
+		id, err := s.AppendAudit(ctx, &AuditEntry{At: at, Source: "s", Kind: "k", Risk: "low", EntityType: "e", EntityID: "1", Summary: "s", Outcome: OutcomeApplied})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+	// Rewrite them the way an older release stored them: RFC3339Nano, trailing zeros trimmed.
+	for i, at := range []time.Time{whole, half} {
+		if _, err := s.db.ExecContext(ctx, `UPDATE audit_log SET at = ? WHERE id = ?`, at.Format(time.RFC3339Nano), ids[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var raw []string
+	rows, err := s.db.QueryContext(ctx, `SELECT at FROM audit_log ORDER BY id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var at string
+		if err := rows.Scan(&at); err != nil {
+			t.Fatal(err)
+		}
+		raw = append(raw, at)
+	}
+	_ = rows.Close()
+	if len(raw) != 2 || raw[0] != "2026-10-03T12:00:00Z" || raw[1] != "2026-10-03T12:00:00.5Z" {
+		t.Fatalf("test setup: stored layouts = %q", raw)
+	}
+
+	for i, want := range []time.Time{whole, half} {
+		got, err := s.GetAudit(ctx, ids[i])
+		if err != nil || !got.At.Equal(want) {
+			t.Errorf("GetAudit(%d).At = %v (%v), want %v", ids[i], got, err, want)
+		}
+	}
+	recent, err := s.RecentAudit(ctx, 5)
+	if err != nil || len(recent) != 2 || !recent[0].At.Equal(half) || !recent[1].At.Equal(whole) {
+		t.Errorf("RecentAudit = %+v (%v)", recent, err)
+	}
+	// Queries against them still work for windows well away from the boundary.
+	if got, err := s.LastUndoable(ctx, whole.Add(-time.Minute)); err != nil || got.ID != ids[1] {
+		t.Errorf("LastUndoable over old rows = %+v (%v)", got, err)
+	}
+
+	// The same for a change.
+	c := newChange("old1")
+	c.CreatedAt, c.ExpiresAt = whole, half
+	if err := s.CreateChange(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE changes SET created_at = ?, expires_at = ?, decided_at = ? WHERE id = 'old1'`,
+		whole.Format(time.RFC3339Nano), half.Format(time.RFC3339Nano), half.Format(time.RFC3339Nano)); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetChange(ctx, "old1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.CreatedAt.Equal(whole) || !got.ExpiresAt.Equal(half) || got.DecidedAt == nil || !got.DecidedAt.Equal(half) {
+		t.Errorf("GetChange times = %v %v %v", got.CreatedAt, got.ExpiresAt, got.DecidedAt)
+	}
+}

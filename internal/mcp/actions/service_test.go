@@ -416,12 +416,30 @@ func TestUndoLowRiskFailureAndNoOp(t *testing.T) {
 	if _, err := f.svc.ApplyNow(f.ctx, "t", KindProductAvailability, params, "", nil); err != nil {
 		t.Fatal(err)
 	}
+	original, err := f.svc.Store().LastUndoable(f.ctx, f.clock.Now().Add(-UndoWindow))
+	if err != nil {
+		t.Fatal(err)
+	}
 	f.fail("McpUpdateProduct")
 	if _, err := f.svc.Undo(f.ctx, ""); err == nil {
 		t.Fatal("undo must report the upstream failure")
 	}
 	f.unfail("McpUpdateProduct")
-	// The failed undo was audited as failed and the original is still undoable.
+
+	// The failed undo was audited as failed, pointing at the change it tried to revert, and the
+	// original is neither marked undone nor out of the undo list.
+	recent, err := f.svc.Store().RecentAudit(f.ctx, 5)
+	if err != nil || len(recent) != 2 {
+		t.Fatalf("audit: %v %v", recent, err)
+	}
+	failed := recent[0]
+	if failed.Outcome != changes.OutcomeFailed || failed.Source != "undo_last_change" || failed.UndoOf == nil || *failed.UndoOf != original.ID || failed.Error == "" {
+		t.Errorf("failed undo audit row = %+v", failed)
+	}
+	if got, _ := f.svc.Store().GetAudit(f.ctx, original.ID); got == nil || got.UndoneBy != nil {
+		t.Errorf("a failed undo must not mark the original undone: %+v", got)
+	}
+
 	// Meanwhile the product was switched back on in the dashboard: undoing is a no-op.
 	f.editProduct("p-maki-saumon", func(p *upstream.Product) { p.IsAvailable = true })
 	u, err := f.svc.Undo(f.ctx, "")
@@ -479,13 +497,75 @@ func TestUndoNeverTouchesUndoEntriesAndWalksBack(t *testing.T) {
 }
 
 func TestUndoWindowBoundary(t *testing.T) {
+	apply := func(t *testing.T) *fixture {
+		f := newFixture(t)
+		if _, err := f.svc.ApplyNow(f.ctx, "t", KindPreparationMinutes, PreparationParams{Minutes: 45}, "", nil); err != nil {
+			t.Fatal(err)
+		}
+		if f.fake.Config.PreparationMinutes != 45 {
+			t.Fatalf("preparation = %d, want 45 after the change", f.fake.Config.PreparationMinutes)
+		}
+		return f
+	}
+
+	t.Run("exactly at the window the change is still undone and the old value is back", func(t *testing.T) {
+		f := apply(t)
+		f.clock.Advance(UndoWindow)
+		u, err := f.svc.Undo(f.ctx, "")
+		if err != nil || u.Mode != "applied" {
+			t.Fatalf("undo: %+v %v", u, err)
+		}
+		if f.fake.Config.PreparationMinutes != 30 {
+			t.Errorf("preparation = %d, want the original 30", f.fake.Config.PreparationMinutes)
+		}
+	})
+
+	t.Run("one nanosecond past the window it is refused and nothing changes", func(t *testing.T) {
+		f := apply(t)
+		f.clock.Advance(UndoWindow + time.Nanosecond)
+		_, err := f.svc.Undo(f.ctx, "")
+		wantUserErr(t, err, "There is no change from the last 30 minutes to undo.")
+		if f.fake.Config.PreparationMinutes != 45 {
+			t.Errorf("preparation = %d, a refused undo must leave the change in place", f.fake.Config.PreparationMinutes)
+		}
+	})
+}
+
+// The undo itself is audited: it points at the change it reverted (UndoOf), says where it came
+// from (Source), and the original is linked to it (UndoneBy) so it is not undone twice.
+func TestUndoAuditTrail(t *testing.T) {
 	f := newFixture(t)
 	if _, err := f.svc.ApplyNow(f.ctx, "t", KindPreparationMinutes, PreparationParams{Minutes: 45}, "", nil); err != nil {
 		t.Fatal(err)
 	}
-	f.clock.Advance(UndoWindow)
-	if _, err := f.svc.Undo(f.ctx, ""); err != nil {
-		t.Errorf("exactly at the window: %v", err)
+	original, err := f.svc.Store().LastUndoable(f.ctx, f.clock.Now().Add(-UndoWindow))
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := f.svc.Undo(f.ctx, "oops")
+	if err != nil || u.Applied == nil {
+		t.Fatalf("undo: %+v %v", u, err)
+	}
+
+	undoRow, err := f.svc.Store().GetAudit(f.ctx, u.Applied.AuditID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if undoRow.UndoOf == nil || *undoRow.UndoOf != original.ID {
+		t.Errorf("UndoOf = %v, want %d", undoRow.UndoOf, original.ID)
+	}
+	if undoRow.Source != "undo_last_change" || undoRow.Outcome != changes.OutcomeApplied || undoRow.RequestContext != "oops" {
+		t.Errorf("undo row = %+v", undoRow)
+	}
+	reverted, err := f.svc.Store().GetAudit(f.ctx, original.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reverted.UndoneBy == nil || *reverted.UndoneBy != undoRow.ID {
+		t.Errorf("UndoneBy = %v, want %d", reverted.UndoneBy, undoRow.ID)
+	}
+	if _, err := f.svc.Undo(f.ctx, ""); err == nil {
+		t.Error("the undone change must not be undoable again, nor the undo itself")
 	}
 }
 

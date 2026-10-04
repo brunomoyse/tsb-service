@@ -255,6 +255,11 @@ func TestReopeningToolNotesAndFailures(t *testing.T) {
 	if strings.Contains(msg, "injected") {
 		t.Errorf("leak: %s", msg)
 	}
+	// The owner is told what the restaurant system said, in the assistant's own words, not a raw
+	// transport error.
+	if want := "The restaurant system refused the change (BOOM)."; msg != want {
+		t.Errorf("owner message = %q, want %q", msg, want)
+	}
 	if got := h2.countOps("McpRestaurantConfig"); got != 2 {
 		t.Errorf("config reads = %d, want 2 (plan + proposal)", got)
 	}
