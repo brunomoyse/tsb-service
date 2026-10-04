@@ -225,14 +225,18 @@ func TestStrictAuthMiddleware_ZitadelTokens(t *testing.T) {
 		assert.Zero(t, e.lookup.calls, "no account is provisioned for a rejected token")
 	})
 
-	// BUG(product decision pending): the verifier does not check "nbf" (not before). A token whose
-	// nbf lies an hour in the future is accepted, although it says it must not be used yet. Zitadel
-	// does not issue such tokens, so the exposure is low (the signature, issuer, audience and exp
-	// are still enforced), but RFC 7519 asks verifiers to reject them. When the verifier starts
-	// checking nbf, move this case into the rejected table of the test above.
-	t.Run("a token that is not valid yet (nbf in the future) is currently accepted", func(t *testing.T) {
+	t.Run("a token that is not valid yet (nbf in the future) is refused", func(t *testing.T) {
 		e := newAuthEnv(t)
 		tok := e.token(t, jwt.MapClaims{"sub": testSub, "nbf": time.Now().Add(time.Hour).Unix()})
+		rec, s := e.run(t, e.v.StrictAuthMiddleware(), bearer(tok))
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+		assert.False(t, s.reached)
+		assert.Zero(t, e.lookup.calls, "no account is provisioned for a token that is not valid yet")
+	})
+
+	t.Run("a token whose nbf is within the clock-skew leeway is accepted", func(t *testing.T) {
+		e := newAuthEnv(t)
+		tok := e.token(t, jwt.MapClaims{"sub": testSub, "nbf": time.Now().Add(20 * time.Second).Unix()})
 		rec, s := e.run(t, e.v.StrictAuthMiddleware(), bearer(tok))
 		assert.Equal(t, http.StatusNoContent, rec.Code)
 		assert.True(t, s.reached)
