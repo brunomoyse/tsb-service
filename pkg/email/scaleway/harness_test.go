@@ -118,7 +118,7 @@ func (s *fakeSMTP) host() string { h, _, _ := net.SplitHostPort(s.ln.Addr().Stri
 func (s *fakeSMTP) port() string { _, p, _ := net.SplitHostPort(s.ln.Addr().String()); return p }
 
 func (s *fakeSMTP) handle(c net.Conn) {
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	br := bufio.NewReader(c)
 	write := func(l string) { _, _ = io.WriteString(c, l+"\r\n") }
 	write("220 fake ESMTP")
