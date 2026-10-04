@@ -101,6 +101,18 @@ func InitService() error {
 	return nil
 }
 
+// ErrNotInitialized is returned by every Send*Email function when InitService has not run (or
+// failed): there is no sender, region or project to build a request from.
+var ErrNotInitialized = errors.New("email service is not initialized")
+
+// copyBaseReq returns a copy of baseReq for one send, so the shared request is never modified.
+func copyBaseReq() (temv1alpha1.CreateEmailRequest, error) {
+	if baseReq == nil {
+		return temv1alpha1.CreateEmailRequest{}, ErrNotInitialized
+	}
+	return *baseReq, nil
+}
+
 // IsInitialized returns true if either email backend has been initialized.
 func IsInitialized() bool {
 	return baseReq != nil
@@ -164,7 +176,10 @@ func SendVerificationEmail(user userDomain.User, lang string, verificationURL st
 	lang = locale.Normalize(lang)
 
 	// Copy baseReq to avoid modifying the original request.
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 
@@ -219,7 +234,10 @@ func SendWelcomeEmail(user userDomain.User, lang, menuURL string) error {
 	lang = locale.Normalize(lang)
 
 	// Copy baseReq to avoid modifying the original request.
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 
@@ -273,7 +291,10 @@ func SendOrderPendingEmail(user userDomain.User, lang string, order orderDomain.
 	lang = locale.Normalize(lang)
 
 	// Copy baseReq to avoid modifying the original request.
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 
@@ -328,7 +349,10 @@ func SendOrderConfirmedEmail(user userDomain.User, lang string, order orderDomai
 	lang = locale.Normalize(lang)
 
 	// Copy baseReq to avoid modifying the original request.
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 
@@ -387,7 +411,10 @@ func SendLoginOtpEmail(user userDomain.User, lang string, code string) error {
 	lang = locale.Normalize(lang)
 
 	// Copy baseReq to avoid modifying the original request.
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 
@@ -475,7 +502,10 @@ func SendOrderCanceledEmail(user userDomain.User, lang string, orderID string, r
 	lang = locale.Normalize(lang)
 
 	// Copy baseReq to avoid modifying the original request.
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 
@@ -531,7 +561,10 @@ func SendOrderCanceledEmail(user userDomain.User, lang string, orderID string, r
 func SendOrderReadyEmail(user userDomain.User, lang string, order orderDomain.Order) error {
 	lang = locale.Normalize(lang)
 
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 	to := temv1alpha1.CreateEmailRequestAddress{
@@ -589,7 +622,10 @@ func SendOrderReadyEmail(user userDomain.User, lang string, order orderDomain.Or
 func SendOrderCompletedEmail(user userDomain.User, lang string) error {
 	lang = locale.Normalize(lang)
 
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 	to := temv1alpha1.CreateEmailRequestAddress{
@@ -635,7 +671,10 @@ func SendOrderCompletedEmail(user userDomain.User, lang string) error {
 func SendRefundIssuedEmail(user userDomain.User, lang string, orderID string, refundAmount string) error {
 	lang = locale.Normalize(lang)
 
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 	to := temv1alpha1.CreateEmailRequestAddress{
@@ -682,7 +721,10 @@ func SendRefundIssuedEmail(user userDomain.User, lang string, orderID string, re
 func SendAccountLinkedEmail(user userDomain.User, lang string) error {
 	lang = locale.Normalize(lang)
 
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 	to := temv1alpha1.CreateEmailRequestAddress{
@@ -728,7 +770,10 @@ func SendAccountLinkedEmail(user userDomain.User, lang string) error {
 func SendReadyTimeUpdatedEmail(user userDomain.User, lang string, order orderDomain.Order) error {
 	lang = locale.Normalize(lang)
 
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 	to := temv1alpha1.CreateEmailRequestAddress{
@@ -775,7 +820,10 @@ func SendReadyTimeUpdatedEmail(user userDomain.User, lang string, order orderDom
 func SendReengagementEmail(user userDomain.User, lang string) error {
 	lang = locale.Normalize(lang)
 
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	userFullName := fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 	to := temv1alpha1.CreateEmailRequestAddress{
@@ -819,7 +867,10 @@ func SendReengagementEmail(user userDomain.User, lang string) error {
 }
 
 func SendFeedbackEmail(name, email, serviceType, feedbackType, message, lang string) error {
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 
 	adminEmail := os.Getenv("FEEDBACK_RECIPIENT_EMAIL")
 	adminName := brandCfg().Name + " Admin"
@@ -859,7 +910,10 @@ func SendFeedbackEmail(name, email, serviceType, feedbackType, message, lang str
 // session expired and links to the dashboard page that reconnects it. The
 // owner reads Chinese, so the email is Chinese only.
 func SendAssistantDisconnectedEmail(to, dashboardLink string, expiredAt time.Time) error {
-	newReq := *baseReq
+	newReq, err := copyBaseReq()
+	if err != nil {
+		return err
+	}
 	name := brandCfg().Name
 	newReq.To = []*temv1alpha1.CreateEmailRequestAddress{{Email: to, Name: &name}}
 
