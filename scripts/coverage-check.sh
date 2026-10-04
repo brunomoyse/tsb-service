@@ -21,7 +21,9 @@ profile="$(mktemp "${TMPDIR:-/tmp}/tsb-cover.XXXXXX")"
 filtered="$(mktemp "${TMPDIR:-/tmp}/tsb-cover-filtered.XXXXXX")"
 trap 'rm -f "$profile" "$filtered"' EXIT
 
-go test -race -coverpkg=./internal/...,./pkg/... -coverprofile="$profile" "$@" ./internal/... ./pkg/...
+# -timeout 30m: the default 10m would kill the graphql binary (~400 s under -race + -coverpkg) on a
+# loaded runner. A later -timeout in "$@" overrides this default.
+go test -race -timeout 30m -coverpkg=./internal/...,./pkg/... -coverprofile="$profile" "$@" ./internal/... ./pkg/...
 
 # Profile lines look like: tsb-service/internal/x/y.go:12.3,15.2 3 1 (first line is "mode: ...").
 exclude='^tsb-service/(internal/api/graphql/generated\.go|internal/api/graphql/model/model_gen\.go|internal/api/graphql/testhelpers/|internal/mcp/fakeupstream/|cmd/)'
