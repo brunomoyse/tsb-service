@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"tsb-service/pkg/email/smtptest"
+
 	"github.com/stretchr/testify/require"
 
 	orderDomain "tsb-service/internal/modules/order/domain"
@@ -140,16 +142,16 @@ func TestEveryCustomerEmailInEveryLanguage(t *testing.T) {
 	for _, tc := range sendCases() {
 		for _, lang := range allLangs {
 			t.Run(tc.name+"/"+lang, func(t *testing.T) {
-				srv := startFakeSMTP(t)
+				srv := smtptest.Start(t)
 				useSMTP(t, srv)
 
 				require.NoError(t, tc.send(lang))
-				m := lastMail(t, srv)
+				m := srv.Only(t)
 
 				require.Equal(t, tc.subjects[lang], m.Subject)
 				require.Equal(t, `"Tokyo Sushi Bar" <noreply@tsb.test>`, m.From)
 				require.Equal(t, "jeanne@example.com", m.To)
-				require.Equal(t, []string{"jeanne@example.com"}, srv.messages()[0].To, "envelope recipient")
+				require.Equal(t, []string{"jeanne@example.com"}, srv.Messages()[0].To, "envelope recipient")
 
 				require.True(t, strings.HasPrefix(m.Text, greeting[lang]), "text opens with the %s greeting, got %.40q", lang, m.Text)
 				require.Contains(t, m.HTML, greeting[lang])
@@ -198,15 +200,17 @@ var languageVariants = []struct{ in, want string }{
 // per-language string such as the ETA wording) to equal the one produced for the
 // expected base language. Unsupported languages must never fail the send.
 func TestEveryEmailNormalisesItsLanguage(t *testing.T) {
-	deliver := func(t *testing.T, tc sendCase, lang string) mailView {
-		srv := startFakeSMTP(t)
+	deliver := func(t *testing.T, tc sendCase, lang string) smtptest.View {
+		srv := smtptest.Start(t)
 		useSMTP(t, srv)
 		require.NoError(t, tc.send(lang), "language %q must never fail the send", lang)
-		require.Len(t, srv.messages(), 1)
-		return lastMail(t, srv)
+		require.Len(t, srv.Messages(), 1)
+		// The canonical sends run on the parent test: do not keep 50+ listeners open until it ends.
+		defer srv.Close()
+		return srv.Only(t)
 	}
 	for _, tc := range sendCases() {
-		canonical := map[string]mailView{}
+		canonical := map[string]smtptest.View{}
 		for _, lang := range allLangs {
 			canonical[lang] = deliver(t, tc, lang)
 		}
@@ -235,7 +239,7 @@ func TestEveryEmailFailsWhenATemplateHalfIsMissing(t *testing.T) {
 	for _, tc := range append(sendCases(), extra...) {
 		for _, half := range []string{"html", "text"} {
 			t.Run(tc.name+"/"+half, func(t *testing.T) {
-				srv := startFakeSMTP(t)
+				srv := smtptest.Start(t)
 				useSMTP(t, srv)
 				t.Setenv("FEEDBACK_RECIPIENT_EMAIL", "admin@x.test")
 				if half == "html" {
@@ -245,7 +249,7 @@ func TestEveryEmailFailsWhenATemplateHalfIsMissing(t *testing.T) {
 				}
 				err := tc.send("en")
 				require.ErrorContains(t, err, "failed to render email template")
-				require.Empty(t, srv.messages())
+				require.Empty(t, srv.Messages())
 			})
 		}
 	}
@@ -261,8 +265,8 @@ func TestEveryEmailSurfacesDeliveryFailure(t *testing.T) {
 	}
 	for _, tc := range append(sendCases(), extra...) {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := startFakeSMTP(t)
-			srv.setRejectRcpt(true)
+			srv := smtptest.Start(t)
+			srv.SetRejectAll(true)
 			useSMTP(t, srv)
 			t.Setenv("FEEDBACK_RECIPIENT_EMAIL", "admin@x.test")
 			err := tc.send("en")
@@ -275,7 +279,7 @@ func TestEveryEmailSurfacesDeliveryFailure(t *testing.T) {
 func TestOrderEmailAmountsAndLines(t *testing.T) {
 	text := func(t *testing.T, lang string, o orderDomain.Order, items []orderDomain.OrderProduct, addr bool, confirmed bool) (string, string) {
 		t.Helper()
-		srv := startFakeSMTP(t)
+		srv := smtptest.Start(t)
 		useSMTP(t, srv)
 		user := sampleUser()
 		var err error
@@ -288,7 +292,7 @@ func TestOrderEmailAmountsAndLines(t *testing.T) {
 			err = SendOrderPendingEmail(user, lang, o, items)
 		}
 		require.NoError(t, err)
-		m := lastMail(t, srv)
+		m := srv.Only(t)
 		return m.Text, m.HTML
 	}
 
@@ -346,12 +350,12 @@ func TestOrderEmailAmountsAndLines(t *testing.T) {
 	})
 
 	t.Run("address without a box number", func(t *testing.T) {
-		srv := startFakeSMTP(t)
+		srv := smtptest.Start(t)
 		useSMTP(t, srv)
 		a := sampleAddress()
 		a.BoxNumber = nil
 		require.NoError(t, SendOrderConfirmedEmail(sampleUser(), "en", deliveryOrder(), sampleItems(), a))
-		txt := lastMail(t, srv).Text
+		txt := srv.Only(t).Text
 		require.Contains(t, txt, "Rue Saint-Gilles 12\r\nLiège, 4000")
 		require.NotContains(t, txt, "Box")
 	})
@@ -374,17 +378,17 @@ func TestOrderConfirmedEstimatedTimePerLanguage(t *testing.T) {
 	for _, lang := range allLangs {
 		for _, o := range []orderDomain.Order{deliveryOrder(), pickupOrder()} {
 			t.Run(lang+"/"+string(o.OrderType), func(t *testing.T) {
-				srv := startFakeSMTP(t)
+				srv := smtptest.Start(t)
 				useSMTP(t, srv)
 				require.NoError(t, SendOrderConfirmedEmail(sampleUser(), lang, o, sampleItems(), nil))
-				m := lastMail(t, srv)
+				m := srv.Only(t)
 				require.Contains(t, m.Text, want[lang])
 				require.Contains(t, m.HTML, want[lang])
 
-				srv2 := startFakeSMTP(t)
+				srv2 := smtptest.Start(t)
 				useSMTP(t, srv2)
 				require.NoError(t, SendReadyTimeUpdatedEmail(sampleUser(), lang, o))
-				m = lastMail(t, srv2)
+				m = srv2.Only(t)
 				require.Contains(t, m.Text, want[lang])
 				require.Contains(t, m.HTML, want[lang])
 			})
@@ -392,39 +396,39 @@ func TestOrderConfirmedEstimatedTimePerLanguage(t *testing.T) {
 	}
 
 	t.Run("no estimate yet tells the customer they will be informed", func(t *testing.T) {
-		srv := startFakeSMTP(t)
+		srv := smtptest.Start(t)
 		useSMTP(t, srv)
 		o := deliveryOrder()
 		o.EstimatedReadyTime = nil
 		require.NoError(t, SendOrderConfirmedEmail(sampleUser(), "fr", o, sampleItems(), nil))
-		m := lastMail(t, srv)
+		m := srv.Only(t)
 		require.Contains(t, m.Text, "Nous vous informerons dès que l'heure estimée sera définie.")
 		require.NotContains(t, m.Text, "heure estimée).")
 	})
 }
 
 func TestOrderConfirmedPickupVsDeliveryWording(t *testing.T) {
-	srv := startFakeSMTP(t)
+	srv := smtptest.Start(t)
 	useSMTP(t, srv)
 	require.NoError(t, SendOrderConfirmedEmail(sampleUser(), "en", deliveryOrder(), sampleItems(), sampleAddress()))
-	require.Contains(t, lastMail(t, srv).Text, "Your order will be delivered on Wednesday, July 1, 2026 at 7:30 PM (estimated time).")
+	require.Contains(t, srv.Only(t).Text, "Your order will be delivered on Wednesday, July 1, 2026 at 7:30 PM (estimated time).")
 
-	srv = startFakeSMTP(t)
+	srv = smtptest.Start(t)
 	useSMTP(t, srv)
 	require.NoError(t, SendOrderConfirmedEmail(sampleUser(), "en", pickupOrder(), sampleItems(), nil))
-	require.Contains(t, lastMail(t, srv).Text, "Your order will be available for pickup on Wednesday, July 1, 2026 at 7:30 PM (estimated time).")
+	require.Contains(t, srv.Only(t).Text, "Your order will be available for pickup on Wednesday, July 1, 2026 at 7:30 PM (estimated time).")
 }
 
 func TestOrderReadyWordingByType(t *testing.T) {
-	srv := startFakeSMTP(t)
+	srv := smtptest.Start(t)
 	useSMTP(t, srv)
 	require.NoError(t, SendOrderReadyEmail(sampleUser(), "nl", deliveryOrder()))
-	require.Contains(t, lastMail(t, srv).Text, "Uw bestelling is onderweg")
+	require.Contains(t, srv.Only(t).Text, "Uw bestelling is onderweg")
 
-	srv = startFakeSMTP(t)
+	srv = smtptest.Start(t)
 	useSMTP(t, srv)
 	require.NoError(t, SendOrderReadyEmail(sampleUser(), "nl", pickupOrder()))
-	require.Contains(t, lastMail(t, srv).Text, "klaar om afgehaald te worden")
+	require.Contains(t, srv.Only(t).Text, "klaar om afgehaald te worden")
 }
 
 func TestCanceledEmailReasonPerLanguage(t *testing.T) {
@@ -432,10 +436,10 @@ func TestCanceledEmailReasonPerLanguage(t *testing.T) {
 	want := map[string]string{"fr": "cuisine fermée", "en": "kitchen closed", "nl": "keuken gesloten", "zh": "厨房已关闭"}
 	for _, lang := range allLangs {
 		t.Run(lang, func(t *testing.T) {
-			srv := startFakeSMTP(t)
+			srv := smtptest.Start(t)
 			useSMTP(t, srv)
 			require.NoError(t, SendOrderCanceledEmail(sampleUser(), lang, testOrderID.String(), &reason))
-			m := lastMail(t, srv)
+			m := srv.Only(t)
 			require.Contains(t, m.Text, want[lang])
 			require.Contains(t, m.HTML, want[lang])
 		})
@@ -444,11 +448,11 @@ func TestCanceledEmailReasonPerLanguage(t *testing.T) {
 	t.Run("no reason or OTHER keeps the generic copy", func(t *testing.T) {
 		other := orderDomain.OrderCancellationReasonOther
 		for _, r := range []*orderDomain.OrderCancellationReason{nil, &other} {
-			srv := startFakeSMTP(t)
+			srv := smtptest.Start(t)
 			useSMTP(t, srv)
 			require.NoError(t, SendOrderCanceledEmail(sampleUser(), "en", testOrderID.String(), r))
 			for _, label := range want {
-				require.NotContains(t, lastMail(t, srv).Text, label)
+				require.NotContains(t, srv.Only(t).Text, label)
 			}
 		}
 	})
@@ -474,20 +478,20 @@ func TestLocalizedCancellationReason(t *testing.T) {
 }
 
 func TestRefundEmailShowsAmountAsGiven(t *testing.T) {
-	srv := startFakeSMTP(t)
+	srv := smtptest.Start(t)
 	useSMTP(t, srv)
 	require.NoError(t, SendRefundIssuedEmail(sampleUser(), "fr", testOrderID.String(), "1 234,56"))
-	m := lastMail(t, srv)
+	m := srv.Only(t)
 	require.Contains(t, m.Text, "1 234,56")
 	require.Contains(t, m.HTML, "1 234,56")
 }
 
 func TestEmailHTMLEscapesUserInputButTextDoesNot(t *testing.T) {
 	user := userDomain.User{FirstName: "Zoë", LastName: `<b>O'Neil&Co</b>`, Email: "zoe@example.com"}
-	srv := startFakeSMTP(t)
+	srv := smtptest.Start(t)
 	useSMTP(t, srv)
 	require.NoError(t, SendWelcomeEmail(user, "fr", "https://shop.test"))
-	m := lastMail(t, srv)
+	m := srv.Only(t)
 
 	require.Contains(t, m.Text, `Zoë <b>O'Neil&Co</b>`)
 	require.NotContains(t, m.HTML, "<b>O'Neil", "markup in a name must not be injected into the HTML part")
@@ -497,23 +501,23 @@ func TestEmailHTMLEscapesUserInputButTextDoesNot(t *testing.T) {
 }
 
 func TestSalutationFallsBackWhenNameIsMissing(t *testing.T) {
-	srv := startFakeSMTP(t)
+	srv := smtptest.Start(t)
 	useSMTP(t, srv)
 	require.NoError(t, SendWelcomeEmail(userDomain.User{Email: "social.only@example.com"}, "en", "https://shop.test"))
-	require.True(t, strings.HasPrefix(lastMail(t, srv).Text, "Hello social.only,"), lastMail(t, srv).Text[:30])
+	require.True(t, strings.HasPrefix(srv.Only(t).Text, "Hello social.only,"), srv.Only(t).Text[:30])
 }
 
 func TestFeedbackEmail(t *testing.T) {
-	srv := startFakeSMTP(t)
+	srv := smtptest.Start(t)
 	useSMTP(t, srv)
 	t.Setenv("FEEDBACK_RECIPIENT_EMAIL", "admin@tsb.test")
 
 	require.NoError(t, SendFeedbackEmail("Marc <script>", "marc@example.com", "delivery", "complaint", "Cold sushi & late", "nl"))
-	m := lastMail(t, srv)
+	m := srv.Only(t)
 
 	require.Equal(t, "Customer feedback (complaint) - Marc <script>", m.Subject)
 	require.Equal(t, "admin@tsb.test", m.To)
-	require.Equal(t, []string{"admin@tsb.test"}, srv.messages()[0].To)
+	require.Equal(t, []string{"admin@tsb.test"}, srv.Messages()[0].To)
 	for _, w := range []string{"marc@example.com", "delivery", "complaint", "nl"} {
 		require.Contains(t, m.Text, w)
 		require.Contains(t, m.HTML, w)
@@ -525,12 +529,12 @@ func TestFeedbackEmail(t *testing.T) {
 }
 
 func TestAssistantDisconnectedEmail(t *testing.T) {
-	srv := startFakeSMTP(t)
+	srv := smtptest.Start(t)
 	useSMTP(t, srv)
 	// 13:05 UTC on 3 Oct 2026 is 15:05 in Brussels (CEST).
 	expired := time.Date(2026, 10, 3, 13, 5, 0, 0, time.UTC)
 	require.NoError(t, SendAssistantDisconnectedEmail("owner@tsb.test", "https://dash.test/assistant", expired))
-	m := lastMail(t, srv)
+	m := srv.Only(t)
 
 	require.Equal(t, "微信助手已断开，请重新连接", m.Subject)
 	require.Equal(t, "owner@tsb.test", m.To)

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"tsb-service/pkg/email/smtptest"
+
 	temv1alpha1 "github.com/scaleway/scaleway-sdk-go/api/tem/v1alpha1"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +25,7 @@ func baseSMTPReq() *temv1alpha1.CreateEmailRequest {
 }
 
 func TestSendViaSMTPDelivers(t *testing.T) {
-	srv := startFakeSMTP(t)
+	srv := smtptest.Start(t)
 	useSMTP(t, srv)
 
 	req := baseSMTPReq()
@@ -31,12 +33,12 @@ func TestSendViaSMTPDelivers(t *testing.T) {
 	req.AdditionalHeaders = []*temv1alpha1.CreateEmailRequestHeader{{Key: "References", Value: "<root@x>"}}
 	require.NoError(t, sendViaSMTP(req))
 
-	msgs := srv.messages()
+	msgs := srv.Messages()
 	require.Len(t, msgs, 1)
 	require.Equal(t, "noreply@tsb.test", msgs[0].From)
 	require.Equal(t, []string{"to@example.com"}, msgs[0].To)
 
-	m := parseMail(t, msgs[0].Data)
+	m := smtptest.Parse(t, msgs[0].Data)
 	require.Equal(t, "Commande confirmée", m.Subject)
 	require.Equal(t, `"Tokyo Sushi Bar" <noreply@tsb.test>`, m.From)
 	require.Equal(t, "to@example.com", m.To)
@@ -47,40 +49,39 @@ func TestSendViaSMTPDelivers(t *testing.T) {
 
 func TestSendViaSMTPAuth(t *testing.T) {
 	t.Run("PLAIN credentials are sent when configured", func(t *testing.T) {
-		srv := startFakeSMTP(t)
-		srv.setAdvertiseAuth(true)
+		srv := smtptest.Start(t)
+		srv.SetAdvertiseAuth(true)
 		useSMTP(t, srv)
 		smtpUser, smtpPassword = "mailer", "s3cret"
 
 		require.NoError(t, sendViaSMTP(baseSMTPReq()))
 
-		srv.mu.Lock()
-		defer srv.mu.Unlock()
-		require.Len(t, srv.authLine, 1)
-		raw, err := base64.StdEncoding.DecodeString(srv.authLine[0])
+		auth := srv.AuthLines()
+		require.Len(t, auth, 1)
+		raw, err := base64.StdEncoding.DecodeString(auth[0])
 		require.NoError(t, err)
 		require.Equal(t, "\x00mailer\x00s3cret", string(raw))
 	})
 
 	t.Run("anonymous when only one of user/password is set", func(t *testing.T) {
-		srv := startFakeSMTP(t)
-		srv.setAdvertiseAuth(true)
+		srv := smtptest.Start(t)
+		srv.SetAdvertiseAuth(true)
 		useSMTP(t, srv)
 		smtpUser, smtpPassword = "mailer", ""
 
 		require.NoError(t, sendViaSMTP(baseSMTPReq()))
-		require.Empty(t, srv.authLine)
-		require.Len(t, srv.messages(), 1)
+		require.Empty(t, srv.AuthLines())
+		require.Len(t, srv.Messages(), 1)
 	})
 
 	t.Run("credentials against a server without AUTH fail", func(t *testing.T) {
-		srv := startFakeSMTP(t)
+		srv := smtptest.Start(t)
 		useSMTP(t, srv)
 		smtpUser, smtpPassword = "mailer", "s3cret"
 
 		err := sendViaSMTP(baseSMTPReq())
 		require.ErrorContains(t, err, "SMTP send:")
-		require.Empty(t, srv.messages())
+		require.Empty(t, srv.Messages())
 	})
 }
 
@@ -91,7 +92,7 @@ func TestSendViaSMTPErrors(t *testing.T) {
 	})
 
 	t.Run("request validation", func(t *testing.T) {
-		srv := startFakeSMTP(t)
+		srv := smtptest.Start(t)
 		useSMTP(t, srv)
 
 		noFrom := baseSMTPReq()
@@ -110,21 +111,21 @@ func TestSendViaSMTPErrors(t *testing.T) {
 		emptyTo.To = []*temv1alpha1.CreateEmailRequestAddress{nil, addr("")}
 		require.ErrorContains(t, sendViaSMTP(emptyTo), "every To entry was empty")
 
-		require.Empty(t, srv.messages(), "nothing may be sent for invalid requests")
+		require.Empty(t, srv.Messages(), "nothing may be sent for invalid requests")
 	})
 
 	t.Run("nil and empty recipients are skipped, valid ones kept", func(t *testing.T) {
-		srv := startFakeSMTP(t)
+		srv := smtptest.Start(t)
 		useSMTP(t, srv)
 		req := baseSMTPReq()
 		req.To = []*temv1alpha1.CreateEmailRequestAddress{nil, addr(""), addr("a@example.com"), addr("b@example.com")}
 		require.NoError(t, sendViaSMTP(req))
-		require.Equal(t, []string{"a@example.com", "b@example.com"}, srv.messages()[0].To)
+		require.Equal(t, []string{"a@example.com", "b@example.com"}, srv.Messages()[0].To)
 	})
 
 	t.Run("server rejecting the recipient", func(t *testing.T) {
-		srv := startFakeSMTP(t)
-		srv.setRejectRcpt(true)
+		srv := smtptest.Start(t)
+		srv.SetRejectAll(true)
 		useSMTP(t, srv)
 		err := sendViaSMTP(baseSMTPReq())
 		require.ErrorContains(t, err, "SMTP send:")
@@ -132,19 +133,19 @@ func TestSendViaSMTPErrors(t *testing.T) {
 	})
 
 	t.Run("connection refused", func(t *testing.T) {
-		srv := startFakeSMTP(t)
+		srv := smtptest.Start(t)
 		useSMTP(t, srv)
-		_ = srv.ln.Close()
+		srv.Close()
 		require.ErrorContains(t, sendViaSMTP(baseSMTPReq()), "SMTP send:")
 	})
 }
 
 func TestBuildMimeMessage(t *testing.T) {
-	build := func(t *testing.T, req *temv1alpha1.CreateEmailRequest) (string, mailView) {
+	build := func(t *testing.T, req *temv1alpha1.CreateEmailRequest) (string, smtptest.View) {
 		t.Helper()
 		raw, err := buildMimeMessage(req, []string{"to@example.com"})
 		require.NoError(t, err)
-		return string(raw), parseMail(t, raw)
+		return string(raw), smtptest.Parse(t, raw)
 	}
 
 	t.Run("From without display name is a bare address", func(t *testing.T) {

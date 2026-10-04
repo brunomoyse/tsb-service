@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"tsb-service/pkg/email/smtptest"
+
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -41,7 +43,7 @@ type dbStack struct {
 	sql      *sqlx.DB
 	router   *gin.Engine
 	mollie   *fakeMollie
-	smtp     *smtpSink
+	smtp     *smtptest.Server
 	notifier *countingNotifier
 	broker   *pubsub.Broker
 	orders   orderApplication.OrderService
@@ -171,13 +173,13 @@ func TestWebhookWithDatabase(t *testing.T) {
 	t.Run("paid: order stays PENDING, payment persisted, one email, one push", func(t *testing.T) {
 		order, couponID := s.newOnlineOrder(salmon, "tr_db_paid", true)
 		s.mollie.set("paid")
-		emailsBefore, pushesBefore := s.smtp.count(), s.notifier.count()
+		emailsBefore, pushesBefore := s.smtp.Count(), s.notifier.count()
 
 		require.Equal(t, http.StatusOK, s.deliver("tr_db_paid").Code)
 		require.Equal(t, "paid", s.paymentStatus("tr_db_paid"))
 		require.Equal(t, "PENDING", s.orderStatus(order.ID))
 		require.Equal(t, []string{"PENDING"}, s.history(order.ID))
-		require.Equal(t, emailsBefore+1, s.smtp.count())
+		require.Equal(t, emailsBefore+1, s.smtp.Count())
 		require.Equal(t, pushesBefore+1, s.notifier.count())
 		g, u := s.couponUses(couponID, order.UserID)
 		require.Equal(t, 1, g)
@@ -187,14 +189,14 @@ func TestWebhookWithDatabase(t *testing.T) {
 		for range 3 {
 			require.Contains(t, s.deliver("tr_db_paid").Body.String(), "already processed")
 		}
-		require.Equal(t, emailsBefore+1, s.smtp.count())
+		require.Equal(t, emailsBefore+1, s.smtp.Count())
 		require.Equal(t, pushesBefore+1, s.notifier.count())
 	})
 
 	t.Run("expired: order CANCELLED with history row, coupon released exactly once", func(t *testing.T) {
 		order, couponID := s.newOnlineOrder(salmon, "tr_db_expired", true)
 		s.mollie.set("expired")
-		emailsBefore := s.smtp.count()
+		emailsBefore := s.smtp.Count()
 
 		require.Equal(t, http.StatusOK, s.deliver("tr_db_expired").Code)
 		require.Equal(t, "expired", s.paymentStatus("tr_db_expired"))
@@ -211,7 +213,7 @@ func TestWebhookWithDatabase(t *testing.T) {
 		g, u = s.couponUses(couponID, order.UserID)
 		require.Equal(t, 0, g)
 		require.Equal(t, 0, u)
-		require.Equal(t, emailsBefore, s.smtp.count(), "no email for a failed attempt")
+		require.Equal(t, emailsBefore, s.smtp.Count(), "no email for a failed attempt")
 	})
 
 	t.Run("failed and canceled behave like expired", func(t *testing.T) {
@@ -257,11 +259,11 @@ func TestWebhookWithDatabase(t *testing.T) {
 	})
 
 	t.Run("unknown payment id returns 200 and touches nothing", func(t *testing.T) {
-		before := s.smtp.count()
+		before := s.smtp.Count()
 		w := s.deliver("tr_db_unknown")
 		require.Equal(t, http.StatusOK, w.Code)
 		require.Contains(t, w.Body.String(), "unknown payment")
-		require.Equal(t, before, s.smtp.count())
+		require.Equal(t, before, s.smtp.Count())
 	})
 
 	t.Run("Mollie error returns 500 and leaves the stored status", func(t *testing.T) {
@@ -291,10 +293,10 @@ func TestWebhookWithDatabase(t *testing.T) {
 
 		order, _ := s.newOnlineOrder(productID, "tr_db_zh", false)
 		s.mollie.set("paid")
-		emailsBefore := s.smtp.count()
+		emailsBefore := s.smtp.Count()
 		require.Equal(t, http.StatusOK, s.deliver("tr_db_zh").Code)
 		require.Equal(t, "paid", s.paymentStatus("tr_db_zh"))
-		require.Equal(t, emailsBefore+1, s.smtp.count())
+		require.Equal(t, emailsBefore+1, s.smtp.Count())
 		require.Equal(t, "PENDING", s.orderStatus(order.ID))
 	})
 
@@ -333,7 +335,7 @@ func TestWebhookWithDatabase(t *testing.T) {
 	t.Run("concurrent paid webhooks (real advisory lock) process once", func(t *testing.T) {
 		order, _ := s.newOnlineOrder(salmon, "tr_db_conc", false)
 		s.mollie.set("paid")
-		emailsBefore, pushesBefore := s.smtp.count(), s.notifier.count()
+		emailsBefore, pushesBefore := s.smtp.Count(), s.notifier.count()
 
 		var wg sync.WaitGroup
 		codes := make([]int, 10)
@@ -351,7 +353,7 @@ func TestWebhookWithDatabase(t *testing.T) {
 		for i, c := range codes {
 			require.Equal(t, http.StatusOK, c, "delivery %d", i)
 		}
-		require.Equal(t, emailsBefore+1, s.smtp.count())
+		require.Equal(t, emailsBefore+1, s.smtp.Count())
 		require.Equal(t, pushesBefore+1, s.notifier.count())
 		require.Equal(t, "paid", s.paymentStatus("tr_db_conc"))
 		require.Equal(t, "PENDING", s.orderStatus(order.ID))

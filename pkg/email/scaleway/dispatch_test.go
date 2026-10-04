@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"testing"
 
+	"tsb-service/pkg/email/smtptest"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -155,26 +157,26 @@ func TestDispatchViaTEM(t *testing.T) {
 }
 
 func TestDispatchViaSMTPSkipsSuppressedRecipient(t *testing.T) {
-	srv := startFakeSMTP(t)
+	srv := smtptest.Start(t)
 	useSMTP(t, srv)
 	store := newRecordingStore()
 	store.suppressed["jeanne@example.com"] = "mailbox_not_found"
 	suppressionStore = store
 
 	require.NoError(t, SendWelcomeEmail(sampleUser(), "fr", "https://shop.test"))
-	require.Empty(t, srv.messages())
+	require.Empty(t, srv.Messages())
 
 	// A different customer still gets their email.
 	other := sampleUser()
 	other.Email = "other@example.com"
 	require.NoError(t, SendWelcomeEmail(other, "fr", "https://shop.test"))
-	require.Len(t, srv.messages(), 1)
-	require.Equal(t, []string{"other@example.com"}, srv.messages()[0].To)
+	require.Len(t, srv.Messages(), 1)
+	require.Equal(t, []string{"other@example.com"}, srv.Messages()[0].To)
 }
 
 func TestDispatchSMTPFailureIsWrapped(t *testing.T) {
-	srv := startFakeSMTP(t)
-	srv.setRejectRcpt(true)
+	srv := smtptest.Start(t)
+	srv.SetRejectAll(true)
 	useSMTP(t, srv)
 	err := SendWelcomeEmail(sampleUser(), "fr", "https://shop.test")
 	require.ErrorContains(t, err, "failed to send email")

@@ -1,9 +1,7 @@
 package feedback
 
 import (
-	"bufio"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,99 +9,23 @@ import (
 	"sync"
 	"testing"
 
+	"tsb-service/pkg/email/scaleway/scalewaytest"
+	"tsb-service/pkg/email/smtptest"
+
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	es "tsb-service/pkg/email/scaleway"
 	"tsb-service/pkg/utils"
 )
 
-// smtpSink is a minimal SMTP server that keeps the envelope recipients and the DATA of each message.
-type smtpSink struct {
-	mu       sync.Mutex
-	messages []sinkMessage
-}
-
-type sinkMessage struct {
-	rcpt []string
-	data string
-}
-
-func (s *smtpSink) all() []sinkMessage {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return append([]sinkMessage(nil), s.messages...)
-}
-
-func startSMTPSink(t *testing.T) *smtpSink {
+// startSMTPSink starts a fake SMTP server and routes the e-mail backend to it for this test (the
+// previous backend is restored when the test ends).
+func startSMTPSink(t *testing.T) *smtptest.Server {
 	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	s := &smtpSink{}
-	t.Cleanup(func() { _ = ln.Close() })
-	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				return
-			}
-			go s.serve(conn)
-		}
-	}()
-	host, port, _ := net.SplitHostPort(ln.Addr().String())
-	t.Setenv("SMTP_HOST", host)
-	t.Setenv("SMTP_PORT", port)
-	t.Setenv("SCW_SENDER_EMAIL", "noreply@example.test")
-	t.Setenv("SCW_SENDER_NAME", "Test")
-	require.NoError(t, es.InitService())
+	s := smtptest.Start(t)
+	scalewaytest.Use(t, s)
 	return s
-}
-
-func (s *smtpSink) serve(conn net.Conn) {
-	defer func() { _ = conn.Close() }()
-	rd := bufio.NewReader(conn)
-	write := func(line string) { _, _ = conn.Write([]byte(line + "\r\n")) }
-	write("220 sink ready")
-	var msg sinkMessage
-	var data strings.Builder
-	inData := false
-	for {
-		line, err := rd.ReadString('\n')
-		if err != nil {
-			return
-		}
-		if inData {
-			if line == ".\r\n" {
-				inData = false
-				msg.data = data.String()
-				s.mu.Lock()
-				s.messages = append(s.messages, msg)
-				s.mu.Unlock()
-				msg, data = sinkMessage{}, strings.Builder{}
-				write("250 queued")
-				continue
-			}
-			data.WriteString(line)
-			continue
-		}
-		cmd := strings.ToUpper(strings.TrimSpace(line))
-		switch {
-		case strings.HasPrefix(cmd, "EHLO"), strings.HasPrefix(cmd, "HELO"):
-			write("250 sink")
-		case strings.HasPrefix(cmd, "RCPT TO:"):
-			msg.rcpt = append(msg.rcpt, strings.Trim(strings.TrimSpace(line[len("RCPT TO:"):]), "<>"))
-			write("250 ok")
-		case strings.HasPrefix(cmd, "DATA"):
-			inData = true
-			write("354 go")
-		case strings.HasPrefix(cmd, "QUIT"):
-			write("221 bye")
-			return
-		default:
-			write("250 ok")
-		}
-	}
 }
 
 // roundTripFunc replaces the default HTTP transport, the way Cloudflare is reached.
@@ -184,7 +106,7 @@ func TestHandleFeedback_HoneypotPretendsToSucceedWithoutSending(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.JSONEq(t, `{"status":"ok"}`, rec.Body.String(), "the bot is not tipped off")
 	assert.Empty(t, *calls, "no captcha call is spent on a bot")
-	assert.Empty(t, sink.all(), "and nothing is sent")
+	assert.Empty(t, sink.Messages(), "and nothing is sent")
 }
 
 func TestHandleFeedback_Turnstile(t *testing.T) {
@@ -201,7 +123,7 @@ func TestHandleFeedback_Turnstile(t *testing.T) {
 		assert.Equal(t, "secret", (*calls)[0].Get("secret"))
 		assert.Equal(t, "tok-1", (*calls)[0].Get("response"))
 		assert.Equal(t, "203.0.113.5", (*calls)[0].Get("remoteip"))
-		assert.Empty(t, sink.all())
+		assert.Empty(t, sink.Messages())
 	})
 
 	t.Run("an unreadable Cloudflare answer fails closed", func(t *testing.T) {
@@ -238,7 +160,7 @@ func TestHandleFeedback_Turnstile(t *testing.T) {
 		sink := startSMTPSink(t)
 		rec := post(t, validBody, "")
 		assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-		assert.Len(t, sink.all(), 1)
+		assert.Len(t, sink.Messages(), 1)
 	})
 }
 
@@ -252,24 +174,16 @@ func TestHandleFeedback_SendsTheEmailToTheOwner(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.JSONEq(t, `{"status":"ok"}`, rec.Body.String())
-	msgs := sink.all()
+	msgs := sink.Messages()
 	require.Len(t, msgs, 1)
-	assert.Equal(t, []string{"owner@example.test"}, msgs[0].rcpt, "the feedback goes to the owner, not to the customer")
-	assert.Contains(t, msgs[0].data, "Customer feedback (compliment) - Ada Lovelace", "the name is trimmed")
+	assert.Equal(t, []string{"owner@example.test"}, msgs[0].To, "the feedback goes to the owner, not to the customer")
+	assert.Contains(t, string(msgs[0].Data), "Customer feedback (compliment) - Ada Lovelace", "the name is trimmed")
 }
 
 func TestHandleFeedback_EmailFailure(t *testing.T) {
 	t.Setenv("TURNSTILE_SECRET_KEY", "")
 	// A mail server that is not listening: the send fails and the customer is told so.
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	host, port, _ := net.SplitHostPort(ln.Addr().String())
-	require.NoError(t, ln.Close())
-	t.Setenv("SMTP_HOST", host)
-	t.Setenv("SMTP_PORT", port)
-	t.Setenv("SCW_SENDER_EMAIL", "noreply@example.test")
-	t.Setenv("SCW_SENDER_NAME", "Test")
-	require.NoError(t, es.InitService())
+	scalewaytest.UseDead(t)
 	t.Setenv("FEEDBACK_RECIPIENT_EMAIL", "owner@example.test")
 
 	rec := post(t, validBody, "")

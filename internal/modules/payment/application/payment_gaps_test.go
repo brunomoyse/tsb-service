@@ -3,11 +3,12 @@ package application
 import (
 	"context"
 	"errors"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"tsb-service/pkg/email/scaleway/scalewaytest"
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/google/uuid"
@@ -18,7 +19,6 @@ import (
 	orderDomain "tsb-service/internal/modules/order/domain"
 	"tsb-service/internal/modules/payment/domain"
 	userDomain "tsb-service/internal/modules/user/domain"
-	es "tsb-service/pkg/email/scaleway"
 )
 
 // mollieAnswering returns a Mollie client whose every call is answered by h.
@@ -104,20 +104,12 @@ func TestCreatePayment_UnreadableMollieAmount(t *testing.T) {
 
 func TestHandlePaymentPaid_RefundEmailFailureDoesNotFailTheWebhook(t *testing.T) {
 	// Point the mailer at a port nobody listens on, so sending fails.
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	host, port, _ := net.SplitHostPort(ln.Addr().String())
-	require.NoError(t, ln.Close())
-	t.Setenv("SMTP_HOST", host)
-	t.Setenv("SMTP_PORT", port)
-	t.Setenv("SCW_SENDER_EMAIL", "noreply@example.test")
-	t.Setenv("SCW_SENDER_NAME", "Test")
-	require.NoError(t, es.InitService())
+	scalewaytest.UseDead(t)
 
 	f := newFlow(t, orderDomain.OrderStatusCanceled, domain.PaymentStatusOpen)
 	f.users.user.NotifyOrderUpdates = true
 
-	_, err = f.svc.HandlePaymentPaid(t.Context(), f.order.ID)
+	_, err := f.svc.HandlePaymentPaid(t.Context(), f.order.ID)
 
 	require.NoError(t, err, "the refund happened; a mail failure must not make Mollie retry the webhook")
 	assert.Len(t, f.mollie.find(http.MethodPost, "/v2/payments/tr_1/refunds"), 1)
