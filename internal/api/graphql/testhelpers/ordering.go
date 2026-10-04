@@ -163,6 +163,8 @@ type MollieStub struct {
 	failCanc bool
 	failPay  bool
 	failGet  bool
+	getDelay time.Duration
+	refDelay time.Duration
 	seq      int
 	payments map[string]*stubPayment
 }
@@ -174,6 +176,12 @@ type stubPayment struct {
 	refunded decimal.Decimal
 	// locked: Mollie no longer lets the payment be cancelled (the customer is in the middle of paying).
 	locked bool
+	// cap is how much may be refunded in total (the payment amount unless raised: Mollie's
+	// amountRemaining "may be higher than the payment amount", e.g. to reimburse a return shipment).
+	cap decimal.Decimal
+	// noRefundInfo: a paid payment without amountRefunded / amountRemaining, as for payment methods
+	// that cannot be refunded through the API (vouchers, gift cards). Refund requests are refused.
+	noRefundInfo bool
 }
 
 // MolliePaymentRequest is the part of a Create Payment call the tests look at.
@@ -226,6 +234,38 @@ func (s *MollieStub) SetRefunded(paymentID, amount string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.payments[paymentID].refunded = decimal.RequireFromString(amount)
+}
+
+// SetRefundCap raises (or lowers) how much may be refunded in total for a payment, and what Mollie
+// reports as amountRemaining accordingly.
+func (s *MollieStub) SetRefundCap(paymentID, total string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.payments[paymentID].cap = decimal.RequireFromString(total)
+}
+
+// SetNotRefundable makes a paid payment one Mollie cannot refund: it reports neither amountRefunded
+// nor amountRemaining and refuses refund requests.
+func (s *MollieStub) SetNotRefundable(paymentID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.payments[paymentID].noRefundInfo = true
+}
+
+// SetRefundDelay makes every refund request take that long to be answered (the refund is only
+// recorded once the answer is out), which keeps a cancellation busy while something else happens.
+func (s *MollieStub) SetRefundDelay(d time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.refDelay = d
+}
+
+// SetLookupDelay makes every GET of a payment take that long, which widens the window in which two
+// concurrent callers can both read the payment before either has refunded it.
+func (s *MollieStub) SetLookupDelay(d time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.getDelay = d
 }
 
 // SetFailLookup makes every GET of a payment answer 500 (until switched off again).
@@ -302,7 +342,7 @@ func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.calls = append(s.calls, r.Method+" "+r.URL.Path)
 	s.bodies = append(s.bodies, string(body))
-	failPay, failRef, failCanc, failGet := s.failPay, s.failRef, s.failCanc, s.failGet
+	failPay, failRef, failCanc, failGet, getDelay, refDelay := s.failPay, s.failRef, s.failCanc, s.failGet, s.getDelay, s.refDelay
 	s.seq++
 	seq := s.seq
 	s.mu.Unlock()
@@ -335,7 +375,8 @@ func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		id := fmt.Sprintf("tr_stub%06d", seq)
 		s.mu.Lock()
-		s.payments[id] = &stubPayment{amount: decimal.RequireFromString(req.Amount.Value), status: "open"}
+		amount := decimal.RequireFromString(req.Amount.Value)
+		s.payments[id] = &stubPayment{amount: amount, cap: amount, status: "open"}
 		s.mu.Unlock()
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -360,6 +401,7 @@ func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
 			snapshot = *p
 		}
 		s.mu.Unlock()
+		time.Sleep(getDelay) // the state above is what this caller gets, however late the answer arrives
 		if !ok {
 			http.NotFound(w, r)
 			return
@@ -371,12 +413,13 @@ func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
 			"resource": "payment", "id": id, "status": snapshot.status, "mode": "test",
 			"isCancelable": snapshot.status == "open" && !snapshot.locked, "amount": eur(snapshot.amount),
 		}
-		if snapshot.status == "paid" {
+		if snapshot.status == "paid" && !snapshot.noRefundInfo {
 			out["amountRefunded"] = eur(snapshot.refunded)
-			out["amountRemaining"] = eur(snapshot.amount.Sub(snapshot.refunded))
+			out["amountRemaining"] = eur(snapshot.cap.Sub(snapshot.refunded))
 		}
 		_ = json.NewEncoder(w).Encode(out)
 	case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/refunds"):
+		time.Sleep(refDelay)
 		if failRef {
 			refuse("refused")
 			return
@@ -391,7 +434,7 @@ func (s *MollieStub) serve(w http.ResponseWriter, r *http.Request) {
 		over := false
 		if known {
 			asked, err := decimal.NewFromString(req.Amount["value"])
-			if err != nil || p.status != "paid" || p.refunded.Add(asked).GreaterThan(p.amount) {
+			if err != nil || p.status != "paid" || p.noRefundInfo || p.refunded.Add(asked).GreaterThan(p.cap) {
 				over = true
 			} else {
 				p.refunded = p.refunded.Add(asked)

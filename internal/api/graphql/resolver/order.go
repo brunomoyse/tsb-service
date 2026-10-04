@@ -268,20 +268,17 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	}
 
 	// Cancelling settles the payment FIRST and saves CANCELLED only when that worked: a refund or
-	// cancel that the payment provider refuses leaves the order untouched, so staff can retry.
+	// cancel that the payment provider refuses leaves the order untouched, so staff can retry. See cancelOrder.
 	cancelling := input.Status != nil && *input.Status == orderDomain.OrderStatusCanceled &&
 		oldOrder.OrderStatus != orderDomain.OrderStatusCanceled
 	var refundIssued bool
 	if cancelling {
-		refundIssued, err = r.settlePaymentBeforeCancel(ctx, id)
+		oldOrder, refundIssued, err = r.cancelOrder(ctx, id, input, oldOrder)
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	err = r.OrderService.UpdateOrder(ctx, id, input.Status, input.EstimatedReadyTime, input.CancellationReason)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update order status: %w", err)
+	} else if err = r.saveOrder(ctx, id, input); err != nil {
+		return nil, err
 	}
 
 	// Fetch the updated order
