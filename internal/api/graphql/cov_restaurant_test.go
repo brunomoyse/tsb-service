@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"tsb-service/pkg/timezone/timezonetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -23,7 +25,7 @@ func day(open, closeAt string) *model.DayScheduleInput {
 
 // openAllDay and closedAllWeek are the two weeks the tests can rely on whatever the date is.
 func openAllDay() model.OpeningHoursInput {
-	d := day("00:00", "23:59")
+	d := day("00:00", "24:00") // 24:00, not 23:59: open during the last minute of the day too
 	return model.OpeningHoursInput{Monday: d, Tuesday: d, Wednesday: d, Thursday: d, Friday: d, Saturday: d, Sunday: d}
 }
 
@@ -205,6 +207,7 @@ func TestRestaurantSettings(t *testing.T) {
 }
 
 func TestScheduleOverrides(t *testing.T) {
+	timezonetest.SkipNearMidnight(t, time.Minute) // "today" is read once and compared with the live clock
 	env := setupCovEnv(t, covOptions{})
 	r := env.Resolver
 	admin := env.ctxFor(env.Fixtures.AdminUser.ID.String(), true, "en")

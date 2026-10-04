@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,11 +41,25 @@ const (
 	handlerProjectID  = "project-1"
 )
 
+var (
+	handlerKeyOnce sync.Once
+	handlerKey     *rsa.PrivateKey
+	handlerKeyErr  error
+)
+
+// handlerSigningKey is the identity provider's RSA key, generated once per test binary: a 2048-bit
+// key takes about a second under -race and every endpoint used to make its own.
+func handlerSigningKey(t *testing.T) *rsa.PrivateKey {
+	t.Helper()
+	handlerKeyOnce.Do(func() { handlerKey, handlerKeyErr = rsa.GenerateKey(rand.Reader, 2048) })
+	require.NoError(t, handlerKeyErr)
+	return handlerKey
+}
+
 // fakeIdentityProvider serves the OIDC discovery and JWKS of one RSA key.
 func fakeIdentityProvider(t *testing.T) (*rsa.PrivateKey, string) {
 	t.Helper()
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err)
+	key := handlerSigningKey(t)
 	issuer := "https://" + handlerIssuerHost
 	mux := http.NewServeMux()
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
@@ -434,6 +449,7 @@ func TestGraphQLEndpointSubscriptions(t *testing.T) {
 	t.Run("without a token, or as a customer, the subscription is refused", func(t *testing.T) {
 		for name, c := range map[string]struct{ token, code string }{
 			"anonymous": {"", "UNAUTHENTICATED"}, "bad token": {"garbage", "UNAUTHENTICATED"}, "customer": {customer, "FORBIDDEN"},
+			"expired admin token": {signZitadelToken(t, ep.key, env.Fixtures.AdminUser.ID.String(), true, -time.Minute), "UNAUTHENTICATED"},
 		} {
 			_, read := ep.subscribe(t, c.token, couponSub, nil)
 			m := next(t, read)

@@ -45,23 +45,23 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		require.NotNil(t, got.CancellationReason)
 		assert.Equal(t, "KITCHEN_CLOSED", *got.CancellationReason)
 
-		assert.Equal(t, []string{"POST /v2/payments/" + payID + "/refunds"}, env.Mollie.callsMatching("POST /v2/payments/"+payID))
+		assert.Equal(t, []string{"POST /v2/payments/" + payID + "/refunds"}, env.Mollie.CallsMatching("POST /v2/payments/"+payID))
 		var refunded string
 		require.NoError(t, env.DB.DB.GetContext(t.Context(), &refunded, `SELECT amount_refunded::text FROM mollie_payments WHERE mollie_payment_id = $1`, payID))
 		var amount string
 		require.NoError(t, env.DB.DB.GetContext(t.Context(), &amount, `SELECT amount::text FROM mollie_payments WHERE mollie_payment_id = $1`, payID))
 		assert.Equal(t, amount, refunded, "the whole payment is refunded")
-		assert.Equal(t, []string{amount}, env.Mollie.refundAmounts(t, payID), "Mollie is asked for the whole payment amount")
+		assert.Equal(t, []string{amount}, env.Mollie.RefundAmounts(t, payID), "Mollie is asked for the whole payment amount")
 
-		env.Mail.waitSubject(t, c.email, "Your refund has been issued")
-		env.Mail.waitSubject(t, c.email, "Order canceled")
+		env.Mail.WaitSubject(t, c.email, "Your refund has been issued")
+		env.Mail.WaitSubject(t, c.email, "Order canceled")
 
 		// Saving the cancelled order again neither refunds nor writes to the customer again.
 		again := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
 		assert.Equal(t, "CANCELLED", again.Status)
-		assert.Len(t, env.Mollie.callsMatching("POST /v2/payments/"+payID), 1)
+		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID), 1)
 		require.Never(t, func() bool {
-			return env.Mail.countSubject(t, c.email, "Order canceled") > 1 || env.Mail.countSubject(t, c.email, "Your refund has been issued") > 1
+			return env.Mail.CountSubject(t, c.email, "Order canceled") > 1 || env.Mail.CountSubject(t, c.email, "Your refund has been issued") > 1
 		}, 400*time.Millisecond, 20*time.Millisecond)
 	})
 
@@ -80,7 +80,7 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		require.NoError(t, env.DB.DB.GetContext(t.Context(), &amount, `SELECT amount::text FROM mollie_payments WHERE mollie_payment_id = $1`, payID))
 
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
-		assert.Equal(t, []string{amount}, env.Mollie.refundAmounts(t, payID), "currently the full amount, not amount - 5.00")
+		assert.Equal(t, []string{amount}, env.Mollie.RefundAmounts(t, payID), "currently the full amount, not amount - 5.00")
 	})
 
 	t.Run("an open payment is cancelled at Mollie, no refund is issued", func(t *testing.T) {
@@ -89,10 +89,10 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		payID := order.Payment.MolliePaymentID
 
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
-		assert.Equal(t, []string{"DELETE /v2/payments/" + payID}, env.Mollie.callsMatching("DELETE /v2/payments/"+payID))
-		assert.Empty(t, env.Mollie.callsMatching("POST /v2/payments/"+payID))
-		env.Mail.waitSubject(t, c.email, "Order canceled")
-		assert.Zero(t, env.Mail.countSubject(t, c.email, "Your refund has been issued"))
+		assert.Equal(t, []string{"DELETE /v2/payments/" + payID}, env.Mollie.CallsMatching("DELETE /v2/payments/"+payID))
+		assert.Empty(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID))
+		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		assert.Zero(t, env.Mail.CountSubject(t, c.email, "Your refund has been issued"))
 	})
 
 	t.Run("an open payment that Mollie no longer lets us cancel is left alone", func(t *testing.T) {
@@ -103,7 +103,7 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 
 		got := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
 		assert.Equal(t, "CANCELLED", got.Status)
-		assert.Empty(t, env.Mollie.callsMatching("DELETE /v2/payments/"+order.Payment.MolliePaymentID))
+		assert.Empty(t, env.Mollie.CallsMatching("DELETE /v2/payments/"+order.Payment.MolliePaymentID))
 		assert.Equal(t, 1, logs.FilterMessage("open payment of a cancelled order is not cancelable at Mollie").Len())
 	})
 
@@ -118,23 +118,23 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		order := env.placeOnlineOrder(t, c)
 		env.markPaid(t, order.ID)
 		payID := order.Payment.MolliePaymentID
-		env.Mollie.setFail(false, true, false)
-		t.Cleanup(func() { env.Mollie.setFail(false, false, false) })
+		env.Mollie.SetFail(false, true, false)
+		t.Cleanup(func() { env.Mollie.SetFail(false, false, false) })
 
 		_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "CANCELLED"})
 		require.NotNil(t, oerr)
 		assert.Equal(t, "Internal server error", oerr.Message)
 		assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM mollie_payments WHERE mollie_payment_id = $1 AND amount_refunded > 0`, payID))
-		assert.Len(t, env.Mollie.callsMatching("POST /v2/payments/"+payID+"/refunds"), 1, "Mollie was asked once")
+		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID+"/refunds"), 1, "Mollie was asked once")
 
 		// KNOWN BUG: the order is CANCELLED although the refund failed.
 		assert.Equal(t, 1, countRows(t, env.TestContext, `SELECT count(*) FROM orders WHERE id = $1 AND order_status = 'CANCELLED'`, order.ID))
 
 		// KNOWN BUG: with Mollie healthy again, saving the order again does not retry the refund.
-		env.Mollie.setFail(false, false, false)
+		env.Mollie.SetFail(false, false, false)
 		again := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
 		assert.Equal(t, "CANCELLED", again.Status)
-		assert.Len(t, env.Mollie.callsMatching("POST /v2/payments/"+payID+"/refunds"), 1, "no retry on re-save")
+		assert.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID+"/refunds"), 1, "no retry on re-save")
 		assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM mollie_payments WHERE mollie_payment_id = $1 AND amount_refunded > 0`, payID), "the customer is still not refunded")
 	})
 
@@ -145,29 +145,47 @@ func TestUpdateOrderCancellationSettlesThePayment(t *testing.T) {
 		c := env.newPushCustomer(t, "nocancel", true)
 		order := env.placeOnlineOrder(t, c)
 		payID := order.Payment.MolliePaymentID
-		env.Mollie.setFail(false, false, true)
-		t.Cleanup(func() { env.Mollie.setFail(false, false, false) })
+		env.Mollie.SetFail(false, false, true)
+		t.Cleanup(func() { env.Mollie.SetFail(false, false, false) })
 
 		_, oerr := env.updateOrderAs(t, order.ID, map[string]any{"status": "CANCELLED"})
 		require.NotNil(t, oerr)
-		assert.Len(t, env.Mollie.callsMatching("DELETE /v2/payments/"+payID), 1)
+		assert.Len(t, env.Mollie.CallsMatching("DELETE /v2/payments/"+payID), 1)
 
 		// KNOWN BUG: CANCELLED is persisted although the payment could not be cancelled.
 		assert.Equal(t, 1, countRows(t, env.TestContext, `SELECT count(*) FROM orders WHERE id = $1 AND order_status = 'CANCELLED'`, order.ID))
 
 		// KNOWN BUG: no retry of the Mollie cancel when the order is saved again.
-		env.Mollie.setFail(false, false, false)
+		env.Mollie.SetFail(false, false, false)
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
-		assert.Len(t, env.Mollie.callsMatching("DELETE /v2/payments/"+payID), 1, "no retry on re-save")
+		assert.Len(t, env.Mollie.CallsMatching("DELETE /v2/payments/"+payID), 1, "no retry on re-save")
+	})
+
+	// BUG(product decision pending): order status transitions are not validated
+	// (orderService.UpdateOrder accepts any status). A cancelled order that was refunded in full can
+	// be put back to CONFIRMED: the kitchen would then prepare an order the customer got their money
+	// back for. Replace the assertions with a refusal once the owner defines the allowed transitions.
+	t.Run("a cancelled and refunded order can be moved back to CONFIRMED", func(t *testing.T) {
+		c := env.newPushCustomer(t, "revive", true)
+		order := env.placeOnlineOrder(t, c)
+		env.markPaid(t, order.ID)
+		payID := order.Payment.MolliePaymentID
+		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED"})
+		require.Len(t, env.Mollie.CallsMatching("POST /v2/payments/"+payID+"/refunds"), 1)
+
+		got := env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CONFIRMED"})
+		assert.Equal(t, "CONFIRMED", got.Status, "currently accepted")
+		assert.Equal(t, 1, countRows(t, env.TestContext, `SELECT count(*) FROM mollie_payments WHERE mollie_payment_id = $1 AND amount_refunded = amount`, payID),
+			"and the payment stays refunded")
 	})
 
 	t.Run("a cash order has no payment to settle", func(t *testing.T) {
 		c := env.newPushCustomer(t, "cash", true)
 		order := env.placeOrder(t, c, "en")
-		before := len(env.Mollie.callsMatching(""))
+		before := len(env.Mollie.CallsMatching(""))
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CANCELLED", "cancellationReason": "OTHER"})
-		env.Mail.waitSubject(t, c.email, "Order canceled")
-		assert.Equal(t, before, len(env.Mollie.callsMatching("")), "Mollie is not involved")
+		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		assert.Equal(t, before, len(env.Mollie.CallsMatching("")), "Mollie is not involved")
 	})
 }
 
@@ -191,6 +209,9 @@ func TestUpdatePaymentStatusMutation(t *testing.T) {
 	t.Run("an order without a payment is an error", func(t *testing.T) {
 		resp := gqlAs(t, env.TestContext, adminToken(t, env.TestContext), "fr", m, map[string]any{"o": uuid.NewString(), "s": "paid"})
 		require.Len(t, resp.Errors, 1)
+		// NOTE(product decision pending): an unknown order is reported as a generic "Internal server error"
+		// although the client could be told NOT_FOUND / USER_ERROR. Pinned as it is today; change it
+		// together with the resolver when the owner decides.
 		assert.Equal(t, "Internal server error", resp.Errors[0].Message)
 	})
 
@@ -201,5 +222,16 @@ func TestUpdatePaymentStatusMutation(t *testing.T) {
 		var status string
 		require.NoError(t, env.DB.DB.GetContext(t.Context(), &status, `SELECT status FROM mollie_payments WHERE order_id = $1`, order.ID))
 		assert.Equal(t, "paid", status)
+	})
+
+	// BUG(product decision pending): the staff override accepts any string as a payment status
+	// (payment/application UpdatePaymentStatusByOrderID casts it, the column is free text), so a typo
+	// such as "payed" is stored and no later refund/webhook logic recognises the payment.
+	t.Run("any string is accepted as a status", func(t *testing.T) {
+		resp := gqlAs(t, env.TestContext, adminToken(t, env.TestContext), "fr", m, map[string]any{"o": order.ID, "s": "payed"})
+		require.Empty(t, resp.Errors, "%+v", resp.Errors)
+		var status string
+		require.NoError(t, env.DB.DB.GetContext(t.Context(), &status, `SELECT status FROM mollie_payments WHERE order_id = $1`, order.ID))
+		assert.Equal(t, "payed", status)
 	})
 }

@@ -33,6 +33,7 @@ type faultyNotif struct {
 	// scheduled together, and what a test cannot otherwise rely on).
 	meet    int
 	arrived *atomic.Int32
+	t       *testing.T // set with meet: the test fails when the callers do not all arrive
 }
 
 func (f faultyNotif) RegisterDeviceToken(ctx context.Context, u uuid.UUID, tok, platform, role string) error {
@@ -73,6 +74,10 @@ func (f faultyNotif) GetDeviceTokens(ctx context.Context, u uuid.UUID) ([]notifi
 		deadline := time.Now().Add(10 * time.Second)
 		for int(f.arrived.Load()) < f.meet && time.Now().Before(deadline) {
 			time.Sleep(time.Millisecond)
+		}
+		if int(f.arrived.Load()) < f.meet {
+			// A silent continue would let the test pass without the callers having overlapped.
+			f.t.Errorf("only %d of the %d callers reached GetDeviceTokens within 10s", f.arrived.Load(), f.meet)
 		}
 	}
 	return tokens, err
@@ -223,6 +228,10 @@ func TestRegisterLiveActivityToken(t *testing.T) {
 	t.Run("an order that does not exist is an error", func(t *testing.T) {
 		resp := gqlAs(t, env.TestContext, ownerTok, "fr", m, map[string]any{"o": uuid.NewString(), "t": "activity-3"})
 		require.Len(t, resp.Errors, 1)
+		// NOTE(product decision pending): a live-activity token for an unknown order is reported as a generic "Internal server error"
+		// although the client could be told NOT_FOUND / USER_ERROR. Pinned as it is today; change it
+		// together with the resolver when the owner decides.
+		// (Somebody else's order, above, is already a proper NOT_FOUND.)
 		assert.Equal(t, "Internal server error", resp.Errors[0].Message)
 	})
 
@@ -250,6 +259,9 @@ func TestUpdateMyOrdersLanguage(t *testing.T) {
 	t.Run("a language the shop does not speak is refused", func(t *testing.T) {
 		resp := gqlAs(t, env.TestContext, token, "fr", m, map[string]any{"l": "klingon"})
 		require.Len(t, resp.Errors, 1)
+		// NOTE(product decision pending): an unsupported language (bad input) is reported as a generic "Internal server error"
+		// although the client could be told NOT_FOUND / USER_ERROR. Pinned as it is today; change it
+		// together with the resolver when the owner decides.
 		assert.Equal(t, "Internal server error", resp.Errors[0].Message)
 	})
 
@@ -278,22 +290,22 @@ func TestUpdateMyOrdersLanguage(t *testing.T) {
 		assert.Equal(t, "fr", langOf(delivered), "a finished order keeps the language it was placed in")
 
 		// The iOS Live Activity gets the update in Dutch...
-		require.Eventually(t, func() bool { return len(env.APNs.pushesTo("la-ok")) == 1 }, 20*time.Second, 20*time.Millisecond)
-		aps, _ := env.APNs.pushesTo("la-ok")[0].Payload["aps"].(map[string]any)
+		require.Eventually(t, func() bool { return len(env.APNs.PushesTo("la-ok")) == 1 }, 20*time.Second, 20*time.Millisecond)
+		aps, _ := env.APNs.PushesTo("la-ok")[0].Payload["aps"].(map[string]any)
 		assert.Equal(t, "update", aps["event"])
 		state, _ := aps["content-state"].(map[string]any)
 		assert.NotEmpty(t, state["subtitle"])
 		assert.Equal(t, notificationApplication.GetLiveActivityContentState(orderDomain.OrderStatusConfirmed, "nl", "PICKUP", nil)["subtitle"], state["subtitle"])
 
 		// ...and the Android devices (not the iOS one) get a data message with the Dutch text.
-		require.Eventually(t, func() bool { return len(env.FCM.pushesTo("phone-android")) == 1 }, 20*time.Second, 20*time.Millisecond)
-		data, _ := env.FCM.pushesTo("phone-android")[0].Payload["data"].(map[string]any)
+		require.Eventually(t, func() bool { return len(env.FCM.PushesTo("phone-android")) == 1 }, 20*time.Second, 20*time.Millisecond)
+		data, _ := env.FCM.PushesTo("phone-android")[0].Payload["data"].(map[string]any)
 		assert.Contains(t, data["deepLinkUrl"], confirmed.String(), "the data message is addressed to the order: %v", data)
 		assert.Equal(t, "Bestelling bevestigd", data["title"])
 		assert.Equal(t, "update", data["event"])
-		assert.Empty(t, env.FCM.pushesTo("phone-ios"))
+		assert.Empty(t, env.FCM.PushesTo("phone-ios"))
 		// The PENDING order has no localized text and no live activity: one push in all.
-		assert.Len(t, env.APNs.pushesTo("la-ok"), 1)
+		assert.Len(t, env.APNs.PushesTo("la-ok"), 1)
 
 		// A dead live-activity token and a refused FCM token are logged, never fatal.
 		waitLog(t, logs, "failed to re-push live activity (language)")
@@ -304,14 +316,14 @@ func TestUpdateMyOrdersLanguage(t *testing.T) {
 		r := env.with(func(r *resolver.Resolver) {
 			r.NotificationService = faultyNotif{NotificationService: env.Notif, activityTokens: true, tokens: true}
 		})
-		before := len(env.APNs.pushesTo("la-ok"))
-		fcmBefore := env.FCM.count()
+		before := len(env.APNs.PushesTo("la-ok"))
+		fcmBefore := len(env.FCM.Requests())
 		n, err := r.Mutation().UpdateMyOrdersLanguage(env.ctxFor(owner.String(), false, "fr"), "en")
 		require.NoError(t, err)
 		assert.Equal(t, 2, n)
 		// The re-push runs off the request path: give it a moment to prove it stays silent.
 		require.Never(t, func() bool {
-			return len(env.APNs.pushesTo("la-ok")) != before || env.FCM.count() != fcmBefore
+			return len(env.APNs.PushesTo("la-ok")) != before || len(env.FCM.Requests()) != fcmBefore
 		}, 300*time.Millisecond, 20*time.Millisecond)
 	})
 
@@ -348,8 +360,8 @@ func TestSendNewOrderPush(t *testing.T) {
 		test.IsTest = true
 		env.Resolver.SendNewOrderPush(test)
 		// All three return before starting any work, so the fakes have seen nothing yet.
-		assert.Zero(t, env.FCM.count())
-		assert.Empty(t, env.APNs.pushesTo("adm-ios"))
+		assert.Zero(t, len(env.FCM.Requests()))
+		assert.Empty(t, env.APNs.PushesTo("adm-ios"))
 		assert.Equal(t, 1, logs.FilterMessage("suppressing new-order push for store-review test order").Len())
 	})
 
@@ -358,20 +370,20 @@ func TestSendNewOrderPush(t *testing.T) {
 		env.Resolver.SendNewOrderPush(order)
 
 		require.Eventually(t, func() bool {
-			return len(env.APNs.pushesTo("adm-ios")) == 1 && len(env.FCM.pushesTo("adm-android")) == 1 &&
-				len(env.FCM.pushesTo("pos-1")) == 1 && len(env.FCM.pushesTo("refused-pos")) == 1
+			return len(env.APNs.PushesTo("adm-ios")) == 1 && len(env.FCM.PushesTo("adm-android")) == 1 &&
+				len(env.FCM.PushesTo("pos-1")) == 1 && len(env.FCM.PushesTo("refused-pos")) == 1
 		}, 20*time.Second, 20*time.Millisecond)
 
-		aps, _ := env.APNs.pushesTo("adm-ios")[0].Payload["aps"].(map[string]any)
+		aps, _ := env.APNs.PushesTo("adm-ios")[0].Payload["aps"].(map[string]any)
 		alert, _ := aps["alert"].(map[string]any)
 		assert.Equal(t, "New order", alert["title"])
-		assert.Equal(t, order.ID.String(), env.APNs.pushesTo("adm-ios")[0].Payload["orderId"])
-		assert.Equal(t, "new_order", env.APNs.pushesTo("adm-ios")[0].Payload["type"])
+		assert.Equal(t, order.ID.String(), env.APNs.PushesTo("adm-ios")[0].Payload["orderId"])
+		assert.Equal(t, "new_order", env.APNs.PushesTo("adm-ios")[0].Payload["type"])
 
-		msg, _ := env.FCM.pushesTo("pos-1")[0].Payload["notification"].(map[string]any)
+		msg, _ := env.FCM.PushesTo("pos-1")[0].Payload["notification"].(map[string]any)
 		assert.Equal(t, "New order", msg["title"])
 		assert.Equal(t, "Awaiting confirmation", msg["body"])
-		assert.Empty(t, env.FCM.pushesTo("cust-android"), "a customer's device is not an admin device")
+		assert.Empty(t, env.FCM.PushesTo("cust-android"), "a customer's device is not an admin device")
 
 		// Tokens the providers report as dead are removed; ones refused for another reason stay.
 		require.Eventually(t, func() bool { return len(env.deviceTokens(t, admin)) == 4 }, 20*time.Second, 20*time.Millisecond)
@@ -387,9 +399,9 @@ func TestSendNewOrderPush(t *testing.T) {
 		r := env.with(func(r *resolver.Resolver) {
 			r.NotificationService = faultyNotif{NotificationService: env.Notif, adminTokens: true}
 		})
-		before := len(env.FCM.pushesTo("pos-1"))
+		before := len(env.FCM.PushesTo("pos-1"))
 		r.SendNewOrderPush(newOrder("fr"))
-		require.Eventually(t, func() bool { return len(env.FCM.pushesTo("pos-1")) == before+1 }, 20*time.Second, 20*time.Millisecond)
+		require.Eventually(t, func() bool { return len(env.FCM.PushesTo("pos-1")) == before+1 }, 20*time.Second, 20*time.Millisecond)
 		waitLog(t, logs, "failed to fetch admin device tokens")
 	})
 
@@ -402,9 +414,9 @@ func TestSendNewOrderPush(t *testing.T) {
 
 	t.Run("with APNs only, android admin devices are skipped", func(t *testing.T) {
 		r := env.with(func(r *resolver.Resolver) { r.FCMClient = nil })
-		before := env.FCM.count()
+		before := len(env.FCM.Requests())
 		r.SendNewOrderPush(newOrder("fr"))
-		require.Eventually(t, func() bool { return len(env.APNs.pushesTo("adm-ios")) >= 2 }, 20*time.Second, 20*time.Millisecond)
-		assert.Equal(t, before, env.FCM.count())
+		require.Eventually(t, func() bool { return len(env.APNs.PushesTo("adm-ios")) >= 2 }, 20*time.Second, 20*time.Millisecond)
+		assert.Equal(t, before, len(env.FCM.Requests()))
 	})
 }

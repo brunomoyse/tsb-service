@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,6 +34,16 @@ func waitLogCount(t *testing.T, logs *observer.ObservedLogs, msg string, n int) 
 	t.Helper()
 	require.Eventually(t, func() bool { return logs.FilterMessage(msg).Len() >= n }, 20*time.Second, 20*time.Millisecond,
 		"log %q written %d times, want %d", msg, logs.FilterMessage(msg).Len(), n)
+}
+
+// waitOrderLogCount waits until the message was logged at least n times for that order. Filtering
+// by order_id keeps a line written for another order (the e-mail and push goroutines of earlier
+// subtests outlive them) from satisfying the wait.
+func waitOrderLogCount(t *testing.T, logs *observer.ObservedLogs, msg, orderID string, n int) {
+	t.Helper()
+	count := func() int { return logs.FilterMessage(msg).FilterField(zap.String("order_id", orderID)).Len() }
+	require.Eventually(t, func() bool { return count() >= n }, 20*time.Second, 20*time.Millisecond,
+		"log %q written %d times for order %s, want %d", msg, count(), orderID, n)
 }
 
 func TestUpdateOrderStepsThatFail(t *testing.T) {
@@ -94,13 +106,13 @@ func TestUpdateOrderSideEffectsThatFail(t *testing.T) {
 		id := env.seedOrderRow(t, c.id, "PENDING", "PICKUP", "en")
 
 		update(r, id, model.UpdateOrderInput{Status: status(orderDomain.OrderStatusConfirmed), EstimatedReadyTime: eta(30)})
-		waitLogCount(t, logs, "failed to retrieve user", 1)
+		waitOrderLogCount(t, logs, "failed to retrieve user", id.String(), 1)
 		update(r, id, model.UpdateOrderInput{EstimatedReadyTime: eta(50)})
-		waitLogCount(t, logs, "failed to retrieve user", 2)
+		waitOrderLogCount(t, logs, "failed to retrieve user", id.String(), 2)
 		update(r, id, model.UpdateOrderInput{Status: status(orderDomain.OrderStatusAwaitingUp)})
-		waitLogCount(t, logs, "failed to retrieve user", 3)
+		waitOrderLogCount(t, logs, "failed to retrieve user", id.String(), 3)
 		update(r, id, model.UpdateOrderInput{Status: status(orderDomain.OrderStatusCanceled)})
-		waitLogCount(t, logs, "failed to retrieve user", 4)
+		waitOrderLogCount(t, logs, "failed to retrieve user", id.String(), 4)
 		assert.Equal(t, "CANCELLED", orderStatusInDB(t, env, id))
 	})
 
@@ -126,7 +138,7 @@ func TestUpdateOrderSideEffectsThatFail(t *testing.T) {
 
 	t.Run("an e-mail that the mail server refuses is logged, for every kind of e-mail", func(t *testing.T) {
 		c := env.newPushCustomer(t, "bounce", true)
-		env.Mail.reject(c.email)
+		env.Mail.Reject(c.email)
 
 		order := env.placeOrder(t, c, "en") // the "received" e-mail bounces
 		waitLog(t, logs, "failed to send order pending email")
@@ -144,7 +156,7 @@ func TestUpdateOrderSideEffectsThatFail(t *testing.T) {
 		env.markPaid(t, paid.ID)
 		update(env.Resolver, uuid.MustParse(paid.ID), model.UpdateOrderInput{Status: status(orderDomain.OrderStatusCanceled)})
 		waitLog(t, logs, "failed to send refund issued email")
-		assert.Empty(t, env.Mail.mailTo(c.email), "nothing was delivered")
+		assert.Empty(t, env.Mail.MailTo(c.email), "nothing was delivered")
 	})
 
 	t.Run("devices the push providers reject are dropped, other failures are logged", func(t *testing.T) {
@@ -155,7 +167,7 @@ func TestUpdateOrderSideEffectsThatFail(t *testing.T) {
 
 		// The alert and the Live Update goroutines read the tokens together, so both see the dead ones.
 		together := env.with(func(r *resolver.Resolver) {
-			r.NotificationService = faultyNotif{NotificationService: env.Notif, meet: 2, arrived: &atomic.Int32{}}
+			r.NotificationService = faultyNotif{NotificationService: env.Notif, meet: 2, arrived: &atomic.Int32{}, t: t}
 		})
 		update(together, id, model.UpdateOrderInput{Status: status(orderDomain.OrderStatusConfirmed)})
 		waitLog(t, logs, "failed to send alert push")
@@ -188,7 +200,7 @@ func TestUpdateOrderSideEffectsThatFail(t *testing.T) {
 			_, deadAndroid := got[c.deadAndroid]
 			return !deadIOS && !deadAndroid
 		}, 20*time.Second, 20*time.Millisecond)
-		require.Eventually(t, func() bool { return len(env.APNs.alertsFor(c.ios, id.String())) == 1 }, 20*time.Second, 20*time.Millisecond)
+		require.Eventually(t, func() bool { return len(alertsFor(env.APNs, c.ios, id.String())) == 1 }, 20*time.Second, 20*time.Millisecond)
 	})
 
 	t.Run("a live activity whose tokens cannot be cleared is logged", func(t *testing.T) {
@@ -210,7 +222,7 @@ func TestUpdateOrderSideEffectsThatFail(t *testing.T) {
 			r.NotificationService = faultyNotif{NotificationService: env.Notif, tokens: true, activityTokens: true}
 		})
 		update(r, id, model.UpdateOrderInput{Status: status(orderDomain.OrderStatusConfirmed)})
-		require.Never(t, func() bool { return len(env.APNs.pushesTo(c.ios)) > 0 }, 300*time.Millisecond, 20*time.Millisecond)
+		require.Never(t, func() bool { return len(env.APNs.PushesTo(c.ios)) > 0 }, 300*time.Millisecond, 20*time.Millisecond)
 	})
 }
 
@@ -287,8 +299,8 @@ func TestCreateOrderStepsThatFail(t *testing.T) {
 	})
 
 	t.Run("a refused payment removes the order, and failures of the clean-up are logged", func(t *testing.T) {
-		env.Mollie.setFail(true, false, false)
-		t.Cleanup(func() { env.Mollie.setFail(false, false, false) })
+		env.Mollie.SetFail(true, false, false)
+		t.Cleanup(func() { env.Mollie.SetFail(false, false, false) })
 		orders := newFaultyOrders(env.Resolver.OrderService)
 		orders.failDelete = true
 		r := env.with(func(r *resolver.Resolver) {
@@ -304,7 +316,7 @@ func TestCreateOrderStepsThatFail(t *testing.T) {
 	})
 
 	t.Run("a cash order is published to the dashboards, mailed and pushed to staff", func(t *testing.T) {
-		env.Mail.waitMailTo(t, c.email, 0)
+		env.Mail.WaitMailTo(t, c.email, 0)
 		admin := env.Fixtures.AdminUser.ID
 		require.NoError(t, env.Notif.RegisterDeviceToken(t.Context(), admin, "admin-ios-new", "ios", "admin"))
 		created, err := env.Resolver.Subscription().OrderCreated(ctx)
@@ -313,23 +325,23 @@ func TestCreateOrderStepsThatFail(t *testing.T) {
 		order := env.placeOrder(t, c, "en")
 		got := recvOrder(t, created)
 		assert.Equal(t, order.ID, got.ID.String())
-		env.Mail.waitSubject(t, c.email, "Order pending validation")
+		env.Mail.WaitSubject(t, c.email, "Order pending validation")
 		require.Eventually(t, func() bool {
-			return len(env.APNs.pushesTo("admin-ios-new")) == 1 && len(env.FCM.pushesTo("pos-new-order")) == 1
+			return len(env.APNs.PushesTo("admin-ios-new")) == 1 && len(env.FCM.PushesTo("pos-new-order")) == 1
 		}, 20*time.Second, 20*time.Millisecond)
 	})
 
 	t.Run("an online order is neither published nor pushed to staff before it is paid", func(t *testing.T) {
 		created, err := env.Resolver.Subscription().OrderCreated(ctx)
 		require.NoError(t, err)
-		pushesBefore := len(env.APNs.pushesTo("admin-ios-new"))
+		pushesBefore := len(env.APNs.PushesTo("admin-ios-new"))
 		order := env.placeOnlineOrder(t, c)
 		select {
 		case got := <-created:
 			t.Fatalf("an unpaid online order was published: %v", got.ID)
 		default:
 		}
-		require.Never(t, func() bool { return len(env.APNs.pushesTo("admin-ios-new")) != pushesBefore }, 300*time.Millisecond, 20*time.Millisecond)
+		require.Never(t, func() bool { return len(env.APNs.PushesTo("admin-ios-new")) != pushesBefore }, 300*time.Millisecond, 20*time.Millisecond)
 		assert.NotEmpty(t, order.ID)
 	})
 }

@@ -1,7 +1,6 @@
 package graphql_test
 
 import (
-	"encoding/json"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -69,7 +68,7 @@ func TestUpdateOrderOfADeliveryAndRefundMailFailures(t *testing.T) {
 		order := mustCreateOrder(t, env.TestContext, c.token, "en", map[string]any{
 			"orderType": "DELIVERY", "isOnlinePayment": false, "addressPlaceId": "addr-deliv", "items": lines(feast, 1)})
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "CONFIRMED", "estimatedReadyTime": inMinutes(40)})
-		env.Mail.waitSubject(t, c.email, "Order confirmed")
+		env.Mail.WaitSubject(t, c.email, "Order confirmed")
 	})
 
 	t.Run("a refund is not announced to a customer who turned e-mails off", func(t *testing.T) {
@@ -82,14 +81,13 @@ func TestUpdateOrderOfADeliveryAndRefundMailFailures(t *testing.T) {
 			_ = env.DB.DB.GetContext(t.Context(), &refunded, `SELECT amount_refunded::text FROM mollie_payments WHERE order_id = $1`, order.ID)
 			return refunded != "0" && refunded != ""
 		}, 10*time.Second, 50*time.Millisecond)
-		require.Never(t, func() bool { return len(env.Mail.mailTo(c.email)) > 0 }, 300*time.Millisecond, 20*time.Millisecond)
+		require.Never(t, func() bool { return len(env.Mail.MailTo(c.email)) > 0 }, 300*time.Millisecond, 20*time.Millisecond)
 	})
 
 	t.Run("a refund whose customer cannot be loaded is still issued", func(t *testing.T) {
 		c := env.newPushCustomer(t, "norefundmail", false)
 		order := env.placeOnlineOrder(t, c)
 		env.markPaid(t, order.ID)
-		before := logs.FilterMessage("failed to retrieve user").Len()
 		r := env.with(func(r *resolver.Resolver) {
 			r.UserService = faultyUsers{UserService: env.Resolver.UserService, failGet: true}
 		})
@@ -97,8 +95,8 @@ func TestUpdateOrderOfADeliveryAndRefundMailFailures(t *testing.T) {
 			model.UpdateOrderInput{Status: status(orderDomain.OrderStatusCanceled)})
 		require.NoError(t, err)
 		assert.Equal(t, orderDomain.OrderStatusCanceled, got.Status)
-		waitLogCount(t, logs, "failed to retrieve user", before+2) // the refund mail and the cancellation mail
-		assert.NotEmpty(t, env.Mollie.callsMatching("POST /v2/payments/"+order.Payment.MolliePaymentID))
+		waitOrderLogCount(t, logs, "failed to retrieve user", order.ID, 2) // the refund mail and the cancellation mail
+		assert.NotEmpty(t, env.Mollie.CallsMatching("POST /v2/payments/"+order.Payment.MolliePaymentID))
 	})
 
 	t.Run("an order without a customer row resolves to a guest", func(t *testing.T) {
@@ -198,5 +196,4 @@ func TestNewOrderPushToAnAdminDeviceWhoseConnectionBreaks(t *testing.T) {
 	env.Resolver.SendNewOrderPush(&orderDomain.Order{ID: uuid.New(), Language: "fr", OrderType: orderDomain.OrderTypePickUp})
 	waitLog(t, logs, "failed to send admin APNs push")
 	assert.Contains(t, env.deviceTokens(t, env.Fixtures.AdminUser.ID), "broken-ios-admin", "a transport failure does not unregister the device")
-	_ = json.Marshal
 }

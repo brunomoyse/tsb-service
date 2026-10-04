@@ -7,6 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"tsb-service/pkg/apns/apnstest"
+	"tsb-service/pkg/fcm/fcmtest"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -128,9 +131,9 @@ func inMinutes(m int) string {
 }
 
 // alertsFor is what the fake APNs got for the order as visible alerts (not Live Activity updates).
-func (f *fakeAPNs) alertsFor(token, orderID string) []pushReq {
-	var out []pushReq
-	for _, r := range f.pushesTo(token) {
+func alertsFor(f *apnstest.Server, token, orderID string) []apnstest.Request {
+	var out []apnstest.Request
+	for _, r := range f.PushesTo(token) {
 		if r.Payload["orderId"] == orderID {
 			out = append(out, r)
 		}
@@ -140,8 +143,8 @@ func (f *fakeAPNs) alertsFor(token, orderID string) []pushReq {
 
 // messagesFor is what the fake FCM got for the order, keyed by what it is: "alert" for a visible
 // notification, "data" for a Live Update data message.
-func (f *fakeFCM) messagesFor(token, orderID string) (alerts, data []pushReq) {
-	for _, r := range f.pushesTo(token) {
+func messagesFor(f *fcmtest.Server, token, orderID string) (alerts, data []fcmtest.Request) {
+	for _, r := range f.PushesTo(token) {
 		if _, ok := r.Payload["notification"]; ok {
 			if d, _ := r.Payload["data"].(map[string]any); d["orderId"] == orderID {
 				alerts = append(alerts, r)
@@ -174,13 +177,12 @@ func recvOrder(t *testing.T, ch <-chan *model.Order) *model.Order {
 
 func TestUpdateOrderLifecycleNotifications(t *testing.T) {
 	env := setupCovEnv(t, covOptions{Push: true})
-	logs := captureLogs(t)
 	c := env.newPushCustomer(t, "life", true)
 	env.registerDevices(t, c, false)
 
 	order := env.placeOrder(t, c, "en")
 	orderID := uuid.MustParse(order.ID)
-	env.Mail.waitSubject(t, c.email, "Order pending validation")
+	env.Mail.WaitSubject(t, c.email, "Order pending validation")
 	env.addActivityToken(t, orderID, "la-life")
 
 	all, stopAll := context.WithCancel(t.Context())
@@ -207,68 +209,68 @@ func TestUpdateOrderLifecycleNotifications(t *testing.T) {
 		assert.Equal(t, "CONFIRMED", string(pubMine.Status))
 
 		// E-mail, with the real order lines.
-		confirm := env.Mail.waitSubject(t, c.email, "Order confirmed")
+		confirm := env.Mail.WaitSubject(t, c.email, "Order confirmed")
 		assert.Equal(t, []string{c.email}, confirm.To)
 
 		// Visible alerts on both platforms, the Live Activity and the Android Live Update.
 		require.Eventually(t, func() bool {
-			alerts, data := env.FCM.messagesFor(c.android, order.ID)
-			return len(env.APNs.alertsFor(c.ios, order.ID)) == 1 && len(alerts) == 1 && len(data) == 1 && len(env.APNs.pushesTo("la-life")) == 1
+			alerts, data := messagesFor(env.FCM, c.android, order.ID)
+			return len(alertsFor(env.APNs, c.ios, order.ID)) == 1 && len(alerts) == 1 && len(data) == 1 && len(env.APNs.PushesTo("la-life")) == 1
 		}, 20*time.Second, 20*time.Millisecond)
-		alert := env.APNs.alertsFor(c.ios, order.ID)[0]
+		alert := alertsFor(env.APNs, c.ios, order.ID)[0]
 		assert.Equal(t, "CONFIRMED", alert.Payload["status"])
 		aps, _ := alert.Payload["aps"].(map[string]any)
 		body := aps["alert"].(map[string]any)["body"]
 		assert.Contains(t, body, "confirmed")
 
-		la, _ := env.APNs.pushesTo("la-life")[0].Payload["aps"].(map[string]any)
+		la, _ := env.APNs.PushesTo("la-life")[0].Payload["aps"].(map[string]any)
 		assert.Equal(t, "update", la["event"])
 		assert.Equal(t, 1, env.activityTokenCount(t, orderID), "a live activity that goes on keeps its token")
 
-		_, data := env.FCM.messagesFor(c.android, order.ID)
+		_, data := messagesFor(env.FCM, c.android, order.ID)
 		d, _ := data[0].Payload["data"].(map[string]any)
 		assert.Equal(t, "update", d["event"])
 
-		assert.Zero(t, env.Mail.countSubject(t, c.email, "Updated estimated time"), "the first estimate is not an update of it")
+		assert.Zero(t, env.Mail.CountSubject(t, c.email, "Updated estimated time"), "the first estimate is not an update of it")
 	})
 
 	t.Run("moving the estimate of a confirmed order tells the customer, without a status change", func(t *testing.T) {
-		before := len(env.APNs.pushesTo("la-life"))
+		before := len(env.APNs.PushesTo("la-life"))
 		got := env.mustUpdateOrder(t, order.ID, map[string]any{"estimatedReadyTime": inMinutes(50)})
 		assert.Equal(t, "CONFIRMED", got.Status)
 
-		env.Mail.waitSubject(t, c.email, "Updated estimated time")
+		env.Mail.WaitSubject(t, c.email, "Updated estimated time")
 		require.Eventually(t, func() bool {
 			var withETA int
-			for _, r := range env.APNs.alertsFor(c.ios, order.ID) {
+			for _, r := range alertsFor(env.APNs, c.ios, order.ID) {
 				if _, ok := r.Payload["estimatedReadyTime"]; ok {
 					withETA++
 				}
 			}
-			alerts, _ := env.FCM.messagesFor(c.android, order.ID)
+			alerts, _ := messagesFor(env.FCM, c.android, order.ID)
 			return withETA == 1 && len(alerts) == 2
 		}, 20*time.Second, 20*time.Millisecond)
-		assert.Equal(t, before, len(env.APNs.pushesTo("la-life")), "no status change, no live activity push")
-		assert.Equal(t, 1, env.Mail.countSubject(t, c.email, "Order confirmed"), "no second confirmation")
+		assert.Equal(t, before, len(env.APNs.PushesTo("la-life")), "no status change, no live activity push")
+		assert.Equal(t, 1, env.Mail.CountSubject(t, c.email, "Order confirmed"), "no second confirmation")
 	})
 
 	t.Run("an order that is ready sends the pick-up e-mail", func(t *testing.T) {
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "AWAITING_PICK_UP"})
-		env.Mail.waitSubject(t, c.email, "Your order is ready!")
+		env.Mail.WaitSubject(t, c.email, "Your order is ready!")
 	})
 
 	t.Run("picking it up ends the live activity and clears its token", func(t *testing.T) {
 		env.mustUpdateOrder(t, order.ID, map[string]any{"status": "PICKED_UP"})
 		require.Eventually(t, func() bool { return env.activityTokenCount(t, orderID) == 0 }, 20*time.Second, 20*time.Millisecond)
 		var ends int
-		for _, r := range env.APNs.pushesTo("la-life") {
+		for _, r := range env.APNs.PushesTo("la-life") {
 			if aps, _ := r.Payload["aps"].(map[string]any); aps["event"] == "end" {
 				ends++
 			}
 		}
 		assert.Equal(t, 1, ends)
 		require.Eventually(t, func() bool {
-			_, data := env.FCM.messagesFor(c.android, order.ID)
+			_, data := messagesFor(env.FCM, c.android, order.ID)
 			for _, m := range data {
 				if d, _ := m.Payload["data"].(map[string]any); d["event"] == "stop" {
 					return true
@@ -281,15 +283,17 @@ func TestUpdateOrderLifecycleNotifications(t *testing.T) {
 	t.Run("a delivery on its way sends the on-its-way e-mail", func(t *testing.T) {
 		id := env.seedOrderRow(t, c.id, "CONFIRMED", "DELIVERY", "en")
 		env.mustUpdateOrder(t, id, map[string]any{"status": "OUT_FOR_DELIVERY"})
-		env.Mail.waitSubject(t, c.email, "Your order is on its way!")
+		env.Mail.WaitSubject(t, c.email, "Your order is on its way!")
 	})
 
 	t.Run("an unknown order is an error and publishes nothing", func(t *testing.T) {
 		_, oerr := env.updateOrderAs(t, uuid.New(), map[string]any{"status": "CONFIRMED"})
 		require.NotNil(t, oerr)
+		// NOTE(product decision pending): updating an unknown order is reported as a generic "Internal server error"
+		// although the client could be told NOT_FOUND / USER_ERROR. Pinned as it is today; change it
+		// together with the resolver when the owner decides.
 		assert.Equal(t, "Internal server error", oerr.Message)
 	})
-	_ = logs
 }
 
 func TestUpdateOrderQuietCases(t *testing.T) {
@@ -307,18 +311,18 @@ func TestUpdateOrderQuietCases(t *testing.T) {
 		env.mustUpdateOrder(t, id, map[string]any{"status": "AWAITING_PICK_UP"})
 		assert.Equal(t, 1, logs.FilterMessage("suppressed late order notification").Len())
 
-		require.Eventually(t, func() bool { return len(env.APNs.pushesTo("la-late")) == 1 }, 20*time.Second, 20*time.Millisecond)
+		require.Eventually(t, func() bool { return len(env.APNs.PushesTo("la-late")) == 1 }, 20*time.Second, 20*time.Millisecond)
 		require.Never(t, func() bool {
-			alerts, _ := env.FCM.messagesFor(c.android, id.String())
-			return len(env.APNs.alertsFor(c.ios, id.String())) > 0 || len(alerts) > 0 ||
-				env.Mail.countSubject(t, c.email, "Your order is ready!") > 0
+			alerts, _ := messagesFor(env.FCM, c.android, id.String())
+			return len(alertsFor(env.APNs, c.ios, id.String())) > 0 || len(alerts) > 0 ||
+				env.Mail.CountSubject(t, c.email, "Your order is ready!") > 0
 		}, 400*time.Millisecond, 20*time.Millisecond)
 
 		// A cancellation is news whenever it comes.
 		env.mustUpdateOrder(t, id, map[string]any{"status": "CANCELLED", "cancellationReason": "OUT_OF_STOCK"})
-		env.Mail.waitSubject(t, c.email, "Order canceled")
-		require.Eventually(t, func() bool { return len(env.APNs.alertsFor(c.ios, id.String())) == 1 }, 20*time.Second, 20*time.Millisecond)
-		aps, _ := env.APNs.alertsFor(c.ios, id.String())[0].Payload["aps"].(map[string]any)
+		env.Mail.WaitSubject(t, c.email, "Order canceled")
+		require.Eventually(t, func() bool { return len(alertsFor(env.APNs, c.ios, id.String())) == 1 }, 20*time.Second, 20*time.Millisecond)
+		aps, _ := alertsFor(env.APNs, c.ios, id.String())[0].Payload["aps"].(map[string]any)
 		assert.Contains(t, aps["alert"].(map[string]any)["body"], "out of stock")
 	})
 
@@ -330,9 +334,9 @@ func TestUpdateOrderQuietCases(t *testing.T) {
 
 		env.mustUpdateOrder(t, id, map[string]any{"status": "DELIVERED"})
 		require.Eventually(t, func() bool { return env.activityTokenCount(t, id) == 0 }, 20*time.Second, 20*time.Millisecond)
-		la, _ := env.APNs.pushesTo("la-handover")[0].Payload["aps"].(map[string]any)
+		la, _ := env.APNs.PushesTo("la-handover")[0].Payload["aps"].(map[string]any)
 		assert.Equal(t, "end", la["event"])
-		require.Never(t, func() bool { return len(env.APNs.alertsFor(c.ios, id.String())) > 0 }, 300*time.Millisecond, 20*time.Millisecond)
+		require.Never(t, func() bool { return len(alertsFor(env.APNs, c.ios, id.String())) > 0 }, 300*time.Millisecond, 20*time.Millisecond)
 	})
 
 	t.Run("a status without a customer text sends no alert", func(t *testing.T) {
@@ -341,8 +345,8 @@ func TestUpdateOrderQuietCases(t *testing.T) {
 		id := env.seedOrderRow(t, c.id, "CONFIRMED", "PICKUP", "en")
 		env.addActivityToken(t, id, "la-pending")
 		env.mustUpdateOrder(t, id, map[string]any{"status": "PENDING"})
-		require.Eventually(t, func() bool { return len(env.APNs.pushesTo("la-pending")) == 1 }, 20*time.Second, 20*time.Millisecond)
-		require.Never(t, func() bool { return len(env.APNs.alertsFor(c.ios, id.String())) > 0 }, 300*time.Millisecond, 20*time.Millisecond)
+		require.Eventually(t, func() bool { return len(env.APNs.PushesTo("la-pending")) == 1 }, 20*time.Second, 20*time.Millisecond)
+		require.Never(t, func() bool { return len(alertsFor(env.APNs, c.ios, id.String())) > 0 }, 300*time.Millisecond, 20*time.Millisecond)
 	})
 
 	t.Run("a customer who turned order e-mails off gets none, the order still moves on", func(t *testing.T) {
@@ -353,6 +357,6 @@ func TestUpdateOrderQuietCases(t *testing.T) {
 		env.mustUpdateOrder(t, id, map[string]any{"estimatedReadyTime": inMinutes(40)})
 		env.mustUpdateOrder(t, id, map[string]any{"status": "AWAITING_PICK_UP"})
 		env.mustUpdateOrder(t, id, map[string]any{"status": "CANCELLED"})
-		require.Never(t, func() bool { return len(env.Mail.mailTo(c.email)) > 0 }, 400*time.Millisecond, 20*time.Millisecond)
+		require.Never(t, func() bool { return len(env.Mail.MailTo(c.email)) > 0 }, 400*time.Millisecond, 20*time.Millisecond)
 	})
 }

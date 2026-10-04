@@ -91,12 +91,12 @@ func TestOrderReadQueries(t *testing.T) {
 	a2 := insert(alice, "DELIVERY", "DELIVERED", "30.00", 4*time.Hour)
 	a3 := insert(alice, "PICKUP", "CONFIRMED", "20.00", 3*time.Hour)
 	b1 := insert(bob, "PICKUP", "DELIVERED", "40.00", 2*time.Hour)
-	_ = insert(bob, "PICKUP", "CANCELLED", "99.00", time.Hour) // never in the history report
+	b2 := insert(bob, "PICKUP", "CANCELLED", "99.00", time.Hour) // never in the history report
 
 	t.Run("staff list every order, newest first", func(t *testing.T) {
 		got := env.queryOrders(t, admin, `{ orders { id status } }`, nil, "orders")
-		assert.Len(t, got, 5)
-		assert.Equal(t, 5, len(ids(got)))
+		assert.Equal(t, []string{b2.String(), b1.String(), a3.String(), a2.String(), a1.String()}, ids(got),
+			"newest (1h old) first, oldest (5h old) last")
 	})
 
 	t.Run("a staff member reads any order, a missing one is an error", func(t *testing.T) {
@@ -106,6 +106,9 @@ func TestOrderReadQueries(t *testing.T) {
 
 		resp = gqlAs(t, env.TestContext, admin, "en", `query ($id: ID!) { order(id: $id) { id } }`, map[string]any{"id": uuid.NewString()})
 		require.Len(t, resp.Errors, 1)
+		// NOTE(product decision pending): a missing order is reported as a generic "Internal server error"
+		// although the client could be told NOT_FOUND / USER_ERROR. Pinned as it is today; change it
+		// together with the resolver when the owner decides.
 		assert.Equal(t, "Internal server error", resp.Errors[0].Message)
 	})
 
