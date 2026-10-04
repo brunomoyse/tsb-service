@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"path"
 	"slices"
@@ -196,6 +197,48 @@ const maxImageBytes = 5 << 20
 
 var allowedImageTypes = map[string]string{"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 
+// notPublic lists the IPv4 ranges (and the IPv6 ones that are not judged by an embedded IPv4
+// address) that are not public unicast although netip does not report them as private, loopback,
+// link-local or multicast: they are reachable from inside carrier or cloud networks, or reserved.
+var notPublic = []netip.Prefix{
+	netip.MustParsePrefix("0.0.0.0/8"),     // "this network" (0.x.x.x reaches localhost on some stacks)
+	netip.MustParsePrefix("100.64.0.0/10"), // carrier-grade NAT, also used by cloud internal networks
+	netip.MustParsePrefix("192.0.0.0/24"),  // IETF protocol assignments
+	netip.MustParsePrefix("198.18.0.0/15"), // benchmarking
+	netip.MustParsePrefix("240.0.0.0/4"),   // reserved, including the 255.255.255.255 broadcast
+	netip.MustParsePrefix("::/96"),         // deprecated IPv4-compatible IPv6 (::7f00:1 is 127.0.0.1)
+}
+
+var (
+	nat64     = netip.MustParsePrefix("64:ff9b::/96") // NAT64: the last 32 bits are the IPv4 address
+	sixToFour = netip.MustParsePrefix("2002::/16")    // 6to4: bits 16..47 are the IPv4 address
+)
+
+// isPublicUnicast reports whether a is a public unicast address. IPv4-mapped IPv6 addresses, NAT64
+// (64:ff9b::/96) and 6to4 (2002::/16) addresses are judged by the IPv4 address they carry, since
+// that is where the connection ends up.
+func isPublicUnicast(a netip.Addr) bool {
+	a = a.WithZone("").Unmap()
+	if a.Is6() {
+		b := a.As16()
+		switch {
+		case nat64.Contains(a):
+			return isPublicUnicast(netip.AddrFrom4([4]byte(b[12:16])))
+		case sixToFour.Contains(a):
+			return isPublicUnicast(netip.AddrFrom4([4]byte(b[2:6])))
+		}
+	}
+	if !a.IsGlobalUnicast() || a.IsPrivate() || a.IsLoopback() || a.IsLinkLocalUnicast() || a.IsMulticast() || a.IsUnspecified() {
+		return false
+	}
+	for _, p := range notPublic {
+		if p.Contains(a) {
+			return false
+		}
+	}
+	return true
+}
+
 // checkDialAddress is the dialer's guard: only public unicast addresses are
 // allowed.
 func checkDialAddress(address string) error {
@@ -203,16 +246,34 @@ func checkDialAddress(address string) error {
 	if err != nil {
 		return err
 	}
-	ip := net.ParseIP(host)
-	if ip == nil || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() {
+	ip, err := netip.ParseAddr(host)
+	if err != nil || !isPublicUnicast(ip) {
 		return fmt.Errorf("address %s is not allowed", host)
 	}
 	return nil
 }
 
-// safeHTTPClient refuses to connect to loopback, private, link-local or
-// unspecified addresses, so an image URL cannot be used to reach cluster
-// internals.
+// maxImageRedirects caps the redirects followed for one image.
+const maxImageRedirects = 3
+
+// imageRedirectPolicy applies to every redirect the same scheme rule as the first request (https,
+// or http when allowHTTP), so an https link cannot bounce to plain http, and stops redirect chains.
+// The dialer still judges the address of every hop.
+func imageRedirectPolicy(allowHTTP bool) func(*http.Request, []*http.Request) error {
+	return func(req *http.Request, via []*http.Request) error {
+		if len(via) > maxImageRedirects {
+			return fmt.Errorf("stopped after %d redirects", maxImageRedirects)
+		}
+		if req.URL.Scheme != "https" && (!allowHTTP || req.URL.Scheme != "http") {
+			return fmt.Errorf("redirect to %q is not allowed", req.URL.Scheme)
+		}
+		return nil
+	}
+}
+
+// safeHTTPClient refuses to connect to loopback, private, link-local, carrier-grade NAT, reserved
+// or unspecified addresses, so an image URL cannot be used to reach cluster internals. Redirects
+// are limited by downloadImage (imageRedirectPolicy), whatever client it is given.
 func safeHTTPClient() *http.Client {
 	dialer := &net.Dialer{Timeout: 10 * time.Second, Control: func(_, address string, _ syscall.RawConn) error {
 		return checkDialAddress(address)
@@ -233,7 +294,11 @@ func (d *Deps) downloadImage(ctx context.Context, raw string) ([]byte, string, s
 	if err != nil {
 		return nil, "", "", actions.Userf("image_url is not a valid link.")
 	}
-	resp, err := d.ImageClient.Do(req)
+	// Whatever client is configured, a redirect obeys the same scheme rule as the first request and
+	// the chain is capped (on a copy: the shared client is left alone).
+	client := *d.ImageClient
+	client.CheckRedirect = imageRedirectPolicy(d.AllowHTTPImages)
+	resp, err := client.Do(req)
 	if err != nil {
 		d.Log.Warn("image download failed", "error", err)
 		return nil, "", "", actions.Userf("The photo could not be downloaded.")
