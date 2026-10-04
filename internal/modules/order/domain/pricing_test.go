@@ -146,3 +146,12 @@ func TestOrderTotal(t *testing.T) {
 		})
 	}
 }
+
+func TestPriceLineWithZeroQuantity(t *testing.T) {
+	// A zero quantity cannot be averaged: the base price is reported as the unit price
+	// and the total only carries what the (non-negative) selections add.
+	total, unit := PriceLine(d("5.00"), 0, []PricedSelection{{Modifier: d("1.50"), Quantity: 2}})
+	if !total.Equal(d("3.00")) || !unit.Equal(d("5.00")) {
+		t.Fatalf("qty 0: total=%s unit=%s", total, unit)
+	}
+}
