@@ -141,12 +141,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 			// the upgrade request), keep it, but still end the socket when that
 			// token expires, as the connection_init branch below does.
 			if utils.GetUserID(ctx) != "" {
-				if exp := utils.GetTokenExpiry(ctx); !exp.IsZero() {
-					var cancel context.CancelFunc
-					ctx, cancel = context.WithDeadline(ctx, exp)
-					_ = cancel
-				}
-				return ctx, &initPayload, nil
+				return bindToTokenExpiry(ctx), &initPayload, nil
 			}
 			// Fall back to connectionParams Authorization header
 			auth := initPayload.Authorization()
@@ -177,23 +172,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 				ctx = utils.SetIsAdmin(ctx, isAdmin)
 				ctx = utils.SetIsPOS(ctx, isPOS)
 				ctx = utils.SetTokenExpiry(ctx, exp)
-				// Bind the WebSocket context lifetime to the access token.
-				// When exp hits, ctx.Done() fires, every in-flight subscription
-				// unblocks on its <-ctx.Done() select arm, and gqlgen tears
-				// down the connection. Clients must reconnect with a fresh
-				// token (both tsb-core and tsb-dashboard already do this via
-				// silentRenew + graphql-ws retry).
-				//
-				// The WS transport cancels the parent ctx on socket close, so
-				// the cancel func here is redundant — the deadline fires via
-				// the runtime clock and its Timer is GC'd by context.cancelCtx
-				// once the parent terminates. Kept in a named var so govet's
-				// lostcancel check is satisfied.
-				if !exp.IsZero() {
-					var cancel context.CancelFunc
-					ctx, cancel = context.WithDeadline(ctx, exp)
-					_ = cancel
-				}
+				ctx = bindToTokenExpiry(ctx)
 			}
 			return ctx, &initPayload, nil
 		},
@@ -318,4 +297,33 @@ func ErrorPresenter(ctx context.Context, e error) *gqlerror.Error {
 		}
 	}
 	return err
+}
+
+// bindToTokenExpiry binds the WebSocket context lifetime to the access token.
+// When exp hits, ctx.Done() fires, every in-flight subscription unblocks on
+// its <-ctx.Done() select arm, and gqlgen tears down the connection. Clients
+// must reconnect with a fresh token (tsb-core and tsb-dashboard do this via
+// silentRenew + graphql-ws retry).
+//
+// POS device sockets are exempt: handhelds in the field run builds that cannot
+// be updated, and older ones do not re-fetch missed orders after a server-side
+// close, so a cut every 8h would drop live order events. They keep the
+// v1.0.33 behaviour (the socket lives until the client closes it). Revoked
+// devices are still refused at device-login and on every HTTP request.
+//
+// The WS transport cancels the parent ctx on socket close, so the cancel func
+// is redundant: the deadline fires via the runtime clock and its Timer is
+// GC'd by context.cancelCtx once the parent terminates. Kept in a named var
+// so govet's lostcancel check is satisfied.
+func bindToTokenExpiry(ctx context.Context) context.Context {
+	if utils.GetIsPOS(ctx) {
+		return ctx
+	}
+	exp := utils.GetTokenExpiry(ctx)
+	if exp.IsZero() {
+		return ctx
+	}
+	ctx, cancel := context.WithDeadline(ctx, exp)
+	_ = cancel
+	return ctx
 }
