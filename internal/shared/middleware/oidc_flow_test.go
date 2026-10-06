@@ -393,6 +393,40 @@ func TestOptionalAuthMiddleware(t *testing.T) {
 		assert.True(t, s.pos)
 	})
 
+	t.Run("a WebSocket upgrade with an invalid bearer token is refused", func(t *testing.T) {
+		e := newAuthEnv(t)
+		e.v.SetAppJWTVerifier(e.app)
+		rec, s := e.run(t, e.v.OptionalAuthMiddleware(), func(r *http.Request) {
+			r.Header.Set("Authorization", "Bearer stale")
+			r.Header.Set("Upgrade", "websocket")
+		})
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+		assert.False(t, s.reached)
+	})
+
+	t.Run("a WebSocket upgrade with a valid POS token goes through", func(t *testing.T) {
+		e := newAuthEnv(t)
+		e.app.deviceID = uuid.New()
+		e.v.SetAppJWTVerifier(e.app)
+		_, s := e.run(t, e.v.OptionalAuthMiddleware(), func(r *http.Request) {
+			r.Header.Set("Authorization", "Bearer pos")
+			r.Header.Set("Upgrade", "websocket")
+		})
+		assert.True(t, s.reached)
+		assert.True(t, s.pos)
+	})
+
+	t.Run("a WebSocket upgrade with only a stale cookie stays anonymous", func(t *testing.T) {
+		e := newAuthEnv(t)
+		rec, s := e.run(t, e.v.OptionalAuthMiddleware(), func(r *http.Request) {
+			r.AddCookie(&http.Cookie{Name: "access_token", Value: "stale"})
+			r.Header.Set("Upgrade", "websocket")
+		})
+		assert.Equal(t, http.StatusNoContent, rec.Code)
+		assert.True(t, s.reached)
+		assert.Empty(t, s.userID)
+	})
+
 	t.Run("a refused user lookup leaves the caller anonymous", func(t *testing.T) {
 		e := newAuthEnv(t)
 		e.lookup.err = errors.New("db down")

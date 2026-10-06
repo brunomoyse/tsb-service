@@ -373,7 +373,9 @@ func (v *OIDCVerifier) StrictAuthMiddleware() gin.HandlerFunc {
 }
 
 // OptionalAuthMiddleware parses a Zitadel JWT (or POS app JWT) if present.
-// Never aborts — unauthenticated requests pass through with no context values.
+// Unauthenticated requests pass through with no context values, with one
+// exception: a WebSocket upgrade whose Authorization header carries a token
+// that verifies on neither path is refused with 401 (see staleSocketUpgrade).
 func (v *OIDCVerifier) OptionalAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := extractToken(c)
@@ -381,11 +383,24 @@ func (v *OIDCVerifier) OptionalAuthMiddleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		if !v.verifyAndSetContext(c, tokenStr) {
-			v.tryVerifyAppJWT(c, tokenStr)
+		if !v.verifyAndSetContext(c, tokenStr) && !v.tryVerifyAppJWT(c, tokenStr) && staleSocketUpgrade(c) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			return
 		}
 		c.Next()
 	}
+}
+
+// staleSocketUpgrade reports whether the request is a WebSocket upgrade that
+// authenticates with an Authorization header. Only the POS handheld does this
+// (browsers cannot set headers on a WebSocket; tsb-core, the dashboard and
+// tsb-mobile send the token in connection_init). If such an upgrade went
+// through anonymously, the handheld would keep resubscribing on a socket that
+// can never be authorized (seen after a POS signing key change). A 401 makes
+// it refresh its token and open a new socket instead.
+func staleSocketUpgrade(c *gin.Context) bool {
+	_, hasBearer := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer ")
+	return hasBearer && strings.EqualFold(c.GetHeader("Upgrade"), "websocket")
 }
 
 // VerifyToken verifies a raw JWT string and returns the subject plus admin flag
