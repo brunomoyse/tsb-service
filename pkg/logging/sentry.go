@@ -1,6 +1,9 @@
 package logging
 
 import (
+	"context"
+	"errors"
+	"strings"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -52,10 +55,25 @@ func (c *sentryCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore
 	return ce
 }
 
+// isClientCancel reports whether err only says the client went away: the request context was canceled (browser
+// navigated, tab closed, fetch aborted) or Postgres canceled the statement for that reason. A repository logs such a
+// failed query at Error like any other, but it is not a fault of the service, so it must not raise a Sentry alert.
+// A timeout (context.DeadlineExceeded) is a real problem and still alerts.
+func isClientCancel(err error) bool {
+	return errors.Is(err, context.Canceled) ||
+		strings.Contains(err.Error(), "canceling statement due to user request")
+}
+
 func (c *sentryCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 	hub := sentry.CurrentHub()
 	if hub.Client() == nil {
-		return nil // Sentry not configured (no SENTRY_DSN) — no-op.
+		return nil // Sentry not configured (no SENTRY_DSN), no-op.
+	}
+
+	for _, f := range append(c.fields[:len(c.fields):len(c.fields)], fields...) {
+		if err, ok := f.Interface.(error); ok && f.Type == zapcore.ErrorType && isClientCancel(err) {
+			return nil
+		}
 	}
 
 	// Flatten accumulated + call-site fields into a map for Sentry extras.

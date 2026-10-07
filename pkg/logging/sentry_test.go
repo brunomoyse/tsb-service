@@ -2,6 +2,8 @@ package logging
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -76,5 +78,44 @@ func TestSentryBridge(t *testing.T) {
 		t.Errorf("context Error log was not captured")
 	} else if e.Tags["request_id"] != "req-9" {
 		t.Errorf("request_id tag = %q, want req-9", e.Tags["request_id"])
+	}
+}
+
+// TestSentryBridgeSkipsClientCancel verifies that an Error log whose error only says the client went away (canceled
+// request context, or Postgres canceling the statement for it) raises no Sentry event, while a timeout still does.
+func TestSentryBridgeSkipsClientCancel(t *testing.T) {
+	tr := &captureTransport{}
+	if err := sentry.Init(sentry.ClientOptions{
+		Dsn:       "https://test@test.ingest.sentry.io/1",
+		Transport: tr,
+	}); err != nil {
+		t.Fatalf("sentry init: %v", err)
+	}
+	t.Cleanup(func() { sentry.Flush(time.Second) })
+
+	Setup("info", "json")
+
+	zap.L().Error("query failed", zap.Error(context.Canceled))                                       // skipped
+	zap.L().Error("wrapped", zap.Error(fmt.Errorf("fetch categories: %w", context.Canceled)))        // skipped
+	zap.L().With(zap.Error(context.Canceled)).Error("logger field")                                  // skipped
+	zap.L().Error("pg cancel", zap.Error(errors.New("pq: canceling statement due to user request"))) // skipped
+	zap.L().Error("timeout", zap.Error(context.DeadlineExceeded))                                    // captured
+	zap.L().Error("real failure", zap.Error(errors.New("relation does not exist")))                  // captured
+
+	sentry.Flush(time.Second)
+
+	got := map[string]bool{}
+	for _, e := range tr.all() {
+		got[e.Message] = true
+	}
+	for _, skipped := range []string{"query failed", "wrapped", "logger field", "pg cancel"} {
+		if got[skipped] {
+			t.Errorf("client cancel %q must not be captured", skipped)
+		}
+	}
+	for _, captured := range []string{"timeout", "real failure"} {
+		if !got[captured] {
+			t.Errorf("%q was not captured", captured)
+		}
 	}
 }
