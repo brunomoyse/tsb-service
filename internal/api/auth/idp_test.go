@@ -268,3 +268,69 @@ func TestCreateIdPSessionHandler_MissingFields(t *testing.T) {
 		})
 	}
 }
+
+// notSucceeded is Zitadel's answer when the customer did not finish the provider step (seen in prod, TSB-CORE-E).
+const notSucceeded = `{"code":9, "message":"Intent has not succeeded (IDP-nme4gszsvx)", "details":[{"@type":"type.googleapis.com/zitadel.v1.ErrorDetail", "id":"IDP-nme4gszsvx", "message":"Intent has not succeeded"}]}`
+
+// A sign-in the customer cancelled on the Google/Apple screen is a 400 the shop can explain, not a 502.
+func TestCreateIdPSessionHandler_IntentNotSucceeded_NewUser(t *testing.T) {
+	setupMockZitadelWithIdP(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/idp_intents/intent-cancelled" && r.Method == "POST":
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(notSucceeded))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	w, c := ginContext("POST", "/auth/idp/session", `{"idpIntentId":"intent-cancelled","idpIntentToken":"tok"}`)
+	CreateIdPSessionHandler(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.JSONEq(t, `{"error":"idp_intent_not_succeeded"}`, w.Body.String())
+}
+
+// The same refusal on the session check of a returning customer (userId given) is answered the same way.
+func TestCreateIdPSessionHandler_IntentNotSucceeded_ExistingUser(t *testing.T) {
+	setupMockZitadelWithIdP(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/sessions" && r.Method == "POST":
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(notSucceeded))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	w, c := ginContext("POST", "/auth/idp/session", `{"idpIntentId":"intent-abc","idpIntentToken":"tok","userId":"existing-user-123"}`)
+	CreateIdPSessionHandler(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.JSONEq(t, `{"error":"idp_intent_not_succeeded"}`, w.Body.String())
+}
+
+// Any other refusal of the intent is still a failure of the sign-in service: 502, logged at Error.
+func TestCreateIdPSessionHandler_IntentOtherError(t *testing.T) {
+	setupMockZitadelWithIdP(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v2/idp_intents/intent-x" && r.Method == "POST":
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"code":16,"message":"Errors.Token.Invalid"}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	w, c := ginContext("POST", "/auth/idp/session", `{"idpIntentId":"intent-x","idpIntentToken":"tok"}`)
+	CreateIdPSessionHandler(c)
+
+	assert.Equal(t, http.StatusBadGateway, w.Code)
+}
+
+func TestIntentNotSucceeded(t *testing.T) {
+	assert.True(t, intentNotSucceeded(http.StatusBadRequest, []byte(notSucceeded)))
+	assert.True(t, intentNotSucceeded(http.StatusPreconditionFailed, []byte(`{"message":"Intent has not succeeded"}`)))
+	assert.False(t, intentNotSucceeded(http.StatusBadRequest, []byte(`{"message":"something else"}`)))
+	assert.False(t, intentNotSucceeded(http.StatusBadGateway, []byte(notSucceeded)))
+}

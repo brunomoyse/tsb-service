@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -95,6 +97,25 @@ func StartIdPIntentHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, idpStartResponse{AuthURL: zResp.AuthURL})
 }
 
+// errIdPIntentNotSucceeded: the customer did not finish the provider step (cancelled on the Google or Apple screen,
+// closed it, came back with the back button), so Zitadel refuses the intent. A normal customer action, not a failure
+// of the service: it is answered 400 idp_intent_not_succeeded (the shop offers to try again) and logged at Warn.
+var errIdPIntentNotSucceeded = errors.New("idp intent has not succeeded")
+
+// intentNotSucceeded reports whether a Zitadel answer is the "Intent has not succeeded" refusal
+// (FailedPrecondition, error id IDP-nme4gszsvx), whichever endpoint gave it.
+func intentNotSucceeded(status int, body []byte) bool {
+	if status != http.StatusBadRequest && status != http.StatusPreconditionFailed {
+		return false
+	}
+	return bytes.Contains(body, []byte("IDP-nme4gszsvx")) || bytes.Contains(body, []byte("Intent has not succeeded"))
+}
+
+func respondIntentNotSucceeded(c *gin.Context, log *zap.Logger) {
+	log.Warn("idp sign-in not completed by the customer")
+	c.JSON(http.StatusBadRequest, gin.H{"error": "idp_intent_not_succeeded"})
+}
+
 // CreateIdPSessionHandler creates a Zitadel session from an IdP intent result.
 // If no userId is provided (new user), it retrieves the IdP intent info
 // and creates the Zitadel user first.
@@ -114,6 +135,10 @@ func CreateIdPSessionHandler(c *gin.Context) {
 	if userID == "" {
 		var err error
 		userID, err = resolveOrCreateZitadelUser(log, req.IdPIntentID, req.IdPIntentToken)
+		if errors.Is(err, errIdPIntentNotSucceeded) {
+			respondIntentNotSucceeded(c, log)
+			return
+		}
 		if err != nil {
 			log.Error("failed to resolve/create zitadel user for IdP intent", zap.Error(err))
 			c.JSON(http.StatusBadGateway, gin.H{"error": "failed to provision user"})
@@ -141,6 +166,10 @@ func CreateIdPSessionHandler(c *gin.Context) {
 		return
 	}
 
+	if intentNotSucceeded(status, respBody) {
+		respondIntentNotSucceeded(c, log)
+		return
+	}
 	if status != http.StatusCreated && status != http.StatusOK {
 		// A non-2xx here blocks login (e.g. the Zitadel projection-lag 404 that
 		// stranded first-time IdP sign-ins). Log at Error so it surfaces in
@@ -186,6 +215,9 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 	})
 	if err != nil {
 		return "", fmt.Errorf("retrieve idp intent: %w", err)
+	}
+	if intentNotSucceeded(intentStatus, intentBody) {
+		return "", errIdPIntentNotSucceeded
 	}
 	if intentStatus != http.StatusOK {
 		return "", fmt.Errorf("retrieve idp intent returned status %d: %s", intentStatus, intentBody)
