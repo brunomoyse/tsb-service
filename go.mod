@@ -26,7 +26,7 @@ require (
 	github.com/pressly/goose/v3 v3.28.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/client_model v0.6.3
-	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.37
+	github.com/scaleway/scaleway-sdk-go v1.38.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/sideshow/apns2 v0.25.0
 	github.com/stretchr/testify v1.12.1
