@@ -64,7 +64,7 @@ func main() {
 
 	for _, p := range products {
 		if p.Slug == p.ID {
-			log.Printf("  SKIP %s — already using UUID as key", p.ID)
+			log.Printf("  SKIP %s: already using UUID as key", p.ID)
 			skipped++
 			continue
 		}
@@ -73,10 +73,10 @@ func main() {
 		if err != nil {
 			// 404 means no image was ever uploaded for this product.
 			if strings.Contains(err.Error(), "status 404") {
-				log.Printf("  SKIP %s (slug=%s) — no image on file service", p.ID, p.Slug)
+				log.Printf("  SKIP %s (slug=%s): no image on file service", p.ID, p.Slug)
 				skipped++
 			} else {
-				log.Printf("  FAIL %s (slug=%s) — %v", p.ID, p.Slug, err)
+				log.Printf("  FAIL %s (slug=%s): %v", p.ID, p.Slug, err)
 				failed++
 			}
 			continue

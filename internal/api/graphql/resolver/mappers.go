@@ -53,7 +53,7 @@ func isUniqueViolation(err error) bool {
 }
 
 // isActiveCouponOrderConflict reports whether err is the unique violation on the
-// one_active_coupon_order_per_user partial index — the race-proof backstop for
+// one_active_coupon_order_per_user partial index, the race-proof backstop for
 // the HasActiveCouponOrder pre-check, hit when a concurrent order slips in
 // between the check and the insert.
 func isActiveCouponOrderConflict(err error) bool {
@@ -507,7 +507,7 @@ func validatePreferredReadyTime(preferred *time.Time, config *restaurantDomain.R
 
 	prepBuffer := max(time.Duration(config.PreparationMinutes), time.Duration(restaurantDomain.MinimumPreparationMinutes)) * time.Minute
 	if slot.Before(nowLocal.Add(prepBuffer)) {
-		return slotError(apperr.CodeSlotTooSoon, "preferred ready time is no longer available — it is within the minimum preparation window")
+		return slotError(apperr.CodeSlotTooSoon, "preferred ready time is no longer available: it is within the minimum preparation window")
 	}
 
 	if slot.Minute()%restaurantDomain.SlotIntervalMinutes != 0 || slot.Second() != 0 || slot.Nanosecond() != 0 {

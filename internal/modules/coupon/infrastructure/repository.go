@@ -93,7 +93,7 @@ func (r *CouponRepository) IncrementUsedCount(ctx context.Context, id uuid.UUID)
 // SELECT ... FOR UPDATE row lock, then atomically validates and increments
 // both the per-user and global counters. All three steps (lock + per-user
 // bump + global bump) commit together or not at all, so a failed global
-// increment cannot leave a dangling per-user increment behind — the race
+// increment cannot leave a dangling per-user increment behind; the race
 // the previous two-step implementation allowed.
 func (r *CouponRepository) RedeemAtomic(ctx context.Context, couponID, userID uuid.UUID) (bool, error) {
 	tx, err := r.pool.ForContext(ctx).BeginTxx(ctx, nil)

@@ -125,8 +125,8 @@ func (r *PaymentRepository) MarkAsRefund(ctx context.Context, externalPaymentID 
 }
 
 // WithPaymentLock runs fn while holding a Postgres session-level advisory lock
-// keyed on the payment ID. Concurrent webhook deliveries for the same payment —
-// possibly landing on different replicas — block here until the holder releases,
+// keyed on the payment ID. Concurrent webhook deliveries for the same payment
+// (possibly landing on different replicas) block here until the holder releases,
 // so the webhook critical section runs one at a time per payment. fn's own queries
 // go through the pool as usual; only the serialization is provided here.
 func (r *PaymentRepository) WithPaymentLock(ctx context.Context, paymentID string, fn func(context.Context) error) error {

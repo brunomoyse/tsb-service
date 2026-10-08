@@ -295,7 +295,7 @@ func (c *GoogleClient) ComputeRoute(ctx context.Context, destLat, destLng float6
 	route := apiResp.Routes[0]
 	durationSeconds = 0
 	if route.Duration != "" {
-		// Duration is in format "540s" — trim trailing 's'
+		// Duration is in format "540s": trim trailing 's'
 		durationStr := strings.TrimSuffix(route.Duration, "s")
 		if val, err := strconv.Atoi(durationStr); err == nil {
 			durationSeconds = val

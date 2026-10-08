@@ -113,7 +113,7 @@ func (r *mutationResolver) UpdateCoupon(ctx context.Context, id uuid.UUID, input
 		coupon.DiscountValue = dv
 	}
 	// Validate the final (type, value) pair regardless of which fields were
-	// supplied — e.g. switching type from 'fixed' to 'percentage' without
+	// supplied, e.g. switching type from 'fixed' to 'percentage' without
 	// resubmitting the value must still be rejected if the value exceeds 100.
 	if err := validateDiscount(coupon.DiscountType, coupon.DiscountValue); err != nil {
 		return nil, err

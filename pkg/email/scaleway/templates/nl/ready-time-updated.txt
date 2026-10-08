@@ -8,6 +8,6 @@ Onze excuses voor het ongemak.
 
 Bestelling volgen: {{.StatusLink}}
 
-Dit is een geautomatiseerde e-mail — gelieve niet te antwoorden.
+Dit is een geautomatiseerde e-mail. Gelieve niet te antwoorden.
 
 © 2026 {{restaurantName}}. Alle rechten voorbehouden.

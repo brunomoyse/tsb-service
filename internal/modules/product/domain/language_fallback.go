@@ -4,7 +4,7 @@ package domain
 //
 // French is always tried immediately after the requested language because
 // FR is the authoring language for every product and is guaranteed to be
-// present in the DB — a missing or empty NL/EN/ZH translation falls back
+// present in the DB: a missing or empty NL/EN/ZH translation falls back
 // to FR rather than to another partially-translated locale.
 func translationFallbackOrder(language string) []string {
 	switch language {

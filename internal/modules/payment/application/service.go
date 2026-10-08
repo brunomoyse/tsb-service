@@ -606,7 +606,7 @@ func (s *paymentService) refundPaidCancelledOrder(ctx context.Context, order *or
 // HandlePaymentFailed handles the business logic when a payment is cancelled/failed/expired:
 // updates order status to CANCELLED. Coupon usage rollback is handled centrally by
 // OrderService.UpdateOrder on the transition into CANCELED (covering cash/admin/POS
-// cancellations too), so it is not repeated here. No email is sent — users frequently
+// cancellations too), so it is not repeated here. No email is sent: users frequently
 // retry the checkout in a fresh order, and a failure notification on the abandoned
 // attempt would contradict the successful retry.
 func (s *paymentService) HandlePaymentFailed(ctx context.Context, orderID uuid.UUID) (*orderDomain.Order, error) {

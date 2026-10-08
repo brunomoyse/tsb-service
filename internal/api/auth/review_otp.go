@@ -14,7 +14,7 @@ import (
 /*
  * Google Play / App Store review access for passwordless (email-OTP) login.
  *
- * App reviewers cannot receive the OTP email — they have no access to the test
+ * App reviewers cannot receive the OTP email: they have no access to the test
  * mailbox. For a dedicated review account we therefore (1) suppress the email,
  * and (2) keep the latest code in memory so it can be fetched over a static URL
  * the reviewer is given in the store listing's "login instructions" field.
@@ -61,7 +61,7 @@ func isReviewOtpLogin(loginName string) bool {
 }
 
 // IsReviewLogin reports whether loginName belongs to a configured store-review
-// account (REVIEW_OTP_LOGINS). Exported for callers outside the auth package —
+// account (REVIEW_OTP_LOGINS). Exported for callers outside the auth package,
 // e.g. suppressing the kitchen handheld push for reviewer orders so staff don't
 // prepare a test order placed during a Google Play / App Store review.
 func IsReviewLogin(loginName string) bool {
@@ -165,7 +165,7 @@ func ReviewLastOtpHandler(c *gin.Context) {
 	if !ok || time.Since(entry.storedAt) > reviewOtpTTL {
 		c.JSON(http.StatusOK, gin.H{
 			"code":    "",
-			"message": "no recent code — request a login code in the app first",
+			"message": "no recent code: request a login code in the app first",
 		})
 		return
 	}

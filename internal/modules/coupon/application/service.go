@@ -42,7 +42,7 @@ func NewCouponService(repo domain.CouponRepository) CouponService {
 func (s *couponService) ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal, userID uuid.UUID) (*domain.Coupon, decimal.Decimal, error) {
 	// Daily brute-force guard: block before any lookup once the user has spent
 	// their failed attempts for the day (Europe/Brussels). Fail-open if the
-	// counter read itself errors — never lock a user out on infra failure.
+	// counter read itself errors: never lock a user out on infra failure.
 	if attempts, err := s.repo.CountFailedCouponAttemptsToday(ctx, userID); err != nil {
 		logging.FromContext(ctx).Error("failed to read daily coupon attempts",
 			zap.String("user_id", userID.String()), zap.Error(err))

@@ -280,9 +280,9 @@ extend type Mutation {
 extend type Subscription {
     orderCreated: Order! @staff
 
-    # for the restaurant—fires on *every* order update
+    # for the restaurant, fires on *every* order update
     orderUpdated: Order! @staff
 
-    # for a customer—fires only when *their* order (by ID) changes
+    # for a customer, fires only when *their* order (by ID) changes
     myOrderUpdated(orderId: ID!): Order! @auth
 }

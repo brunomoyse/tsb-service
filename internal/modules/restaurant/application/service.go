@@ -45,7 +45,7 @@ func (s *restaurantService) GetConfig(ctx context.Context) (*domain.RestaurantCo
 }
 
 // GetConfigWithOverrides fetches both the config and overrides relevant
-// to "today and the next 7 days" — enough for all current consumers
+// to "today and the next 7 days", enough for all current consumers
 // (IsCurrentlyOpen, availableSlotsToday, nextOpeningAt).
 func (s *restaurantService) GetConfigWithOverrides(ctx context.Context) (*domain.RestaurantConfig, map[string]*domain.ScheduleOverride, error) {
 	config, err := s.repo.GetConfig(ctx)

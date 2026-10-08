@@ -269,7 +269,7 @@ func TestTokenExchangeHandler_RefreshToken(t *testing.T) {
 }
 
 func TestTokenExchangeHandler_InvalidClientId(t *testing.T) {
-	setupMockZitadel(t, nil) // No mock needed — rejected before network call
+	setupMockZitadel(t, nil) // No mock needed: rejected before network call
 
 	w, c := ginContext("POST", "/auth/token-exchange", `{"code":"auth-code","clientId":"unknown-client"}`)
 	TokenExchangeHandler(c)

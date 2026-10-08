@@ -13,7 +13,7 @@ import (
 )
 
 // normalizeEmail is a defense-in-depth duplicate of the application-layer
-// helper — every email written to or queried from the users table goes through
+// helper: every email written to or queried from the users table goes through
 // it so capitalisation can never leak into storage even if a caller forgets.
 func normalizeEmail(raw string) string {
 	return strings.ToLower(strings.TrimSpace(raw))
@@ -110,7 +110,7 @@ func (r *UserRepository) AnonymizeForDeletion(ctx context.Context, userID string
 	// locally via JWKS (no introspection), so a token issued before deletion
 	// stays valid until it expires. If we dropped the sub, the next request on
 	// that stale token would miss FindByZitadelID, miss FindByEmail (email is
-	// anonymized), and JIT-provision a fresh row from the token claims —
+	// anonymized), and JIT-provision a fresh row from the token claims,
 	// resurrecting the account with the PII we just erased. Keeping the (now
 	// dead, never-reused) Zitadel sub makes FindByZitadelID return this
 	// anonymized row instead, so the stale token resolves to "Anonyme Anonyme"

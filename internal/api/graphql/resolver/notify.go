@@ -14,7 +14,7 @@ import (
 
 // SendNewOrderPush fans out a "new order" push notification to admin devices
 // (phones / dashboard) and POS handhelds. Safe to call when FCM and APNs are
-// both unconfigured (no-op). Runs in its own goroutine — callers should not
+// both unconfigured (no-op). Runs in its own goroutine: callers should not
 // wrap it in `go`.
 //
 // Online-payment orders must only call this once the Mollie webhook confirms

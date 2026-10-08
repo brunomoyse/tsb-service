@@ -188,7 +188,7 @@ func CreateIdPSessionHandler(c *gin.Context) {
 
 	// Best-effort: a user just provisioned from an IdP that omitted the name
 	// (Apple on repeat auth) carries the placeholder marker and should be routed
-	// through profile completion before /auth/finalize — same signal and same
+	// through profile completion before /auth/finalize: same signal and same
 	// /auth/session/otp/complete-profile endpoint the OTP flow uses. A failed
 	// lookup must never block login: the user keeps the placeholder name and can
 	// edit it from their profile later.
@@ -226,7 +226,7 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 	var intentInfo struct {
 		// Top-level userId is set by Zitadel when the external identity is ALREADY
 		// linked to a Zitadel user (a repeat IdP login). When present we use it
-		// directly — see step 0.
+		// directly (see step 0).
 		UserID       string          `json:"userId"`
 		AddHumanUser json.RawMessage `json:"addHumanUser"`
 		IdpInfo      struct {
@@ -241,7 +241,7 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 
 	// 0. The external identity is already linked to a Zitadel user (repeat IdP
 	// login). Use that user directly and skip the find-by-email / link / create
-	// path below, which is fragile when the link already exists — e.g. an
+	// path below, which is fragile when the link already exists, e.g. an
 	// incomplete first sign-in (user closed the app before completing their
 	// profile) left a placeholder account with the IdP already linked, and
 	// re-linking or re-creating it would fail.
@@ -275,9 +275,9 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 			// (e.g. 400/412), so inspect the message too rather than trusting 409.
 			switch {
 			case linkStatus == http.StatusOK || linkStatus == http.StatusCreated || linkStatus == http.StatusConflict:
-				// freshly linked, or already linked (409) — ok
+				// freshly linked, or already linked (409): ok
 			case containsAny(parseZitadelError(linkResp), "already", "AlreadyExists"):
-				// already linked under a non-409 status — ok
+				// already linked under a non-409 status: ok
 			default:
 				return "", fmt.Errorf("link idp to user returned status %d: %s", linkStatus, linkResp)
 			}
@@ -286,15 +286,15 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 		}
 	}
 
-	// 3. No existing user — create one using the template from the intent.
+	// 3. No existing user: create one using the template from the intent.
 	// Uses admin PAT since user creation requires management permissions.
 	//
 	// Apple only returns the user's name on the FIRST authorization of an Apple
 	// ID against our Services ID; every later sign-in (including any sign-in
-	// after the app account was deleted — Apple keeps the consent server-side)
+	// after the app account was deleted: Apple keeps the consent server-side)
 	// omits it. Zitadel's /v2/users/human rejects an empty givenName/familyName
-	// (min 1 rune), so we backfill the placeholder marker — same as the OTP
-	// signup path — and let the complete-profile flow collect the real name.
+	// (min 1 rune), so we backfill the placeholder marker (same as the OTP
+	// signup path) and let the complete-profile flow collect the real name.
 	addHumanUser := ensureProfileName(log, intentInfo.AddHumanUser)
 	log.Info("creating new zitadel user from IdP intent",
 		zap.String("email", email),
@@ -320,7 +320,7 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 	// Zitadel's user query projection updates asynchronously after creation, so
 	// the POST /v2/sessions call that immediately follows can race it and fail
 	// with a spurious NotFound (404, "User could not be found"), surfacing as
-	// "Authentication failed" — this hit an App Store reviewer on a first-time
+	// "Authentication failed": this hit an App Store reviewer on a first-time
 	// Apple sign-in. Wait for the new user to be queryable before returning. If
 	// it never shows we proceed anyway: the session attempt is no worse off than
 	// without the wait, and a non-blocking login beats blocking on a slow poll.

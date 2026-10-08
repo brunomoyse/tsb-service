@@ -55,7 +55,7 @@ type ChoiceTranslation struct {
 }
 
 // GetTranslationFor returns the translation matching the given locale.
-// Empty Name values are skipped — a blank row for the requested locale
+// Empty Name values are skipped: a blank row for the requested locale
 // must not shadow a valid translation in the fallback chain.
 func (c *ProductChoice) GetTranslationFor(locale string) string {
 	for _, candidate := range translationFallbackOrder(locale) {

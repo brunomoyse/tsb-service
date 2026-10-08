@@ -97,7 +97,7 @@ func TestCreateIdPSessionHandler_WithExistingUserId(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"sessionId":"sess-idp-1","sessionToken":"tok-idp-1"}`))
 		case r.URL.Path == "/v2/users/existing-user-123" && r.Method == "GET":
-			// Profile-completion probe — existing user has a real name.
+			// Profile-completion probe: existing user has a real name.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"Existing","familyName":"User"}}}}`))
 		default:
@@ -128,11 +128,11 @@ func TestCreateIdPSessionHandler_NewUserFromIdP(t *testing.T) {
 				"idpInformation":{"idpId":"test-google-idp","userId":"google-sub-1","userName":"new@google.com"}
 			}`))
 		case r.URL.Path == "/v2/users" && r.Method == "POST":
-			// Email search — user not found
+			// Email search: user not found
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result":[]}`))
 		case r.URL.Path == "/v2/users/human" && r.Method == "POST":
-			// Create new user — the IdP supplied a name, so it is preserved.
+			// Create new user: the IdP supplied a name, so it is preserved.
 			var body map[string]any
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 			profile := body["profile"].(map[string]any)
@@ -144,7 +144,7 @@ func TestCreateIdPSessionHandler_NewUserFromIdP(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"sessionId":"sess-new","sessionToken":"tok-new"}`))
 		case r.URL.Path == "/v2/users/new-user-789" && r.Method == "GET":
-			// Profile-completion probe — real name was provided by the IdP.
+			// Profile-completion probe: real name was provided by the IdP.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"New","familyName":"User"}}}}`))
 		default:
@@ -170,14 +170,14 @@ func TestCreateIdPSessionHandler_NewUserNoName(t *testing.T) {
 	setupMockZitadelWithIdP(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/v2/idp_intents/intent-apple" && r.Method == "POST":
-			// IdP intent with NO profile — mirrors Apple on a repeat sign-in.
+			// IdP intent with NO profile: mirrors Apple on a repeat sign-in.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{
 				"addHumanUser":{"email":{"email":"relay@privaterelay.appleid.com"}},
 				"idpInformation":{"idpId":"test-apple-idp","userId":"apple-sub-1","userName":"relay@privaterelay.appleid.com"}
 			}`))
 		case r.URL.Path == "/v2/users" && r.Method == "POST":
-			// Email search — user not found.
+			// Email search, user not found.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result":[]}`))
 		case r.URL.Path == "/v2/users/human" && r.Method == "POST":
@@ -193,7 +193,7 @@ func TestCreateIdPSessionHandler_NewUserNoName(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"sessionId":"sess-apple","sessionToken":"tok-apple"}`))
 		case r.URL.Path == "/v2/users/apple-user-1" && r.Method == "GET":
-			// Profile-completion probe — still the placeholder marker.
+			// Profile-completion probe: still the placeholder marker.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"-","familyName":"-"}}}}`))
 		default:
@@ -215,7 +215,7 @@ func TestCreateIdPSessionHandler_NewUserNoName(t *testing.T) {
 // TestCreateIdPSessionHandler_AlreadyLinkedIdP covers a repeat IdP login where
 // the external identity is already linked to a Zitadel user (e.g. an incomplete
 // first sign-in left a placeholder account). Zitadel returns the linked userId
-// at the top level of the intent, and the handler must use it directly — never
+// at the top level of the intent, and the handler must use it directly: never
 // re-searching, re-linking, or re-creating (those would fail on the duplicate).
 func TestCreateIdPSessionHandler_AlreadyLinkedIdP(t *testing.T) {
 	setupMockZitadelWithIdP(t, func(w http.ResponseWriter, r *http.Request) {

@@ -45,7 +45,7 @@ EXPOSE 8080
 # Step 11: Health check
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:8080/api/v1/up || exit 1
 
-# Sentry release tracking — set at build time by the CI to the git tag so
+# Sentry release tracking: set at build time by the CI to the git tag so
 # events in Sentry are grouped by version. Read by main.go sentry.Init.
 ARG APP_VERSION
 ENV APP_VERSION=${APP_VERSION}

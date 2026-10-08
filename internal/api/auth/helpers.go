@@ -90,7 +90,7 @@ func containsAny(s string, subs ...string) bool {
 // GetZitadelUserInfo fetches a Zitadel user's profile (email, given name, family name)
 // by their Zitadel user ID. Used by the OIDC middleware to enrich JIT provisioning
 // when JWT access tokens don't include profile claims (which is the case for
-// locally-validated Zitadel JWTs — see zitadel-go SDK oauth.WithJWT).
+// locally-validated Zitadel JWTs; see zitadel-go SDK oauth.WithJWT).
 func GetZitadelUserInfo(_ context.Context, userID string) (email, givenName, familyName string, err error) {
 	respBody, status, err := zitadelRequest("GET", "/v2/users/"+url.PathEscape(userID), nil)
 	if err != nil {
@@ -223,11 +223,11 @@ func createPlaceholderZitadelUser(email string) (string, error) {
 // NotFound (HTTP 404, QUERY-Dfbg2 "User could not be found"), which surfaces to
 // the client as "Authentication failed". Polling GET /v2/users/{id} until it
 // returns 200 confirms the exact projection the session check depends on has
-// caught up — observed lag is tens of milliseconds, so a short bounded poll is
+// caught up: observed lag is tens of milliseconds, so a short bounded poll is
 // enough.
 //
 // Best-effort: on timeout it returns an error, but the caller should still
-// proceed — the session attempt is then no worse off than without the wait.
+// proceed; the session attempt is then no worse off than without the wait.
 //
 // Cadence is held in package vars (not consts) so tests can shrink the delay
 // and attempt count; production keeps 10 × 150ms ≈ 1.35s, comfortably above the

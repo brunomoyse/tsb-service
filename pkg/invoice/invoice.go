@@ -222,7 +222,7 @@ func GeneratePDF(data InvoiceData) ([]byte, error) {
 
 		name := item.Name
 		if item.Code != "" {
-			name = item.Code + " — " + item.Name
+			name = item.Code + " " + item.Name
 		}
 
 		pdf.CellFormat(colProduct, 7, name, "", 0, "L", fill, 0, "")

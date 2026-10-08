@@ -42,9 +42,9 @@ func NewPaymentHandler(service paymentApplication.PaymentService, broker *pubsub
 // Security model: Mollie standard webhooks do NOT include a signature header.
 // The webhook body contains only a payment ID (e.g. "tr_xxx"). We always re-fetch
 // the payment from the Mollie API to get the authoritative status. This means a
-// spoofed webhook cannot change payment state — the Mollie API is the source of truth.
+// spoofed webhook cannot change payment state: the Mollie API is the source of truth.
 func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
-	// The webhook itself runs under the plain request context — only the
+	// The webhook itself runs under the plain request context; only the
 	// service calls that need write access to orders/payments run under an
 	// admin-flagged context. This keeps the elevation narrow: pubsub events
 	// and any future downstream code added here don't silently inherit admin
@@ -77,7 +77,7 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 	// consistent stored status.
 	if lockErr := h.service.WithPaymentLock(adminCtx, paymentID, func(adminCtx context.Context) error {
 		// Verify the payment exists in our DB. A genuine not-found means a spoofed
-		// or stale ID — ack with 200 so Mollie stops. Any OTHER error (e.g. a
+		// or stale ID: ack with 200 so Mollie stops. Any OTHER error (e.g. a
 		// transient DB failure) must return 500 so Mollie retries; acking it would
 		// silently drop the webhook.
 		payment, err := h.service.GetPaymentByExternalID(adminCtx, paymentID)
@@ -102,7 +102,7 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 
 		// Idempotency: the stored status is the commit marker. If it already matches
 		// Mollie, the work for this transition was done (possibly by a concurrent
-		// delivery that held the lock just before us) — nothing more to do.
+		// delivery that held the lock just before us): nothing more to do.
 		if update.Status == payment.Status {
 			c.JSON(http.StatusOK, gin.H{"message": "already processed"})
 			return nil
@@ -133,20 +133,20 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 				// Paid after the order was cancelled: HandlePaymentPaid refunded
 				// it. Never announce it to staff as a new order.
 			case order.IsTest:
-				// Store-review test order: stays fully invisible to staff — no
+				// Store-review test order: stays fully invisible to staff: no
 				// subscription publish, no push. It will auto-cancel after 10 min.
 				// TEMPORARY (revert after launch).
-				log.Info("webhook: store-review test order paid — suppressing publish/push", zap.String("order_id", order.ID.String()))
+				log.Info("webhook: store-review test order paid, suppressing publish/push", zap.String("order_id", order.ID.String()))
 				h.sendConfirmation(adminCtx, orderID)
 			default:
 				gqlOrder := resolver.ToGQLOrder(order)
-				// First time the dashboard sees this online-payment order — publish
+				// First time the dashboard sees this online-payment order: publish
 				// orderCreated so admin clients add it to their store. CreateOrder
 				// suppressed that event for online orders until payment confirmed.
 				h.broker.Publish("orderCreated", gqlOrder)
 				h.broker.Publish("orderUpdated", gqlOrder)
 				h.broker.Publish(fmt.Sprintf("orderUpdated:%s", orderID), gqlOrder)
-				// Same rationale applies to push notifications — we only wake up
+				// Same rationale applies to push notifications: we only wake up
 				// admin phones and POS handhelds once the payment is confirmed.
 				if h.notifier != nil {
 					h.notifier.SendNewOrderPush(order)

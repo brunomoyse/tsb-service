@@ -15,7 +15,7 @@ type Product {
     price: String!
     slug: String!
 
-    # Belgian VAT categorization — one of: food, beverage, zero_rated, out_of_scope.
+    # Belgian VAT categorization, one of: food, beverage, zero_rated, out_of_scope.
     # The concrete VAT rate / SCE 2.0 code depends on the order service type.
     vatCategory: String!
 

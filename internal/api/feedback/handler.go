@@ -21,7 +21,7 @@ type FeedbackRequest struct {
 	ServiceType    string `json:"serviceType" binding:"required,oneof=takeaway dine-in delivery"`
 	FeedbackType   string `json:"feedbackType" binding:"required,oneof=improvement complaint compliment"`
 	Message        string `json:"message" binding:"required,min=10,max=2000"`
-	Website        string `json:"website"`        // honeypot — should always be empty
+	Website        string `json:"website"`        // honeypot: should always be empty
 	TurnstileToken string `json:"turnstileToken"` // Cloudflare Turnstile token
 }
 
@@ -32,7 +32,7 @@ type turnstileResponse struct {
 func verifyTurnstile(token, remoteIP string) bool {
 	secret := os.Getenv("TURNSTILE_SECRET_KEY")
 	if secret == "" {
-		// Turnstile not configured — skip verification
+		// Turnstile not configured: skip verification
 		return true
 	}
 

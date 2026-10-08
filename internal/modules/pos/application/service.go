@@ -235,7 +235,7 @@ func (s *Service) AccessTokenExpiry(tokenStr string) time.Time {
 
 func verifyHMAC(secretHashHex, payload, sigB64 string) bool {
 	// The server only stores the SHA-256 of the secret. Both sides use the hash
-	// itself as the HMAC key — see internal docs for rationale.
+	// itself as the HMAC key; see internal docs for rationale.
 	key, err := hex.DecodeString(secretHashHex)
 	if err != nil {
 		return false

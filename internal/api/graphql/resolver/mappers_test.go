@@ -47,7 +47,7 @@ func atBrussels(t *testing.T, dateStr, timeStr string) time.Time {
 // test for the production bug where a server running in UTC compared slot
 // wall-clock minutes (UTC) against schedule hours (Brussels), causing valid
 // slots like 12:00 Brussels to be rejected as "outside allowed opening slots"
-// because in UTC they read 10:00 — before the 11:00 Brussels lunch open.
+// because in UTC they read 10:00, before the 11:00 Brussels lunch open.
 func TestValidatePreferredReadyTime_ServerInUTCAcceptsBrusselsSlot(t *testing.T) {
 	cfg := &restaurantDomain.RestaurantConfig{
 		OrderingEnabled:    true,
@@ -181,9 +181,9 @@ func TestIsOrderUpdateTooLate(t *testing.T) {
 	}{
 		{"nil ETA never suppresses", nil, false},
 		{"ETA in the future", ptr(30 * time.Minute), false},
-		{"ETA 30 min ago — still inside threshold", ptr(-30 * time.Minute), false},
-		{"ETA exactly 40 min ago — boundary, not yet stale", ptr(-40 * time.Minute), false},
-		{"ETA 41 min ago — over threshold", ptr(-41 * time.Minute), true},
+		{"ETA 30 min ago: still inside threshold", ptr(-30 * time.Minute), false},
+		{"ETA exactly 40 min ago: boundary, not yet stale", ptr(-40 * time.Minute), false},
+		{"ETA 41 min ago: over threshold", ptr(-41 * time.Minute), true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

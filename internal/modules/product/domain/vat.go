@@ -2,7 +2,7 @@ package domain
 
 // VatCategory classifies a product for Belgian VAT purposes.
 // The actual VAT rate and SCE 2.0 code (A/B/C/D/X) depend on both
-// this category and the order's service type — resolved by
+// this category and the order's service type, resolved by
 // VatRatePercent / SceCode below.
 type VatCategory string
 
@@ -48,7 +48,7 @@ func (c VatCategory) IsValid() bool {
 //   - Restaurant food takeaway/delivery: 6%
 //   - Beverages (alcohol + soft drinks): 21%
 //   - Zero-rated items: 0%
-//   - Out-of-scope items: 0 (informational — not billable via SCE)
+//   - Out-of-scope items: 0 (informational: not billable via SCE)
 func (c VatCategory) VatRatePercent(svc ServiceType) float64 {
 	switch c {
 	case VatCategoryBeverage:

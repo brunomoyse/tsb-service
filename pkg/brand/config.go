@@ -58,7 +58,7 @@ func Current() Config {
 func NewFromEnv() Config {
 	return Config{
 		Name:          cmp.Or(os.Getenv("RESTAURANT_NAME"), "Tokyo Sushi Bar"),
-		LegalName:     cmp.Or(os.Getenv("RESTAURANT_LEGAL_NAME"), "Tokyo Sushi Bar — SRL"),
+		LegalName:     cmp.Or(os.Getenv("RESTAURANT_LEGAL_NAME"), "Tokyo Sushi Bar SRL"),
 		Address:       cmp.Or(os.Getenv("RESTAURANT_ADDRESS"), "Rue de la Cathédrale 59, 4000 Liège, Belgique"),
 		Phone:         cmp.Or(os.Getenv("RESTAURANT_PHONE"), "+32 4 222 98 88"),
 		Email:         cmp.Or(os.Getenv("RESTAURANT_EMAIL"), "tokyosushibar888@gmail.com"),

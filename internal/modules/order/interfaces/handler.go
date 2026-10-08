@@ -142,7 +142,7 @@ func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 			if choiceErr == nil && choice != nil {
 				choiceName := choice.GetTranslationFor(order.Language)
 				if choiceName != "" {
-					name += " — " + choiceName
+					name += " (" + choiceName + ")"
 				}
 			}
 		}

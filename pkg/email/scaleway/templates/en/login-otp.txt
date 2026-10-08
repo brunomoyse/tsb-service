@@ -4,7 +4,7 @@ Here is your login code for {{restaurantName}}. Enter it on the login page to ac
 
 {{.Code}}
 
-This code is valid for just a few minutes. If you didn't try to log in, ignore this email — your account stays secure.
+This code is valid for just a few minutes. If you didn't try to log in, ignore this email. Your account stays secure.
 
 See you soon at {{restaurantName}}!
 

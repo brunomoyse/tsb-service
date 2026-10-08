@@ -22,7 +22,7 @@ const skipSentryKey = "_skip_sentry"
 var SkipSentry = zap.Bool(skipSentryKey, true)
 
 // sentryCore forwards every Error-level-and-above zap entry to Sentry, so any
-// .Error(...) call anywhere in the service raises an alert — not just GraphQL
+// .Error(...) call anywhere in the service raises an alert, not just GraphQL
 // resolver errors and panics, which were the only paths wired before.
 //
 // It is installed unconditionally; CaptureEvent is a no-op until sentry.Init
@@ -34,7 +34,7 @@ type sentryCore struct {
 }
 
 func newSentryCore() *sentryCore {
-	// Error and above only — Warn-level entries (expected client conditions
+	// Error and above only: Warn-level entries (expected client conditions
 	// such as UNAUTHENTICATED, invalid OTP code, user-not-found lookups) must
 	// not page anyone.
 	return &sentryCore{LevelEnabler: zapcore.ErrorLevel}

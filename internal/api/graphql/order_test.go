@@ -73,7 +73,7 @@ func insertTestOrder(t *testing.T, tc *TestContext, userID uuid.UUID) uuid.UUID 
 // that isn't theirs must get a *gqlerror.Error tagged with
 // `extensions.code = "FORBIDDEN"` (and same for "NOT_FOUND" on an unknown
 // order). Without the extension code the error presenter routes the failure
-// to Sentry at ERROR level — which is exactly the production paging we hit.
+// to Sentry at ERROR level, which is exactly the production paging we hit.
 //
 // The subscription resolver (MyOrderUpdated) uses the identical ownership
 // check; testing the query path here gives us regression coverage for the
@@ -128,7 +128,7 @@ func TestMyOrderOwnership(t *testing.T) {
 		assert.Equal(t, []string{"myOrder"}, gqlErr.Path)
 
 		// The contract that keeps Sentry quiet: extensions.code must be set.
-		require.NotNil(t, gqlErr.Extensions, "missing extensions on FORBIDDEN error — error presenter will route this to Sentry")
+		require.NotNil(t, gqlErr.Extensions, "missing extensions on FORBIDDEN error: error presenter will route this to Sentry")
 		assert.Equal(t, "FORBIDDEN", gqlErr.Extensions["code"],
 			"FORBIDDEN errors must carry extensions.code so the error presenter demotes them away from Sentry")
 	})

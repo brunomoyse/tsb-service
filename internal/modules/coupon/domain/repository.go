@@ -16,7 +16,7 @@ type CouponRepository interface {
 	// RedeemAtomic performs the full redemption under a single transaction:
 	// takes a row lock on the coupon, re-validates activity/window/global-cap,
 	// increments per-user usage (bounded by max_uses_per_user), and increments
-	// the global counter — committing all three or none. Returns true on
+	// the global counter, committing all three or none. Returns true on
 	// successful redemption, false when the coupon is no longer available
 	// (expired, exhausted, per-user cap reached, or deactivated).
 	RedeemAtomic(ctx context.Context, couponID, userID uuid.UUID) (bool, error)

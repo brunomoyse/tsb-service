@@ -39,6 +39,6 @@ If you have any questions about your order, please do not hesitate to contact us
 
 If you did not place this order, please disregard this email.
 
-This is an automated email — please do not reply.
+This is an automated email. Please do not reply.
 
 © 2026 {{restaurantName}}. All rights reserved.

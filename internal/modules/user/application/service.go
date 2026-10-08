@@ -52,7 +52,7 @@ type UserService interface {
 
 // ZitadelUserFetcher retrieves a user's profile from Zitadel by sub.
 // Used to enrich JIT provisioning because local JWT validation (zitadel-go
-// SDK oauth.WithJWT) does not populate profile claims on the auth context —
+// SDK oauth.WithJWT) does not populate profile claims on the auth context;
 // only `sub` is guaranteed. Without this fallback, social-IdP users (Apple,
 // Google) are created with empty firstName/lastName/email.
 type ZitadelUserFetcher interface {
@@ -125,7 +125,7 @@ func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *st
 // DeleteMe permanently deletes the caller's account in one in-app step
 // (App Store guideline 5.1.1(v) / GDPR erasure). It removes the Zitadel
 // identity so the account can no longer authenticate, then anonymises the app
-// user row. The row itself is kept — not dropped — because orders reference it
+// user row. The row itself is kept, not dropped, because orders reference it
 // with ON DELETE RESTRICT and must be retained for Belgian VAT bookkeeping; all
 // personal data on the row is erased instead.
 func (s *userService) DeleteMe(ctx context.Context, userID string) error {
@@ -161,7 +161,7 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 	// Try to find existing user by Zitadel ID
 	user, err := s.repo.FindByZitadelID(ctx, zitadelID)
 	if err == nil {
-		// Backfill empty profile fields — e.g. Apple/Google users who were
+		// Backfill empty profile fields, e.g. Apple/Google users who were
 		// JIT-created before the Zitadel fallback existed have blank name/email.
 		if user.Email == "" || user.FirstName == "" || user.LastName == "" {
 			email, firstName, lastName = s.enrichFromZitadel(ctx, zitadelID, email, firstName, lastName)
@@ -186,7 +186,7 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 		return user, nil
 	}
 
-	// New user path — ensure we have profile data from Zitadel before creating.
+	// New user path: ensure we have profile data from Zitadel before creating.
 	email, firstName, lastName = s.enrichFromZitadel(ctx, zitadelID, email, firstName, lastName)
 
 	// Try by email first (for migrated users not yet backfilled)

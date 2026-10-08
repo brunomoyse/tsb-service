@@ -61,7 +61,7 @@ func FinalizeOIDCHandler(c *gin.Context) {
 	}
 
 	// Serialize finalizes for the same authRequestID. Zitadel's auth request
-	// is one-shot — a duplicate POST after a stutter would 4xx and the user
+	// is one-shot: a duplicate POST after a stutter would 4xx and the user
 	// sees "expired". The cache returns the already-resolved callbackUrl.
 	entry := finalizeGate.acquire(req.AuthRequestID)
 	defer finalizeGate.release(entry)

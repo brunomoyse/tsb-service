@@ -47,7 +47,7 @@ func GetOrderStatusNotification(status orderDomain.OrderStatus, language string,
 }
 
 // Localized labels + templates for the cancellation reason appended to push bodies.
-// OTHER is intentionally omitted — we keep the generic body.
+// OTHER is intentionally omitted: we keep the generic body.
 var cancellationReasonPushLabels = map[string]map[orderDomain.OrderCancellationReason]string{
 	"fr": {
 		orderDomain.OrderCancellationReasonOutOfStock:    "rupture de stock",
@@ -226,7 +226,7 @@ var liveActivityPickupSteps = []orderDomain.OrderStatus{
 }
 
 // liveActivityProgress returns the 0..1 step position for a status (determinate
-// progress; matches the app — no timer).
+// progress; matches the app; no timer).
 func liveActivityProgress(status orderDomain.OrderStatus, orderType string) float64 {
 	steps := liveActivityDeliverySteps
 	if orderType == "PICKUP" {

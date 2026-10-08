@@ -9,14 +9,14 @@ import (
 // key and caches successful responses so a duplicate or retried request
 // returns the same response without hitting the upstream. Used to protect
 // Zitadel session/OIDC endpoints whose underlying state machines consume
-// one-shot codes (the OTP-email code, the OIDC auth code) — without it, a
+// one-shot codes (the OTP-email code, the OIDC auth code). Without it, a
 // double-submit causes the second call to fail and the user sees an
 // "expired" error even though the first call actually succeeded.
 //
 // Cache key is (primaryKey, fingerprint). primaryKey gates the per-key mutex
 // (e.g., sessionID); fingerprint distinguishes a legitimate retry of the
 // same operation from a new attempt with different inputs (e.g., the user
-// types the wrong code, then the right one — only the right one should hit
+// types the wrong code, then the right one: only the right one should hit
 // the cache). Failures are never cached: a wrong code must remain retryable.
 type idempotencyGate[T any] struct {
 	mu      sync.Mutex
@@ -69,7 +69,7 @@ func (g *idempotencyGate[T]) cache(e *idempotencyEntry[T], fingerprint string, r
 
 // gcLocked deletes expired entries. Caller must hold g.mu. Each entry is
 // inspected via TryLock so a held entry (currently in cache() or hit() under
-// the caller's per-key mutex) is left alone — it'll be revisited on the
+// the caller's per-key mutex) is left alone; it'll be revisited on the
 // next acquire. This avoids racing with concurrent writers.
 func (g *idempotencyGate[T]) gcLocked() {
 	now := time.Now()
@@ -97,7 +97,7 @@ func (e *idempotencyEntry[T]) hit(fingerprint string) (T, bool) {
 
 // Package-level gates. Verify TTL matches Zitadel's OTP code TTL (~5min) so
 // a cached success cannot outlive a session that Zitadel itself has rotated
-// out. Finalize TTL is shorter — the cached callbackUrl carries an OIDC
+// out. Finalize TTL is shorter: the cached callbackUrl carries an OIDC
 // auth code that Zitadel typically expires after ~60s anyway.
 var (
 	verifyGate   = newIdempotencyGate[verifyOtpResponse](5 * time.Minute)

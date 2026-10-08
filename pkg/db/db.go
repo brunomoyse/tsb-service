@@ -24,7 +24,7 @@ type DBPool struct {
 
 // ForContext returns the appropriate database connection based on role flags
 // in the context. Admin callers (Zitadel admins and POS devices) get the Admin
-// pool — both need privileged access. Regular customers use the Customer pool.
+// pool: both need privileged access. Regular customers use the Customer pool.
 func (p *DBPool) ForContext(ctx context.Context) *sqlx.DB {
 	if utils.GetIsStaff(ctx) {
 		return p.Admin
@@ -112,7 +112,7 @@ func ConnectDualDatabase() (*DBPool, error) {
 		return nil, err
 	}
 
-	// Admin connection (optional — falls back to customer if not set)
+	// Admin connection (optional: falls back to customer if not set)
 	adminUser := os.Getenv("DB_ADMIN_USERNAME")
 	adminPassword := os.Getenv("DB_ADMIN_PASSWORD")
 

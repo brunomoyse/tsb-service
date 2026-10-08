@@ -14,14 +14,14 @@ import (
 // and ActivityKit Live Activity updates.
 //
 // It holds BOTH the production and sandbox (development) HTTP/2 clients built
-// from the same p8 auth key. APNs device tokens are environment-specific — a
+// from the same p8 auth key. APNs device tokens are environment-specific: a
 // token minted by a development build (Xcode debug / Expo dev / EAS
 // development) is only valid against the sandbox endpoint, while a token from a
 // TestFlight or App Store build is only valid against production. Since the
 // token table doesn't record which environment a token came from, every send
 // tries the preferred endpoint first and, on a BadDeviceToken reply (APNs's
 // "wrong environment" signal), retries once against the other endpoint. This
-// lets a single backend serve both dev and release builds, and — critically —
+// lets a single backend serve both dev and release builds, and, critically,
 // stops a sandbox token from being wrongly deleted as "invalid" when the
 // production endpoint rejects it.
 type Client struct {
@@ -67,7 +67,7 @@ var ErrTokenInvalid = fmt.Errorf("device token is invalid")
 const reasonBadEnvironmentKeyInToken = "BadEnvironmentKeyInToken"
 
 // isWrongEnvironmentReason reports whether an APNs rejection means "right
-// credentials, wrong environment" — i.e. retrying against the other endpoint
+// credentials, wrong environment", i.e. retrying against the other endpoint
 // could succeed. Covers both the device-token mismatch (BadDeviceToken) and the
 // auth-key/certificate environment-scope mismatches.
 func isWrongEnvironmentReason(reason string) bool {

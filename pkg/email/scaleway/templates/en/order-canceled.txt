@@ -4,4 +4,4 @@ We regret to inform you that your order has been cancelled.{{if .Reason}} Reason
 
 Please accept our sincere apologies for the inconvenience. If you need further assistance, feel free to contact the restaurant directly at {{restaurantPhone}}.
 
-This is an automated email — please do not reply.
+This is an automated email. Please do not reply.

@@ -25,7 +25,7 @@ jobs:
         with:
           ref: main
           # PAT (not GITHUB_TOKEN) so the tag push triggers the downstream
-          # "Build and Deploy" workflow — GITHUB_TOKEN-pushed events do not
+          # "Build and Deploy" workflow: GITHUB_TOKEN-pushed events do not
           # cascade by design.
           token: ${{ secrets.PAT }}
           fetch-depth: 0

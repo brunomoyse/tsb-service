@@ -82,7 +82,7 @@ func main() {
 
 		zitadelUserID, err := createZitadelUser(zitadelURL, pat, u)
 		if err != nil {
-			log.Printf("  ERROR: %v — skipping", err)
+			log.Printf("  ERROR: %v, skipping", err)
 			continue
 		}
 

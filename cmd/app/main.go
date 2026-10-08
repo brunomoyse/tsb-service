@@ -229,7 +229,7 @@ func main() {
 	userService := userApplication.NewUserService(userRepo, zitadelUserFetcher{})
 	paymentService := paymentApplication.NewPaymentService(paymentRepo, *mollieClient, orderService, userService, productService)
 
-	// OIDC verifier — validates JWTs via JWKS + resolves Zitadel sub → app user UUID
+	// OIDC verifier: validates JWTs via JWKS + resolves Zitadel sub → app user UUID
 	zitadelInternalURL := os.Getenv("ZITADEL_INTERNAL_URL") // Optional: internal Docker URL for OIDC discovery
 	zitadelProjectID := os.Getenv("ZITADEL_PROJECT_ID")     // used for project-specific role claim fallback
 	oidcVerifier, err := middleware.NewOIDCVerifier(context.Background(), zitadelIssuer, zitadelInternalURL, zitadelClientID, zitadelProjectID, userService)
@@ -244,12 +244,12 @@ func main() {
 	oidcVerifier.SetAdminClientIDs(adminClientIDs)
 	zap.L().Info("OIDC verifier initialized", zap.String("issuer", zitadelIssuer))
 
-	// POS (shop-floor handheld) auth module — single trusted device, HMAC-only.
+	// POS (shop-floor handheld) auth module: single trusted device, HMAC-only.
 	// Falls back to a generated ephemeral secret if POS_JWT_SECRET is unset so
 	// dev servers start cleanly; production MUST set POS_JWT_SECRET.
 	posJWTSecret := []byte(os.Getenv("POS_JWT_SECRET"))
 	if len(posJWTSecret) == 0 {
-		zap.L().Warn("POS_JWT_SECRET not set — generating ephemeral secret (tokens invalid on restart)")
+		zap.L().Warn("POS_JWT_SECRET not set: generating ephemeral secret (tokens invalid on restart)")
 		ephemeral := make([]byte, 32)
 		if _, err := cryptoRand.Read(ephemeral); err != nil {
 			zap.L().Error("rand for POS_JWT_SECRET failed", zap.Error(err))
@@ -279,7 +279,7 @@ func main() {
 		AdminClientIDs:     adminClientIDs,
 	})
 
-	// APNs client for iOS push notifications (optional — non-fatal if not configured)
+	// APNs client for iOS push notifications (optional, non-fatal if not configured)
 	var apnsClient *apns.Client
 	apnsKeyPath := os.Getenv("APNS_AUTH_KEY_PATH")
 	apnsKeyID := os.Getenv("APNS_KEY_ID")
@@ -292,7 +292,7 @@ func main() {
 		// is a property of the *build that minted the device token* (and of the
 		// auth key's environment scope), not of the backend deployment: a staging
 		// backend (APP_ENV != production) still serves TestFlight/ad-hoc builds
-		// whose tokens — and our prod-scoped p8 key — are Production. Set
+		// whose tokens (and our prod-scoped p8 key) are Production. Set
 		// APNS_PRODUCTION explicitly; default to APP_ENV for backward compat.
 		isProduction := os.Getenv("APP_ENV") == "production"
 		if v := os.Getenv("APNS_PRODUCTION"); v != "" {
@@ -311,7 +311,7 @@ func main() {
 		}
 	}
 
-	// FCM client for Android push notifications (optional — non-fatal if not configured)
+	// FCM client for Android push notifications (optional, non-fatal if not configured)
 	// Uses GOOGLE_APPLICATION_CREDENTIALS env var for service account authentication
 	var fcmClient *fcm.Client
 	if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
@@ -483,7 +483,7 @@ func main() {
 	api.POST("/auth/idp/start", authLimiter.Middleware(), auth.StartIdPIntentHandler)
 	api.POST("/auth/idp/session", authLimiter.Middleware(), auth.CreateIdPSessionHandler)
 
-	// POS (Sunmi V3H handheld) auth endpoints — HMAC-signed, no Zitadel.
+	// POS (Sunmi V3H handheld) auth endpoints: HMAC-signed, no Zitadel.
 	posLimiter := middleware.NewRateLimiter(30.0/60, 10) // 30 req/min per IP
 	api.POST("/pos/auth/device-login", posLimiter.Middleware(), posHandler.DeviceLogin)
 	api.PATCH("/pos/devices/fcm-token", posLimiter.Middleware(), posHandler.UpdateFCMToken)
@@ -511,7 +511,7 @@ func main() {
 	// HTTP server
 	// Use ReadHeaderTimeout instead of ReadTimeout, and omit WriteTimeout,
 	// because both set deadlines on the underlying net.Conn that persist after
-	// WebSocket hijack — killing long-lived subscription connections.
+	// WebSocket hijack: killing long-lived subscription connections.
 	port := cmp.Or(os.Getenv("PORT"), "8080")
 	srv := &http.Server{
 		Addr:              ":" + port,

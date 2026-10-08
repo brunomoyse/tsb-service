@@ -265,9 +265,9 @@ func TestDownloadInvoice_Success(t *testing.T) {
 		requireRun(t, lines, "Type de commande: Livraison", "Adresse de livraison: Rue Neuve 12 / 3B, 4000 Liège")
 		// Lines (choice name appended, 0 % VAT line printed without VAT), then the money block.
 		requireRun(t, lines,
-			"A1 — Sushi — Piquant", "2", "10,50 €", "21,00 €",
-			"A1 — Sushi", "1", "3,00 €", "3,00 €",
-			"A1 — Sushi", "1", "1,00 €", "1,00 €",
+			"A1 Sushi (Piquant)", "2", "10,50 €", "21,00 €",
+			"A1 Sushi", "1", "3,00 €", "3,00 €",
+			"A1 Sushi", "1", "1,00 €", "1,00 €",
 			"Sous-total", "25,00 €",
 			// VAT is extracted from the gross: 3 × 21/121 = 0.52 and 21 × 6/106 = 1.19; 0 % adds none.
 			"TVA (21.00%)", "0,52 €",
@@ -288,7 +288,7 @@ func TestDownloadInvoice_Success(t *testing.T) {
 		rec := e.do(t, e.userID.String(), e.orderID.String())
 		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
 		// The line is printed with the bare product name and the right amounts.
-		requireRun(t, invoiceLines(t, rec), "A1 — Sushi", "2", "10,50 €", "21,00 €")
+		requireRun(t, invoiceLines(t, rec), "A1 Sushi", "2", "10,50 €", "21,00 €")
 	})
 
 	t.Run("choice without translation keeps the bare product name", func(t *testing.T) {
@@ -298,7 +298,7 @@ func TestDownloadInvoice_Success(t *testing.T) {
 		e.products.choice = &productDomain.ProductChoice{}
 		rec := e.do(t, e.userID.String(), e.orderID.String())
 		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
-		requireRun(t, invoiceLines(t, rec), "A1 — Sushi", "2", "10,50 €", "21,00 €")
+		requireRun(t, invoiceLines(t, rec), "A1 Sushi", "2", "10,50 €", "21,00 €")
 	})
 
 	t.Run("product without code is accepted", func(t *testing.T) {
@@ -308,7 +308,7 @@ func TestDownloadInvoice_Success(t *testing.T) {
 		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
 		lines := invoiceLines(t, rec)
 		requireRun(t, lines, "Sushi", "2", "10,50 €", "21,00 €")
-		assert.NotContains(t, lines, "A1 — Sushi")
+		assert.NotContains(t, lines, "A1 Sushi")
 	})
 
 	t.Run("zero stored total is recomputed from the line totals", func(t *testing.T) {
@@ -334,7 +334,7 @@ func TestDownloadInvoice_Success(t *testing.T) {
 		rec := e.do(t, e.userID.String(), e.orderID.String())
 		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
 		lines := invoiceLines(t, rec)
-		requireRun(t, lines, "A1 — Sushi", "2", "10,50 €", "21,00 €")
+		requireRun(t, lines, "A1 Sushi", "2", "10,50 €", "21,00 €")
 		assert.NotContains(t, lines, "0,00 €")
 		requireRun(t, lines, "Sous-total", "21,00 €", "TVA (6.00%)", "1,19 €", "Total TVA", "1,19 €",
 			"Frais de livraison", "1,00 €", "Total", "22,00 €")
@@ -359,7 +359,7 @@ func TestDownloadInvoice_Success(t *testing.T) {
 		assertPDF(t, rec, "facture-02-12-2025-jean-paul-dupont.pdf")
 		// The first line still carries its stored 21.00, so no line is repriced.
 		lines := invoiceLines(t, rec)
-		requireRun(t, lines, "A1 — 1 × Sushi", "1", "0,00 €", "0,00 €")
+		requireRun(t, lines, "A1 1 × Sushi", "1", "0,00 €", "0,00 €")
 		requireRun(t, lines, "Sous-total", "21,00 €", "TVA (6.00%)", "1,19 €", "Total TVA", "1,19 €", "Total", "21,00 €")
 	})
 

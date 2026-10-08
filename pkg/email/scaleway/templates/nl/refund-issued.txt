@@ -6,6 +6,6 @@ Het kan enkele werkdagen duren voordat het bedrag op uw rekening verschijnt.
 
 Voor vragen kunt u rechtstreeks contact opnemen met het restaurant op {{restaurantPhone}}.
 
-Dit is een geautomatiseerde e-mail — gelieve niet te antwoorden.
+Dit is een geautomatiseerde e-mail. Gelieve niet te antwoorden.
 
 © 2026 {{restaurantName}}. Alle rechten voorbehouden.

@@ -24,7 +24,7 @@ func TestRequestOtpHandler_Success(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result":[{"userId":"user-otp-1"}]}`))
 		case r.URL.Path == "/v2/users/user-otp-1/otp_email" && r.Method == "POST":
-			// Lazy OTP-email factor enrollment — first attempt succeeds.
+			// Lazy OTP-email factor enrollment: first attempt succeeds.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"details":{}}`))
 		case r.URL.Path == "/v2/sessions" && r.Method == "POST":
@@ -34,7 +34,7 @@ func TestRequestOtpHandler_Success(t *testing.T) {
 			var body map[string]any
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 
-			// Identify the user but do NOT submit any auth-method check yet —
+			// Identify the user but do NOT submit any auth-method check yet:
 			// the otpEmail.code check is added later via VerifyOtpHandler.
 			checks := body["checks"].(map[string]any)
 			assert.NotNil(t, checks["user"])
@@ -66,7 +66,7 @@ func TestRequestOtpHandler_Success(t *testing.T) {
 	assert.Equal(t, "sess-otp-1", resp["sessionId"])
 	assert.Equal(t, "tok-otp-1", resp["sessionToken"])
 
-	// The OTP code itself must never leak to the client — only the sessionId
+	// The OTP code itself must never leak to the client; only the sessionId
 	// and sessionToken needed to verify it.
 	assert.NotContains(t, w.Body.String(), "123456")
 }
@@ -79,7 +79,7 @@ func TestRequestOtpHandler_UnknownEmail(t *testing.T) {
 	setupMockZitadel(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/v2/users" && r.Method == "POST":
-			// Email lookup — no result, triggers placeholder creation.
+			// Email lookup: no result, triggers placeholder creation.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result":[]}`))
 		case r.URL.Path == "/v2/users/human" && r.Method == "POST":
@@ -90,12 +90,12 @@ func TestRequestOtpHandler_UnknownEmail(t *testing.T) {
 			assert.Equal(t, "-", profile["givenName"], "placeholder must use sentinel marker")
 			assert.Equal(t, "-", profile["familyName"])
 			email := body["email"].(map[string]any)
-			assert.Equal(t, true, email["isVerified"], "placeholder email must be pre-verified — OTP completion proves control")
+			assert.Equal(t, true, email["isVerified"], "placeholder email must be pre-verified: OTP completion proves control")
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"userId":"placeholder-user"}`))
 		case r.URL.Path == "/v2/users/placeholder-user" && r.Method == "GET":
 			// Projection-readiness probe (waitForZitadelUserProjection) before the
-			// session create — user is queryable.
+			// session create: user is queryable.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"-","familyName":"-"}}}}`))
 		case r.URL.Path == "/v2/users/placeholder-user/otp_email" && r.Method == "POST":
@@ -131,7 +131,7 @@ func TestRequestOtpHandler_ZitadelSessionFails(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result":[{"userId":"user-otp-2"}]}`))
 		case r.URL.Path == "/v2/users/user-otp-2/otp_email" && r.Method == "POST":
-			// Already-enrolled response (Zitadel returns 409) — must be a no-op.
+			// Already-enrolled response (Zitadel returns 409): must be a no-op.
 			w.WriteHeader(http.StatusConflict)
 			_, _ = w.Write([]byte(`{"code":6,"message":"AlreadyExists"}`))
 		case r.URL.Path == "/v2/sessions":
@@ -146,12 +146,12 @@ func TestRequestOtpHandler_ZitadelSessionFails(t *testing.T) {
 	w, c := ginContext("POST", "/auth/session/otp/request", `{"loginName":"locked@example.com"}`)
 	RequestOtpHandler(c)
 
-	// Generic 200 — we mustn't disclose Zitadel-side rejections through the
+	// Generic 200: we mustn't disclose Zitadel-side rejections through the
 	// status code.
 	assert.Equal(t, http.StatusOK, w.Code)
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	// No error field leaked — only the sentinel session shape.
+	// No error field leaked: only the sentinel session shape.
 	_, hasError := resp["error"]
 	assert.False(t, hasError)
 }
@@ -222,14 +222,14 @@ func TestVerifyOtpHandler_Success(t *testing.T) {
 
 			w.WriteHeader(http.StatusOK)
 			// Zitadel responds with a fresh sessionToken whose otpEmail check is
-			// fulfilled — that's the token used to finalize OIDC.
+			// fulfilled; that's the token used to finalize OIDC.
 			_, _ = w.Write([]byte(`{"sessionToken":"tok-otp-2"}`))
 		case r.URL.Path == "/v2/sessions/sess-otp-1" && r.Method == "GET":
 			// Lookup of session userId for the requiresProfile check (Pattern B).
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"session":{"factors":{"user":{"id":"user-existing","loginName":"user@example.com"}}}}`))
 		case r.URL.Path == "/v2/users/user-existing" && r.Method == "GET":
-			// Existing user — real first name, no profile completion needed.
+			// Existing user: real first name, no profile completion needed.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"Alice","familyName":"Wonderland"}}}}`))
 		case strings.HasSuffix(r.URL.Path, "/authentication_methods") && r.Method == "GET":
@@ -248,11 +248,11 @@ func TestVerifyOtpHandler_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	// sessionId is preserved from the URL — the verify response must round-trip
+	// sessionId is preserved from the URL; the verify response must round-trip
 	// it so the client uses the same session for finalize.
 	assert.Equal(t, "sess-otp-1", resp["sessionId"])
 	assert.Equal(t, "tok-otp-2", resp["sessionToken"])
-	// Existing user has a real name — no profile completion step needed.
+	// Existing user has a real name: no profile completion step needed.
 	assert.Equal(t, false, resp["requiresProfile"])
 }
 
@@ -269,7 +269,7 @@ func TestVerifyOtpHandler_PlaceholderUser(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"session":{"factors":{"user":{"id":"placeholder-user","loginName":"new@example.com"}}}}`))
 		case r.URL.Path == "/v2/users/placeholder-user" && r.Method == "GET":
-			// Placeholder marker still in place — frontend must capture name.
+			// Placeholder marker still in place: frontend must capture name.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"-","familyName":"-"}}}}`))
 		case strings.HasSuffix(r.URL.Path, "/authentication_methods") && r.Method == "GET":
@@ -311,7 +311,7 @@ func TestVerifyOtpHandler_InvalidCode(t *testing.T) {
 }
 
 // TestVerifyOtpHandler_ExpiredCode asserts that an expired code collapses to
-// the same response as a wrong code — preventing an attacker from learning
+// the same response as a wrong code, preventing an attacker from learning
 // whether the code expired vs. was never valid.
 func TestVerifyOtpHandler_ExpiredCode(t *testing.T) {
 	setupMockZitadel(t, func(w http.ResponseWriter, _ *http.Request) {
@@ -330,7 +330,7 @@ func TestVerifyOtpHandler_ExpiredCode(t *testing.T) {
 }
 
 // TestVerifyOtpHandler_UnknownSession covers the case where the sessionId is
-// stale or never existed — must look the same as a wrong code.
+// stale or never existed: must look the same as a wrong code.
 func TestVerifyOtpHandler_UnknownSession(t *testing.T) {
 	setupMockZitadel(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -407,7 +407,7 @@ func TestVerifyOtpHandler_DuplicateSubmitReturnsCachedResponse(t *testing.T) {
 	require.Equal(t, http.StatusOK, w2.Code)
 
 	assert.Equal(t, int32(1), atomic.LoadInt32(&patchHits), "duplicate submit must hit Zitadel PATCH exactly once")
-	assert.Equal(t, int32(1), atomic.LoadInt32(&getSessionHits), "session lookup must run once — cache replays the full response")
+	assert.Equal(t, int32(1), atomic.LoadInt32(&getSessionHits), "session lookup must run once: cache replays the full response")
 	assert.Equal(t, int32(1), atomic.LoadInt32(&getUserHits), "user lookup must run once for the same reason")
 	assert.JSONEq(t, w1.Body.String(), w2.Body.String(), "cached response must equal first response")
 }
@@ -462,7 +462,7 @@ func TestVerifyOtpHandler_ConcurrentSubmitsAreSerialized(t *testing.T) {
 }
 
 // TestVerifyOtpHandler_DifferentCodeBypassesCache asserts that after a
-// failed verify, retrying with a different code still hits Zitadel — only
+// failed verify, retrying with a different code still hits Zitadel; only
 // successful (sessionID, code) pairs are cached.
 func TestVerifyOtpHandler_DifferentCodeBypassesCache(t *testing.T) {
 	var patchCalls atomic.Int32
@@ -500,7 +500,7 @@ func TestVerifyOtpHandler_DifferentCodeBypassesCache(t *testing.T) {
 	VerifyOtpHandler(c2)
 	require.Equal(t, http.StatusOK, w2.Code)
 
-	assert.Equal(t, int32(2), patchCalls.Load(), "wrong-then-right code must hit Zitadel twice — failures are not cached")
+	assert.Equal(t, int32(2), patchCalls.Load(), "wrong-then-right code must hit Zitadel twice: failures are not cached")
 }
 
 // --- ResendOtpHandler Tests ---
@@ -513,7 +513,7 @@ func TestResendOtpHandler_Success(t *testing.T) {
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 			assert.Equal(t, "tok-otp-1", body["sessionToken"])
 
-			// Resend re-issues the otpEmail challenge — no checks block.
+			// Resend re-issues the otpEmail challenge: no checks block.
 			challenges := body["challenges"].(map[string]any)
 			otpEmail := challenges["otpEmail"].(map[string]any)
 			assert.NotNil(t, otpEmail["returnCode"])
@@ -524,7 +524,7 @@ func TestResendOtpHandler_Success(t *testing.T) {
 			_, _ = w.Write([]byte(`{"sessionToken":"tok-otp-1","challenges":{"otpEmail":"654321"}}`))
 		case r.URL.Path == "/v2/sessions/sess-otp-1" && r.Method == "GET":
 			// Lookup of session user for the resend email recipient (skipped
-			// when scaleway isn't initialized — kept here as a benign mock).
+			// when scaleway isn't initialized; kept here as a benign mock).
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"session":{"factors":{"user":{"loginName":"user@example.com","displayName":"Test User"}}}}`))
 		default:
@@ -545,7 +545,7 @@ func TestResendOtpHandler_Success(t *testing.T) {
 }
 
 // TestResendOtpHandler_ZitadelError asserts the endpoint always returns 200
-// — never disclose the session state to the client through resend errors.
+// and never disclose the session state to the client through resend errors.
 func TestResendOtpHandler_ZitadelError(t *testing.T) {
 	setupMockZitadel(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)

@@ -8,6 +8,6 @@ If you need further assistance, feel free to contact the restaurant directly at 
 
 If you did not place this order, please disregard this email.
 
-This is an automated email — please do not reply.
+This is an automated email. Please do not reply.
 
 © 2026 {{restaurantName}}. All rights reserved.

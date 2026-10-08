@@ -48,7 +48,7 @@ type UserLookup interface {
 
 // AppJWTVerifier is a secondary verifier for tsb-service-signed JWTs issued by
 // the POS /auth/device-login endpoint. It lets the shop-floor device hit
-// GraphQL with an app token instead of a Zitadel JWT — see internal/modules/pos.
+// GraphQL with an app token instead of a Zitadel JWT; see internal/modules/pos.
 // POS tokens grant staff scope (utils.SetIsPOS), never admin: the device only
 // reaches the @staff operations the shop floor needs.
 type AppJWTVerifier interface {
@@ -79,7 +79,7 @@ type OIDCVerifier struct {
 
 // NewOIDCVerifier initializes the Zitadel Go SDK authorizer for local JWT validation.
 // issuerURL is the Zitadel instance URL (e.g., "https://auth.example.com").
-// internalURL is optional — when set (e.g., "http://zitadel-api:8080" in Docker),
+// internalURL is optional: when set (e.g., "http://zitadel-api:8080" in Docker),
 // OIDC discovery and JWKS requests are routed to the internal URL while the external
 // domain is preserved as the Host header and issuer.
 // clientID is the audience expected in the JWT (the API app client ID). The
@@ -285,17 +285,17 @@ func extractToken(c *gin.Context) string {
 // resolveAppUserID resolves a Zitadel sub to an app user UUID via the
 // configured userLookup (with JIT provisioning). Returns ("", false) if no
 // lookup is configured or resolution fails. Callers should refuse the request
-// when ok is false — raw subs may be opaque provider identifiers (e.g. Google
+// when ok is false: raw subs may be opaque provider identifiers (e.g. Google
 // numeric IDs) that break Postgres UUID columns downstream.
 func (v *OIDCVerifier) resolveAppUserID(ctx context.Context, sub, email, givenName, familyName string) (string, bool) {
 	if v.userLookup == nil {
-		zap.L().Warn("OIDC verifier has no userLookup configured — refusing request",
+		zap.L().Warn("OIDC verifier has no userLookup configured, refusing request",
 			zap.String("sub", sub))
 		return "", false
 	}
 	appID, err := v.userLookup.ResolveZitadelID(ctx, sub, email, givenName, familyName)
 	if err != nil {
-		zap.L().Warn("failed to resolve Zitadel user — refusing request",
+		zap.L().Warn("failed to resolve Zitadel user, refusing request",
 			zap.String("sub", sub), zap.Error(err))
 		return "", false
 	}
@@ -317,7 +317,7 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 
 	isAdmin := v.isAdmin(authCtx)
 
-	// Profile claims — the zitadel-go SDK's local JWT path only populates
+	// Profile claims: the zitadel-go SDK's local JWT path only populates
 	// sub/aud/iss on IntrospectionContext; everything else (including email/
 	// given_name/family_name) must be read from the raw Claims map. If the
 	// JWT doesn't carry them at all (common for social-IdP logins), the user

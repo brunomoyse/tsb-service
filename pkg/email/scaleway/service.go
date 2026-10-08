@@ -173,7 +173,7 @@ func classifyTemError(err error) error {
 
 // orderThreadHeaders returns RFC 5322 headers that group every email for one
 // order into a single conversation in the recipient's inbox. The thread root
-// is a synthetic Message-ID that is never sent — clients thread by shared
+// is a synthetic Message-ID that is never sent: clients thread by shared
 // References ancestry, so the root only needs to exist as a reference target.
 func orderThreadHeaders(orderID string) []*temv1alpha1.CreateEmailRequestHeader {
 	root := fmt.Sprintf("<order-thread-%s@%s>", orderID, brandCfg().Domain)
@@ -478,7 +478,7 @@ func SendLoginOtpEmail(user userDomain.User, lang string, code string) error {
 }
 
 // cancellationReasonLabels holds localized display labels for each enum value.
-// OTHER is intentionally omitted — we fall back to the generic copy.
+// OTHER is intentionally omitted: we fall back to the generic copy.
 var cancellationReasonLabels = map[string]map[orderDomain.OrderCancellationReason]string{
 	"fr": {
 		orderDomain.OrderCancellationReasonOutOfStock:    "rupture de stock",

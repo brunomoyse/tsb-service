@@ -48,7 +48,7 @@ func normalizeOrderLanguage(l string) string {
 func (r *mutationResolver) repushActivitiesLanguage(orders []*orderDomain.Order, lang string) {
 	for _, o := range orders {
 		cs := notificationApplication.GetLiveActivityContentState(o.OrderStatus, lang, string(o.OrderType), o.CancellationReason)
-		// PENDING has no localized status text — nothing meaningful to re-push.
+		// PENDING has no localized status text: nothing meaningful to re-push.
 		if sub, _ := cs["subtitle"].(string); sub == "" {
 			continue
 		}

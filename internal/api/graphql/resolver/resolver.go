@@ -159,11 +159,11 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 					appID, lookupErr := resolver.UserService.ResolveZitadelID(ctx, sub, "", "", "")
 					if lookupErr != nil {
 						// Don't set a raw Zitadel sub (often a numeric Google
-						// user ID) as the userID — it will hit Postgres UUID
+						// user ID) as the userID; it will hit Postgres UUID
 						// columns and produce "invalid input syntax for type
 						// uuid". Leave userID empty so the @auth directive
 						// sees no authenticated user and returns UNAUTHENTICATED.
-						zap.L().Warn("failed to resolve Zitadel user on WS init — proceeding unauthenticated",
+						zap.L().Warn("failed to resolve Zitadel user on WS init, proceeding unauthenticated",
 							zap.String("sub", sub), zap.Error(lookupErr))
 						return ctx, &initPayload, nil
 					}
@@ -272,7 +272,7 @@ func ErrorPresenter(ctx context.Context, e error) *gqlerror.Error {
 		// error, validation failure, persisted-query miss). Reached before any
 		// resolver ran, so it is always client/crawler noise, never a server
 		// fault. The "input:" prefix in the message is gqlerror's default
-		// filename, not the error Path — Path is empty here, which is why the
+		// filename, not the error Path: Path is empty here, which is why the
 		// previous err.Path.String() == "input" check never matched. Skip Sentry.
 	case strings.HasPrefix(e.Error(), "input: "):
 		// gqlgen pre-execution rejection (malformed GET, parse error,

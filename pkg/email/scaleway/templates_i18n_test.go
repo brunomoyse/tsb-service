@@ -57,7 +57,7 @@ func TestCustomerTemplatesExistInEveryLanguage(t *testing.T) {
 }
 
 // TestCustomerTemplatesUseTheSameFields: every language of an email shows the same data (a field dropped from
-// one translation — the order total, the address, the tracking link — would go unnoticed otherwise).
+// one translation (the order total, the address, the tracking link) would go unnoticed otherwise).
 func TestCustomerTemplatesUseTheSameFields(t *testing.T) {
 	for _, name := range customerTemplates {
 		for _, ext := range []string{"html", "txt"} {

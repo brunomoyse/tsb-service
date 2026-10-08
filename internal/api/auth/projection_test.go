@@ -42,13 +42,13 @@ func TestWaitForZitadelUserProjection_ImmediateSuccess(t *testing.T) {
 
 // TestWaitForZitadelUserProjection_SucceedsAfterLag is the core scenario: the
 // query projection lags creation (404), then catches up (200). The wait must
-// retry and succeed — this is exactly what was missing when the App Store
+// retry and succeed: this is exactly what was missing when the App Store
 // reviewer's first-time Apple sign-in 404'd.
 func TestWaitForZitadelUserProjection_SucceedsAfterLag(t *testing.T) {
 	fastProjectionPolling(t)
 	var calls atomic.Int32
 	setupMockZitadel(t, func(w http.ResponseWriter, _ *http.Request) {
-		// Project the user only on the 3rd probe — first two race the projection.
+		// Project the user only on the 3rd probe: first two race the projection.
 		if calls.Add(1) < 3 {
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = w.Write([]byte(`{"code":5,"message":"User could not be found"}`))
@@ -84,7 +84,7 @@ func TestWaitForZitadelUserProjection_Timeout(t *testing.T) {
 // test for the reviewer bug: a brand-new IdP user is created, but Zitadel's user
 // query projection lags, so the first GET /v2/users/{id} 404s. The handler must
 // wait for the projection to catch up before creating the session, and return a
-// successful session — NOT the spurious 404 the reviewer saw.
+// successful session, NOT the spurious 404 the reviewer saw.
 func TestCreateIdPSessionHandler_NewUserProjectionRace(t *testing.T) {
 	fastProjectionPolling(t)
 	var userGets atomic.Int32
@@ -98,7 +98,7 @@ func TestCreateIdPSessionHandler_NewUserProjectionRace(t *testing.T) {
 				"idpInformation":{"idpId":"test-apple-idp","userId":"apple-sub-1","userName":"john@privaterelay.appleid.com"}
 			}`))
 		case r.URL.Path == "/v2/users" && r.Method == "POST":
-			// Email search — no existing user.
+			// Email search: no existing user.
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"result":[]}`))
 		case r.URL.Path == "/v2/users/human" && r.Method == "POST":
@@ -115,7 +115,7 @@ func TestCreateIdPSessionHandler_NewUserProjectionRace(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"user":{"human":{"profile":{"givenName":"John","familyName":"Apple"}}}}`))
 		case r.URL.Path == "/v2/sessions" && r.Method == "POST":
-			// Must only run once the user is visible — assert the wait happened.
+			// Must only run once the user is visible: assert the wait happened.
 			assert.GreaterOrEqual(t, userGets.Load(), int32(2),
 				"session must not be created until the projection caught up")
 			sessionCreated.Store(true)

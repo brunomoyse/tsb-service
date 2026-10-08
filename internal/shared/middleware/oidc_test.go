@@ -18,7 +18,7 @@ func (s *stubUserLookup) ResolveZitadelID(_ context.Context, _, _, _, _ string) 
 }
 
 func TestResolveAppUserID(t *testing.T) {
-	const sub = "373762126155612239" // Google numeric ID — not a UUID
+	const sub = "373762126155612239" // Google numeric ID, not a UUID
 
 	t.Run("nil userLookup refuses the request", func(t *testing.T) {
 		v := &OIDCVerifier{}

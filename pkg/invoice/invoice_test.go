@@ -73,7 +73,7 @@ func TestGeneratePDFFullInvoiceFrench(t *testing.T) {
 	// Exact reading order of the whole document: header, order info, customer,
 	// items, totals, footer. Amounts are printed exactly as supplied, with " €".
 	require.Equal(t, []string{
-		"Tokyo Sushi Bar — SRL",
+		"Tokyo Sushi Bar SRL",
 		"Facture",
 		"Rue de la Cathédrale 59, 4000 Liège, Belgique",
 		"Tél: +32 4 222 98 88  |  E-mail: tokyosushibar888@gmail.com",
@@ -87,7 +87,7 @@ func TestGeneratePDFFullInvoiceFrench(t *testing.T) {
 		"jeanne@example.com",
 		"+32 470 12 34 56",
 		"Produit", "Qté", "Prix unit.", "Total",
-		"S01 — Sushi au Saumon", "2", "12.50 €", "25.00 €",
+		"S01 Sushi au Saumon", "2", "12.50 €", "25.00 €",
 		"Thé vert", "1", "3.00 €", "3.00 €",
 		"Sous-total", "28.00 €",
 		"TVA (6%)", "1.58 €",
@@ -145,7 +145,7 @@ func TestGeneratePDFOptionalBlocksAreOmitted(t *testing.T) {
 	lines := generate(t, d)
 
 	require.Equal(t, []string{
-		"Tokyo Sushi Bar — SRL", "Facture",
+		"Tokyo Sushi Bar SRL", "Facture",
 		"Rue de la Cathédrale 59, 4000 Liège, Belgique",
 		"Tél: +32 4 222 98 88  |  E-mail: tokyosushibar888@gmail.com",
 		"N° d'entreprise: BE0772.499.585",
@@ -154,7 +154,7 @@ func TestGeneratePDFOptionalBlocksAreOmitted(t *testing.T) {
 		"Type de commande: Livraison",
 		"Client", "Jeanne Dupont", "jeanne@example.com",
 		"Produit", "Qté", "Prix unit.", "Total",
-		"S01 — Sushi au Saumon", "2", "12.50 €", "25.00 €",
+		"S01 Sushi au Saumon", "2", "12.50 €", "25.00 €",
 		"Thé vert", "1", "3.00 €", "3.00 €",
 		"Sous-total", "28.00 €",
 		"Total", "27.70 €",
@@ -219,7 +219,7 @@ func TestGeneratePDFNonLatinAndSpecialCharacters(t *testing.T) {
 	}
 	lines := generate(t, d)
 	require.Contains(t, lines, "王小明 (Wang)")
-	require.Contains(t, lines, "天 — 寿司拼盘 (大)")
+	require.Contains(t, lines, "天 寿司拼盘 (大)")
 	require.Contains(t, lines, `Back\slash & (paren)`)
 }
 
@@ -269,7 +269,7 @@ func TestGeneratePDFUsesBrandIdentity(t *testing.T) {
 	require.Contains(t, lines, "Tél: +32 4 000 00 00  |  E-mail: hello@ygf.test")
 	require.Contains(t, lines, "N° d'entreprise: BE0123.456.789")
 	require.Contains(t, lines, "Réf. commande: YGF-2026-2C3D4E5F")
-	require.NotContains(t, lines, "Tokyo Sushi Bar — SRL")
+	require.NotContains(t, lines, "Tokyo Sushi Bar SRL")
 }
 
 func TestFormatOrderRef(t *testing.T) {

@@ -193,7 +193,7 @@ func (r *OrderRepository) Update(ctx context.Context, order *domain.Order) error
 // UpdateActiveOrdersLanguage sets `language` on every non-terminal order of the
 // user and returns the affected rows (only the columns needed to re-push a Live
 // Activity). Terminal orders (DELIVERED/PICKED_UP/CANCELLED/FAILED) are left
-// untouched — their notifications are already sent.
+// untouched: their notifications are already sent.
 func (r *OrderRepository) UpdateActiveOrdersLanguage(ctx context.Context, userID uuid.UUID, language string) ([]*domain.Order, error) {
 	const query = `
 		UPDATE orders
@@ -326,7 +326,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 
 	offset := (page - 1) * limit
 
-	// Hide online-payment orders that haven't been paid yet — those are not
+	// Hide online-payment orders that haven't been paid yet: those are not
 	// actionable from the admin dashboard. Cash orders are always returned.
 	conditions := []string{
 		`(o.is_online_payment = false OR EXISTS (
@@ -342,7 +342,7 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 		args = append(args, *userID)
 		placeholderIndex++
 	} else {
-		// Global (admin/POS) listing — never surface store-review test orders.
+		// Global (admin/POS) listing: never surface store-review test orders.
 		// User-scoped listings (myOrders) still show the reviewer their own
 		// order so they can validate the checkout flow. TEMPORARY.
 		conditions = append(conditions, "o.is_test = false")
@@ -381,7 +381,7 @@ func (r *OrderRepository) FindFiltered(ctx context.Context, filter domain.OrderH
 		filter.Limit = 20
 	}
 
-	// The order-history view tracks fulfilled business — cancelled and failed
+	// The order-history view tracks fulfilled business: cancelled and failed
 	// orders never count toward revenue, average, or the listing. Pin these
 	// exclusions server-side so the summary aggregates and the page list stay
 	// consistent regardless of the filters the caller supplies.

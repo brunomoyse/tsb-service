@@ -397,7 +397,7 @@ func TestValidateCouponDailyLimit(t *testing.T) {
 	}
 
 	t.Run("valid codes never count toward the limit", func(t *testing.T) {
-		// Six successful validations — more than the limit — must all pass,
+		// Six successful validations (more than the limit) must all pass,
 		// proving successes are not counted.
 		for i := range 6 {
 			res := validate("DAILYOK")

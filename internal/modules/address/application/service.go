@@ -45,7 +45,7 @@ func (s *addressService) Resolve(ctx context.Context, placeID, sessionToken stri
 		return cacheToAddress(cached), nil
 	}
 
-	// 2) Cache miss — ask Google
+	// 2) Cache miss: ask Google
 	details, err := s.google.PlaceDetails(ctx, placeID, sessionToken, s.language)
 	if err != nil {
 		return nil, fmt.Errorf("place details: %w", err)

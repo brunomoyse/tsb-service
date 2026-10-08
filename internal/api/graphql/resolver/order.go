@@ -50,7 +50,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	// orders (Google Play / App Store reviewers place a real order on prod to
 	// validate checkout) and to let those reviewers bypass the opening-hours gate
 	// below so they can complete checkout at any time. Such orders never reach
-	// staff — hidden from the admin/POS lists, no subscription, no push — and
+	// staff (hidden from the admin/POS lists, no subscription, no push) and
 	// auto-cancel after 10 min. TEMPORARY (revert after launch).
 	user, err := r.UserService.GetUserByID(ctx, userUUID.String())
 	if err != nil {
@@ -182,7 +182,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	for i, ir := range *itemsRaw {
 		pd, ok := prodMap[ir.ProductID]
 		if !ok {
-			// this should never happen—just in case
+			// this should never happen, just in case
 			return nil, fmt.Errorf("missing product details for %s", ir.ProductID)
 		}
 		items[i] = orderDomain.OrderProduct{
@@ -238,8 +238,8 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 	// 11) Publish subscription. Online-payment orders are only published to
 	// the admin dashboard once the Mollie webhook confirms payment (see
-	// payment/interfaces/handler.go) — unpaid orders are not actionable.
-	// Store-review test orders are never published — they must not appear in any
+	// payment/interfaces/handler.go): unpaid orders are not actionable.
+	// Store-review test orders are never published: they must not appear in any
 	// admin/POS client's live order list. TEMPORARY (revert after launch).
 	if !input.IsOnlinePayment && !order.IsTest {
 		r.Broker.Publish("orderCreated", gql)
@@ -247,7 +247,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 
 	// 12) Send push notification to admin devices + POS handhelds (non-blocking).
 	// Online-payment orders defer this until the Mollie webhook confirms payment
-	// (see payment/interfaces/handler.go) — we must not wake up POS/staff for an
+	// (see payment/interfaces/handler.go): we must not wake up POS/staff for an
 	// order that may never be paid.
 	if !input.IsOnlinePayment && !order.IsTest {
 		r.SendNewOrderPush(order)
@@ -292,7 +292,7 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 
 	// Skip progression-status notifications when the update lands well after
 	// the customer has likely already received the order. CANCELLED / FAILED
-	// stay exempt — those carry information regardless of timing (refund,
+	// stay exempt: those carry information regardless of timing (refund,
 	// "your order wasn't fulfilled").
 	suppressLate := isOrderUpdateTooLate(time.Now(), o.EstimatedReadyTime) &&
 		o.OrderStatus != orderDomain.OrderStatusCanceled &&
@@ -533,8 +533,8 @@ func (r *mutationResolver) UpdateOrder(ctx context.Context, id uuid.UUID, input 
 	}
 
 	// Update the iOS Live Activity (Lock Screen / Dynamic Island) for this order.
-	// Fires on EVERY status change — including OUT_FOR_DELIVERY → DELIVERED, whose
-	// *alert* is suppressed above — because the activity must be ended on terminal
+	// Fires on EVERY status change, including OUT_FOR_DELIVERY → DELIVERED, whose
+	// *alert* is suppressed above, because the activity must be ended on terminal
 	// statuses regardless of alert suppression.
 	if r.APNsClient != nil && statusChanged {
 		go func() {
