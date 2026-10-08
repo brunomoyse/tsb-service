@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -356,6 +357,15 @@ func main() {
 		zap.L().Error("APP_BASE_URL and APP_DASHBOARD_URL are required")
 		os.Exit(1)
 	}
+	// Browser origins of the customer site and the dashboard. APP_EXTRA_ORIGINS
+	// (comma-separated) keeps a former host allowed while it moves, e.g. the
+	// dashboard's old address until every open tab runs the new build.
+	webOrigins := []string{appBaseURL, appDashboardURL}
+	for _, origin := range strings.Split(os.Getenv("APP_EXTRA_ORIGINS"), ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			webOrigins = append(webOrigins, origin)
+		}
+	}
 
 	// Request body size limit (1MB default). GraphQL multipart uploads and the
 	// image preview proxy apply their own limits internally, so the global cap
@@ -372,7 +382,7 @@ func main() {
 	})
 
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:  []string{appBaseURL, appDashboardURL, "capacitor://localhost", "http://localhost", "https://localhost"},
+		AllowOrigins:  append(slices.Clone(webOrigins), "capacitor://localhost", "http://localhost", "https://localhost"),
 		CustomSchemas: []string{"capacitor://"},
 		AllowMethods:  []string{"HEAD", "GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:  []string{"Origin", "Content-Type", "Authorization", "Accept-Language"},
@@ -460,7 +470,7 @@ func main() {
 		ctx := utils.SetClientIP(c.Request.Context(), c.ClientIP())
 		auditRecorder.Record(ctx, audit.Entry{Action: action, Success: success})
 	})
-	graphqlHandler := resolver.GraphQLHandler(rootResolver, []string{appBaseURL, appDashboardURL, "capacitor://localhost", "https://localhost"}, oidcVerifier, auditRecorder)
+	graphqlHandler := resolver.GraphQLHandler(rootResolver, append(slices.Clone(webOrigins), "capacitor://localhost", "https://localhost"), oidcVerifier, auditRecorder)
 	optionalAuth := oidcVerifier.OptionalAuthMiddleware()
 
 	api.POST("/graphql", optionalAuth, graphqlHandler)
