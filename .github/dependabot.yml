@@ -4,6 +4,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "friday"
+      time: "12:00"
+      timezone: "Europe/Brussels"
     groups:
       golang-org:
         patterns:
@@ -16,3 +19,6 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "friday"
+      time: "12:00"
+      timezone: "Europe/Brussels"
