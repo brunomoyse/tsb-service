@@ -1164,6 +1164,28 @@ func (r *queryResolver) MyOrder(ctx context.Context, id uuid.UUID) (*model.Order
 	return order, nil
 }
 
+// MyOrderedProducts is the resolver for the myOrderedProducts field.
+func (r *queryResolver) MyOrderedProducts(ctx context.Context, first *int) ([]*model.ProductOrderCount, error) {
+	userUUID, err := uuid.Parse(utils.GetUserID(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+	rows, err := r.OrderService.GetOrderedProducts(ctx, userUUID, productRowLimit(first, 12))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ordered products: %w", err)
+	}
+	return Map(rows, toGQLProductOrderCount), nil
+}
+
+// PopularProducts is the resolver for the popularProducts field.
+func (r *queryResolver) PopularProducts(ctx context.Context, first *int) ([]*model.ProductOrderCount, error) {
+	rows, err := r.OrderService.GetPopularProducts(ctx, productRowLimit(first, 8))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get popular products: %w", err)
+	}
+	return Map(rows, toGQLProductOrderCount), nil
+}
+
 // OrderCreated is the resolver for the orderCreated field.
 func (r *subscriptionResolver) OrderCreated(ctx context.Context) (<-chan *model.Order, error) {
 	ch := make(chan *model.Order, 1)

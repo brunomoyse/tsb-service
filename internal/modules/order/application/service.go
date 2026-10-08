@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,20 +28,42 @@ type OrderService interface {
 	HasActiveCouponOrder(ctx context.Context, userID uuid.UUID) (bool, error)
 	GetCustomerStats(ctx context.Context, startDate, endDate *time.Time, orderType *string, minOrders *int) ([]*domain.CustomerStatsRow, error)
 	GetOrderHistory(ctx context.Context, filter domain.OrderHistoryFilter) ([]*domain.Order, *domain.OrderHistorySummary, error)
+	// GetOrderedProducts is the customer's own product history for the menu's "your favourites" row.
+	GetOrderedProducts(ctx context.Context, userID uuid.UUID, limit int) ([]*domain.ProductOrderCount, error)
+	// GetPopularProducts is the menu's "most ordered" row: the last PopularWindow, at most
+	// PopularPerCategory products of a category. The same for everyone, so it is cached for PopularCacheTTL.
+	GetPopularProducts(ctx context.Context, limit int) ([]*domain.ProductOrderCount, error)
 	// CancelStaleTestOrders auto-cancels store-review test orders older than
 	// olderThan and returns how many were cancelled. TEMPORARY (revert after launch).
 	CancelStaleTestOrders(ctx context.Context, olderThan time.Duration) (int, error)
 }
 
+const (
+	PopularWindow      = 90 * 24 * time.Hour
+	PopularPerCategory = 2
+	PopularCacheTTL    = 15 * time.Minute
+)
+
 type orderService struct {
 	repo          domain.OrderRepository
 	couponService couponApplication.CouponService
+
+	popularMu    sync.Mutex
+	popularCache map[int]popularEntry
+	now          func() time.Time
+}
+
+type popularEntry struct {
+	at       time.Time
+	products []*domain.ProductOrderCount
 }
 
 func NewOrderService(repo domain.OrderRepository, couponService couponApplication.CouponService) OrderService {
 	return &orderService{
 		repo:          repo,
 		couponService: couponService,
+		popularCache:  map[int]popularEntry{},
+		now:           time.Now,
 	}
 }
 
@@ -175,6 +198,25 @@ func (s *orderService) BatchGetOrdersByUserIDs(ctx context.Context, userIDs []st
 
 func (s *orderService) GetCustomerStats(ctx context.Context, startDate, endDate *time.Time, orderType *string, minOrders *int) ([]*domain.CustomerStatsRow, error) {
 	return s.repo.GetCustomerStats(ctx, startDate, endDate, orderType, minOrders)
+}
+
+func (s *orderService) GetOrderedProducts(ctx context.Context, userID uuid.UUID, limit int) ([]*domain.ProductOrderCount, error) {
+	return s.repo.FindOrderedProducts(ctx, userID, limit)
+}
+
+func (s *orderService) GetPopularProducts(ctx context.Context, limit int) ([]*domain.ProductOrderCount, error) {
+	s.popularMu.Lock()
+	defer s.popularMu.Unlock()
+	now := s.now()
+	if entry, ok := s.popularCache[limit]; ok && now.Sub(entry.at) < PopularCacheTTL {
+		return entry.products, nil
+	}
+	products, err := s.repo.FindPopularProducts(ctx, now.Add(-PopularWindow), PopularPerCategory, limit)
+	if err != nil {
+		return nil, err
+	}
+	s.popularCache[limit] = popularEntry{at: now, products: products}
+	return products, nil
 }
 
 func (s *orderService) GetOrderHistory(ctx context.Context, filter domain.OrderHistoryFilter) ([]*domain.Order, *domain.OrderHistorySummary, error) {

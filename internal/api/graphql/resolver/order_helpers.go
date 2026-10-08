@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"tsb-service/internal/api/graphql/apperr"
+	"tsb-service/internal/api/graphql/model"
 	notificationApplication "tsb-service/internal/modules/notification/application"
 	orderDomain "tsb-service/internal/modules/order/domain"
 )
@@ -93,4 +94,19 @@ func choiceLoadError(err error, choiceID, productID uuid.UUID) error {
 			With("productId", productID.String())
 	}
 	return fmt.Errorf("failed to retrieve choice %s: %w", choiceID, err)
+}
+
+// maxProductRow caps the menu's product rows (myOrderedProducts, popularProducts): a row shows a handful.
+const maxProductRow = 24
+
+// productRowLimit is a product row's `first`: the default when absent or not positive, at most maxProductRow.
+func productRowLimit(first *int, def int) int {
+	if first == nil || *first <= 0 {
+		return def
+	}
+	return min(*first, maxProductRow)
+}
+
+func toGQLProductOrderCount(row *orderDomain.ProductOrderCount) *model.ProductOrderCount {
+	return &model.ProductOrderCount{ProductID: row.ProductID, OrderCount: row.OrderCount}
 }

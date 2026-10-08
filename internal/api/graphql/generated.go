@@ -400,6 +400,11 @@ type ComplexityRoot struct {
 		Translations  func(childComplexity int) int
 	}
 
+	ProductOrderCount struct {
+		OrderCount func(childComplexity int) int
+		ProductID  func(childComplexity int) int
+	}
+
 	Query struct {
 		AssistantConnection   func(childComplexity int) int
 		AssistantLogin        func(childComplexity int, id string) int
@@ -410,10 +415,12 @@ type ComplexityRoot struct {
 		CustomerStats         func(childComplexity int, input *model.CustomerStatsInput) int
 		Me                    func(childComplexity int) int
 		MyOrder               func(childComplexity int, id uuid.UUID) int
+		MyOrderedProducts     func(childComplexity int, first *int) int
 		MyOrders              func(childComplexity int, first *int, page *int) int
 		Order                 func(childComplexity int, id uuid.UUID) int
 		OrderHistory          func(childComplexity int, input *model.OrderHistoryInput) int
 		Orders                func(childComplexity int) int
+		PopularProducts       func(childComplexity int, first *int) int
 		Product               func(childComplexity int, id uuid.UUID) int
 		ProductCategories     func(childComplexity int) int
 		ProductCategory       func(childComplexity int, id uuid.UUID) int
@@ -567,6 +574,8 @@ type QueryResolver interface {
 	OrderHistory(ctx context.Context, input *model.OrderHistoryInput) (*model.OrderHistoryResponse, error)
 	MyOrders(ctx context.Context, first *int, page *int) ([]*model.Order, error)
 	MyOrder(ctx context.Context, id uuid.UUID) (*model.Order, error)
+	MyOrderedProducts(ctx context.Context, first *int) ([]*model.ProductOrderCount, error)
+	PopularProducts(ctx context.Context, first *int) ([]*model.ProductOrderCount, error)
 	Product(ctx context.Context, id uuid.UUID) (*model.Product, error)
 	Products(ctx context.Context) ([]*model.Product, error)
 	ProductCategory(ctx context.Context, id uuid.UUID) (*model.ProductCategory, error)
@@ -2303,6 +2312,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ProductChoiceGroup.Translations(childComplexity), true
 
+	case "ProductOrderCount.orderCount":
+		if e.ComplexityRoot.ProductOrderCount.OrderCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductOrderCount.OrderCount(childComplexity), true
+	case "ProductOrderCount.productId":
+		if e.ComplexityRoot.ProductOrderCount.ProductID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ProductOrderCount.ProductID(childComplexity), true
+
 	case "Query.assistantConnection":
 		if e.ComplexityRoot.Query.AssistantConnection == nil {
 			break
@@ -2388,6 +2410,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.MyOrder(childComplexity, args["id"].(uuid.UUID)), true
+	case "Query.myOrderedProducts":
+		if e.ComplexityRoot.Query.MyOrderedProducts == nil {
+			break
+		}
+
+		args, err := ec.field_Query_myOrderedProducts_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.MyOrderedProducts(childComplexity, args["first"].(*int)), true
 	case "Query.myOrders":
 		if e.ComplexityRoot.Query.MyOrders == nil {
 			break
@@ -2427,6 +2460,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Orders(childComplexity), true
+	case "Query.popularProducts":
+		if e.ComplexityRoot.Query.PopularProducts == nil {
+			break
+		}
+
+		args, err := ec.field_Query_popularProducts_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.PopularProducts(childComplexity, args["first"].(*int)), true
 	case "Query.product":
 		if e.ComplexityRoot.Query.Product == nil {
 			break
@@ -3561,6 +3605,16 @@ func (ec *executionContext) childFields_ProductChoiceGroup(ctx context.Context, 
 	return nil, fmt.Errorf("no field named %q was found under type ProductChoiceGroup", field.Name)
 }
 
+func (ec *executionContext) childFields_ProductOrderCount(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "productId":
+		return ec.fieldContext_ProductOrderCount_productId(ctx, field)
+	case "orderCount":
+		return ec.fieldContext_ProductOrderCount_orderCount(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ProductOrderCount", field.Name)
+}
+
 func (ec *executionContext) childFields_RestaurantConfig(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "orderingEnabled":
@@ -4307,6 +4361,20 @@ func (ec *executionContext) field_Query_myOrder_args(ctx context.Context, rawArg
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_myOrderedProducts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOInt2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_myOrders_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -4354,6 +4422,20 @@ func (ec *executionContext) field_Query_order_args(ctx context.Context, rawArgs 
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_popularProducts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOInt2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
 	return args, nil
 }
 
@@ -11577,6 +11659,52 @@ func (ec *executionContext) fieldContext_ProductChoiceGroup_choices(_ context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _ProductOrderCount_productId(ctx context.Context, field graphql.CollectedField, obj *model.ProductOrderCount) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductOrderCount_productId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ProductID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v uuid.UUID) graphql.Marshaler {
+			return ec.marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductOrderCount_productId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductOrderCount", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ProductOrderCount_orderCount(ctx context.Context, field graphql.CollectedField, obj *model.ProductOrderCount) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ProductOrderCount_orderCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.OrderCount, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ProductOrderCount_orderCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ProductOrderCount", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
 func (ec *executionContext) _Query_autocompleteAddresses(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -12294,6 +12422,107 @@ func (ec *executionContext) fieldContext_Query_myOrder(ctx context.Context, fiel
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_myOrder_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_myOrderedProducts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_myOrderedProducts(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().MyOrderedProducts(ctx, fc.Args["first"].(*int))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal []*model.ProductOrderCount
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.ProductOrderCount) graphql.Marshaler {
+			return ec.marshalNProductOrderCount2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductOrderCountᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_myOrderedProducts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProductOrderCount(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_myOrderedProducts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_popularProducts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_popularProducts(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().PopularProducts(ctx, fc.Args["first"].(*int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.ProductOrderCount) graphql.Marshaler {
+			return ec.marshalNProductOrderCount2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductOrderCountᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_popularProducts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ProductOrderCount(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_popularProducts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -19459,6 +19688,49 @@ func (ec *executionContext) _ProductChoiceGroup(ctx context.Context, sel ast.Sel
 	return out
 }
 
+var productOrderCountImplementors = []string{"ProductOrderCount"}
+
+func (ec *executionContext) _ProductOrderCount(ctx context.Context, sel ast.SelectionSet, obj *model.ProductOrderCount) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, productOrderCountImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ProductOrderCount")
+		case "productId":
+			out.Values[i] = ec._ProductOrderCount_productId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "orderCount":
+			out.Values[i] = ec._ProductOrderCount_orderCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -19775,6 +20047,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_myOrder(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "myOrderedProducts":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myOrderedProducts(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "popularProducts":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_popularProducts(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -21789,6 +22105,32 @@ func (ec *executionContext) marshalNProductChoiceGroup2ᚖtsbᚑserviceᚋintern
 		return graphql.Null
 	}
 	return ec._ProductChoiceGroup(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNProductOrderCount2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductOrderCountᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ProductOrderCount) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNProductOrderCount2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductOrderCount(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNProductOrderCount2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐProductOrderCount(ctx context.Context, sel ast.SelectionSet, v *model.ProductOrderCount) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ProductOrderCount(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNQuoteOrderInput2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐQuoteOrderInput(ctx context.Context, v any) (model.QuoteOrderInput, error) {

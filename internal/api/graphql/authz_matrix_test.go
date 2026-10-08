@@ -106,6 +106,7 @@ func zeroLiteral(schema *ast.Schema, t *ast.Type) string {
 // Adding a name here is a conscious decision that the field is public: say why in the commit.
 var publicFields = map[string]string{
 	"query autocompleteAddresses":           "address search of the checkout form, rate limited, no personal data",
+	"query popularProducts":                 "the menu's most ordered row: product ids and order counts over all customers, nobody's own data",
 	"query product":                         "public catalog",
 	"query productCategories":               "public catalog",
 	"query productCategory":                 "public catalog",

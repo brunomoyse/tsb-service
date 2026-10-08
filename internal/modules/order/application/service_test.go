@@ -77,6 +77,14 @@ func (f *fakeOrderRepo) GetCustomerStats(_ context.Context, _, _ *time.Time, _ *
 	return nil, nil
 }
 
+func (f *fakeOrderRepo) FindOrderedProducts(_ context.Context, _ uuid.UUID, _ int) ([]*domain.ProductOrderCount, error) {
+	return nil, nil
+}
+
+func (f *fakeOrderRepo) FindPopularProducts(_ context.Context, _ time.Time, _ int, _ int) ([]*domain.ProductOrderCount, error) {
+	return nil, nil
+}
+
 // fakeCouponService implements couponApplication.CouponService and records the
 // (couponID, userID) of every DecrementUsageAtomic call.
 type fakeCouponService struct {

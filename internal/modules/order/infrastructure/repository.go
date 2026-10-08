@@ -730,3 +730,51 @@ func (r *OrderRepository) GetCustomerStats(ctx context.Context, startDate, endDa
 	}
 	return rows, nil
 }
+
+// The orders that count for the menu's product rows: delivered or collected, never a store-review
+// test order. Only products still on the menu and not sold out are listed.
+const orderedProductsFrom = `
+		FROM orders o
+		JOIN order_product op ON op.order_id = o.id
+		JOIN products p ON p.id = op.product_id
+		WHERE NOT o.is_test
+		  AND o.order_status IN ('DELIVERED', 'PICKED_UP')
+		  AND p.is_visible AND p.is_available`
+
+func (r *OrderRepository) FindOrderedProducts(ctx context.Context, userID uuid.UUID, limit int) ([]*domain.ProductOrderCount, error) {
+	// A product on two lines of one order (two different options) counts once for that order.
+	query := `
+		SELECT op.product_id, COUNT(DISTINCT o.id) AS order_count` + orderedProductsFrom + `
+		  AND o.user_id = $1
+		GROUP BY op.product_id
+		ORDER BY order_count DESC, SUM(op.quantity) DESC, MAX(o.created_at) DESC, op.product_id
+		LIMIT $2`
+
+	rows := []*domain.ProductOrderCount{}
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &rows, query, userID, limit); err != nil {
+		return nil, fmt.Errorf("failed to query ordered products: %w", err)
+	}
+	return rows, nil
+}
+
+func (r *OrderRepository) FindPopularProducts(ctx context.Context, since time.Time, perCategory int, limit int) ([]*domain.ProductOrderCount, error) {
+	query := `
+		SELECT product_id, order_count FROM (
+			SELECT op.product_id, COUNT(DISTINCT o.id) AS order_count, SUM(op.quantity) AS units,
+				ROW_NUMBER() OVER (
+					PARTITION BY p.category_id
+					ORDER BY COUNT(DISTINCT o.id) DESC, SUM(op.quantity) DESC, op.product_id
+				) AS rank_in_category` + orderedProductsFrom + `
+			  AND o.created_at >= $1
+			GROUP BY op.product_id, p.category_id
+		) ranked
+		WHERE rank_in_category <= $2
+		ORDER BY order_count DESC, units DESC, product_id
+		LIMIT $3`
+
+	rows := []*domain.ProductOrderCount{}
+	if err := r.pool.ForContext(ctx).SelectContext(ctx, &rows, query, since, perCategory, limit); err != nil {
+		return nil, fmt.Errorf("failed to query popular products: %w", err)
+	}
+	return rows, nil
+}

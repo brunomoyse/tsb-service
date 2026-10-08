@@ -149,6 +149,13 @@ type CustomerStatsRow struct {
 	PickupCount    int             `db:"pickup_count"`
 }
 
+// ProductOrderCount is how often a product was ordered: in how many separate orders, however many
+// units each one held. It feeds the menu's "your favourites" and "most ordered" rows.
+type ProductOrderCount struct {
+	ProductID  uuid.UUID `db:"product_id"`
+	OrderCount int       `db:"order_count"`
+}
+
 // NewOrder is a constructor function that creates a new Order domain object.
 // Prices will be set later in the service layer.
 // DiscountAmount returns the total discount (takeaway + coupon).

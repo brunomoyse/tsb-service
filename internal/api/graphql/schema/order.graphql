@@ -246,6 +246,17 @@ extend type Query {
     orderHistory(input: OrderHistoryInput): OrderHistoryResponse! @admin
     myOrders (first: Int = 5, page: Int = 1): [Order!]! @auth
     myOrder(id: ID!): Order! @auth
+    "The signed-in customer's products from their delivered or collected orders, most often ordered first. Only products on sale now; `first` is capped at 24."
+    myOrderedProducts(first: Int = 12): [ProductOrderCount!]! @auth
+    "The products in the most delivered or collected orders over the last 90 days, at most two per category. Only products on sale now; `first` is capped at 24."
+    popularProducts(first: Int = 8): [ProductOrderCount!]!
+}
+
+"How often a product was ordered, for the menu's \"your favourites\" and \"most ordered\" rows."
+type ProductOrderCount {
+    productId: ID!
+    "In how many separate orders the product was, however many units each one held."
+    orderCount: Int!
 }
 
 extend type Mutation {

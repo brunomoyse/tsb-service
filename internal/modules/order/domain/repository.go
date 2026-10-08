@@ -47,6 +47,12 @@ type OrderRepository interface {
 	FindStatusHistoryByOrderID(ctx context.Context, orderID uuid.UUID) ([]*OrderStatusHistory, error)
 	DeleteOrder(ctx context.Context, orderID uuid.UUID) error
 	GetCustomerStats(ctx context.Context, startDate, endDate *time.Time, orderType *string, minOrders *int) ([]*CustomerStatsRow, error)
+	// FindOrderedProducts lists the products of the user's delivered or collected orders that are
+	// still on sale, most often ordered first (then the most units, then the most recent).
+	FindOrderedProducts(ctx context.Context, userID uuid.UUID, limit int) ([]*ProductOrderCount, error)
+	// FindPopularProducts lists the products on sale that were in the most delivered or collected
+	// orders since `since`, keeping at most perCategory products of each category.
+	FindPopularProducts(ctx context.Context, since time.Time, perCategory int, limit int) ([]*ProductOrderCount, error)
 }
 
 // CancelledOrderRef identifies an order cancelled in bulk, with what the

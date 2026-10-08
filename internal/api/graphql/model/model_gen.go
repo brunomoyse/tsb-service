@@ -463,6 +463,13 @@ type ProductChoiceGroup struct {
 	Choices       []*ProductChoice     `json:"choices"`
 }
 
+// How often a product was ordered, for the menu's "your favourites" and "most ordered" rows.
+type ProductOrderCount struct {
+	ProductID uuid.UUID `json:"productId"`
+	// In how many separate orders the product was, however many units each one held.
+	OrderCount int `json:"orderCount"`
+}
+
 type Query struct {
 }
 
