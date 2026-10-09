@@ -324,6 +324,20 @@ func TestUpdateOrderQuietCases(t *testing.T) {
 		assert.Contains(t, aps["alert"].(map[string]any)["body"], "out of stock")
 	})
 
+	t.Run("a duplicate order cancelled by staff keeps its reason and tells the customer", func(t *testing.T) {
+		c := env.newPushCustomer(t, "duplicate", true)
+		env.registerDevices(t, c, false)
+		id := env.seedOrderRow(t, c.id, "CONFIRMED", "PICKUP", "en")
+
+		env.mustUpdateOrder(t, id, map[string]any{"status": "CANCELLED", "cancellationReason": "DUPLICATE"})
+		var stored string
+		require.NoError(t, env.DB.DB.GetContext(t.Context(), &stored, `SELECT cancellation_reason FROM orders WHERE id = $1`, id))
+		assert.Equal(t, "DUPLICATE", stored)
+		require.Eventually(t, func() bool { return len(alertsFor(env.APNs, c.ios, id.String())) == 1 }, 20*time.Second, 20*time.Millisecond)
+		aps, _ := alertsFor(env.APNs, c.ios, id.String())[0].Payload["aps"].(map[string]any)
+		assert.Contains(t, aps["alert"].(map[string]any)["body"], "duplicate order")
+	})
+
 	t.Run("a delivery handed over to the customer is not announced, its live activity ends", func(t *testing.T) {
 		c := env.newPushCustomer(t, "handover", true)
 		env.registerDevices(t, c, false)

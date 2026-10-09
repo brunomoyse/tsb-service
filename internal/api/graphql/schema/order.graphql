@@ -79,6 +79,8 @@ enum OrderCancellationReason {
     OUT_OF_STOCK
     KITCHEN_CLOSED
     DELIVERY_AREA
+    "The customer placed the same order twice (or re-ordered with a change); the other one stands."
+    DUPLICATE
     OTHER
 }
 

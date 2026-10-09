@@ -37,6 +37,7 @@ const (
 	OrderCancellationReasonOutOfStock    OrderCancellationReason = "OUT_OF_STOCK"
 	OrderCancellationReasonKitchenClosed OrderCancellationReason = "KITCHEN_CLOSED"
 	OrderCancellationReasonDeliveryArea  OrderCancellationReason = "DELIVERY_AREA"
+	OrderCancellationReasonDuplicate     OrderCancellationReason = "DUPLICATE"
 	OrderCancellationReasonOther         OrderCancellationReason = "OTHER"
 )
 

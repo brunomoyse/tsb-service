@@ -98,6 +98,8 @@ func TestGetOrderStatusNotification(t *testing.T) {
 			{"en", orderDomain.OrderCancellationReasonKitchenClosed, "Your order has been cancelled: kitchen closed."},
 			{"nl", orderDomain.OrderCancellationReasonDeliveryArea, "Uw bestelling is geannuleerd: buiten de leveringszone."},
 			{"zh", orderDomain.OrderCancellationReasonOutOfStock, "您的订单已被取消：缺货。"},
+			{"fr", orderDomain.OrderCancellationReasonDuplicate, "Votre commande a été annulée : commande en double."},
+			{"zh", orderDomain.OrderCancellationReasonDuplicate, "您的订单已被取消：重复下单。"},
 		}
 		for _, c := range cases {
 			msg := GetOrderStatusNotification(orderDomain.OrderStatusCanceled, c.lang, "DELIVERY", reason(c.reason))

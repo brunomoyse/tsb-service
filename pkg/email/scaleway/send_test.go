@@ -516,6 +516,10 @@ func TestLocalizedCancellationReason(t *testing.T) {
 	require.Equal(t, "outside delivery area", LocalizedCancellationReason(&r, "en"))
 	require.Equal(t, "buiten de leveringszone", LocalizedCancellationReason(&r, "nl"))
 	require.Equal(t, "超出配送范围", LocalizedCancellationReason(&r, "zh"))
+	duplicate := orderDomain.OrderCancellationReasonDuplicate
+	for lang, want := range map[string]string{"fr": "commande en double", "en": "duplicate order", "nl": "dubbele bestelling", "zh": "重复下单"} {
+		require.Equal(t, want, LocalizedCancellationReason(&duplicate, lang))
+	}
 	for _, lang := range []string{"de", "", "  ", "xx-YY"} {
 		require.Equal(t, "hors zone de livraison", LocalizedCancellationReason(&r, lang), "unsupported language %q falls back to French", lang)
 	}

@@ -53,21 +53,25 @@ var cancellationReasonPushLabels = map[string]map[orderDomain.OrderCancellationR
 		orderDomain.OrderCancellationReasonOutOfStock:    "rupture de stock",
 		orderDomain.OrderCancellationReasonKitchenClosed: "cuisine fermée",
 		orderDomain.OrderCancellationReasonDeliveryArea:  "hors zone de livraison",
+		orderDomain.OrderCancellationReasonDuplicate:     "commande en double",
 	},
 	"en": {
 		orderDomain.OrderCancellationReasonOutOfStock:    "out of stock",
 		orderDomain.OrderCancellationReasonKitchenClosed: "kitchen closed",
 		orderDomain.OrderCancellationReasonDeliveryArea:  "outside delivery area",
+		orderDomain.OrderCancellationReasonDuplicate:     "duplicate order",
 	},
 	"nl": {
 		orderDomain.OrderCancellationReasonOutOfStock:    "uitverkocht",
 		orderDomain.OrderCancellationReasonKitchenClosed: "keuken gesloten",
 		orderDomain.OrderCancellationReasonDeliveryArea:  "buiten de leveringszone",
+		orderDomain.OrderCancellationReasonDuplicate:     "dubbele bestelling",
 	},
 	"zh": {
 		orderDomain.OrderCancellationReasonOutOfStock:    "缺货",
 		orderDomain.OrderCancellationReasonKitchenClosed: "厨房已停止接单",
 		orderDomain.OrderCancellationReasonDeliveryArea:  "超出配送范围",
+		orderDomain.OrderCancellationReasonDuplicate:     "重复下单",
 	},
 }
 
