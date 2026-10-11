@@ -443,20 +443,20 @@ func main() {
 		addressService, couponService, notificationService, orderService, paymentService, productService, restaurantService, userService, posService,
 		couponValidateLimiter, publicQueryLimiter,
 	)
-	// WeChat assistant (tsb-agent): connection status and QR login for the
-	// dashboard, and an email to the owner when the WeChat session expires.
+	// Telegram assistant (tsb-agent): bot status and account linking for the
+	// dashboard, and an email to the owner when Telegram refuses the bot.
 	// Disabled unless ASSISTANT_AGENT_URL is set.
 	var assistantClient assistantDomain.AgentClient
 	if agentURL := os.Getenv("ASSISTANT_AGENT_URL"); agentURL != "" {
 		assistantClient = assistantInfrastructure.NewAgentClient(agentURL, os.Getenv("ASSISTANT_ADMIN_TOKEN"), nil)
 	}
 	alertEmail := os.Getenv("ASSISTANT_ALERT_EMAIL")
-	assistantService := assistantApplication.NewService(assistantClient, broker, func(_ context.Context, expiredAt time.Time) error {
+	assistantService := assistantApplication.NewService(assistantClient, broker, func(_ context.Context, since time.Time) error {
 		if alertEmail == "" {
-			zap.L().Warn("ASSISTANT_ALERT_EMAIL is not set: the assistant expiry is not emailed")
+			zap.L().Warn("ASSISTANT_ALERT_EMAIL is not set: the assistant bot problem is not emailed")
 			return nil
 		}
-		return scaleway.SendAssistantDisconnectedEmail(alertEmail, appDashboardURL+"/zh/assistant", expiredAt)
+		return scaleway.SendAssistantBotProblemEmail(alertEmail, appDashboardURL+"/zh/assistant", since)
 	}, time.Now)
 	rootResolver.AssistantService = assistantService
 	assistantCtx, stopAssistantWatch := context.WithCancel(context.Background())

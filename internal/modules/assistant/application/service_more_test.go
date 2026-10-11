@@ -13,11 +13,11 @@ import (
 	"tsb-service/internal/modules/assistant/domain"
 )
 
-// scriptClient serves a connection that changes after each call and a login with a chosen status.
+// scriptClient serves a connection that changes after each call and a link with a chosen status.
 type scriptClient struct {
 	fakeClient
-	login      domain.Login
-	loginErr   error
+	link       domain.Link
+	linkErr    error
 	connCalls  atomic.Int32
 	onConnCall func(n int32)
 	conns      []domain.Connection // answered in order, the last one repeats
@@ -34,77 +34,74 @@ func (c *scriptClient) Connection(context.Context) (domain.Connection, error) {
 	i := min(int(n)-1, len(c.conns)-1)
 	return c.conns[i], nil
 }
-func (c *scriptClient) StartLogin(context.Context, bool) (domain.Login, error) {
-	return c.login, c.loginErr
+func (c *scriptClient) StartLink(context.Context) (domain.Link, error) {
+	return c.link, c.linkErr
 }
-func (c *scriptClient) LoginStatus(context.Context, string) (domain.Login, error) {
-	return c.login, c.loginErr
+func (c *scriptClient) LinkStatus(context.Context, string) (domain.Link, error) {
+	return c.link, c.linkErr
 }
 
-func TestLoginRefreshesTheConnectionOnlyWhenSomethingChanged(t *testing.T) {
-	connected := domain.Connection{State: domain.StateConnected, EverConnected: true}
-	disconnected := domain.Connection{State: domain.StateDisconnected}
+func TestLinkRefreshesTheConnectionOnlyWhenSomethingChanged(t *testing.T) {
+	noAccounts := domain.Connection{State: domain.StateNoAccounts, MaxAccounts: 3}
+	withMarie := ready()
 
-	t.Run("StartLogin refreshes after a successful start; an unchanged state is not published", func(t *testing.T) {
-		client := &scriptClient{login: domain.Login{ID: "l1", Status: domain.LoginWait}, conns: []domain.Connection{disconnected, connected}}
+	t.Run("StartLink refreshes after a successful start; an unchanged state is not published", func(t *testing.T) {
+		client := &scriptClient{link: domain.Link{ID: "l1", Status: domain.LinkWait}, conns: []domain.Connection{noAccounts, withMarie}}
 		pub := &recorder{}
 		s := NewService(client, pub, nil, nil)
-		s.Observe(t.Context(), disconnected) // the watcher's first observation
+		s.Observe(t.Context(), noAccounts) // the watcher's first observation
 
-		lg, err := s.StartLogin(t.Context(), true)
+		lk, err := s.StartLink(t.Context())
 		require.NoError(t, err)
-		assert.Equal(t, "l1", lg.ID)
+		assert.Equal(t, "l1", lk.ID)
 		assert.EqualValues(t, 1, client.connCalls.Load())
 		assert.Empty(t, pub.msgs, "an unchanged state is not published")
 	})
 
-	t.Run("StartLogin does not refresh when the agent refuses", func(t *testing.T) {
-		boom := errors.New("agent says no")
-		client := &scriptClient{loginErr: boom, conns: []domain.Connection{connected}}
-		_, err := NewService(client, nil, nil, nil).StartLogin(t.Context(), false)
-		assert.ErrorIs(t, err, boom)
+	t.Run("StartLink does not refresh when the agent refuses", func(t *testing.T) {
+		client := &scriptClient{linkErr: domain.ErrLimitReached, conns: []domain.Connection{withMarie}}
+		_, err := NewService(client, nil, nil, nil).StartLink(t.Context())
+		assert.ErrorIs(t, err, domain.ErrLimitReached)
 		assert.Zero(t, client.connCalls.Load())
 	})
 
 	for status, wantRefresh := range map[string]bool{
-		domain.LoginWait: false, domain.LoginScanned: false,
-		domain.LoginConfirmed: true, domain.LoginExpired: true, domain.LoginRefused: true,
-		domain.LoginFailed: true, domain.LoginCancelled: true,
+		domain.LinkWait: false, domain.LinkLinked: true, domain.LinkExpired: true, domain.LinkRefusedFull: true,
 	} {
-		t.Run("LoginStatus "+status, func(t *testing.T) {
-			client := &scriptClient{login: domain.Login{ID: "l1", Status: status}, conns: []domain.Connection{connected}}
-			lg, err := NewService(client, nil, nil, nil).LoginStatus(t.Context(), "l1")
+		t.Run("LinkStatus "+status, func(t *testing.T) {
+			client := &scriptClient{link: domain.Link{ID: "l1", Status: status}, conns: []domain.Connection{withMarie}}
+			lk, err := NewService(client, nil, nil, nil).LinkStatus(t.Context(), "l1")
 			require.NoError(t, err)
-			assert.Equal(t, status, lg.Status)
+			assert.Equal(t, status, lk.Status)
 			if wantRefresh {
-				assert.EqualValues(t, 1, client.connCalls.Load(), "a finished login refreshes the connection")
+				assert.EqualValues(t, 1, client.connCalls.Load(), "a finished link refreshes the connection")
 			} else {
-				assert.Zero(t, client.connCalls.Load(), "a login in progress does not")
+				assert.Zero(t, client.connCalls.Load(), "a link in progress does not")
 			}
 		})
 	}
 
-	t.Run("LoginStatus with an error does not refresh and returns the error", func(t *testing.T) {
-		client := &scriptClient{loginErr: domain.ErrUnknownLogin, conns: []domain.Connection{connected}}
-		_, err := NewService(client, nil, nil, nil).LoginStatus(t.Context(), "gone")
-		assert.ErrorIs(t, err, domain.ErrUnknownLogin)
+	t.Run("LinkStatus with an error does not refresh and returns the error", func(t *testing.T) {
+		client := &scriptClient{linkErr: domain.ErrUnknownLink, conns: []domain.Connection{withMarie}}
+		_, err := NewService(client, nil, nil, nil).LinkStatus(t.Context(), "gone")
+		assert.ErrorIs(t, err, domain.ErrUnknownLink)
 		assert.Zero(t, client.connCalls.Load())
 	})
 }
 
 func TestDisabledServiceRefusesEverything(t *testing.T) {
 	s := NewService(nil, nil, nil, nil)
-	_, err := s.LoginStatus(t.Context(), "x")
+	_, err := s.LinkStatus(t.Context(), "x")
 	assert.ErrorIs(t, err, domain.ErrDisabled)
-	c, err := s.Disconnect(t.Context())
+	c, err := s.RemoveAccount(t.Context(), "123")
 	assert.ErrorIs(t, err, domain.ErrDisabled)
 	assert.Empty(t, c.State)
 	c, err = s.Connection(t.Context())
 	assert.ErrorIs(t, err, domain.ErrDisabled)
-	assert.Equal(t, domain.StateDisconnected, c.State)
+	assert.Equal(t, domain.StateUnavailable, c.State)
 }
 
-func TestConnectionAndDisconnectErrors(t *testing.T) {
+func TestConnectionAndRemoveErrors(t *testing.T) {
 	boom := errors.New("agent broke")
 
 	t.Run("an error other than unavailable is returned as is", func(t *testing.T) {
@@ -112,10 +109,10 @@ func TestConnectionAndDisconnectErrors(t *testing.T) {
 		assert.ErrorIs(t, err, boom)
 	})
 
-	t.Run("a failed disconnect publishes nothing", func(t *testing.T) {
+	t.Run("a failed removal publishes nothing", func(t *testing.T) {
 		pub := &recorder{}
 		s := NewService(&fakeClient{err: boom}, pub, nil, nil)
-		_, err := s.Disconnect(t.Context())
+		_, err := s.RemoveAccount(t.Context(), "123")
 		assert.ErrorIs(t, err, boom)
 		assert.Empty(t, pub.msgs)
 	})
@@ -129,8 +126,8 @@ func TestConnectionAndDisconnectErrors(t *testing.T) {
 }
 
 func TestWatchPollsUntilTheContextEnds(t *testing.T) {
-	connected := domain.Connection{State: domain.StateConnected, EverConnected: true}
-	expired := domain.Connection{State: domain.StateExpired, EverConnected: true}
+	connected := ready()
+	expired := rejected(t0)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	client := &scriptClient{conns: []domain.Connection{connected, connected, expired}}
@@ -155,5 +152,5 @@ func TestWatchPollsUntilTheContextEnds(t *testing.T) {
 
 	assert.GreaterOrEqual(t, client.connCalls.Load(), int32(3), "polled every interval")
 	require.NotEmpty(t, pub.msgs)
-	assert.Equal(t, domain.StateExpired, pub.msgs[len(pub.msgs)-1].State, "the state change was published")
+	assert.Equal(t, domain.StateTokenRejected, pub.msgs[len(pub.msgs)-1].State, "the state change was published")
 }

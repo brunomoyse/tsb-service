@@ -55,7 +55,7 @@ type Resolver struct {
 	RestaurantService   restaurantApplication.RestaurantService
 	UserService         userApplication.UserService
 	PosService          *posApplication.Service
-	// AssistantService proxies the WeChat assistant's connection; nil or
+	// AssistantService proxies the Telegram assistant's connection; nil or
 	// disabled when no assistant is configured. Set after NewResolver.
 	AssistantService      *assistantApplication.Service
 	CouponValidateLimiter *middleware.RateLimiter

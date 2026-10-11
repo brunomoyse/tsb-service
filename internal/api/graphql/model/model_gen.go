@@ -34,21 +34,28 @@ type AddressSuggestion struct {
 	SecondaryText string `json:"secondaryText"`
 }
 
-type AssistantConnection struct {
-	Enabled         bool                     `json:"enabled"`
-	State           AssistantConnectionState `json:"state"`
-	Account         *string                  `json:"account,omitempty"`
-	Since           *time.Time               `json:"since,omitempty"`
-	ExpiredAt       *time.Time               `json:"expiredAt,omitempty"`
-	EverConnected   bool                     `json:"everConnected"`
-	LoginInProgress bool                     `json:"loginInProgress"`
+type AssistantAccount struct {
+	ID       string    `json:"id"`
+	Name     string    `json:"name"`
+	Username *string   `json:"username,omitempty"`
+	LinkedAt time.Time `json:"linkedAt"`
 }
 
-type AssistantLogin struct {
-	ID        string               `json:"id"`
-	Status    AssistantLoginStatus `json:"status"`
-	QRContent string               `json:"qrContent"`
-	ExpiresAt time.Time            `json:"expiresAt"`
+type AssistantConnection struct {
+	Enabled      bool                     `json:"enabled"`
+	State        AssistantConnectionState `json:"state"`
+	BotUsername  *string                  `json:"botUsername,omitempty"`
+	Accounts     []*AssistantAccount      `json:"accounts"`
+	MaxAccounts  int                      `json:"maxAccounts"`
+	ProblemSince *time.Time               `json:"problemSince,omitempty"`
+}
+
+type AssistantLink struct {
+	ID        string              `json:"id"`
+	Status    AssistantLinkStatus `json:"status"`
+	URL       string              `json:"url"`
+	ExpiresAt time.Time           `json:"expiresAt"`
+	Account   *AssistantAccount   `json:"account,omitempty"`
 }
 
 type ChoiceTranslation struct {
@@ -605,22 +612,24 @@ type UpdateUserInput struct {
 type AssistantConnectionState string
 
 const (
-	AssistantConnectionStateConnected    AssistantConnectionState = "CONNECTED"
-	AssistantConnectionStateDisconnected AssistantConnectionState = "DISCONNECTED"
-	AssistantConnectionStateExpired      AssistantConnectionState = "EXPIRED"
-	AssistantConnectionStateUnavailable  AssistantConnectionState = "UNAVAILABLE"
+	AssistantConnectionStateReady         AssistantConnectionState = "READY"
+	AssistantConnectionStateNoAccounts    AssistantConnectionState = "NO_ACCOUNTS"
+	AssistantConnectionStateTokenRejected AssistantConnectionState = "TOKEN_REJECTED"
+	AssistantConnectionStateConflict      AssistantConnectionState = "CONFLICT"
+	AssistantConnectionStateUnavailable   AssistantConnectionState = "UNAVAILABLE"
 )
 
 var AllAssistantConnectionState = []AssistantConnectionState{
-	AssistantConnectionStateConnected,
-	AssistantConnectionStateDisconnected,
-	AssistantConnectionStateExpired,
+	AssistantConnectionStateReady,
+	AssistantConnectionStateNoAccounts,
+	AssistantConnectionStateTokenRejected,
+	AssistantConnectionStateConflict,
 	AssistantConnectionStateUnavailable,
 }
 
 func (e AssistantConnectionState) IsValid() bool {
 	switch e {
-	case AssistantConnectionStateConnected, AssistantConnectionStateDisconnected, AssistantConnectionStateExpired, AssistantConnectionStateUnavailable:
+	case AssistantConnectionStateReady, AssistantConnectionStateNoAccounts, AssistantConnectionStateTokenRejected, AssistantConnectionStateConflict, AssistantConnectionStateUnavailable:
 		return true
 	}
 	return false
@@ -661,58 +670,52 @@ func (e AssistantConnectionState) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-type AssistantLoginStatus string
+type AssistantLinkStatus string
 
 const (
-	AssistantLoginStatusWait                AssistantLoginStatus = "WAIT"
-	AssistantLoginStatusScanned             AssistantLoginStatus = "SCANNED"
-	AssistantLoginStatusConfirmed           AssistantLoginStatus = "CONFIRMED"
-	AssistantLoginStatusExpired             AssistantLoginStatus = "EXPIRED"
-	AssistantLoginStatusRefusedOtherAccount AssistantLoginStatus = "REFUSED_OTHER_ACCOUNT"
-	AssistantLoginStatusFailed              AssistantLoginStatus = "FAILED"
-	AssistantLoginStatusCancelled           AssistantLoginStatus = "CANCELLED"
+	AssistantLinkStatusWait        AssistantLinkStatus = "WAIT"
+	AssistantLinkStatusLinked      AssistantLinkStatus = "LINKED"
+	AssistantLinkStatusExpired     AssistantLinkStatus = "EXPIRED"
+	AssistantLinkStatusRefusedFull AssistantLinkStatus = "REFUSED_FULL"
 )
 
-var AllAssistantLoginStatus = []AssistantLoginStatus{
-	AssistantLoginStatusWait,
-	AssistantLoginStatusScanned,
-	AssistantLoginStatusConfirmed,
-	AssistantLoginStatusExpired,
-	AssistantLoginStatusRefusedOtherAccount,
-	AssistantLoginStatusFailed,
-	AssistantLoginStatusCancelled,
+var AllAssistantLinkStatus = []AssistantLinkStatus{
+	AssistantLinkStatusWait,
+	AssistantLinkStatusLinked,
+	AssistantLinkStatusExpired,
+	AssistantLinkStatusRefusedFull,
 }
 
-func (e AssistantLoginStatus) IsValid() bool {
+func (e AssistantLinkStatus) IsValid() bool {
 	switch e {
-	case AssistantLoginStatusWait, AssistantLoginStatusScanned, AssistantLoginStatusConfirmed, AssistantLoginStatusExpired, AssistantLoginStatusRefusedOtherAccount, AssistantLoginStatusFailed, AssistantLoginStatusCancelled:
+	case AssistantLinkStatusWait, AssistantLinkStatusLinked, AssistantLinkStatusExpired, AssistantLinkStatusRefusedFull:
 		return true
 	}
 	return false
 }
 
-func (e AssistantLoginStatus) String() string {
+func (e AssistantLinkStatus) String() string {
 	return string(e)
 }
 
-func (e *AssistantLoginStatus) UnmarshalGQL(v any) error {
+func (e *AssistantLinkStatus) UnmarshalGQL(v any) error {
 	str, ok := v.(string)
 	if !ok {
 		return fmt.Errorf("enums must be strings")
 	}
 
-	*e = AssistantLoginStatus(str)
+	*e = AssistantLinkStatus(str)
 	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid AssistantLoginStatus", str)
+		return fmt.Errorf("%s is not a valid AssistantLinkStatus", str)
 	}
 	return nil
 }
 
-func (e AssistantLoginStatus) MarshalGQL(w io.Writer) {
+func (e AssistantLinkStatus) MarshalGQL(w io.Writer) {
 	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
-func (e *AssistantLoginStatus) UnmarshalJSON(b []byte) error {
+func (e *AssistantLinkStatus) UnmarshalJSON(b []byte) error {
 	s, err := strconv.Unquote(string(b))
 	if err != nil {
 		return err
@@ -720,7 +723,7 @@ func (e *AssistantLoginStatus) UnmarshalJSON(b []byte) error {
 	return e.UnmarshalGQL(s)
 }
 
-func (e AssistantLoginStatus) MarshalJSON() ([]byte, error) {
+func (e AssistantLinkStatus) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

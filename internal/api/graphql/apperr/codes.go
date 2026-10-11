@@ -129,12 +129,14 @@ const (
 	CodePaymentNotRefundable Code = "PAYMENT_NOT_REFUNDABLE"
 )
 
-// WeChat assistant (dashboard).
+// Telegram assistant (dashboard).
 const (
 	// CodeAssistantDisabled: no assistant is configured on this server.
 	CodeAssistantDisabled Code = "ASSISTANT_DISABLED"
 	// CodeAssistantUnavailable: the assistant service did not answer.
 	CodeAssistantUnavailable Code = "ASSISTANT_UNAVAILABLE"
+	// CodeAssistantLimitReached: the maximum number of Telegram accounts is already linked.
+	CodeAssistantLimitReached Code = "ASSISTANT_LIMIT_REACHED"
 )
 
 // expected lists the codes that are the customer's / the world's doing rather than ours: they are
@@ -174,6 +176,7 @@ var expected = map[Code]bool{
 	CodeInvalidAmount:         true,
 	CodeRateLimited:           true,
 	CodeAssistantDisabled:     true,
+	CodeAssistantLimitReached: true,
 	// A provider outage is not a bug of ours and the message is for the staff member who must retry;
 	// the resolver logs the cause at error level itself.
 	CodePaymentSettlementFailed: true,

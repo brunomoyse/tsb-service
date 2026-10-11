@@ -90,7 +90,7 @@ func waitClosed[T any](t *testing.T, ch <-chan T, failure string) {
 }
 
 func TestSubscriptionResolvers(t *testing.T) {
-	agent := &fakeAgent{conn: assistantDomain.Connection{State: "connected", Account: "owner"}}
+	agent := &fakeAgent{conn: assistantDomain.Connection{State: "ready", MaxAccounts: 3}}
 	env := setupCovEnv(t, covOptions{Agent: agent})
 	owner, _ := testhelpers.SeedCustomer(t, env.DB.DB, "subscriber")
 	orderID := env.seedOrderRow(t, owner, "CONFIRMED", "PICKUP", "en")
@@ -144,13 +144,13 @@ func TestSubscriptionResolvers(t *testing.T) {
 		}, "scheduleOverridesUpdated", msg, func(got []*model.ScheduleOverride) { require.Len(t, got, 1); assert.True(t, got[0].Closed) })
 	})
 	t.Run("assistantConnectionUpdated", func(t *testing.T) {
-		msg := assistantDomain.Connection{State: "expired", EverConnected: true}
+		msg := assistantDomain.Connection{State: "token_rejected", MaxAccounts: 3}
 		subscriptionContract(t, r, func(ctx context.Context, r *resolver.Resolver) (<-chan *model.AssistantConnection, error) {
 			return r.Subscription().AssistantConnectionUpdated(ctx)
 		}, assistantApplication.Topic, msg, func(got *model.AssistantConnection) {
 			assert.True(t, got.Enabled)
-			assert.Equal(t, model.AssistantConnectionStateExpired, got.State)
-			assert.True(t, got.EverConnected)
+			assert.Equal(t, model.AssistantConnectionStateTokenRejected, got.State)
+			assert.Equal(t, 3, got.MaxAccounts)
 		})
 	})
 

@@ -14,18 +14,18 @@ import (
 	assistantDomain "tsb-service/internal/modules/assistant/domain"
 )
 
-// StartAssistantLogin is the resolver for the startAssistantLogin field.
-func (r *mutationResolver) StartAssistantLogin(ctx context.Context, replaceOwner *bool) (*model.AssistantLogin, error) {
-	lg, err := r.AssistantService.StartLogin(ctx, replaceOwner != nil && *replaceOwner)
+// StartAssistantLink is the resolver for the startAssistantLink field.
+func (r *mutationResolver) StartAssistantLink(ctx context.Context) (*model.AssistantLink, error) {
+	lk, err := r.AssistantService.StartLink(ctx)
 	if err != nil {
 		return nil, assistantError(err)
 	}
-	return toGQLAssistantLogin(lg), nil
+	return toGQLAssistantLink(lk), nil
 }
 
-// DisconnectAssistant is the resolver for the disconnectAssistant field.
-func (r *mutationResolver) DisconnectAssistant(ctx context.Context) (*model.AssistantConnection, error) {
-	c, err := r.AssistantService.Disconnect(ctx)
+// RemoveAssistantAccount is the resolver for the removeAssistantAccount field.
+func (r *mutationResolver) RemoveAssistantAccount(ctx context.Context, id string) (*model.AssistantConnection, error) {
+	c, err := r.AssistantService.RemoveAccount(ctx, id)
 	if err != nil {
 		return nil, assistantError(err)
 	}
@@ -44,13 +44,13 @@ func (r *queryResolver) AssistantConnection(ctx context.Context) (*model.Assista
 	return toGQLAssistantConnection(c, true), nil
 }
 
-// AssistantLogin is the resolver for the assistantLogin field.
-func (r *queryResolver) AssistantLogin(ctx context.Context, id string) (*model.AssistantLogin, error) {
-	lg, err := r.AssistantService.LoginStatus(ctx, id)
+// AssistantLink is the resolver for the assistantLink field.
+func (r *queryResolver) AssistantLink(ctx context.Context, id string) (*model.AssistantLink, error) {
+	lk, err := r.AssistantService.LinkStatus(ctx, id)
 	if err != nil {
 		return nil, assistantError(err)
 	}
-	return toGQLAssistantLogin(lg), nil
+	return toGQLAssistantLink(lk), nil
 }
 
 // AssistantConnectionUpdated is the resolver for the assistantConnectionUpdated field.

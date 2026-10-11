@@ -27,14 +27,14 @@ func (f *fakeClient) Connection(context.Context) (domain.Connection, error) {
 	defer f.mu.Unlock()
 	return f.conn, f.err
 }
-func (f *fakeClient) StartLogin(context.Context, bool) (domain.Login, error) {
-	return domain.Login{ID: "l1", Status: domain.LoginWait}, f.err
+func (f *fakeClient) StartLink(context.Context) (domain.Link, error) {
+	return domain.Link{ID: "l1", Status: domain.LinkWait}, f.err
 }
-func (f *fakeClient) LoginStatus(context.Context, string) (domain.Login, error) {
-	return domain.Login{ID: "l1", Status: domain.LoginConfirmed}, f.err
+func (f *fakeClient) LinkStatus(context.Context, string) (domain.Link, error) {
+	return domain.Link{ID: "l1", Status: domain.LinkLinked}, f.err
 }
-func (f *fakeClient) Disconnect(context.Context) (domain.Connection, error) {
-	return domain.Connection{State: domain.StateDisconnected, EverConnected: true}, f.err
+func (f *fakeClient) RemoveAccount(context.Context, string) (domain.Connection, error) {
+	return domain.Connection{State: domain.StateNoAccounts, MaxAccounts: 3}, f.err
 }
 
 type recorder struct {
@@ -66,9 +66,19 @@ func (a *alerts) send(_ context.Context, at time.Time) error {
 
 var t0 = time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
 
+var marie = domain.Account{ID: "123", Name: "Marie", Username: "marie", LinkedAt: t0}
+
+func ready() domain.Connection {
+	return domain.Connection{State: domain.StateReady, BotUsername: "pili_bot", Accounts: []domain.Account{marie}, MaxAccounts: 3}
+}
+
+func rejected(at time.Time) domain.Connection {
+	return domain.Connection{State: domain.StateTokenRejected, BotUsername: "pili_bot", MaxAccounts: 3, ProblemAt: &at}
+}
+
 func TestWatchPublishesAndAlertsOncePerIncident(t *testing.T) {
 	ctx := t.Context()
-	client := &fakeClient{conn: domain.Connection{State: domain.StateConnected, Since: new(t0), EverConnected: true}}
+	client := &fakeClient{conn: ready()}
 	pub, al := &recorder{}, &alerts{}
 	s := NewService(client, pub, al.send, func() time.Time { return t0 })
 
@@ -78,32 +88,64 @@ func TestWatchPublishesAndAlertsOncePerIncident(t *testing.T) {
 		t.Fatalf("published %v", pub.msgs)
 	}
 
-	exp := t0.Add(time.Hour)
-	client.set(domain.Connection{State: domain.StateExpired, ExpiredAt: &exp, EverConnected: true})
+	bad := t0.Add(time.Hour)
+	client.set(rejected(bad))
 	s.refresh(ctx)
 	s.refresh(ctx)
-	if len(pub.msgs) != 1 || pub.msgs[0].State != domain.StateExpired {
+	if len(pub.msgs) != 1 || pub.msgs[0].State != domain.StateTokenRejected {
 		t.Fatalf("published %v", pub.msgs)
 	}
-	if len(al.sent) != 1 || !al.sent[0].Equal(exp) {
+	if len(al.sent) != 1 || !al.sent[0].Equal(bad) {
 		t.Fatalf("alerts %v", al.sent)
 	}
 
-	// Reconnected, then expired again: a new incident, a new email.
-	client.set(domain.Connection{State: domain.StateConnected, Since: new(exp.Add(time.Hour)), EverConnected: true})
+	// Fixed, then refused again: a new incident, a new email.
+	client.set(ready())
 	s.refresh(ctx)
-	exp2 := exp.Add(48 * time.Hour)
-	client.set(domain.Connection{State: domain.StateExpired, ExpiredAt: &exp2, EverConnected: true})
+	bad2 := bad.Add(48 * time.Hour)
+	client.set(rejected(bad2))
 	s.refresh(ctx)
 	if len(al.sent) != 2 || len(pub.msgs) != 3 {
 		t.Errorf("alerts %v, published %d", al.sent, len(pub.msgs))
 	}
 }
 
+func TestAccountChangesArePublished(t *testing.T) {
+	ctx := t.Context()
+	client := &fakeClient{conn: ready()}
+	pub := &recorder{}
+	s := NewService(client, pub, nil, nil)
+	s.refresh(ctx)
+
+	other := ready()
+	other.Accounts = append(other.Accounts, domain.Account{ID: "456", Name: "Jean", LinkedAt: t0})
+	client.set(other)
+	s.refresh(ctx)
+	renamed := ready()
+	renamed.Accounts = []domain.Account{{ID: "123", Name: "Marie D.", Username: "marie", LinkedAt: t0}}
+	client.set(renamed)
+	s.refresh(ctx)
+	if len(pub.msgs) != 2 {
+		t.Errorf("published %d, want 2", len(pub.msgs))
+	}
+}
+
+func TestConflictIsPublishedButNotAlerted(t *testing.T) {
+	client := &fakeClient{conn: ready()}
+	pub, al := &recorder{}, &alerts{}
+	s := NewService(client, pub, al.send, func() time.Time { return t0 })
+	s.refresh(t.Context())
+	at := t0.Add(time.Minute)
+	client.set(domain.Connection{State: domain.StateConflict, ProblemAt: &at})
+	s.refresh(t.Context())
+	if len(pub.msgs) != 1 || len(al.sent) != 0 {
+		t.Errorf("published %v, alerts %v", pub.msgs, al.sent)
+	}
+}
+
 func TestAlertRetriedAfterFailure(t *testing.T) {
 	ctx := t.Context()
-	exp := t0.Add(time.Minute)
-	client := &fakeClient{conn: domain.Connection{State: domain.StateExpired, ExpiredAt: &exp, EverConnected: true}}
+	client := &fakeClient{conn: rejected(t0.Add(time.Minute))}
 	al := &alerts{fail: true}
 	s := NewService(client, &recorder{}, al.send, func() time.Time { return t0 })
 	s.refresh(ctx)
@@ -115,32 +157,30 @@ func TestAlertRetriedAfterFailure(t *testing.T) {
 	}
 }
 
-func TestOldExpiryNotAlertedAgainAfterRestart(t *testing.T) {
-	exp := t0.Add(-time.Hour)
-	client := &fakeClient{conn: domain.Connection{State: domain.StateExpired, ExpiredAt: &exp, EverConnected: true}}
+func TestOldProblemNotAlertedAgainAfterRestart(t *testing.T) {
+	client := &fakeClient{conn: rejected(t0.Add(-time.Hour))}
 	al := &alerts{}
 	s := NewService(client, &recorder{}, al.send, func() time.Time { return t0 })
 	s.refresh(t.Context())
 	if len(al.sent) != 0 {
-		t.Errorf("an expiry from before the restart was alerted again: %v", al.sent)
+		t.Errorf("a problem from before the restart was alerted again: %v", al.sent)
 	}
-	// A recent expiry (within the catch-up window) is alerted on start.
-	exp = t0.Add(-5 * time.Minute)
-	client.set(domain.Connection{State: domain.StateExpired, ExpiredAt: &exp, EverConnected: true})
+	// A recent problem (within the catch-up window) is alerted on start.
+	client.set(rejected(t0.Add(-5 * time.Minute)))
 	s2 := NewService(client, &recorder{}, al.send, func() time.Time { return t0 })
 	s2.refresh(t.Context())
 	if len(al.sent) != 1 {
-		t.Errorf("recent expiry not alerted: %v", al.sent)
+		t.Errorf("recent problem not alerted: %v", al.sent)
 	}
 }
 
-func TestManualDisconnectIsNotAlerted(t *testing.T) {
-	client := &fakeClient{conn: domain.Connection{State: domain.StateConnected, Since: new(t0), EverConnected: true}}
+func TestRemovingAnAccountIsNotAlerted(t *testing.T) {
+	client := &fakeClient{conn: ready()}
 	pub, al := &recorder{}, &alerts{}
 	s := NewService(client, pub, al.send, func() time.Time { return t0 })
 	s.refresh(t.Context())
-	c, err := s.Disconnect(t.Context())
-	if err != nil || c.State != domain.StateDisconnected {
+	c, err := s.RemoveAccount(t.Context(), "123")
+	if err != nil || c.State != domain.StateNoAccounts {
 		t.Fatal(c, err)
 	}
 	if len(al.sent) != 0 || len(pub.msgs) != 1 {
@@ -155,8 +195,8 @@ func TestUnavailableAndDisabled(t *testing.T) {
 	if err != nil || c.State != domain.StateUnavailable {
 		t.Errorf("unavailable: %+v %v", c, err)
 	}
-	if _, err := s.StartLogin(ctx, false); !errors.Is(err, domain.ErrUnavailable) {
-		t.Errorf("start login on a down agent: %v", err)
+	if _, err := s.StartLink(ctx); !errors.Is(err, domain.ErrUnavailable) {
+		t.Errorf("start link on a down agent: %v", err)
 	}
 
 	var nilService *Service
@@ -167,7 +207,7 @@ func TestUnavailableAndDisabled(t *testing.T) {
 		if _, err := s.Connection(ctx); !errors.Is(err, domain.ErrDisabled) {
 			t.Errorf("connection: %v", err)
 		}
-		if _, err := s.StartLogin(ctx, false); !errors.Is(err, domain.ErrDisabled) {
+		if _, err := s.StartLink(ctx); !errors.Is(err, domain.ErrDisabled) {
 			t.Errorf("start: %v", err)
 		}
 		s.Watch(ctx, time.Millisecond) // returns at once
@@ -175,7 +215,6 @@ func TestUnavailableAndDisabled(t *testing.T) {
 }
 
 func TestConcurrentObservationsSendOneAlert(t *testing.T) {
-	exp := t0
 	release := make(chan struct{})
 	var mu sync.Mutex
 	n := 0
@@ -186,7 +225,7 @@ func TestConcurrentObservationsSendOneAlert(t *testing.T) {
 		<-release
 		return nil
 	}, func() time.Time { return t0 })
-	c := domain.Connection{State: domain.StateExpired, ExpiredAt: &exp}
+	c := rejected(t0)
 	var wg sync.WaitGroup
 	for range 5 {
 		wg.Go(func() { s.Observe(t.Context(), c) })

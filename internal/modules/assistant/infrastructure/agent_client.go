@@ -31,27 +31,28 @@ func NewAgentClient(baseURL, token string, httpClient *http.Client) domain.Agent
 
 func (c *AgentClient) Connection(ctx context.Context) (domain.Connection, error) {
 	var out domain.Connection
-	return out, c.do(ctx, http.MethodGet, "/admin/connection", nil, &out)
+	return out, c.do(ctx, http.MethodGet, "/admin/connection", nil, nil, &out)
 }
 
-func (c *AgentClient) StartLogin(ctx context.Context, replaceOwner bool) (domain.Login, error) {
-	var out domain.Login
-	return out, c.do(ctx, http.MethodPost, "/admin/login", map[string]bool{"replace_owner": replaceOwner}, &out)
+func (c *AgentClient) StartLink(ctx context.Context) (domain.Link, error) {
+	var out domain.Link
+	return out, c.do(ctx, http.MethodPost, "/admin/links", map[string]any{}, nil, &out)
 }
 
-func (c *AgentClient) LoginStatus(ctx context.Context, id string) (domain.Login, error) {
-	var out domain.Login
-	return out, c.do(ctx, http.MethodGet, "/admin/login/"+url.PathEscape(id), nil, &out)
+func (c *AgentClient) LinkStatus(ctx context.Context, id string) (domain.Link, error) {
+	var out domain.Link
+	return out, c.do(ctx, http.MethodGet, "/admin/links/"+url.PathEscape(id), nil, domain.ErrUnknownLink, &out)
 }
 
-func (c *AgentClient) Disconnect(ctx context.Context) (domain.Connection, error) {
+func (c *AgentClient) RemoveAccount(ctx context.Context, id string) (domain.Connection, error) {
 	var out domain.Connection
-	return out, c.do(ctx, http.MethodPost, "/admin/disconnect", nil, &out)
+	return out, c.do(ctx, http.MethodDelete, "/admin/accounts/"+url.PathEscape(id), nil, domain.ErrUnknownAccount, &out)
 }
 
-// do sends a request. A transport error or a 5xx answer is ErrUnavailable;
-// a 404 is ErrUnknownLogin.
-func (c *AgentClient) do(ctx context.Context, method, path string, body, out any) error {
+// do sends a request. A transport error or an unexpected status is
+// ErrUnavailable; a 404 is notFound, a 409 limit_reached is ErrLimitReached
+// and a 503 bot_not_ready is ErrBotNotReady.
+func (c *AgentClient) do(ctx context.Context, method, path string, body any, notFound error, out any) error {
 	var rd io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -77,9 +78,16 @@ func (c *AgentClient) do(ctx context.Context, method, path string, body, out any
 	if err != nil {
 		return fmt.Errorf("%w: %v", domain.ErrUnavailable, err)
 	}
+	var apiErr struct {
+		Error string `json:"error"`
+	}
 	switch {
-	case resp.StatusCode == http.StatusNotFound:
-		return domain.ErrUnknownLogin
+	case resp.StatusCode == http.StatusNotFound && notFound != nil:
+		return notFound
+	case resp.StatusCode == http.StatusConflict && json.Unmarshal(raw, &apiErr) == nil && apiErr.Error == "limit_reached":
+		return domain.ErrLimitReached
+	case resp.StatusCode == http.StatusServiceUnavailable && json.Unmarshal(raw, &apiErr) == nil && apiErr.Error == "bot_not_ready":
+		return domain.ErrBotNotReady
 	case resp.StatusCode != http.StatusOK:
 		return fmt.Errorf("%w: agent %s %s: HTTP %d", domain.ErrUnavailable, method, path, resp.StatusCode)
 	}

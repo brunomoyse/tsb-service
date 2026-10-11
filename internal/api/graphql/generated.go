@@ -72,21 +72,28 @@ type ComplexityRoot struct {
 		SecondaryText func(childComplexity int) int
 	}
 
-	AssistantConnection struct {
-		Account         func(childComplexity int) int
-		Enabled         func(childComplexity int) int
-		EverConnected   func(childComplexity int) int
-		ExpiredAt       func(childComplexity int) int
-		LoginInProgress func(childComplexity int) int
-		Since           func(childComplexity int) int
-		State           func(childComplexity int) int
+	AssistantAccount struct {
+		ID       func(childComplexity int) int
+		LinkedAt func(childComplexity int) int
+		Name     func(childComplexity int) int
+		Username func(childComplexity int) int
 	}
 
-	AssistantLogin struct {
+	AssistantConnection struct {
+		Accounts     func(childComplexity int) int
+		BotUsername  func(childComplexity int) int
+		Enabled      func(childComplexity int) int
+		MaxAccounts  func(childComplexity int) int
+		ProblemSince func(childComplexity int) int
+		State        func(childComplexity int) int
+	}
+
+	AssistantLink struct {
+		Account   func(childComplexity int) int
 		ExpiresAt func(childComplexity int) int
 		ID        func(childComplexity int) int
-		QRContent func(childComplexity int) int
 		Status    func(childComplexity int) int
+		URL       func(childComplexity int) int
 	}
 
 	ChoiceTranslation struct {
@@ -168,10 +175,10 @@ type ComplexityRoot struct {
 		DeleteProductChoice       func(childComplexity int, id uuid.UUID) int
 		DeleteProductChoiceGroup  func(childComplexity int, id uuid.UUID) int
 		DeleteScheduleOverride    func(childComplexity int, date time.Time) int
-		DisconnectAssistant       func(childComplexity int) int
 		RegisterDeviceToken       func(childComplexity int, deviceToken string, platform string) int
 		RegisterLiveActivityToken func(childComplexity int, orderID uuid.UUID, token string) int
-		StartAssistantLogin       func(childComplexity int, replaceOwner *bool) int
+		RemoveAssistantAccount    func(childComplexity int, id string) int
+		StartAssistantLink        func(childComplexity int) int
 		UnregisterDeviceToken     func(childComplexity int, deviceToken string) int
 		UpdateCoupon              func(childComplexity int, id uuid.UUID, input model.UpdateCouponInput) int
 		UpdateMe                  func(childComplexity int, input model.UpdateUserInput) int
@@ -407,7 +414,7 @@ type ComplexityRoot struct {
 
 	Query struct {
 		AssistantConnection   func(childComplexity int) int
-		AssistantLogin        func(childComplexity int, id string) int
+		AssistantLink         func(childComplexity int, id string) int
 		AutocompleteAddresses func(childComplexity int, input string, sessionToken string) int
 		Coupon                func(childComplexity int, id uuid.UUID) int
 		Coupons               func(childComplexity int) int
@@ -497,8 +504,8 @@ type ComplexityRoot struct {
 // region    ************************** generated!.gotpl **************************
 
 type MutationResolver interface {
-	StartAssistantLogin(ctx context.Context, replaceOwner *bool) (*model.AssistantLogin, error)
-	DisconnectAssistant(ctx context.Context) (*model.AssistantConnection, error)
+	StartAssistantLink(ctx context.Context) (*model.AssistantLink, error)
+	RemoveAssistantAccount(ctx context.Context, id string) (*model.AssistantConnection, error)
 	CreateCoupon(ctx context.Context, input model.CreateCouponInput) (*model.Coupon, error)
 	UpdateCoupon(ctx context.Context, id uuid.UUID, input model.UpdateCouponInput) (*model.Coupon, error)
 	CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error)
@@ -563,7 +570,7 @@ type QueryResolver interface {
 	AutocompleteAddresses(ctx context.Context, input string, sessionToken string) ([]*model.AddressSuggestion, error)
 	ResolveAddress(ctx context.Context, placeID string, sessionToken string) (*model.Address, error)
 	AssistantConnection(ctx context.Context) (*model.AssistantConnection, error)
-	AssistantLogin(ctx context.Context, id string) (*model.AssistantLogin, error)
+	AssistantLink(ctx context.Context, id string) (*model.AssistantLink, error)
 	ValidateCoupon(ctx context.Context, code string, orderAmount string) (*model.CouponValidation, error)
 	Coupons(ctx context.Context) ([]*model.Coupon, error)
 	Coupon(ctx context.Context, id uuid.UUID) (*model.Coupon, error)
@@ -712,42 +719,61 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.AddressSuggestion.SecondaryText(childComplexity), true
 
-	case "AssistantConnection.account":
-		if e.ComplexityRoot.AssistantConnection.Account == nil {
+	case "AssistantAccount.id":
+		if e.ComplexityRoot.AssistantAccount.ID == nil {
 			break
 		}
 
-		return e.ComplexityRoot.AssistantConnection.Account(childComplexity), true
+		return e.ComplexityRoot.AssistantAccount.ID(childComplexity), true
+	case "AssistantAccount.linkedAt":
+		if e.ComplexityRoot.AssistantAccount.LinkedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantAccount.LinkedAt(childComplexity), true
+	case "AssistantAccount.name":
+		if e.ComplexityRoot.AssistantAccount.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantAccount.Name(childComplexity), true
+	case "AssistantAccount.username":
+		if e.ComplexityRoot.AssistantAccount.Username == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantAccount.Username(childComplexity), true
+
+	case "AssistantConnection.accounts":
+		if e.ComplexityRoot.AssistantConnection.Accounts == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantConnection.Accounts(childComplexity), true
+	case "AssistantConnection.botUsername":
+		if e.ComplexityRoot.AssistantConnection.BotUsername == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantConnection.BotUsername(childComplexity), true
 	case "AssistantConnection.enabled":
 		if e.ComplexityRoot.AssistantConnection.Enabled == nil {
 			break
 		}
 
 		return e.ComplexityRoot.AssistantConnection.Enabled(childComplexity), true
-	case "AssistantConnection.everConnected":
-		if e.ComplexityRoot.AssistantConnection.EverConnected == nil {
+	case "AssistantConnection.maxAccounts":
+		if e.ComplexityRoot.AssistantConnection.MaxAccounts == nil {
 			break
 		}
 
-		return e.ComplexityRoot.AssistantConnection.EverConnected(childComplexity), true
-	case "AssistantConnection.expiredAt":
-		if e.ComplexityRoot.AssistantConnection.ExpiredAt == nil {
+		return e.ComplexityRoot.AssistantConnection.MaxAccounts(childComplexity), true
+	case "AssistantConnection.problemSince":
+		if e.ComplexityRoot.AssistantConnection.ProblemSince == nil {
 			break
 		}
 
-		return e.ComplexityRoot.AssistantConnection.ExpiredAt(childComplexity), true
-	case "AssistantConnection.loginInProgress":
-		if e.ComplexityRoot.AssistantConnection.LoginInProgress == nil {
-			break
-		}
-
-		return e.ComplexityRoot.AssistantConnection.LoginInProgress(childComplexity), true
-	case "AssistantConnection.since":
-		if e.ComplexityRoot.AssistantConnection.Since == nil {
-			break
-		}
-
-		return e.ComplexityRoot.AssistantConnection.Since(childComplexity), true
+		return e.ComplexityRoot.AssistantConnection.ProblemSince(childComplexity), true
 	case "AssistantConnection.state":
 		if e.ComplexityRoot.AssistantConnection.State == nil {
 			break
@@ -755,30 +781,36 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.AssistantConnection.State(childComplexity), true
 
-	case "AssistantLogin.expiresAt":
-		if e.ComplexityRoot.AssistantLogin.ExpiresAt == nil {
+	case "AssistantLink.account":
+		if e.ComplexityRoot.AssistantLink.Account == nil {
 			break
 		}
 
-		return e.ComplexityRoot.AssistantLogin.ExpiresAt(childComplexity), true
-	case "AssistantLogin.id":
-		if e.ComplexityRoot.AssistantLogin.ID == nil {
+		return e.ComplexityRoot.AssistantLink.Account(childComplexity), true
+	case "AssistantLink.expiresAt":
+		if e.ComplexityRoot.AssistantLink.ExpiresAt == nil {
 			break
 		}
 
-		return e.ComplexityRoot.AssistantLogin.ID(childComplexity), true
-	case "AssistantLogin.qrContent":
-		if e.ComplexityRoot.AssistantLogin.QRContent == nil {
+		return e.ComplexityRoot.AssistantLink.ExpiresAt(childComplexity), true
+	case "AssistantLink.id":
+		if e.ComplexityRoot.AssistantLink.ID == nil {
 			break
 		}
 
-		return e.ComplexityRoot.AssistantLogin.QRContent(childComplexity), true
-	case "AssistantLogin.status":
-		if e.ComplexityRoot.AssistantLogin.Status == nil {
+		return e.ComplexityRoot.AssistantLink.ID(childComplexity), true
+	case "AssistantLink.status":
+		if e.ComplexityRoot.AssistantLink.Status == nil {
 			break
 		}
 
-		return e.ComplexityRoot.AssistantLogin.Status(childComplexity), true
+		return e.ComplexityRoot.AssistantLink.Status(childComplexity), true
+	case "AssistantLink.url":
+		if e.ComplexityRoot.AssistantLink.URL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AssistantLink.URL(childComplexity), true
 
 	case "ChoiceTranslation.locale":
 		if e.ComplexityRoot.ChoiceTranslation.Locale == nil {
@@ -1152,12 +1184,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.DeleteScheduleOverride(childComplexity, args["date"].(time.Time)), true
-	case "Mutation.disconnectAssistant":
-		if e.ComplexityRoot.Mutation.DisconnectAssistant == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Mutation.DisconnectAssistant(childComplexity), true
 	case "Mutation.registerDeviceToken":
 		if e.ComplexityRoot.Mutation.RegisterDeviceToken == nil {
 			break
@@ -1180,17 +1206,23 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.RegisterLiveActivityToken(childComplexity, args["orderId"].(uuid.UUID), args["token"].(string)), true
-	case "Mutation.startAssistantLogin":
-		if e.ComplexityRoot.Mutation.StartAssistantLogin == nil {
+	case "Mutation.removeAssistantAccount":
+		if e.ComplexityRoot.Mutation.RemoveAssistantAccount == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_startAssistantLogin_args(ctx, rawArgs)
+		args, err := ec.field_Mutation_removeAssistantAccount_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Mutation.StartAssistantLogin(childComplexity, args["replaceOwner"].(*bool)), true
+		return e.ComplexityRoot.Mutation.RemoveAssistantAccount(childComplexity, args["id"].(string)), true
+	case "Mutation.startAssistantLink":
+		if e.ComplexityRoot.Mutation.StartAssistantLink == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Mutation.StartAssistantLink(childComplexity), true
 	case "Mutation.unregisterDeviceToken":
 		if e.ComplexityRoot.Mutation.UnregisterDeviceToken == nil {
 			break
@@ -2331,17 +2363,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.AssistantConnection(childComplexity), true
-	case "Query.assistantLogin":
-		if e.ComplexityRoot.Query.AssistantLogin == nil {
+	case "Query.assistantLink":
+		if e.ComplexityRoot.Query.AssistantLink == nil {
 			break
 		}
 
-		args, err := ec.field_Query_assistantLogin_args(ctx, rawArgs)
+		args, err := ec.field_Query_assistantLink_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.AssistantLogin(childComplexity, args["id"].(string)), true
+		return e.ComplexityRoot.Query.AssistantLink(childComplexity, args["id"].(string)), true
 	case "Query.autocompleteAddresses":
 		if e.ComplexityRoot.Query.AutocompleteAddresses == nil {
 			break
@@ -3009,38 +3041,52 @@ func (ec *executionContext) childFields_AddressSuggestion(ctx context.Context, f
 	return nil, fmt.Errorf("no field named %q was found under type AddressSuggestion", field.Name)
 }
 
+func (ec *executionContext) childFields_AssistantAccount(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_AssistantAccount_id(ctx, field)
+	case "name":
+		return ec.fieldContext_AssistantAccount_name(ctx, field)
+	case "username":
+		return ec.fieldContext_AssistantAccount_username(ctx, field)
+	case "linkedAt":
+		return ec.fieldContext_AssistantAccount_linkedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type AssistantAccount", field.Name)
+}
+
 func (ec *executionContext) childFields_AssistantConnection(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "enabled":
 		return ec.fieldContext_AssistantConnection_enabled(ctx, field)
 	case "state":
 		return ec.fieldContext_AssistantConnection_state(ctx, field)
-	case "account":
-		return ec.fieldContext_AssistantConnection_account(ctx, field)
-	case "since":
-		return ec.fieldContext_AssistantConnection_since(ctx, field)
-	case "expiredAt":
-		return ec.fieldContext_AssistantConnection_expiredAt(ctx, field)
-	case "everConnected":
-		return ec.fieldContext_AssistantConnection_everConnected(ctx, field)
-	case "loginInProgress":
-		return ec.fieldContext_AssistantConnection_loginInProgress(ctx, field)
+	case "botUsername":
+		return ec.fieldContext_AssistantConnection_botUsername(ctx, field)
+	case "accounts":
+		return ec.fieldContext_AssistantConnection_accounts(ctx, field)
+	case "maxAccounts":
+		return ec.fieldContext_AssistantConnection_maxAccounts(ctx, field)
+	case "problemSince":
+		return ec.fieldContext_AssistantConnection_problemSince(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type AssistantConnection", field.Name)
 }
 
-func (ec *executionContext) childFields_AssistantLogin(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+func (ec *executionContext) childFields_AssistantLink(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "id":
-		return ec.fieldContext_AssistantLogin_id(ctx, field)
+		return ec.fieldContext_AssistantLink_id(ctx, field)
 	case "status":
-		return ec.fieldContext_AssistantLogin_status(ctx, field)
-	case "qrContent":
-		return ec.fieldContext_AssistantLogin_qrContent(ctx, field)
+		return ec.fieldContext_AssistantLink_status(ctx, field)
+	case "url":
+		return ec.fieldContext_AssistantLink_url(ctx, field)
 	case "expiresAt":
-		return ec.fieldContext_AssistantLogin_expiresAt(ctx, field)
+		return ec.fieldContext_AssistantLink_expiresAt(ctx, field)
+	case "account":
+		return ec.fieldContext_AssistantLink_account(ctx, field)
 	}
-	return nil, fmt.Errorf("no field named %q was found under type AssistantLogin", field.Name)
+	return nil, fmt.Errorf("no field named %q was found under type AssistantLink", field.Name)
 }
 
 func (ec *executionContext) childFields_ChoiceTranslation(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -3981,17 +4027,17 @@ func (ec *executionContext) field_Mutation_registerLiveActivityToken_args(ctx co
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_startAssistantLogin_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Mutation_removeAssistantAccount_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "replaceOwner",
-		func(ctx context.Context, v any) (*bool, error) {
-			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["replaceOwner"] = arg0
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -4253,7 +4299,7 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_assistantLogin_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Query_assistantLink_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
@@ -4957,6 +5003,98 @@ func (ec *executionContext) fieldContext_AddressSuggestion_secondaryText(_ conte
 	return graphql.NewScalarFieldContext("AddressSuggestion", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _AssistantAccount_id(ctx context.Context, field graphql.CollectedField, obj *model.AssistantAccount) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantAccount_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantAccount_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantAccount", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantAccount_name(ctx context.Context, field graphql.CollectedField, obj *model.AssistantAccount) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantAccount_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantAccount_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantAccount", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantAccount_username(ctx context.Context, field graphql.CollectedField, obj *model.AssistantAccount) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantAccount_username(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Username, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantAccount_username(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantAccount", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantAccount_linkedAt(ctx context.Context, field graphql.CollectedField, obj *model.AssistantAccount) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantAccount_linkedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LinkedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNDateTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantAccount_linkedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantAccount", field, false, false, errors.New("field of type DateTime does not have child fields"))
+}
+
 func (ec *executionContext) _AssistantConnection_enabled(ctx context.Context, field graphql.CollectedField, obj *model.AssistantConnection) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5003,16 +5141,16 @@ func (ec *executionContext) fieldContext_AssistantConnection_state(_ context.Con
 	return graphql.NewScalarFieldContext("AssistantConnection", field, false, false, errors.New("field of type AssistantConnectionState does not have child fields"))
 }
 
-func (ec *executionContext) _AssistantConnection_account(ctx context.Context, field graphql.CollectedField, obj *model.AssistantConnection) (ret graphql.Marshaler) {
+func (ec *executionContext) _AssistantConnection_botUsername(ctx context.Context, field graphql.CollectedField, obj *model.AssistantConnection) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_AssistantConnection_account(ctx, field)
+			return ec.fieldContext_AssistantConnection_botUsername(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.Account, nil
+			return obj.BotUsername, nil
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
@@ -5022,20 +5160,75 @@ func (ec *executionContext) _AssistantConnection_account(ctx context.Context, fi
 		false,
 	)
 }
-func (ec *executionContext) fieldContext_AssistantConnection_account(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_AssistantConnection_botUsername(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("AssistantConnection", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
-func (ec *executionContext) _AssistantConnection_since(ctx context.Context, field graphql.CollectedField, obj *model.AssistantConnection) (ret graphql.Marshaler) {
+func (ec *executionContext) _AssistantConnection_accounts(ctx context.Context, field graphql.CollectedField, obj *model.AssistantConnection) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_AssistantConnection_since(ctx, field)
+			return ec.fieldContext_AssistantConnection_accounts(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.Since, nil
+			return obj.Accounts, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.AssistantAccount) graphql.Marshaler {
+			return ec.marshalNAssistantAccount2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantAccountᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantConnection_accounts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AssistantConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_AssistantAccount(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AssistantConnection_maxAccounts(ctx context.Context, field graphql.CollectedField, obj *model.AssistantConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantConnection_maxAccounts(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MaxAccounts, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantConnection_maxAccounts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantConnection", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantConnection_problemSince(ctx context.Context, field graphql.CollectedField, obj *model.AssistantConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantConnection_problemSince(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ProblemSince, nil
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
@@ -5045,86 +5238,17 @@ func (ec *executionContext) _AssistantConnection_since(ctx context.Context, fiel
 		false,
 	)
 }
-func (ec *executionContext) fieldContext_AssistantConnection_since(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_AssistantConnection_problemSince(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("AssistantConnection", field, false, false, errors.New("field of type DateTime does not have child fields"))
 }
 
-func (ec *executionContext) _AssistantConnection_expiredAt(ctx context.Context, field graphql.CollectedField, obj *model.AssistantConnection) (ret graphql.Marshaler) {
+func (ec *executionContext) _AssistantLink_id(ctx context.Context, field graphql.CollectedField, obj *model.AssistantLink) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_AssistantConnection_expiredAt(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.ExpiredAt, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
-			return ec.marshalODateTime2ᚖtimeᚐTime(ctx, selections, v)
-		},
-		true,
-		false,
-	)
-}
-func (ec *executionContext) fieldContext_AssistantConnection_expiredAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("AssistantConnection", field, false, false, errors.New("field of type DateTime does not have child fields"))
-}
-
-func (ec *executionContext) _AssistantConnection_everConnected(ctx context.Context, field graphql.CollectedField, obj *model.AssistantConnection) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_AssistantConnection_everConnected(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.EverConnected, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
-			return ec.marshalNBoolean2bool(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_AssistantConnection_everConnected(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("AssistantConnection", field, false, false, errors.New("field of type Boolean does not have child fields"))
-}
-
-func (ec *executionContext) _AssistantConnection_loginInProgress(ctx context.Context, field graphql.CollectedField, obj *model.AssistantConnection) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_AssistantConnection_loginInProgress(ctx, field)
-		},
-		func(ctx context.Context) (any, error) {
-			return obj.LoginInProgress, nil
-		},
-		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
-			return ec.marshalNBoolean2bool(ctx, selections, v)
-		},
-		true,
-		true,
-	)
-}
-func (ec *executionContext) fieldContext_AssistantConnection_loginInProgress(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("AssistantConnection", field, false, false, errors.New("field of type Boolean does not have child fields"))
-}
-
-func (ec *executionContext) _AssistantLogin_id(ctx context.Context, field graphql.CollectedField, obj *model.AssistantLogin) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_AssistantLogin_id(ctx, field)
+			return ec.fieldContext_AssistantLink_id(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
 			return obj.ID, nil
@@ -5137,43 +5261,43 @@ func (ec *executionContext) _AssistantLogin_id(ctx context.Context, field graphq
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_AssistantLogin_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("AssistantLogin", field, false, false, errors.New("field of type String does not have child fields"))
+func (ec *executionContext) fieldContext_AssistantLink_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantLink", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
-func (ec *executionContext) _AssistantLogin_status(ctx context.Context, field graphql.CollectedField, obj *model.AssistantLogin) (ret graphql.Marshaler) {
+func (ec *executionContext) _AssistantLink_status(ctx context.Context, field graphql.CollectedField, obj *model.AssistantLink) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_AssistantLogin_status(ctx, field)
+			return ec.fieldContext_AssistantLink_status(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
 			return obj.Status, nil
 		},
 		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v model.AssistantLoginStatus) graphql.Marshaler {
-			return ec.marshalNAssistantLoginStatus2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantLoginStatus(ctx, selections, v)
+		func(ctx context.Context, selections ast.SelectionSet, v model.AssistantLinkStatus) graphql.Marshaler {
+			return ec.marshalNAssistantLinkStatus2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantLinkStatus(ctx, selections, v)
 		},
 		true,
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_AssistantLogin_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("AssistantLogin", field, false, false, errors.New("field of type AssistantLoginStatus does not have child fields"))
+func (ec *executionContext) fieldContext_AssistantLink_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantLink", field, false, false, errors.New("field of type AssistantLinkStatus does not have child fields"))
 }
 
-func (ec *executionContext) _AssistantLogin_qrContent(ctx context.Context, field graphql.CollectedField, obj *model.AssistantLogin) (ret graphql.Marshaler) {
+func (ec *executionContext) _AssistantLink_url(ctx context.Context, field graphql.CollectedField, obj *model.AssistantLink) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_AssistantLogin_qrContent(ctx, field)
+			return ec.fieldContext_AssistantLink_url(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.QRContent, nil
+			return obj.URL, nil
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
@@ -5183,17 +5307,17 @@ func (ec *executionContext) _AssistantLogin_qrContent(ctx context.Context, field
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_AssistantLogin_qrContent(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("AssistantLogin", field, false, false, errors.New("field of type String does not have child fields"))
+func (ec *executionContext) fieldContext_AssistantLink_url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantLink", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
-func (ec *executionContext) _AssistantLogin_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.AssistantLogin) (ret graphql.Marshaler) {
+func (ec *executionContext) _AssistantLink_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.AssistantLink) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_AssistantLogin_expiresAt(ctx, field)
+			return ec.fieldContext_AssistantLink_expiresAt(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
 			return obj.ExpiresAt, nil
@@ -5206,8 +5330,40 @@ func (ec *executionContext) _AssistantLogin_expiresAt(ctx context.Context, field
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_AssistantLogin_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("AssistantLogin", field, false, false, errors.New("field of type DateTime does not have child fields"))
+func (ec *executionContext) fieldContext_AssistantLink_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AssistantLink", field, false, false, errors.New("field of type DateTime does not have child fields"))
+}
+
+func (ec *executionContext) _AssistantLink_account(ctx context.Context, field graphql.CollectedField, obj *model.AssistantLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AssistantLink_account(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Account, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.AssistantAccount) graphql.Marshaler {
+			return ec.marshalOAssistantAccount2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantAccount(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_AssistantLink_account(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AssistantLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_AssistantAccount(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _ChoiceTranslation_locale(ctx context.Context, field graphql.CollectedField, obj *model.ChoiceTranslation) (ret graphql.Marshaler) {
@@ -6263,24 +6419,23 @@ func (ec *executionContext) fieldContext_DeliveryFeeTier_fee(_ context.Context, 
 	return graphql.NewScalarFieldContext("DeliveryFeeTier", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
-func (ec *executionContext) _Mutation_startAssistantLogin(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_startAssistantLink(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Mutation_startAssistantLogin(ctx, field)
+			return ec.fieldContext_Mutation_startAssistantLink(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().StartAssistantLogin(ctx, fc.Args["replaceOwner"].(*bool))
+			return ec.Resolvers.Mutation().StartAssistantLink(ctx)
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
 				if ec.Directives.Admin == nil {
-					var zeroVal *model.AssistantLogin
+					var zeroVal *model.AssistantLink
 					return zeroVal, errors.New("directive admin is not implemented")
 				}
 				return ec.Directives.Admin(ctx, nil, directive0)
@@ -6289,47 +6444,37 @@ func (ec *executionContext) _Mutation_startAssistantLogin(ctx context.Context, f
 			next = directive1
 			return next
 		},
-		func(ctx context.Context, selections ast.SelectionSet, v *model.AssistantLogin) graphql.Marshaler {
-			return ec.marshalNAssistantLogin2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantLogin(ctx, selections, v)
+		func(ctx context.Context, selections ast.SelectionSet, v *model.AssistantLink) graphql.Marshaler {
+			return ec.marshalNAssistantLink2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantLink(ctx, selections, v)
 		},
 		true,
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_Mutation_startAssistantLogin(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_startAssistantLink(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.childFields_AssistantLogin(ctx, field)
+			return ec.childFields_AssistantLink(ctx, field)
 		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_startAssistantLogin_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_disconnectAssistant(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_removeAssistantAccount(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Mutation_disconnectAssistant(ctx, field)
+			return ec.fieldContext_Mutation_removeAssistantAccount(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Mutation().DisconnectAssistant(ctx)
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().RemoveAssistantAccount(ctx, fc.Args["id"].(string))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
@@ -6352,7 +6497,7 @@ func (ec *executionContext) _Mutation_disconnectAssistant(ctx context.Context, f
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_Mutation_disconnectAssistant(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_removeAssistantAccount(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -6361,6 +6506,17 @@ func (ec *executionContext) fieldContext_Mutation_disconnectAssistant(_ context.
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_AssistantConnection(ctx, field)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_removeAssistantAccount_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -11838,24 +11994,24 @@ func (ec *executionContext) fieldContext_Query_assistantConnection(_ context.Con
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_assistantLogin(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_assistantLink(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_Query_assistantLogin(ctx, field)
+			return ec.fieldContext_Query_assistantLink(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().AssistantLogin(ctx, fc.Args["id"].(string))
+			return ec.Resolvers.Query().AssistantLink(ctx, fc.Args["id"].(string))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
 
 			directive1 := func(ctx context.Context) (any, error) {
 				if ec.Directives.Admin == nil {
-					var zeroVal *model.AssistantLogin
+					var zeroVal *model.AssistantLink
 					return zeroVal, errors.New("directive admin is not implemented")
 				}
 				return ec.Directives.Admin(ctx, nil, directive0)
@@ -11864,21 +12020,21 @@ func (ec *executionContext) _Query_assistantLogin(ctx context.Context, field gra
 			next = directive1
 			return next
 		},
-		func(ctx context.Context, selections ast.SelectionSet, v *model.AssistantLogin) graphql.Marshaler {
-			return ec.marshalNAssistantLogin2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantLogin(ctx, selections, v)
+		func(ctx context.Context, selections ast.SelectionSet, v *model.AssistantLink) graphql.Marshaler {
+			return ec.marshalNAssistantLink2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantLink(ctx, selections, v)
 		},
 		true,
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_Query_assistantLogin(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_assistantLink(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.childFields_AssistantLogin(ctx, field)
+			return ec.childFields_AssistantLink(ctx, field)
 		},
 	}
 	defer func() {
@@ -11888,7 +12044,7 @@ func (ec *executionContext) fieldContext_Query_assistantLogin(ctx context.Contex
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_assistantLogin_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Query_assistantLink_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -16804,10 +16960,10 @@ func (ec *executionContext) _AddressSuggestion(ctx context.Context, sel ast.Sele
 	return out
 }
 
-var assistantConnectionImplementors = []string{"AssistantConnection"}
+var assistantAccountImplementors = []string{"AssistantAccount"}
 
-func (ec *executionContext) _AssistantConnection(ctx context.Context, sel ast.SelectionSet, obj *model.AssistantConnection) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, assistantConnectionImplementors)
+func (ec *executionContext) _AssistantAccount(ctx context.Context, sel ast.SelectionSet, obj *model.AssistantAccount) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, assistantAccountImplementors)
 
 	out := graphql.NewFieldSet(fields)
 	deferredFieldSet := graphql.NewFieldSet(nil)
@@ -16815,39 +16971,24 @@ func (ec *executionContext) _AssistantConnection(ctx context.Context, sel ast.Se
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("AssistantConnection")
-		case "enabled":
-			out.Values[i] = ec._AssistantConnection_enabled(ctx, field, obj)
+			out.Values[i] = graphql.MarshalString("AssistantAccount")
+		case "id":
+			out.Values[i] = ec._AssistantAccount_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "state":
-			out.Values[i] = ec._AssistantConnection_state(ctx, field, obj)
+		case "name":
+			out.Values[i] = ec._AssistantAccount_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "account":
-			out.Values[i] = ec._AssistantConnection_account(ctx, field, obj)
+		case "username":
+			out.Values[i] = ec._AssistantAccount_username(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
-		case "since":
-			out.Values[i] = ec._AssistantConnection_since(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "expiredAt":
-			out.Values[i] = ec._AssistantConnection_expiredAt(ctx, field, obj)
-			if out.Values[i] == graphql.RequiredNull {
-				out.Invalids++
-			}
-		case "everConnected":
-			out.Values[i] = ec._AssistantConnection_everConnected(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "loginInProgress":
-			out.Values[i] = ec._AssistantConnection_loginInProgress(ctx, field, obj)
+		case "linkedAt":
+			out.Values[i] = ec._AssistantAccount_linkedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -16872,10 +17013,10 @@ func (ec *executionContext) _AssistantConnection(ctx context.Context, sel ast.Se
 	return out
 }
 
-var assistantLoginImplementors = []string{"AssistantLogin"}
+var assistantConnectionImplementors = []string{"AssistantConnection"}
 
-func (ec *executionContext) _AssistantLogin(ctx context.Context, sel ast.SelectionSet, obj *model.AssistantLogin) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, assistantLoginImplementors)
+func (ec *executionContext) _AssistantConnection(ctx context.Context, sel ast.SelectionSet, obj *model.AssistantConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, assistantConnectionImplementors)
 
 	out := graphql.NewFieldSet(fields)
 	deferredFieldSet := graphql.NewFieldSet(nil)
@@ -16883,25 +17024,93 @@ func (ec *executionContext) _AssistantLogin(ctx context.Context, sel ast.Selecti
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("AssistantLogin")
+			out.Values[i] = graphql.MarshalString("AssistantConnection")
+		case "enabled":
+			out.Values[i] = ec._AssistantConnection_enabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "state":
+			out.Values[i] = ec._AssistantConnection_state(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "botUsername":
+			out.Values[i] = ec._AssistantConnection_botUsername(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "accounts":
+			out.Values[i] = ec._AssistantConnection_accounts(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "maxAccounts":
+			out.Values[i] = ec._AssistantConnection_maxAccounts(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "problemSince":
+			out.Values[i] = ec._AssistantConnection_problemSince(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var assistantLinkImplementors = []string{"AssistantLink"}
+
+func (ec *executionContext) _AssistantLink(ctx context.Context, sel ast.SelectionSet, obj *model.AssistantLink) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, assistantLinkImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AssistantLink")
 		case "id":
-			out.Values[i] = ec._AssistantLogin_id(ctx, field, obj)
+			out.Values[i] = ec._AssistantLink_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "status":
-			out.Values[i] = ec._AssistantLogin_status(ctx, field, obj)
+			out.Values[i] = ec._AssistantLink_status(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "qrContent":
-			out.Values[i] = ec._AssistantLogin_qrContent(ctx, field, obj)
+		case "url":
+			out.Values[i] = ec._AssistantLink_url(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "expiresAt":
-			out.Values[i] = ec._AssistantLogin_expiresAt(ctx, field, obj)
+			out.Values[i] = ec._AssistantLink_expiresAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "account":
+			out.Values[i] = ec._AssistantLink_account(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
 		default:
@@ -17434,16 +17643,16 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mutation")
-		case "startAssistantLogin":
+		case "startAssistantLink":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_startAssistantLogin(ctx, field)
+				return ec._Mutation_startAssistantLink(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "disconnectAssistant":
+		case "removeAssistantAccount":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_disconnectAssistant(ctx, field)
+				return ec._Mutation_removeAssistantAccount(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -19817,7 +20026,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "assistantLogin":
+		case "assistantLink":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -19826,7 +20035,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_assistantLogin(ctx, field)
+				res = ec._Query_assistantLink(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -21354,6 +21563,32 @@ func (ec *executionContext) marshalNAddressSuggestion2ᚖtsbᚑserviceᚋinterna
 	return ec._AddressSuggestion(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNAssistantAccount2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantAccountᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.AssistantAccount) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNAssistantAccount2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantAccount(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNAssistantAccount2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantAccount(ctx context.Context, sel ast.SelectionSet, v *model.AssistantAccount) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AssistantAccount(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNAssistantConnection2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantConnection(ctx context.Context, sel ast.SelectionSet, v *model.AssistantConnection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -21374,23 +21609,23 @@ func (ec *executionContext) marshalNAssistantConnectionState2tsbᚑserviceᚋint
 	return v
 }
 
-func (ec *executionContext) marshalNAssistantLogin2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantLogin(ctx context.Context, sel ast.SelectionSet, v *model.AssistantLogin) graphql.Marshaler {
+func (ec *executionContext) marshalNAssistantLink2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantLink(ctx context.Context, sel ast.SelectionSet, v *model.AssistantLink) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
-	return ec._AssistantLogin(ctx, sel, v)
+	return ec._AssistantLink(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalNAssistantLoginStatus2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantLoginStatus(ctx context.Context, v any) (model.AssistantLoginStatus, error) {
-	var res model.AssistantLoginStatus
+func (ec *executionContext) unmarshalNAssistantLinkStatus2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantLinkStatus(ctx context.Context, v any) (model.AssistantLinkStatus, error) {
+	var res model.AssistantLinkStatus
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNAssistantLoginStatus2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantLoginStatus(ctx context.Context, sel ast.SelectionSet, v model.AssistantLoginStatus) graphql.Marshaler {
+func (ec *executionContext) marshalNAssistantLinkStatus2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantLinkStatus(ctx context.Context, sel ast.SelectionSet, v model.AssistantLinkStatus) graphql.Marshaler {
 	return v
 }
 
@@ -22499,6 +22734,13 @@ func (ec *executionContext) marshalOAddress2ᚖtsbᚑserviceᚋinternalᚋapiᚋ
 		return graphql.Null
 	}
 	return ec._Address(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOAssistantAccount2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐAssistantAccount(ctx context.Context, sel ast.SelectionSet, v *model.AssistantAccount) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._AssistantAccount(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v any) (bool, error) {

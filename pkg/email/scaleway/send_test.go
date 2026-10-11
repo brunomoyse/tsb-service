@@ -255,7 +255,7 @@ func TestEveryEmailFailsWhenATemplateHalfIsMissing(t *testing.T) {
 	extra := []sendCase{
 		{name: "feedback", send: func(string) error { return SendFeedbackEmail("A", "a@x.test", "svc", "typ", "msg", "en") }},
 		{name: "assistant disconnected", send: func(string) error {
-			return SendAssistantDisconnectedEmail("owner@x.test", "https://dash.test", time.Now())
+			return SendAssistantBotProblemEmail("owner@x.test", "https://dash.test", time.Now())
 		}},
 	}
 	for _, tc := range append(sendCases(), extra...) {
@@ -284,7 +284,7 @@ func TestEveryEmailFailsCleanlyWhenTheServiceIsNotInitialized(t *testing.T) {
 	extra := []sendCase{
 		{name: "feedback", send: func(string) error { return SendFeedbackEmail("A", "a@x.test", "svc", "typ", "msg", "en") }},
 		{name: "assistant disconnected", send: func(string) error {
-			return SendAssistantDisconnectedEmail("owner@x.test", "https://dash.test", time.Now())
+			return SendAssistantBotProblemEmail("owner@x.test", "https://dash.test", time.Now())
 		}},
 	}
 	for _, tc := range append(sendCases(), extra...) {
@@ -309,7 +309,7 @@ func TestEveryEmailSurfacesDeliveryFailure(t *testing.T) {
 	extra := []sendCase{
 		{name: "feedback", send: func(string) error { return SendFeedbackEmail("A", "a@x.test", "svc", "typ", "msg", "en") }},
 		{name: "assistant disconnected", send: func(string) error {
-			return SendAssistantDisconnectedEmail("owner@x.test", "https://dash.test", time.Now())
+			return SendAssistantBotProblemEmail("owner@x.test", "https://dash.test", time.Now())
 		}},
 	}
 	for _, tc := range append(sendCases(), extra...) {
@@ -581,15 +581,15 @@ func TestFeedbackEmail(t *testing.T) {
 	require.Empty(t, m.Header.Get("References"), "feedback is not part of an order thread")
 }
 
-func TestAssistantDisconnectedEmail(t *testing.T) {
+func TestAssistantBotProblemEmail(t *testing.T) {
 	srv := smtptest.Start(t)
 	useSMTP(t, srv)
 	// 13:05 UTC on 3 Oct 2026 is 15:05 in Brussels (CEST).
 	expired := time.Date(2026, 10, 3, 13, 5, 0, 0, time.UTC)
-	require.NoError(t, SendAssistantDisconnectedEmail("owner@tsb.test", "https://dash.test/assistant", expired))
+	require.NoError(t, SendAssistantBotProblemEmail("owner@tsb.test", "https://dash.test/assistant", expired))
 	m := srv.Only(t)
 
-	require.Equal(t, "微信助手已断开，请重新连接", m.Subject)
+	require.Equal(t, "Telegram 助手已停止工作", m.Subject)
 	require.Equal(t, "owner@tsb.test", m.To)
 	for _, body := range []string{m.Text, m.HTML} {
 		require.Contains(t, body, "10月3日 15:05")

@@ -128,7 +128,7 @@ func TestAllTemplatesParseAndPair(t *testing.T) {
 		require.Equal(t, html["fr"], func() map[string]bool {
 			m := map[string]bool{}
 			for k := range html[lang] {
-				if k != "feedback" && k != "assistant-disconnected" { // en-only / zh-only by design
+				if k != "feedback" && k != "assistant-bot-problem" { // en-only / zh-only by design
 					m[k] = true
 				}
 			}

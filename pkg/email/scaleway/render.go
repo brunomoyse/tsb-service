@@ -698,15 +698,15 @@ func renderFeedbackEmailText(path, name, email, serviceType, feedbackType, messa
 	return renderEmail(path, data, loadTextTemplate)
 }
 
-func prepareAssistantDisconnectedData(dashboardLink string, expiredAt time.Time) any {
-	local := timezone.In(expiredAt)
+func prepareAssistantBotProblemData(dashboardLink string, since time.Time) any {
+	local := timezone.In(since)
 	return struct {
 		DashboardLink string
-		ExpiredAt     string
+		Since         string
 		LogoURL       string
 	}{
 		DashboardLink: dashboardLink,
-		ExpiredAt:     fmt.Sprintf("%d月%d日 %s", int(local.Month()), local.Day(), local.Format("15:04")),
+		Since:         fmt.Sprintf("%d月%d日 %s", int(local.Month()), local.Day(), local.Format("15:04")),
 		LogoURL:       logoURL(),
 	}
 }

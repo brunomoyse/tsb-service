@@ -1,9 +1,9 @@
 # tsb-mcp
 
-An MCP server that lets the Tokyo Sushi Bar owner run the dashboard from chat (WeChat ClawBot through an agent service). It exposes narrow, typed tools for the catalogue, opening hours, closures, coupons and order reads.
+An MCP server that lets the Tokyo Sushi Bar owner run the dashboard from chat (a Telegram bot through an agent service). It exposes narrow, typed tools for the catalogue, opening hours, closures, coupons and order reads.
 
 ```
-WeChat ClawBot (iLink) / CLI
+Telegram bot / CLI
   -> agent service (LLM + confirmation logic)
   -> tsb-mcp (this)                     cmd/tsb-mcp, internal/mcp
   -> tsb-service GraphQL API            POST /api/v1/graphql (same API as the dashboard)

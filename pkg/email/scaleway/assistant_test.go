@@ -6,10 +6,10 @@ import (
 	"time"
 )
 
-func TestRenderAssistantDisconnected(t *testing.T) {
-	data := prepareAssistantDisconnectedData("https://dashboard.example/zh/assistant", time.Date(2026, 10, 3, 13, 5, 0, 0, time.UTC))
+func TestRenderAssistantBotProblem(t *testing.T) {
+	data := prepareAssistantBotProblemData("https://dashboard.example/zh/assistant", time.Date(2026, 10, 3, 13, 5, 0, 0, time.UTC))
 	for name, loader := range map[string]func(string) (templateExecutor, error){"html": loadHTMLTemplate, "text": loadTextTemplate} {
-		out, err := renderEmail("templates/zh/assistant-disconnected", data, loader)
+		out, err := renderEmail("templates/zh/assistant-bot-problem", data, loader)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}

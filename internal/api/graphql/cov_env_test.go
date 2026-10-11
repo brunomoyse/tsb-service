@@ -55,7 +55,7 @@ import (
 // The environment of the resolver coverage tests: the real services over a real Postgres (like
 // setupTestContext) plus every boundary the resolvers reach beyond the database, replaced by a
 // fake that records what it was asked: Mollie, APNs, FCM, the Zitadel identity API, Google Places,
-// the WeChat agent and an SMTP server for the transactional e-mails.
+// the Telegram agent and an SMTP server for the transactional e-mails.
 
 // ---- SMTP --------------------------------------------------------------------------------------
 
@@ -141,29 +141,29 @@ func (g *fakeGoogle) ComputeRoute(context.Context, float64, float64) (int, int, 
 	return 1500, 420, nil
 }
 
-// fakeAgent is the WeChat assistant's agent.
+// fakeAgent is the Telegram assistant's agent.
 type fakeAgent struct {
-	conn     assistantDomain.Connection
-	connErr  error
-	login    assistantDomain.Login
-	loginErr error
-	discErr  error
+	conn    assistantDomain.Connection
+	connErr error
+	link    assistantDomain.Link
+	linkErr error
+	rmErr   error
 }
 
 func (a *fakeAgent) Connection(context.Context) (assistantDomain.Connection, error) {
 	return a.conn, a.connErr
 }
 
-func (a *fakeAgent) StartLogin(context.Context, bool) (assistantDomain.Login, error) {
-	return a.login, a.loginErr
+func (a *fakeAgent) StartLink(context.Context) (assistantDomain.Link, error) {
+	return a.link, a.linkErr
 }
 
-func (a *fakeAgent) LoginStatus(context.Context, string) (assistantDomain.Login, error) {
-	return a.login, a.loginErr
+func (a *fakeAgent) LinkStatus(context.Context, string) (assistantDomain.Link, error) {
+	return a.link, a.linkErr
 }
 
-func (a *fakeAgent) Disconnect(context.Context) (assistantDomain.Connection, error) {
-	return a.conn, a.discErr
+func (a *fakeAgent) RemoveAccount(context.Context, string) (assistantDomain.Connection, error) {
+	return a.conn, a.rmErr
 }
 
 type fakePosDevices struct {
@@ -186,7 +186,7 @@ func (f *fakePosDevices) FindActiveFCMTokens(context.Context) ([]string, error) 
 type covOptions struct {
 	// Push installs the APNs and FCM clients (pointed at the fakes).
 	Push bool
-	// Agent is the WeChat agent; nil leaves the assistant unconfigured.
+	// Agent is the Telegram agent; nil leaves the assistant unconfigured.
 	Agent *fakeAgent
 	// PosTokens are the FCM tokens of the active POS handhelds.
 	PosTokens []string

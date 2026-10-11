@@ -1,58 +1,70 @@
-# WeChat assistant (tsb-agent): its WeChat connection and the QR login that
-# (re)connects it. The assistant runs as a separate service; these fields
-# proxy its admin API.
+# Telegram assistant (tsb-agent): its Telegram bot, the accounts linked to it
+# and the one-time links that add an account. The assistant runs as a
+# separate service; these fields proxy its admin API.
 
 enum AssistantConnectionState {
-    CONNECTED
-    DISCONNECTED
-    # The WeChat session ended (iLink session expired): scan a new QR code.
-    EXPIRED
+    # The bot works and at least one account is linked.
+    READY
+    # The bot works but no account is linked yet.
+    NO_ACCOUNTS
+    # Telegram refused the bot (its token was revoked or the bot deleted).
+    TOKEN_REJECTED
+    # Another process polls Telegram with the same bot token.
+    CONFLICT
     # The assistant service did not answer.
     UNAVAILABLE
+}
+
+type AssistantAccount {
+    # The Telegram user id. A String, not an ID: the global ID scalar is bound
+    # to UUID, and Telegram ids are numbers.
+    id: String!
+    name: String!
+    # The Telegram @username, when the account has one.
+    username: String
+    linkedAt: DateTime!
 }
 
 type AssistantConnection {
     # False when no assistant is configured on this server.
     enabled: Boolean!
     state: AssistantConnectionState!
-    # The WeChat account (iLink user id) that owns the assistant.
-    account: String
-    since: DateTime
-    expiredAt: DateTime
-    # True once a WeChat account has been connected.
-    everConnected: Boolean!
-    loginInProgress: Boolean!
+    # The bot's @username (without the @), once known.
+    botUsername: String
+    accounts: [AssistantAccount!]!
+    # How many accounts may be linked at once.
+    maxAccounts: Int!
+    # Since when the bot has a problem (TOKEN_REJECTED, CONFLICT).
+    problemSince: DateTime
 }
 
-enum AssistantLoginStatus {
+enum AssistantLinkStatus {
     WAIT
-    SCANNED
-    CONFIRMED
+    LINKED
     EXPIRED
-    # Confirmed by a WeChat account other than the owner's. Start again with
-    # replaceOwner to hand the assistant to that account.
-    REFUSED_OTHER_ACCOUNT
-    FAILED
-    CANCELLED
+    # The account limit was reached before the link was used.
+    REFUSED_FULL
 }
 
-type AssistantLogin {
+type AssistantLink {
     id: String!
-    status: AssistantLoginStatus!
-    # Text to encode as a QR code (a WeChat link). It changes when an expired
-    # QR code is renewed.
-    qrContent: String!
+    status: AssistantLinkStatus!
+    # A t.me link to show as a QR code or a button; opening it and tapping
+    # Start links the Telegram account.
+    url: String!
     expiresAt: DateTime!
+    # The account that was linked, once status is LINKED.
+    account: AssistantAccount
 }
 
 extend type Query {
     assistantConnection: AssistantConnection! @admin
-    assistantLogin(id: String!): AssistantLogin! @admin
+    assistantLink(id: String!): AssistantLink! @admin
 }
 
 extend type Mutation {
-    startAssistantLogin(replaceOwner: Boolean): AssistantLogin! @admin
-    disconnectAssistant: AssistantConnection! @admin
+    startAssistantLink: AssistantLink! @admin
+    removeAssistantAccount(id: String!): AssistantConnection! @admin
 }
 
 extend type Subscription {

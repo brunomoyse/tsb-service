@@ -9,39 +9,57 @@ import (
 	assistantDomain "tsb-service/internal/modules/assistant/domain"
 )
 
-func toGQLAssistantConnection(c assistantDomain.Connection, enabled bool) *model.AssistantConnection {
-	out := &model.AssistantConnection{
-		Enabled:         enabled,
-		State:           model.AssistantConnectionState(strings.ToUpper(c.State)),
-		Since:           c.Since,
-		ExpiredAt:       c.ExpiredAt,
-		EverConnected:   c.EverConnected,
-		LoginInProgress: c.LoginInProgress,
-	}
-	if !out.State.IsValid() {
-		out.State = model.AssistantConnectionStateUnavailable
-	}
-	if c.Account != "" {
-		out.Account = &c.Account
+func toGQLAssistantAccount(a assistantDomain.Account) *model.AssistantAccount {
+	out := &model.AssistantAccount{ID: a.ID, Name: a.Name, LinkedAt: a.LinkedAt}
+	if a.Username != "" {
+		out.Username = &a.Username
 	}
 	return out
 }
 
-func toGQLAssistantLogin(l assistantDomain.Login) *model.AssistantLogin {
-	status := model.AssistantLoginStatus(strings.ToUpper(l.Status))
-	if !status.IsValid() {
-		status = model.AssistantLoginStatusFailed
+func toGQLAssistantConnection(c assistantDomain.Connection, enabled bool) *model.AssistantConnection {
+	out := &model.AssistantConnection{
+		Enabled:      enabled,
+		State:        model.AssistantConnectionState(strings.ToUpper(c.State)),
+		Accounts:     make([]*model.AssistantAccount, 0, len(c.Accounts)),
+		MaxAccounts:  c.MaxAccounts,
+		ProblemSince: c.ProblemAt,
 	}
-	return &model.AssistantLogin{ID: l.ID, Status: status, QRContent: l.QRContent, ExpiresAt: l.ExpiresAt}
+	if !out.State.IsValid() {
+		out.State = model.AssistantConnectionStateUnavailable
+	}
+	if c.BotUsername != "" {
+		out.BotUsername = &c.BotUsername
+	}
+	for _, a := range c.Accounts {
+		out.Accounts = append(out.Accounts, toGQLAssistantAccount(a))
+	}
+	return out
+}
+
+func toGQLAssistantLink(l assistantDomain.Link) *model.AssistantLink {
+	status := model.AssistantLinkStatus(strings.ToUpper(l.Status))
+	if !status.IsValid() {
+		status = model.AssistantLinkStatusExpired
+	}
+	out := &model.AssistantLink{ID: l.ID, Status: status, URL: l.URL, ExpiresAt: l.ExpiresAt}
+	if l.Account != nil {
+		out.Account = toGQLAssistantAccount(*l.Account)
+	}
+	return out
 }
 
 func assistantError(err error) error {
 	switch {
 	case errors.Is(err, assistantDomain.ErrDisabled):
-		return apperr.New(apperr.CodeAssistantDisabled, "the WeChat assistant is not configured")
-	case errors.Is(err, assistantDomain.ErrUnknownLogin):
-		return apperr.New(apperr.CodeNotFound, "unknown or replaced login")
+		return apperr.New(apperr.CodeAssistantDisabled, "the Telegram assistant is not configured")
+	case errors.Is(err, assistantDomain.ErrUnknownLink):
+		return apperr.New(apperr.CodeNotFound, "unknown link")
+	case errors.Is(err, assistantDomain.ErrUnknownAccount):
+		return apperr.New(apperr.CodeNotFound, "unknown account")
+	case errors.Is(err, assistantDomain.ErrLimitReached):
+		return apperr.New(apperr.CodeAssistantLimitReached, "the assistant already has the maximum number of accounts")
 	default:
-		return apperr.New(apperr.CodeAssistantUnavailable, "the WeChat assistant is unavailable")
+		return apperr.New(apperr.CodeAssistantUnavailable, "the Telegram assistant is unavailable")
 	}
 }

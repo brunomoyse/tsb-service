@@ -11,7 +11,7 @@ import (
 
 // Chinese summaries. Every summary also exists in Chinese (summary_zh), built
 // from these fixed templates rather than by a model, so the owner confirms in
-// WeChat exactly what will be applied. Names use the Chinese translation and
+// Telegram exactly what will be applied. Names use the Chinese translation and
 // fall back to the French name when it is missing.
 
 // lines collects the parts of a summary in English and Chinese side by side.

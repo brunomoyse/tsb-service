@@ -923,10 +923,10 @@ func SendFeedbackEmail(name, email, serviceType, feedbackType, message, lang str
 	return nil
 }
 
-// SendAssistantDisconnectedEmail tells the owner that the WeChat assistant's
-// session expired and links to the dashboard page that reconnects it. The
-// owner reads Chinese, so the email is Chinese only.
-func SendAssistantDisconnectedEmail(to, dashboardLink string, expiredAt time.Time) error {
+// SendAssistantBotProblemEmail tells the owner that Telegram refused the
+// assistant's bot (token revoked or bot deleted) and links to the dashboard
+// assistant page. The owner reads Chinese, so the email is Chinese only.
+func SendAssistantBotProblemEmail(to, assistantPageURL string, since time.Time) error {
 	newReq, err := copyBaseReq()
 	if err != nil {
 		return err
@@ -934,8 +934,8 @@ func SendAssistantDisconnectedEmail(to, dashboardLink string, expiredAt time.Tim
 	name := brandCfg().Name
 	newReq.To = []*temv1alpha1.CreateEmailRequestAddress{{Email: to, Name: &name}}
 
-	data := prepareAssistantDisconnectedData(dashboardLink, expiredAt)
-	path := "templates/zh/assistant-disconnected"
+	data := prepareAssistantBotProblemData(assistantPageURL, since)
+	path := "templates/zh/assistant-bot-problem"
 	htmlContent, err := renderEmail(path, data, loadHTMLTemplate)
 	if err != nil {
 		return fmt.Errorf("failed to render email template: %w", err)
@@ -945,12 +945,12 @@ func SendAssistantDisconnectedEmail(to, dashboardLink string, expiredAt time.Tim
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
 
-	newReq.Subject = "微信助手已断开，请重新连接"
+	newReq.Subject = "Telegram 助手已停止工作"
 	newReq.HTML = htmlContent
 	newReq.Text = plainTextContent
 	if err := dispatch(&newReq); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
-	logger.Debugf("Assistant disconnected email sent")
+	logger.Debugf("Assistant bot problem email sent")
 	return nil
 }

@@ -12,7 +12,7 @@ import (
 )
 
 // customerTemplates are the emails a customer receives, in every language the shops offer.
-// (feedback is staff-facing English and assistant-disconnected staff-facing Chinese: not listed.)
+// (feedback is staff-facing English and assistant-bot-problem staff-facing Chinese: not listed.)
 var customerTemplates = []string{
 	"account-linked", "login-otp", "order-canceled", "order-completed", "order-confirmed", "order-pending",
 	"order-ready", "ready-time-updated", "reengagement", "refund-issued", "verify", "welcome",
