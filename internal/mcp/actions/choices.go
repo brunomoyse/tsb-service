@@ -109,6 +109,10 @@ type groupState struct {
 	MinSelections int               `json:"min_selections"`
 	MaxSelections int               `json:"max_selections"`
 	SortOrder     int               `json:"sort_order"`
+	// Choices lists the choice ids a group deletion was proposed for, so a
+	// choice added or removed before the confirmation turns it into a conflict
+	// instead of silently deleting something the owner never saw.
+	Choices []string `json:"choices,omitempty"`
 }
 
 type createdID struct {
@@ -272,12 +276,14 @@ func choiceGroupDelete() handler {
 			}
 			names := make([]string, 0, len(g.Choices))
 			namesZh := make([]string, 0, len(g.Choices))
+			ids := make([]string, 0, len(g.Choices))
 			for _, c := range g.Choices {
+				ids = append(ids, c.ID)
 				names = append(names, c.Name)
 				namesZh = append(namesZh, nameZh(choiceNames(c.Translations), c.Name))
 			}
 			return &prepared{EntityType: "choice_group", EntityID: g.ID,
-				Before:    groupState{Exists: true, Names: choiceNames(g.Translations), MinSelections: g.MinSelections, MaxSelections: g.MaxSelections, SortOrder: g.SortOrder},
+				Before:    groupState{Exists: true, Names: choiceNames(g.Translations), MinSelections: g.MinSelections, MaxSelections: g.MaxSelections, SortOrder: g.SortOrder, Choices: ids},
 				Summary:   fmt.Sprintf("%s: delete choice group %q and its %d choices (%s). This cannot be undone.", ProductLabel(prod), g.Name, len(g.Choices), strings.Join(names, ", ")),
 				SummaryZh: fmt.Sprintf("%s：删除选项组%s及其 %d 个选项（%s）。此操作无法撤销。", productLabelZh(prod), choiceLabelZh(g.Translations, g.Name), len(g.Choices), strings.Join(namesZh, "、"))}, nil
 		},
