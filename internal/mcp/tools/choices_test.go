@@ -125,14 +125,160 @@ func TestGetProductAfterChoiceEditsShowsTheNewState(t *testing.T) {
 	}
 }
 
-// Choices are options of a product, not products: the product search looks at
-// product names, codes and categories only, and says nothing matched.
-func TestSearchProductsDoesNotMatchChoiceNames(t *testing.T) {
+// Choices are not products: they never count in match_count, but a query that
+// matches an option name lists it, with the dish and group it belongs to.
+func TestSearchProductsListsOptionsSeparately(t *testing.T) {
 	h := newHarness(t)
-	for _, q := range []string{"Mayo épicée", "Soja", "酱汁", "Sauce", "c-spicy", "g-sauce"} {
+	for _, q := range []string{"Mayo épicée", "mayo epicee", "Mayo"} {
 		out := h.call("search_products", map[string]any{"query": q})
-		if num(out["match_count"]) != 0 {
-			t.Errorf("%q matched products %v", q, out)
+		opts := list(out["options"])
+		if num(out["match_count"]) != 0 || num(out["option_match_count"]) != 1 || len(opts) != 1 {
+			t.Fatalf("%q: %v", q, out)
+		}
+		o := opts[0].(map[string]any)
+		if str(o["choice_id"]) != "c-spicy" || str(o["group_id"]) != "g-sauce" || str(o["product_id"]) != "p-maki-box" || num(o["price_modifier_cents"]) != 50 {
+			t.Errorf("%q option: %v", q, o)
+		}
+		if got := str(o["also_option_of"]); got != "This is also an option of: 套餐 卷寿司套餐 > group Sauce" {
+			t.Errorf("also_option_of = %q", got)
+		}
+		if str(o["product_labels"].(map[string]any)["fr"]) != "Boxes Maki box" {
+			t.Errorf("labels: %v", o["product_labels"])
+		}
+		if !strings.Contains(str(out["note"]), "No product matches, but it is an option of one dish") {
+			t.Errorf("note = %q", out["note"])
+		}
+	}
+	// Typos do not turn into options, ids and group names are not option names.
+	for _, q := range []string{"Mayyo epicee", "c-spicy", "g-sauce", "Sauce", "酱汁", "zzz"} {
+		out := h.call("search_products", map[string]any{"query": q})
+		if num(out["option_match_count"]) != 0 || len(list(out["options"])) != 0 {
+			t.Errorf("%q matched options: %v", q, out["options"])
+		}
+	}
+	// No option anywhere: the list is empty, not missing, and the note is unchanged.
+	out := h.call("search_products", map[string]any{"query": "maki saumon"})
+	if _, ok := out["options"].([]any); !ok || num(out["option_match_count"]) != 0 || strings.Contains(str(out["note"]), "option") {
+		t.Errorf("maki saumon: %v", out)
+	}
+}
+
+// 辣汤 is a dish of 东京热食 and a choice in two platters: the model must be
+// told the name is ambiguous.
+func TestSearchNameBothProductAndOption(t *testing.T) {
+	h := newMenuChoicesHarness(t)
+	h.fake.Lock()
+	for _, id := range []string{idPlateauM1, "9e199415-0f31-46a9-ae14-f0dc0899e681"} {
+		for _, p := range h.fake.Products {
+			if p.ID == id {
+				if len(p.ChoiceGroups) == 0 {
+					p.ChoiceGroups = []upstream.ChoiceGroup{group("g-"+id[:8], id, "Soupe", "汤", 1, 1, 0)}
+				}
+				g := &p.ChoiceGroups[0]
+				g.Choices = append(g.Choices, choice("c-"+id[:8]+"-hot", g.ID, "Soupe piquante", "辣汤", "0", 5))
+			}
+		}
+	}
+	h.fake.Unlock()
+	out := h.call("search_products", map[string]any{"query": "辣汤"})
+	if num(out["exact_matches"]) != 1 || num(out["match_count"]) < 1 || num(out["option_match_count"]) != 2 {
+		t.Fatalf("counts: %v", out)
+	}
+	note := str(out["note"])
+	for _, want := range []string{"also matches 2 option(s)", "ask before changing anything", "propose_choice_change", "propose_price_change"} {
+		if !strings.Contains(note, want) {
+			t.Errorf("note %q lacks %q", note, want)
+		}
+	}
+	first := list(out["results"])[0].(map[string]any)
+	if str(first["labels"].(map[string]any)["zh"]) != "东京热食 辣汤" {
+		t.Errorf("product result: %v", first["labels"])
+	}
+	var of []string
+	for _, o := range list(out["options"]) {
+		of = append(of, str(o.(map[string]any)["also_option_of"]))
+	}
+	if len(of) != 2 || !strings.Contains(strings.Join(of, "|"), "拼盘套餐 M1 > group Soupe") || !strings.Contains(strings.Join(of, "|"), "拼盘套餐 M2 > group Soupe") {
+		t.Errorf("options: %v", of)
+	}
+	// Chinese written with spaces and the French name find the same options.
+	for _, q := range []string{"辣 汤", "Soupe piquante"} {
+		o := h.call("search_products", map[string]any{"query": q})
+		if num(o["option_match_count"]) != 2 {
+			t.Errorf("%q: %v", q, o["option_match_count"])
+		}
+	}
+}
+
+// An option of several dishes, and no dish of that name: ask which dish.
+func TestSearchOptionOfSeveralProducts(t *testing.T) {
+	h := newMenuChoicesHarness(t)
+	h.fake.Lock()
+	for _, id := range []string{idMakiSaumon, idSushiSaumon, idSashimiSaumon} {
+		for _, p := range h.fake.Products {
+			if p.ID == id {
+				g := &p.ChoiceGroups[0]
+				g.Choices = append(g.Choices, choice("c-ponzu-"+id[:8], g.ID, "Ponzu maison", "柚子醋", "0.30", 9))
+			}
+		}
+	}
+	h.fake.Unlock()
+	out := h.call("search_products", map[string]any{"query": "Ponzu"})
+	if num(out["match_count"]) != 0 || num(out["option_match_count"]) != 3 || len(list(out["options"])) != 3 {
+		t.Fatalf("Ponzu: %v", out)
+	}
+	if note := str(out["note"]); !strings.Contains(note, "ask which one, listing the dishes by category + name") {
+		t.Errorf("note = %q", note)
+	}
+	ids := map[string]bool{}
+	for _, o := range list(out["options"]) {
+		ids[str(o.(map[string]any)["product_id"])] = true
+	}
+	if !ids[idMakiSaumon] || !ids[idSushiSaumon] || !ids[idSashimiSaumon] {
+		t.Errorf("dishes: %v", ids)
+	}
+	// Chinese name: the same three dishes, labelled by category.
+	zh := h.call("search_products", map[string]any{"query": "柚子醋"})
+	var labels []string
+	for _, o := range list(zh["options"]) {
+		labels = append(labels, str(o.(map[string]any)["product_labels"].(map[string]any)["zh"]))
+	}
+	if len(labels) != 3 || !strings.Contains(strings.Join(labels, "|"), "卷寿司 三文鱼") || !strings.Contains(strings.Join(labels, "|"), "刺身 三文鱼") {
+		t.Errorf("labels: %v", labels)
+	}
+}
+
+func TestSearchOptionListIsCapped(t *testing.T) {
+	h := newMenuChoicesHarness(t)
+	h.fake.Lock()
+	for _, p := range h.fake.Products {
+		if p.ID == idPokeSaumon {
+			g := &p.ChoiceGroups[0]
+			for i := range 14 {
+				g.Choices = append(g.Choices, choice("c-extra-"+string(rune('a'+i)), g.ID, "Sauce extra "+string(rune('a'+i)), "", "0", 20+i))
+			}
+		}
+	}
+	h.fake.Unlock()
+	out := h.call("search_products", map[string]any{"query": "Sauce extra"})
+	if num(out["option_match_count"]) != 14 || len(list(out["options"])) != 10 {
+		t.Errorf("count %v listed %d", out["option_match_count"], len(list(out["options"])))
+	}
+}
+
+func TestSearchOptionsCarryNoPrivateData(t *testing.T) {
+	h := newMenuChoicesHarness(t)
+	out := h.call("search_products", map[string]any{"query": "Soupe miso"})
+	if len(list(out["options"])) == 0 {
+		t.Fatal("no option listed")
+	}
+	for _, o := range list(out["options"]) {
+		for k := range o.(map[string]any) {
+			switch k {
+			case "choice_id", "name", "names", "group_id", "group_name", "product_id", "product_labels", "also_option_of", "price_modifier_cents":
+			default:
+				t.Errorf("unexpected option field %q", k)
+			}
 		}
 	}
 }

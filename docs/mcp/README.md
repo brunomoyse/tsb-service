@@ -42,7 +42,7 @@ Conventions:
 
 ### Product search
 
-`search_products` matches names, codes, and category + name in any language mix: `Maki 三文鱼`, `三文鱼 maki`, `春卷 saumon avocat`, `卷寿司三文鱼`. A Chinese query without spaces may also be part of a name followed by part of a category (`三文鱼卷` matches 三文鱼牛油果 under 加州卷).
+`search_products` matches names, codes, and category + name in any language mix: `Maki 三文鱼`, `三文鱼 maki`, `春卷 saumon avocat`, `卷寿司三文鱼`. A Chinese query without spaces may also be part of a name followed by part of a category (`三文鱼卷` matches 三文鱼牛油果 under 加州卷). It also lists, in `options` (up to 10, `option_match_count` for the total), the choices whose name matches (exact, prefix or substring, no typos), each with its dish (category + name), group and surcharge. A name that is both a dish and an option, or an option of several dishes, makes the note tell the model to ask which one is meant.
 
 The output says whether the query names one product:
 

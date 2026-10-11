@@ -97,20 +97,63 @@ type SearchProductsOut struct {
 	ExactMatches int            `json:"exact_matches" jsonschema:"results whose name, code or category + name is exactly the query"`
 	Note         string         `json:"note,omitempty" jsonschema:"whether the query identifies one product; read it before acting"`
 	Results      []ProductMatch `json:"results"`
+	// Options are the choices (option groups' items) whose name matches the
+	// query: "辣汤" can be a dish and an option of several platters.
+	OptionMatchCount int           `json:"option_match_count" jsonschema:"choices (options of a dish) whose name matches the query, also those beyond the list"`
+	Options          []OptionMatch `json:"options" jsonschema:"choices whose name matches the query, with the dish and group they belong to; a name that is both a product and an option, or an option of several dishes, must be clarified with the owner"`
+}
+
+// maxOptionMatches caps the options listed in a search result.
+const maxOptionMatches = 10
+
+// OptionMatch is a choice whose name matches a search query.
+type OptionMatch struct {
+	ChoiceID     string            `json:"choice_id"`
+	Name         string            `json:"name"`
+	Names        map[string]string `json:"names"`
+	GroupID      string            `json:"group_id"`
+	GroupName    string            `json:"group_name"`
+	ProductID    string            `json:"product_id"`
+	Labels       map[string]string `json:"product_labels" jsonschema:"the dish the option belongs to: category + name per language"`
+	AlsoOptionOf string            `json:"also_option_of" jsonschema:"readable form: this is also an option of <category + name> > group <group>"`
+	Surcharge    int64             `json:"price_modifier_cents"`
+}
+
+type optionRef struct {
+	p *upstream.Product
+	g *upstream.ChoiceGroup
+	c *upstream.Choice
 }
 
 // ProductIndex is a catalogue prepared for search_products.
 type ProductIndex struct {
-	byID map[string]*upstream.Product
-	ix   *search.Index
+	byID    map[string]*upstream.Product
+	ix      *search.Index
+	options *search.Index
+	optRefs map[string]optionRef
 }
 
 // NewProductIndex prepares a catalogue for searching.
 func NewProductIndex(ps []upstream.Product) *ProductIndex {
-	ix := &ProductIndex{byID: map[string]*upstream.Product{}, ix: search.NewIndex(productCandidates(ps))}
+	ix := &ProductIndex{byID: map[string]*upstream.Product{}, ix: search.NewIndex(productCandidates(ps)), optRefs: map[string]optionRef{}}
+	var opts []search.Candidate
 	for i := range ps {
-		ix.byID[ps[i].ID] = &ps[i]
+		p := &ps[i]
+		ix.byID[p.ID] = p
+		for j := range p.ChoiceGroups {
+			g := &p.ChoiceGroups[j]
+			for k := range g.Choices {
+				c := &g.Choices[k]
+				names := []string{c.Name}
+				for _, t := range c.Translations {
+					names = append(names, t.Name)
+				}
+				ix.optRefs[c.ID] = optionRef{p, g, c}
+				opts = append(opts, search.Candidate{ID: c.ID, Primary: names, Preferred: p.IsAvailable && p.IsVisible, SortKey: p.NameIn("fr") + "\x00" + g.Name})
+			}
+		}
 	}
+	ix.options = search.NewIndex(opts)
 	return ix
 }
 
@@ -118,8 +161,20 @@ func NewProductIndex(ps []upstream.Product) *ProductIndex {
 func (ix *ProductIndex) Search(query string, limit int) SearchProductsOut {
 	byID := ix.byID
 	all := ix.ix.Rank(query, 0)
-	out := SearchProductsOut{Query: query, MatchCount: len(all), Results: []ProductMatch{},
-		Note: searchNote(all, func(id string) string { return productOut(byID[id]).Labels["zh"] })}
+	out := SearchProductsOut{Query: query, MatchCount: len(all), Results: []ProductMatch{}, Options: []OptionMatch{}}
+	// Options: whole names, prefixes and substrings only, not typos.
+	var opts []search.Result
+	for _, r := range ix.options.Rank(query, 0) {
+		if r.Score >= search.ScoreSubstring {
+			opts = append(opts, r)
+		}
+	}
+	out.OptionMatchCount = len(opts)
+	for _, r := range opts[:min(len(opts), maxOptionMatches)] {
+		out.Options = append(out.Options, ix.optionMatch(ix.optRefs[r.ID]))
+	}
+	out.Note = searchNote(all, func(id string) string { return productOut(byID[id]).Labels["zh"] })
+	out.Note = optionNote(out.Note, len(all), len(opts), out.Options)
 	for _, r := range all {
 		if r.Exact {
 			out.ExactMatches++
@@ -129,6 +184,42 @@ func (ix *ProductIndex) Search(query string, limit int) SearchProductsOut {
 		out.Results = append(out.Results, ProductMatch{ProductOut: productOut(byID[r.ID]), Score: r.Score, Matched: r.Matched, Exact: r.Exact})
 	}
 	return out
+}
+
+func (ix *ProductIndex) optionMatch(r optionRef) OptionMatch {
+	po := productOut(r.p)
+	m := OptionMatch{ChoiceID: r.c.ID, Name: r.c.Name, Names: map[string]string{}, GroupID: r.g.ID, GroupName: r.g.Name, ProductID: r.p.ID, Labels: po.Labels,
+		Surcharge: money.MustCents(r.c.PriceModifier)}
+	for _, t := range r.c.Translations {
+		m.Names[t.Locale] = t.Name
+	}
+	m.AlsoOptionOf = fmt.Sprintf("This is also an option of: %s > group %s", po.Labels["zh"], r.g.Name)
+	return m
+}
+
+// optionNote adds to the note what a name that is also an option means: the
+// model must not guess between a dish and an option, or between dishes.
+func optionNote(note string, products, options int, listed []OptionMatch) string {
+	if options == 0 {
+		return note
+	}
+	dishes := map[string]bool{}
+	for _, o := range listed {
+		dishes[o.ProductID] = true
+	}
+	var extra string
+	switch {
+	case products > 0 && options > 0:
+		extra = fmt.Sprintf("The name also matches %d option(s) of dishes (see options). A name that is both a product and an option is ambiguous: unless the owner already said which one (the dish itself, or the option of which dish), ask before changing anything. A surcharge on an option uses propose_choice_change, a price of the dish uses propose_price_change.", options)
+	case len(dishes) > 1 || options > 1:
+		extra = fmt.Sprintf("No product matches, but %d option(s) of dishes do (see options). If the owner did not say which dish, ask which one, listing the dishes by category + name, before changing anything.", options)
+	default:
+		extra = "No product matches, but it is an option of one dish (see options): use the choice tools with its choice_id."
+	}
+	if note == "" {
+		return extra
+	}
+	return note + " " + extra
 }
 
 // searchNote tells the model whether the query names one product. A product
@@ -341,7 +432,7 @@ func (d *Deps) downloadImage(ctx context.Context, raw string) ([]byte, string, s
 func registerProducts(s *mcp.Server, d *Deps) {
 	add(s, d, &mcp.Tool{
 		Name: "search_products", Annotations: readOnly,
-		Description: describe(`Find products by name (any language incl. Chinese), partial name, code, or category + name in any language mix ("Maki 三文鱼", "春卷三文鱼牛油果", "三文鱼卷"). Pass the owner's own words, category included. Case and accents are ignored; exact and prefix matches come first, then available products. A product is identified by its category and name together: the same name exists in several categories. Read "note": when the query does not name exactly one product, ask the owner which one before changing anything. Use it to get the product_id before any product action. Results include hidden and sold-out products.`,
+		Description: describe(`Find products by name (any language incl. Chinese), partial name, code, or category + name in any language mix ("Maki 三文鱼", "春卷三文鱼牛油果", "三文鱼卷"). Pass the owner's own words, category included. Case and accents are ignored; exact and prefix matches come first, then available products. A product is identified by its category and name together: the same name exists in several categories. Read "note": when the query does not name exactly one product, ask the owner which one before changing anything. Use it to get the product_id before any product action. Results include hidden and sold-out products. "options" lists the choices (options of a dish, e.g. a soup in a platter) whose name matches, each with the dish and group it belongs to: when a name is both a product and an option, or an option of several dishes, ask the owner which one is meant.`,
 			`search_products({"query": "三文鱼", "limit": 5})`),
 	}, func(ctx context.Context, in SearchProductsIn) (SearchProductsOut, error) {
 		ps, err := d.Up.Products(ctx)
