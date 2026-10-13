@@ -36,6 +36,10 @@ type Config struct {
 	// DeliveryEnabled is false for a takeaway-only instance (RESTAURANT_DELIVERY_ENABLED=false):
 	// delivery orders are refused and the ordering policy advertises it to the clients.
 	DeliveryEnabled bool
+	// InvoicesEnabled is false for an instance that must not issue PDF invoices
+	// (RESTAURANT_INVOICES_ENABLED=false), e.g. before the company is registered:
+	// the invoice endpoint then answers 404.
+	InvoicesEnabled bool
 }
 
 // current is initialized at package init so tests and callers always see a
@@ -68,6 +72,7 @@ func NewFromEnv() Config {
 		InvoicePrefix: cmp.Or(os.Getenv("RESTAURANT_INVOICE_PREFIX"), "TSB"),
 
 		DeliveryEnabled: boolFromEnv("RESTAURANT_DELIVERY_ENABLED", true),
+		InvoicesEnabled: boolFromEnv("RESTAURANT_INVOICES_ENABLED", true),
 	}
 }
 

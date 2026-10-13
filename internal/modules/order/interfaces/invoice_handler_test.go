@@ -22,6 +22,7 @@ import (
 	productDomain "tsb-service/internal/modules/product/domain"
 	userApplication "tsb-service/internal/modules/user/application"
 	userDomain "tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/brand"
 	"tsb-service/pkg/invoice/invoicetest"
 	"tsb-service/pkg/utils"
 )
@@ -128,6 +129,16 @@ func TestDownloadInvoice_Rejections(t *testing.T) {
 		rec := e.do(t, "", e.orderID.String())
 		assert.Equal(t, http.StatusUnauthorized, rec.Code)
 		assert.Contains(t, errorOf(t, rec), "unauthorized")
+	})
+	t.Run("invoices disabled for this instance is 404", func(t *testing.T) {
+		t.Cleanup(func() { brand.Load() })
+		t.Setenv("RESTAURANT_INVOICES_ENABLED", "false")
+		brand.Load()
+		e := newInvoiceEnv()
+		rec := e.do(t, e.userID.String(), e.orderID.String())
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+		assert.Contains(t, errorOf(t, rec), "invoices are not available")
+		assert.NotContains(t, rec.Header().Get("Content-Type"), "pdf")
 	})
 	t.Run("malformed order id is 400", func(t *testing.T) {
 		e := newInvoiceEnv()
