@@ -146,6 +146,19 @@ jobs:
               ${MCP_SET} \
               --atomic --timeout 5m
             sudo kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=up
+            # Yangguofu Malatang Liège (release ygf-apps, namespace ygf) runs the
+            # same backend image on its own DB: keep it on the same version and
+            # schema. Skipped until that release exists.
+            if sudo env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm status ygf-apps -n ygf >/dev/null 2>&1; then
+              sops -d "secrets/ygf-${APP}.secret.enc.yaml" | sudo kubectl apply -n ygf -f -
+              sudo flock -w 600 /var/lock/ygf-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade ygf-apps ./charts/tokyosushi-apps \
+                --namespace ygf \
+                -f ./charts/tokyosushi-apps/values.ygf.yaml \
+                --reuse-values \
+                --set "apps.${APP}.image.tag=${TAG}" \
+                --atomic --timeout 5m
+              sudo kubectl exec -n ygf deployment/tsb-service -- /app/tsb-migrate -cmd=up
+            fi
 
 # ── Rollback (manual trigger) ────────────────────────────────────────────────
 
