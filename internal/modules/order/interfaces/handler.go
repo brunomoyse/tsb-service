@@ -15,6 +15,7 @@ import (
 	"tsb-service/internal/modules/order/domain"
 	productApplication "tsb-service/internal/modules/product/application"
 	userApplication "tsb-service/internal/modules/user/application"
+	"tsb-service/pkg/brand"
 	"tsb-service/pkg/invoice"
 	"tsb-service/pkg/logging"
 	"tsb-service/pkg/timezone"
@@ -42,6 +43,12 @@ func NewOrderHandler(
 func (h *OrderHandler) DownloadInvoice(c *gin.Context) {
 	ctx := c.Request.Context()
 	log := logging.FromContext(ctx)
+
+	// 0. This instance may not issue invoices at all (RESTAURANT_INVOICES_ENABLED=false)
+	if !brand.Current().InvoicesEnabled {
+		c.JSON(http.StatusNotFound, gin.H{"error": "invoices are not available"})
+		return
+	}
 
 	// 1. Get authenticated user
 	userID := utils.GetUserID(ctx)
