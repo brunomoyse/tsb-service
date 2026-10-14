@@ -255,7 +255,7 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 	if email != "" {
 		userID, findErr := findZitadelUserByEmail(email)
 		if findErr == nil && userID != "" {
-			log.Info("found existing zitadel user for IdP login, linking IdP", zap.String("email", email), zap.String("user_id", userID))
+			log.Info("found existing zitadel user for IdP login, linking IdP", zap.String("user_id", userID))
 
 			// Link the IdP to the existing user so the session check passes
 			// Uses admin PAT since this requires user management permissions
@@ -296,10 +296,9 @@ func resolveOrCreateZitadelUser(log *zap.Logger, intentID, intentToken string) (
 	// (min 1 rune), so we backfill the placeholder marker (same as the OTP
 	// signup path) and let the complete-profile flow collect the real name.
 	addHumanUser := ensureProfileName(log, intentInfo.AddHumanUser)
+	// IDs only: the email and the profile (name, language) stay out of the logs.
 	log.Info("creating new zitadel user from IdP intent",
-		zap.String("email", email),
 		zap.String("idp_user_id", intentInfo.IdpInfo.UserID),
-		zap.ByteString("add_human_user", addHumanUser),
 	)
 	userBody, userStatus, err := zitadelAdminRequest("POST", "/v2/users/human", addHumanUser)
 	if err != nil {
