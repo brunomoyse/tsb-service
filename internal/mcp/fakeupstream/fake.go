@@ -682,6 +682,9 @@ func applyCoupon(c *upstream.Coupon, in upstream.CouponInput) {
 	if in.IsActive != nil {
 		c.IsActive = *in.IsActive
 	}
+	if in.AppOnly != nil {
+		c.AppOnly = *in.AppOnly
+	}
 	if in.ValidFrom != nil {
 		c.ValidFrom = in.ValidFrom
 	}

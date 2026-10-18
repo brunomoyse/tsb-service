@@ -91,11 +91,11 @@ func TestCouponReadTools(t *testing.T) {
 	until := time.Date(2026, 12, 31, 22, 0, 0, 0, time.UTC)
 	h.fake.Lock()
 	c := h.fake.Coupons[0]
-	c.MaxUses, c.MaxUsesPerUser, c.ValidFrom, c.ValidUntil, c.UsedCount, c.MinOrderAmount = new(100), new(2), &from, &until, 7, new("15.5")
+	c.MaxUses, c.MaxUsesPerUser, c.ValidFrom, c.ValidUntil, c.UsedCount, c.MinOrderAmount, c.AppOnly = new(100), new(2), &from, &until, 7, new("15.5"), true
 	h.fake.Unlock()
 
 	r := h.call("get_coupon", map[string]any{"coupon_id": "cp-welcome"})
-	if num(r["max_uses"]) != 100 || num(r["max_uses_per_user"]) != 2 || num(r["used_count"]) != 7 || num(r["min_order_cents"]) != 1550 || r["active"] != true ||
+	if num(r["max_uses"]) != 100 || num(r["max_uses_per_user"]) != 2 || num(r["used_count"]) != 7 || num(r["min_order_cents"]) != 1550 || r["active"] != true || r["app_only"] != true ||
 		str(r["valid_from"]) != "2026-10-01T10:00:00+02:00" || str(r["valid_until"]) != "2026-12-31T23:00:00+01:00" || str(r["discount_type"]) != "percentage" || num(r["percent_off"]) != 10 || str(r["currency"]) != "EUR" {
 		t.Errorf("get_coupon: %v", r)
 	}
@@ -110,6 +110,8 @@ func TestCouponReadTools(t *testing.T) {
 	r = h.call("search_coupons", map[string]any{"status": " inactive "})
 	if cs := list(r["coupons"]); len(cs) != 1 || str(cs[0].(map[string]any)["code"]) != "SUMMER5" {
 		t.Errorf("inactive coupons: %v", r)
+	} else if appOnly, ok := cs[0].(map[string]any)["app_only"]; !ok || appOnly != false {
+		t.Errorf("app_only must always be present, false here: %v", cs[0])
 	}
 	r = h.call("search_coupons", map[string]any{})
 	if cs := list(r["coupons"]); len(cs) != 2 {
@@ -167,8 +169,11 @@ func TestCouponToolsBuildTheRightChange(t *testing.T) {
 	mustContain(t, "summary", str(r["summary"]), "New coupon FIX5: 5.00 EUR off", "max 1 per customer", "from 2026-10-10 08:00", "until 2026-12-31 23:59", "active")
 	h.apply(str(r["change_id"]))
 	c := h.fake.Coupons[len(h.fake.Coupons)-1]
-	if c.Code != "FIX5" || c.DiscountType != "FIXED" || c.DiscountValue != "5" || !c.IsActive || c.ValidFrom == nil || !c.ValidFrom.Equal(time.Date(2026, 10, 10, 6, 0, 0, 0, time.UTC)) {
+	if c.Code != "FIX5" || c.DiscountType != "FIXED" || c.DiscountValue != "5" || !c.IsActive || c.AppOnly || c.ValidFrom == nil || !c.ValidFrom.Equal(time.Date(2026, 10, 10, 6, 0, 0, 0, time.UTC)) {
 		t.Errorf("created coupon: %+v", c)
+	}
+	if in := h.lastVars("McpCreateCoupon")["input"].(map[string]any); in["appOnly"] != false {
+		t.Errorf("app_only defaults to false: %v", in)
 	}
 	// active=false is honoured.
 	r = h.call("propose_coupon_creation", map[string]any{"code": "OFF10", "discount_type": "percentage", "percent_off": 10, "active": false})
@@ -179,8 +184,49 @@ func TestCouponToolsBuildTheRightChange(t *testing.T) {
 	mustContain(t, "update summary", str(r["summary"]), "code: WELCOME10 -> BIENVENUE", "valid from: none -> 2026-10-04 09:00", "valid until: none -> 2026-11-01 13:00", "max uses per customer: none -> 3", "minimum order: none -> 25.00 EUR")
 	h.apply(str(r["change_id"]))
 	got := h.fake.Coupons[0]
-	if got.Code != "BIENVENUE" || *got.MaxUsesPerUser != 3 || *got.MinOrderAmount != "25" || got.DiscountValue != "10" {
+	if got.Code != "BIENVENUE" || *got.MaxUsesPerUser != 3 || *got.MinOrderAmount != "25" || got.DiscountValue != "10" || got.AppOnly {
 		t.Errorf("updated coupon: %+v", got)
+	}
+	if _, sent := h.lastVars("McpUpdateCoupon")["input"].(map[string]any)["appOnly"]; sent {
+		t.Error("an update without app_only must not send appOnly")
+	}
+}
+
+func TestCouponToolsAppOnly(t *testing.T) {
+	h := newHarness(t)
+	r := h.call("propose_coupon_creation", map[string]any{"code": "sakura5", "discount_type": "fixed", "amount_off_cents": 500, "min_order_cents": 2500, "max_uses_per_user": 1, "app_only": true})
+	mustContain(t, "summary", str(r["summary"]), "New coupon SAKURA5: 5.00 EUR off (app only, minimum order 25.00 EUR, max 1 per customer), active")
+	mustContain(t, "summary_zh", str(r["summary_zh"]), "仅限App")
+	h.apply(str(r["change_id"]))
+	if in := h.lastVars("McpCreateCoupon")["input"].(map[string]any); in["appOnly"] != true {
+		t.Errorf("create input: %v", in)
+	}
+	created := h.fake.Coupons[len(h.fake.Coupons)-1]
+	if created.Code != "SAKURA5" || !created.AppOnly {
+		t.Fatalf("created coupon: %+v", created)
+	}
+	if r := h.call("get_coupon", map[string]any{"coupon_id": created.ID}); r["app_only"] != true {
+		t.Errorf("get_coupon: %v", r)
+	}
+
+	// Open it to the website again, then restrict another coupon to the app.
+	r = h.call("propose_coupon_update", map[string]any{"coupon_id": created.ID, "app_only": false})
+	mustContain(t, "update summary", str(r["summary"]), "Coupon SAKURA5: app only: yes -> no")
+	mustContain(t, "update summary_zh", str(r["summary_zh"]), "仅限App：是 → 否")
+	h.apply(str(r["change_id"]))
+	if in := h.lastVars("McpUpdateCoupon")["input"].(map[string]any); in["appOnly"] != false {
+		t.Errorf("update input: %v", in)
+	}
+	r = h.call("propose_coupon_update", map[string]any{"coupon_id": "cp-old", "app_only": true})
+	mustContain(t, "update summary", str(r["summary"]), "Coupon SUMMER5: app only: no -> yes")
+	h.apply(str(r["change_id"]))
+	if h.fake.Coupons[len(h.fake.Coupons)-1].AppOnly || !h.fake.Coupons[1].AppOnly {
+		t.Errorf("coupons: %+v %+v", h.fake.Coupons[len(h.fake.Coupons)-1], h.fake.Coupons[1])
+	}
+	// Asking for the current value is a no-op, not a pending change.
+	r = h.call("propose_coupon_update", map[string]any{"coupon_id": "cp-old", "app_only": true})
+	if r["no_op"] != true || str(r["change_id"]) != "" {
+		t.Errorf("same app_only must be a no-op: %v", r)
 	}
 }
 

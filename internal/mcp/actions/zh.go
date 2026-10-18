@@ -194,8 +194,14 @@ func couponValueZh(v CouponValue) string {
 	return "减 " + moneyZh(v.AmountOffCent)
 }
 
-func couponDetailsZh(minOrder *int64, maxUses, perUser *int, from, until *time.Time, loc *time.Location) string {
+// appOnlyZh names a coupon only the iOS/Android app can redeem.
+const appOnlyZh = "仅限App"
+
+func couponDetailsZh(appOnly bool, minOrder *int64, maxUses, perUser *int, from, until *time.Time, loc *time.Location) string {
 	var parts []string
+	if appOnly {
+		parts = append(parts, appOnlyZh)
+	}
 	if minOrder != nil {
 		parts = append(parts, "最低消费 "+moneyZh(*minOrder))
 	}

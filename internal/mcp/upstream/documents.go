@@ -161,6 +161,6 @@ fragment McpProductFields on Product {
 }
 `
 
-const couponFields = `id code discountType discountValue minOrderAmount maxUses maxUsesPerUser usedCount isActive status validFrom validUntil createdAt`
+const couponFields = `id code discountType discountValue minOrderAmount maxUses maxUsesPerUser usedCount isActive appOnly status validFrom validUntil createdAt`
 
 const orderListFields = `id createdAt status type isOnlinePayment totalPrice discountAmount deliveryFee couponCode preferredReadyTime customer { firstName lastName } payment { status } items { quantity }`

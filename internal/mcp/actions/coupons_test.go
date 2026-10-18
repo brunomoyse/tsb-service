@@ -30,6 +30,21 @@ func (f *fixture) editCoupon(id string, edit func(c *upstream.Coupon)) {
 	}
 }
 
+// lastCouponInput returns the input variable of the last op call sent upstream.
+func (f *fixture) lastCouponInput(t *testing.T, op string) map[string]any {
+	t.Helper()
+	f.fake.Lock()
+	defer f.fake.Unlock()
+	for i := len(f.fake.Calls) - 1; i >= 0; i-- {
+		if f.fake.Calls[i].Op == op {
+			in, _ := f.fake.Calls[i].Vars["input"].(map[string]any)
+			return in
+		}
+	}
+	t.Fatalf("no %s call recorded", op)
+	return nil
+}
+
 func TestGetCoupon(t *testing.T) {
 	f := newFixture(t)
 	c, err := getCoupon(f.ctx, f.svc.env, "cp-welcome")
@@ -135,18 +150,34 @@ func TestValidateLimits(t *testing.T) {
 func TestCouponDetailsFormatting(t *testing.T) {
 	from := time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC) // 11:00 in Brussels (CET)
 	until := time.Date(2026, 11, 30, 22, 30, 0, 0, time.UTC)
-	if got := couponDetails(nil, nil, nil, nil, nil, brussels); got != "" {
+	if got := couponDetails(false, nil, nil, nil, nil, nil, brussels); got != "" {
 		t.Errorf("empty = %q", got)
 	}
-	got := couponDetails(i64(1500), ip(100), ip(2), &from, &until, brussels)
+	if got := couponDetailsZh(false, nil, nil, nil, nil, nil, brussels); got != "" {
+		t.Errorf("empty zh = %q", got)
+	}
+	got := couponDetails(false, i64(1500), ip(100), ip(2), &from, &until, brussels)
 	want := " (minimum order 15.00 EUR, max 100 uses, max 2 per customer, from 2026-11-01 11:00, until 2026-11-30 23:30)"
 	if got != want {
 		t.Errorf("details = %q, want %q", got, want)
 	}
-	gotZh := couponDetailsZh(i64(1500), ip(100), ip(2), &from, &until, brussels)
+	gotZh := couponDetailsZh(false, i64(1500), ip(100), ip(2), &from, &until, brussels)
 	wantZh := "（最低消费 15.00 欧元，最多使用 100 次，每位顾客最多 2 次，11月1日 11:00 起，11月30日 23:30 止）"
 	if gotZh != wantZh {
 		t.Errorf("details zh = %q, want %q", gotZh, wantZh)
+	}
+	// The app-only restriction comes first, alone or with the other terms.
+	if got := couponDetails(true, nil, nil, nil, nil, nil, brussels); got != " (app only)" {
+		t.Errorf("app only = %q", got)
+	}
+	if got := couponDetailsZh(true, nil, nil, nil, nil, nil, brussels); got != "（仅限App）" {
+		t.Errorf("app only zh = %q", got)
+	}
+	if got := couponDetails(true, i64(2500), nil, ip(1), nil, nil, brussels); got != " (app only, minimum order 25.00 EUR, max 1 per customer)" {
+		t.Errorf("app only with limits = %q", got)
+	}
+	if got := couponDetailsZh(true, i64(2500), nil, ip(1), nil, nil, brussels); got != "（仅限App，最低消费 25.00 欧元，每位顾客最多 1 次）" {
+		t.Errorf("app only with limits zh = %q", got)
 	}
 	if fmtTimePtr(&from, brussels) != "2026-11-01 11:00" || fmtTimePtr(nil, brussels) != "none" {
 		t.Error("fmtTimePtr")
@@ -236,8 +267,41 @@ func TestCouponCreateWithGeneratedCodeAndPercentage(t *testing.T) {
 	contains(t, "summary_zh", p.SummaryZh, "（自动生成）", "优惠 20%", "停用")
 	f.applyChange(t, KindCouponCreate, CouponCreateParams{Discount: CouponValue{Type: "percentage", PercentOff: 20}})
 	c := f.fake.Coupons[2]
-	if c.DiscountType != "PERCENTAGE" || c.DiscountValue != "20" || c.IsActive || c.MinOrderAmount != nil || c.Code == "" {
+	if c.DiscountType != "PERCENTAGE" || c.DiscountValue != "20" || c.IsActive || c.AppOnly || c.MinOrderAmount != nil || c.Code == "" {
 		t.Errorf("created: %+v", c)
+	}
+	if in := f.lastCouponInput(t, "McpCreateCoupon"); in["appOnly"] != false {
+		t.Errorf("a coupon is not app-only unless asked: appOnly = %v", in["appOnly"])
+	}
+}
+
+func TestCouponCreateAppOnlyAndUndo(t *testing.T) {
+	f := newFixture(t)
+	until := f.clock.Now().Add(14 * 24 * time.Hour)
+	params := CouponCreateParams{Code: "sakura5", Discount: CouponValue{Type: "fixed", AmountOffCent: 500}, MinOrderCents: i64(2500), MaxUsesPerUser: ip(1), Active: true, AppOnly: true, ValidUntil: &until}
+	p := f.propose(t, KindCouponCreate, params)
+	contains(t, "summary", p.Summary, "New coupon SAKURA5: 5.00 EUR off (app only, minimum order 25.00 EUR, max 1 per customer", "active")
+	contains(t, "summary_zh", p.SummaryZh, "新优惠码 SAKURA5：减 5.00 欧元（仅限App，最低消费 25.00 欧元", "启用")
+	if _, err := f.svc.ApplyPending(f.ctx, p.ChangeID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if in := f.lastCouponInput(t, "McpCreateCoupon"); in["appOnly"] != true {
+		t.Errorf("create input appOnly = %v", in["appOnly"])
+	}
+	created := f.fake.Coupons[len(f.fake.Coupons)-1]
+	if created.Code != "SAKURA5" || !created.AppOnly || !created.IsActive {
+		t.Fatalf("created coupon: %+v", created)
+	}
+	// Undo still deactivates the coupon and leaves the flag alone.
+	u, err := f.svc.Undo(f.ctx, "")
+	if err != nil || u.Mode != "pending" {
+		t.Fatalf("undo: %+v %v", u, err)
+	}
+	if _, err := f.svc.ApplyPending(f.ctx, u.Proposal.ChangeID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if c := f.coupon(created.ID); c.IsActive || !c.AppOnly {
+		t.Errorf("after undo: %+v", c)
 	}
 }
 
@@ -307,6 +371,7 @@ func TestCouponUpdateNoOp(t *testing.T) {
 		"same discount":   {CouponID: "cp-old", Discount: &CouponValue{Type: "fixed", AmountOffCent: 500}},
 		"same minimum":    {CouponID: "cp-old", MinOrderCents: i64(3000)},
 		"same max uses":   {CouponID: "cp-old", MaxUses: ip(10), MaxUsesPerUser: ip(2)},
+		"same app only":   {CouponID: "cp-old", AppOnly: bp(false)},
 		"same dates":      {CouponID: "cp-old", ValidUntil: new(until.In(brussels)), ValidFrom: new(from.In(brussels))},
 		"everything same": {CouponID: "cp-old", Code: sp("SUMMER5"), MinOrderCents: i64(3000), MaxUses: ip(10), ValidFrom: &from},
 	} {
@@ -381,6 +446,52 @@ func TestCouponUpdateAndUndoRestoresTerms(t *testing.T) {
 	}
 }
 
+func TestCouponUpdateAppOnlyAndUndo(t *testing.T) {
+	f := newFixture(t)
+	p := f.propose(t, KindCouponUpdate, CouponUpdateParams{CouponID: "cp-welcome", AppOnly: bp(true)})
+	contains(t, "summary", p.Summary, "Coupon WELCOME10: app only: no -> yes")
+	contains(t, "summary_zh", p.SummaryZh, "优惠码 WELCOME10：仅限App：否 → 是")
+	if f.coupon("cp-welcome").AppOnly {
+		t.Fatal("proposal must not change the coupon")
+	}
+	if _, err := f.svc.ApplyPending(f.ctx, p.ChangeID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if in := f.lastCouponInput(t, "McpUpdateCoupon"); in["appOnly"] != true || len(in) != 1 {
+		t.Errorf("update input must only carry appOnly: %v", in)
+	}
+	if !f.coupon("cp-welcome").AppOnly {
+		t.Fatal("coupon not app-only")
+	}
+	// Undo of a sensitive change is itself pending, and opens the coupon to the website again.
+	u, err := f.svc.Undo(f.ctx, "")
+	if err != nil || u.Mode != "pending" {
+		t.Fatalf("undo: %+v %v", u, err)
+	}
+	contains(t, "undo summary", u.Proposal.Summary, "app only: yes -> no")
+	contains(t, "undo summary_zh", u.Proposal.SummaryZh, "仅限App：是 → 否")
+	if _, err := f.svc.ApplyPending(f.ctx, u.Proposal.ChangeID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if f.coupon("cp-welcome").AppOnly {
+		t.Error("undo must clear app_only")
+	}
+
+	// Other changes keep the flag: it is not sent unless asked for.
+	f.editCoupon("cp-old", func(c *upstream.Coupon) { c.AppOnly = true })
+	f.applyChange(t, KindCouponUpdate, CouponUpdateParams{CouponID: "cp-old", MaxUses: ip(5)})
+	if in := f.lastCouponInput(t, "McpUpdateCoupon"); in["appOnly"] != nil {
+		t.Errorf("appOnly sent without being asked: %v", in)
+	}
+	if c := f.coupon("cp-old"); !c.AppOnly || *c.MaxUses != 5 {
+		t.Errorf("cp-old: %+v", c)
+	}
+	out, err := f.execute(t, KindCouponUpdate, CouponUpdateParams{CouponID: "cp-old", AppOnly: bp(false)}, nil)
+	if err != nil || out.(couponTerms).AppOnly {
+		t.Errorf("execute: %+v %v", out, err)
+	}
+}
+
 func TestCouponUpdateInverseCannotRemoveLimits(t *testing.T) {
 	f := newFixture(t)
 	empty := couponTerms{}
@@ -398,12 +509,17 @@ func TestCouponUpdateInverseCannotRemoveLimits(t *testing.T) {
 			wantUserErr(t, err, "cannot be removed automatically")
 		})
 	}
-	// Code and discount always have a previous value.
-	kind, inv, err := f.inverse(t, KindCouponUpdate, CouponUpdateParams{CouponID: "c", Code: sp("X"), Discount: &CouponValue{Type: "fixed", AmountOffCent: 1}},
+	// Code, discount and the app-only flag always have a previous value.
+	kind, inv, err := f.inverse(t, KindCouponUpdate, CouponUpdateParams{CouponID: "c", Code: sp("X"), Discount: &CouponValue{Type: "fixed", AmountOffCent: 1}, AppOnly: bp(true)},
 		couponTerms{Code: "OLD", Discount: CouponValue{Type: "percentage", PercentOff: 5}}, "{}")
 	got := inv.(CouponUpdateParams)
-	if err != nil || kind != KindCouponUpdate || *got.Code != "OLD" || got.Discount.PercentOff != 5 || got.MaxUses != nil {
+	if err != nil || kind != KindCouponUpdate || *got.Code != "OLD" || got.Discount.PercentOff != 5 || got.AppOnly == nil || *got.AppOnly || got.MaxUses != nil {
 		t.Errorf("inverse: %v %+v %v", kind, got, err)
+	}
+	// A change that does not touch the flag does not restore it either.
+	_, inv, _ = f.inverse(t, KindCouponUpdate, CouponUpdateParams{CouponID: "c", Code: sp("X")}, couponTerms{Code: "OLD", AppOnly: true}, "{}")
+	if inv.(CouponUpdateParams).AppOnly != nil {
+		t.Errorf("inverse must leave app_only alone: %+v", inv)
 	}
 }
 
