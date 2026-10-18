@@ -89,7 +89,7 @@ func percentCoupon() *domain.Coupon {
 func TestValidateCoupon_Success(t *testing.T) {
 	c := percentCoupon()
 	repo := &scriptedRepo{coupon: c}
-	got, discount, err := NewCouponService(repo).ValidateCoupon(t.Context(), " tsb-10 ", decimal.NewFromInt(50), uuid.New())
+	got, discount, err := NewCouponService(repo).ValidateCoupon(t.Context(), " tsb-10 ", decimal.NewFromInt(50), uuid.New(), domain.ChannelWeb)
 	require.NoError(t, err)
 	assert.Same(t, c, got)
 	assert.True(t, discount.Equal(decimal.NewFromInt(5)))
@@ -100,7 +100,7 @@ func TestValidateCoupon_Success(t *testing.T) {
 func TestValidateCoupon_DailyAttemptLimit(t *testing.T) {
 	t.Run("at the limit the lookup is not even attempted", func(t *testing.T) {
 		repo := &scriptedRepo{coupon: percentCoupon(), attempts: domain.MaxFailedCouponAttemptsPerDay}
-		_, discount, err := NewCouponService(repo).ValidateCoupon(t.Context(), "TSB-10", decimal.NewFromInt(50), uuid.New())
+		_, discount, err := NewCouponService(repo).ValidateCoupon(t.Context(), "TSB-10", decimal.NewFromInt(50), uuid.New(), domain.ChannelWeb)
 		_, ok := errors.AsType[*domain.DailyAttemptLimitError](err)
 		assert.True(t, ok, "err = %v", err)
 		assert.True(t, discount.IsZero())
@@ -110,13 +110,13 @@ func TestValidateCoupon_DailyAttemptLimit(t *testing.T) {
 
 	t.Run("one below the limit still validates", func(t *testing.T) {
 		repo := &scriptedRepo{coupon: percentCoupon(), attempts: domain.MaxFailedCouponAttemptsPerDay - 1}
-		_, _, err := NewCouponService(repo).ValidateCoupon(t.Context(), "TSB-10", decimal.NewFromInt(50), uuid.New())
+		_, _, err := NewCouponService(repo).ValidateCoupon(t.Context(), "TSB-10", decimal.NewFromInt(50), uuid.New(), domain.ChannelWeb)
 		assert.NoError(t, err)
 	})
 
 	t.Run("an unreadable counter fails open", func(t *testing.T) {
 		repo := &scriptedRepo{coupon: percentCoupon(), attemptsErr: errors.New("db down")}
-		_, discount, err := NewCouponService(repo).ValidateCoupon(t.Context(), "TSB-10", decimal.NewFromInt(50), uuid.New())
+		_, discount, err := NewCouponService(repo).ValidateCoupon(t.Context(), "TSB-10", decimal.NewFromInt(50), uuid.New(), domain.ChannelWeb)
 		require.NoError(t, err, "never lock a customer out because of an infrastructure failure")
 		assert.True(t, discount.Equal(decimal.NewFromInt(5)))
 	})
@@ -134,7 +134,7 @@ func TestValidateCoupon_Refusals(t *testing.T) {
 		t.Run(name+" is a generic refusal that costs an attempt", func(t *testing.T) {
 			c.ID, c.DiscountType, c.DiscountValue = uuid.New(), domain.DiscountTypeFixed, decimal.NewFromInt(5)
 			repo := &scriptedRepo{coupon: c}
-			got, discount, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(50), uuid.New())
+			got, discount, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(50), uuid.New(), domain.ChannelWeb)
 			require.Error(t, err)
 			assert.Equal(t, "invalid or expired coupon", err.Error(), "the reason is not leaked")
 			assert.Same(t, c, got)
@@ -147,7 +147,7 @@ func TestValidateCoupon_Refusals(t *testing.T) {
 		c := percentCoupon()
 		c.MaxUsesPerUser = &[]int{2}[0]
 		repo := &scriptedRepo{coupon: c, usage: 2}
-		_, _, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(50), uuid.New())
+		_, _, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(50), uuid.New(), domain.ChannelWeb)
 		assert.EqualError(t, err, "invalid or expired coupon")
 		assert.Equal(t, 1, repo.recorded)
 	})
@@ -157,7 +157,7 @@ func TestValidateCoupon_Refusals(t *testing.T) {
 		min := decimal.NewFromInt(30)
 		c.MinOrderAmount = &min
 		repo := &scriptedRepo{coupon: c}
-		got, discount, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(10), uuid.New())
+		got, discount, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(10), uuid.New(), domain.ChannelWeb)
 		minErr, ok := errors.AsType[*domain.MinOrderNotMetError](err)
 		require.True(t, ok, "err = %v", err)
 		assert.True(t, minErr.Required.Equal(min))
@@ -166,9 +166,41 @@ func TestValidateCoupon_Refusals(t *testing.T) {
 		assert.Zero(t, repo.recorded)
 	})
 
+	t.Run("an app-only code on the website is shown to the customer and is not counted as a guess", func(t *testing.T) {
+		c := percentCoupon()
+		c.AppOnly = true
+		repo := &scriptedRepo{coupon: c}
+		got, discount, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(50), uuid.New(), domain.ChannelWeb)
+		_, ok := errors.AsType[*domain.AppOnlyError](err)
+		require.True(t, ok, "err = %v", err)
+		assert.Same(t, c, got)
+		assert.True(t, discount.IsZero())
+		assert.Zero(t, repo.recorded, "the code is real and public: refusing it on the website is not enumeration")
+	})
+
+	t.Run("an app-only code in the app validates", func(t *testing.T) {
+		c := percentCoupon()
+		c.AppOnly = true
+		repo := &scriptedRepo{coupon: c}
+		_, discount, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(50), uuid.New(), domain.ChannelApp)
+		require.NoError(t, err)
+		assert.True(t, discount.Equal(decimal.NewFromInt(5)))
+		assert.Zero(t, repo.recorded)
+	})
+
+	t.Run("an expired app-only code on the website stays a generic, counted refusal", func(t *testing.T) {
+		c := percentCoupon()
+		c.AppOnly = true
+		c.ValidUntil = &[]time.Time{now.Add(-time.Hour)}[0]
+		repo := &scriptedRepo{coupon: c}
+		_, _, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(50), uuid.New(), domain.ChannelWeb)
+		assert.EqualError(t, err, "invalid or expired coupon")
+		assert.Equal(t, 1, repo.recorded)
+	})
+
 	t.Run("a failure to record the attempt does not change the refusal", func(t *testing.T) {
 		repo := &scriptedRepo{findErr: fmt.Errorf("coupon not found: %w", sql.ErrNoRows), recordErr: errors.New("db down")}
-		_, _, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(10), uuid.New())
+		_, _, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(10), uuid.New(), domain.ChannelWeb)
 		assert.EqualError(t, err, "invalid or expired coupon")
 		assert.Equal(t, 1, repo.recorded)
 	})

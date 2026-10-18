@@ -75,6 +75,10 @@ type OIDCVerifier struct {
 	// Empty = legacy behavior (any client), kept so a missing env var does not
 	// lock admins out.
 	adminClientIDs map[string]bool
+	// appClientIDs are the OIDC clients of the iOS/Android app. A token issued to
+	// one of them marks the request as coming from the app (utils.SetIsAppClient),
+	// which app-only coupons require.
+	appClientIDs map[string]bool
 }
 
 // NewOIDCVerifier initializes the Zitadel Go SDK authorizer for local JWT validation.
@@ -223,6 +227,25 @@ func (v *OIDCVerifier) clientMayBeAdmin(claims map[string]any) bool {
 	return v.adminClientIDs[tokenClientID(claims)]
 }
 
+// SetAppClientIDs declares the OIDC clients of the mobile app (the native
+// client). Blank entries are ignored; with none, no request counts as the app.
+func (v *OIDCVerifier) SetAppClientIDs(ids []string) {
+	v.appClientIDs = make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if id = strings.TrimSpace(id); id != "" {
+			v.appClientIDs[id] = true
+		}
+	}
+	if len(v.appClientIDs) == 0 {
+		zap.L().Warn("no app OIDC client configured (ZITADEL_NATIVE_CLIENT_ID): app-only coupons cannot be redeemed")
+	}
+}
+
+// isAppClient reports whether the token was issued to a mobile app client.
+func (v *OIDCVerifier) isAppClient(claims map[string]any) bool {
+	return v.appClientIDs[tokenClientID(claims)]
+}
+
 // tokenClientID returns the OIDC client a Zitadel access token was issued to.
 // Zitadel JWT access tokens carry it as client_id; azp is the standard OIDC
 // name and is checked as a fallback.
@@ -342,6 +365,7 @@ func (v *OIDCVerifier) verifyAndSetContext(c *gin.Context, tokenStr string) bool
 	ctx := utils.SetUserID(c.Request.Context(), appID)
 	ctx = utils.SetZitadelSub(ctx, sub)
 	ctx = utils.SetIsAdmin(ctx, isAdmin)
+	ctx = utils.SetIsAppClient(ctx, v.isAppClient(authCtx.Claims))
 	if expRaw, ok := authCtx.Claims["exp"].(float64); ok {
 		ctx = utils.SetTokenExpiry(ctx, time.Unix(int64(expRaw), 0).UTC())
 	}

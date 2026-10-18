@@ -47,6 +47,44 @@ func TestClientMayBeAdmin(t *testing.T) {
 	}
 }
 
+func TestIsAppClient(t *testing.T) {
+	const native = "native-client"
+
+	t.Run("without app clients nothing is the app", func(t *testing.T) {
+		v := &OIDCVerifier{}
+		v.SetAppClientIDs([]string{"", " "})
+		if v.isAppClient(map[string]any{"client_id": native}) {
+			t.Fatal("no request may count as the app when no app client is configured")
+		}
+		if (&OIDCVerifier{}).isAppClient(map[string]any{"client_id": native}) {
+			t.Fatal("a verifier that was never configured has no app client either")
+		}
+	})
+
+	v := &OIDCVerifier{}
+	v.SetAppClientIDs([]string{" " + native + " "})
+
+	cases := []struct {
+		name   string
+		claims map[string]any
+		want   bool
+	}{
+		{"native client_id", map[string]any{"client_id": native}, true},
+		{"native azp fallback", map[string]any{"azp": native}, true},
+		{"website client", map[string]any{"client_id": "web-client"}, false},
+		{"client_id wins over azp", map[string]any{"client_id": "web-client", "azp": native}, false},
+		{"no client claim", map[string]any{}, false},
+		{"nil claims", nil, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := v.isAppClient(tc.claims); got != tc.want {
+				t.Fatalf("isAppClient(%v) = %v, want %v", tc.claims, got, tc.want)
+			}
+		})
+	}
+}
+
 type stubAppJWT struct{ deviceID uuid.UUID }
 
 func (s stubAppJWT) VerifyAccessToken(context.Context, string) (uuid.UUID, error) {
@@ -71,6 +109,9 @@ func TestPOSTokenGetsStaffScopeNotAdmin(t *testing.T) {
 	}
 	if !utils.GetIsPOS(ctx) || !utils.GetIsStaff(ctx) {
 		t.Fatal("POS device must get staff scope")
+	}
+	if utils.GetIsAppClient(ctx) {
+		t.Fatal("a POS device is not the customer app")
 	}
 	if utils.GetUserID(ctx) != deviceID.String() {
 		t.Fatalf("userID = %q, want device ID", utils.GetUserID(ctx))

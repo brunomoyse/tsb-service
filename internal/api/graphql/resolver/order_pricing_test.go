@@ -16,6 +16,7 @@ import (
 	orderDomain "tsb-service/internal/modules/order/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
 	restaurantDomain "tsb-service/internal/modules/restaurant/domain"
+	"tsb-service/pkg/utils"
 )
 
 // ---- fakes ---------------------------------------------------------------------------------------
@@ -68,9 +69,10 @@ func (f fakeAddresses) Resolve(_ context.Context, placeID, _ string) (*addressDo
 // fakeCoupons answers ValidateCoupon like the real service: a known code gives a fixed amount or a
 // percentage of the amount it is asked about (capped at that amount), with an optional minimum.
 type fakeCoupons struct {
-	calls   int
-	failure error // returned as-is by every ValidateCoupon call, to simulate an outage
-	coupons map[string]fakeCoupon
+	calls       int
+	lastChannel couponDomain.Channel
+	failure     error // returned as-is by every ValidateCoupon call, to simulate an outage
+	coupons     map[string]fakeCoupon
 }
 
 type fakeCoupon struct {
@@ -78,16 +80,21 @@ type fakeCoupon struct {
 	fixed   string
 	percent string
 	min     string
+	appOnly bool
 }
 
-func (f *fakeCoupons) ValidateCoupon(_ context.Context, code string, amount decimal.Decimal, _ uuid.UUID) (*couponDomain.Coupon, decimal.Decimal, error) {
+func (f *fakeCoupons) ValidateCoupon(_ context.Context, code string, amount decimal.Decimal, _ uuid.UUID, channel couponDomain.Channel) (*couponDomain.Coupon, decimal.Decimal, error) {
 	f.calls++
+	f.lastChannel = channel
 	if f.failure != nil {
 		return nil, decimal.Zero, f.failure
 	}
 	c, ok := f.coupons[code]
 	if !ok {
 		return nil, decimal.Zero, fmt.Errorf("invalid or expired coupon")
+	}
+	if c.appOnly && channel != couponDomain.ChannelApp {
+		return &couponDomain.Coupon{ID: c.id}, decimal.Zero, &couponDomain.AppOnlyError{}
 	}
 	if c.min != "" && amount.LessThan(decimal.RequireFromString(c.min)) {
 		return &couponDomain.Coupon{ID: c.id}, decimal.Zero, &couponDomain.MinOrderNotMetError{Required: decimal.RequireFromString(c.min)}
@@ -180,6 +187,7 @@ func newPricingFixture(t *testing.T) *pricingFixture {
 			"TENPCT":  {id: uuid.New(), percent: "10"},
 			"WHOLE":   {id: uuid.New(), percent: "100"},
 			"MIN30":   {id: uuid.New(), fixed: "5", min: "30"},
+			"APPONLY": {id: uuid.New(), fixed: "5", appOnly: true},
 			"BIGFIXD": {id: uuid.New(), fixed: "500"},
 		}},
 		restaurant: fakeRestaurant{dev: true},
@@ -511,6 +519,49 @@ func TestPricing_CouponRefusals(t *testing.T) {
 	wantCodes(t, active.Issues, apperr.CodeCouponAlreadyActive)
 	if active.Coupon.Valid {
 		t.Error("a coupon blocked by another open order is not valid")
+	}
+}
+
+func TestPricing_AppOnlyCoupon(t *testing.T) {
+	f := newPricingFixture(t)
+	basket := []pricingItem{item(salmonID, 2)}
+
+	web := f.price(pricingInput{CouponCode: new("APPONLY"), Channel: couponDomain.ChannelWeb, Items: basket})
+	if f.coupons.lastChannel != couponDomain.ChannelWeb {
+		t.Errorf("channel = %q, want web", f.coupons.lastChannel)
+	}
+	wantCodes(t, web.Issues, apperr.CodeCouponAppOnly)
+	if web.Coupon == nil || web.Coupon.Valid || web.Coupon.ErrorCode == nil || *web.Coupon.ErrorCode != "COUPON_APP_ONLY" {
+		t.Errorf("coupon = %+v", web.Coupon)
+	}
+	wantMoney(t, "no discount on the website", web.CouponDiscount, "0")
+	if web.CouponID != nil {
+		t.Error("a refused coupon must not be reserved")
+	}
+
+	app := f.price(pricingInput{CouponCode: new("APPONLY"), Channel: couponDomain.ChannelApp, Items: basket})
+	if f.coupons.lastChannel != couponDomain.ChannelApp {
+		t.Errorf("channel = %q, want app", f.coupons.lastChannel)
+	}
+	wantCodes(t, app.Issues)
+	if app.Coupon == nil || !app.Coupon.Valid {
+		t.Errorf("coupon = %+v", app.Coupon)
+	}
+	wantMoney(t, "the app gets the discount", app.CouponDiscount, "5.00")
+	if app.CouponID == nil {
+		t.Error("createOrder needs the coupon id to reserve it")
+	}
+}
+
+func TestCouponChannel(t *testing.T) {
+	if got := couponChannel(t.Context()); got != couponDomain.ChannelWeb {
+		t.Errorf("no flag: %q, want web", got)
+	}
+	if got := couponChannel(utils.SetIsAppClient(t.Context(), false)); got != couponDomain.ChannelWeb {
+		t.Errorf("website token: %q, want web", got)
+	}
+	if got := couponChannel(utils.SetIsAppClient(t.Context(), true)); got != couponDomain.ChannelApp {
+		t.Errorf("app token: %q, want app", got)
 	}
 }
 

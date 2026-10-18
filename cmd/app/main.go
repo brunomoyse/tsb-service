@@ -243,6 +243,9 @@ func main() {
 	// minted for the customer site from carrying admin scope.
 	adminClientIDs := strings.Split(os.Getenv("ZITADEL_ADMIN_CLIENT_IDS"), ",")
 	oidcVerifier.SetAdminClientIDs(adminClientIDs)
+	// Tokens issued to the native client come from the iOS/Android app: the only
+	// channel where app-only coupons can be redeemed.
+	oidcVerifier.SetAppClientIDs([]string{os.Getenv("ZITADEL_NATIVE_CLIENT_ID")})
 	zap.L().Info("OIDC verifier initialized", zap.String("issuer", zitadelIssuer))
 
 	// POS (shop-floor handheld) auth module: single trusted device, HMAC-only.

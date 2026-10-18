@@ -75,6 +75,7 @@ func TestCouponRepositoryCRUD(t *testing.T) {
 			c.MaxUses = intp(100)
 			c.MaxUsesPerUser = intp(2)
 			c.ValidFrom, c.ValidUntil = timep(from), timep(until)
+			c.AppOnly = true
 		})
 		assert.False(t, c.CreatedAt.IsZero())
 
@@ -88,6 +89,7 @@ func TestCouponRepositoryCRUD(t *testing.T) {
 		assert.Equal(t, 100, *got.MaxUses)
 		assert.Equal(t, 2, *got.MaxUsesPerUser)
 		assert.True(t, got.IsActive)
+		assert.True(t, got.AppOnly)
 		assert.True(t, from.Equal(*got.ValidFrom))
 		assert.True(t, until.Equal(*got.ValidUntil))
 		assert.Zero(t, got.UsedCount)
@@ -106,6 +108,7 @@ func TestCouponRepositoryCRUD(t *testing.T) {
 		got, err := e.repo.FindByCode(ctx, "  summer10 ")
 		require.NoError(t, err)
 		assert.Equal(t, c.ID, got.ID)
+		assert.False(t, got.AppOnly, "a coupon is valid everywhere unless flagged")
 
 		_, err = e.repo.FindByCode(ctx, "NOPE")
 		require.ErrorIs(t, err, sql.ErrNoRows)
@@ -115,7 +118,7 @@ func TestCouponRepositoryCRUD(t *testing.T) {
 	})
 
 	t.Run("FindAll lists newest first", func(t *testing.T) {
-		a := e.coupon(t, func(c *domain.Coupon) { c.Code = "ALL-A" })
+		a := e.coupon(t, func(c *domain.Coupon) { c.Code = "ALL-A"; c.AppOnly = true })
 		b := e.coupon(t, func(c *domain.Coupon) { c.Code = "ALL-B" })
 		_, err := e.tdb.DB.ExecContext(ctx, `UPDATE coupons SET created_at = created_at - interval '1 hour' WHERE id = $1`, a.ID)
 		require.NoError(t, err)
@@ -125,6 +128,7 @@ func TestCouponRepositoryCRUD(t *testing.T) {
 		for _, c := range all {
 			if c.ID == a.ID || c.ID == b.ID {
 				order = append(order, c.ID)
+				assert.Equal(t, c.ID == a.ID, c.AppOnly, "FindAll reads the app-only flag")
 			}
 		}
 		assert.Equal(t, []uuid.UUID{b.ID, a.ID}, order)
@@ -136,6 +140,7 @@ func TestCouponRepositoryCRUD(t *testing.T) {
 
 		c.Code, c.DiscountType, c.DiscountValue = "UPD2", domain.DiscountTypePercentage, decimal.NewFromInt(20)
 		c.IsActive, c.MaxUses, c.MaxUsesPerUser = false, intp(9), intp(3)
+		c.AppOnly = true
 		c.UsedCount = 99 // must be ignored
 		require.NoError(t, e.repo.Update(ctx, c))
 
@@ -144,6 +149,13 @@ func TestCouponRepositoryCRUD(t *testing.T) {
 		assert.Equal(t, "UPD2", got.Code)
 		assert.Equal(t, domain.DiscountTypePercentage, got.DiscountType)
 		assert.False(t, got.IsActive)
+		assert.True(t, got.AppOnly)
+
+		c.AppOnly = false
+		require.NoError(t, e.repo.Update(ctx, c))
+		got, err = e.repo.FindByID(ctx, c.ID)
+		require.NoError(t, err)
+		assert.False(t, got.AppOnly, "the flag can be switched back off")
 		assert.Equal(t, 9, *got.MaxUses)
 		assert.Equal(t, 3, *got.MaxUsesPerUser)
 		assert.Equal(t, 1, got.UsedCount)

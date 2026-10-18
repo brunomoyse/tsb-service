@@ -84,6 +84,9 @@ const (
 	CodeCouponInvalid Code = "COUPON_INVALID"
 	// CodeCouponMinOrderNotMet: the basket is below the coupon's minimum (`minimum` in the extensions).
 	CodeCouponMinOrderNotMet Code = "COUPON_MIN_ORDER_NOT_MET"
+	// CodeCouponAppOnly: the coupon can only be redeemed from the iOS/Android app, and this order or
+	// check comes from elsewhere (the website). Only for a code that is otherwise redeemable.
+	CodeCouponAppOnly Code = "COUPON_APP_ONLY"
 	// CodeCouponRateLimited: too many failed attempts (per minute or per day).
 	CodeCouponRateLimited Code = "COUPON_RATE_LIMITED"
 	// CodeCouponAlreadyActive: the customer already has another open order that holds a coupon.
@@ -169,6 +172,7 @@ var expected = map[Code]bool{
 	CodeDeliveryUnavailable:   true,
 	CodeCouponInvalid:         true,
 	CodeCouponMinOrderNotMet:  true,
+	CodeCouponAppOnly:         true,
 	CodeCouponRateLimited:     true,
 	CodeCouponAlreadyActive:   true,
 	CodeCouponExhausted:       true,

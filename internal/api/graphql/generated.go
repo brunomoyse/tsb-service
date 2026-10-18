@@ -102,6 +102,7 @@ type ComplexityRoot struct {
 	}
 
 	Coupon struct {
+		AppOnly        func(childComplexity int) int
 		Code           func(childComplexity int) int
 		CreatedAt      func(childComplexity int) int
 		DiscountType   func(childComplexity int) int
@@ -825,6 +826,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ChoiceTranslation.Name(childComplexity), true
 
+	case "Coupon.appOnly":
+		if e.ComplexityRoot.Coupon.AppOnly == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Coupon.AppOnly(childComplexity), true
 	case "Coupon.code":
 		if e.ComplexityRoot.Coupon.Code == nil {
 			break
@@ -3119,6 +3126,8 @@ func (ec *executionContext) childFields_Coupon(ctx context.Context, field graphq
 		return ec.fieldContext_Coupon_usedCount(ctx, field)
 	case "isActive":
 		return ec.fieldContext_Coupon_isActive(ctx, field)
+	case "appOnly":
+		return ec.fieldContext_Coupon_appOnly(ctx, field)
 	case "status":
 		return ec.fieldContext_Coupon_status(ctx, field)
 	case "validFrom":
@@ -5616,6 +5625,29 @@ func (ec *executionContext) _Coupon_isActive(ctx context.Context, field graphql.
 	)
 }
 func (ec *executionContext) fieldContext_Coupon_isActive(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Coupon", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _Coupon_appOnly(ctx context.Context, field graphql.CollectedField, obj *model.Coupon) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Coupon_appOnly(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AppOnly, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Coupon_appOnly(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Coupon", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
@@ -15369,7 +15401,7 @@ func (ec *executionContext) unmarshalInputCreateCouponInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"code", "discountType", "discountValue", "minOrderAmount", "maxUses", "maxUsesPerUser", "isActive", "validFrom", "validUntil"}
+	fieldsInOrder := [...]string{"code", "discountType", "discountValue", "minOrderAmount", "maxUses", "maxUsesPerUser", "isActive", "appOnly", "validFrom", "validUntil"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -15425,6 +15457,13 @@ func (ec *executionContext) unmarshalInputCreateCouponInput(ctx context.Context,
 				return it, err
 			}
 			it.IsActive = data
+		case "appOnly":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("appOnly"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AppOnly = data
 		case "validFrom":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("validFrom"))
 			data, err := ec.unmarshalODateTime2ᚖtimeᚐTime(ctx, v)
@@ -16402,7 +16441,7 @@ func (ec *executionContext) unmarshalInputUpdateCouponInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"code", "discountType", "discountValue", "minOrderAmount", "maxUses", "maxUsesPerUser", "isActive", "validFrom", "validUntil"}
+	fieldsInOrder := [...]string{"code", "discountType", "discountValue", "minOrderAmount", "maxUses", "maxUsesPerUser", "isActive", "appOnly", "validFrom", "validUntil"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -16458,6 +16497,13 @@ func (ec *executionContext) unmarshalInputUpdateCouponInput(ctx context.Context,
 				return it, err
 			}
 			it.IsActive = data
+		case "appOnly":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("appOnly"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AppOnly = data
 		case "validFrom":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("validFrom"))
 			data, err := ec.unmarshalODateTime2ᚖtimeᚐTime(ctx, v)
@@ -17231,6 +17277,11 @@ func (ec *executionContext) _Coupon(ctx context.Context, sel ast.SelectionSet, o
 			}
 		case "isActive":
 			out.Values[i] = ec._Coupon_isActive(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "appOnly":
+			out.Values[i] = ec._Coupon_appOnly(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

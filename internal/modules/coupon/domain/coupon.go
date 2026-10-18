@@ -49,6 +49,15 @@ func (e *MinOrderNotMetError) Error() string {
 	return fmt.Sprintf("minimum order amount of %s not met", e.Required.String())
 }
 
+// AppOnlyError signals that an app-only coupon was used outside the mobile app.
+// Like MinOrderNotMetError, it is safe to surface: it only fires for a code that
+// is currently redeemable, and the customer can use it in the app.
+type AppOnlyError struct{}
+
+func (e *AppOnlyError) Error() string {
+	return "this coupon can only be used in the app"
+}
+
 // CheckFailedError signals that the coupon could not be checked because of an infrastructure
 // failure (database error, ...). It is NOT a refusal: the code may well be valid, so callers must
 // report a server fault instead of "invalid coupon", and must never show its text to the customer.
@@ -79,6 +88,17 @@ const (
 	DiscountTypeFixed      DiscountType = "fixed"
 )
 
+// Channel is where an order (or a coupon check) comes from. It is derived on the
+// server from the OIDC client of the caller's access token, never sent by the client.
+type Channel string
+
+const (
+	// ChannelWeb is the website, and the default for anything that is not the app.
+	ChannelWeb Channel = "web"
+	// ChannelApp is the iOS/Android app.
+	ChannelApp Channel = "app"
+)
+
 type Status string
 
 const (
@@ -99,6 +119,7 @@ type Coupon struct {
 	MaxUsesPerUser *int             `db:"max_uses_per_user"`
 	UsedCount      int              `db:"used_count"`
 	IsActive       bool             `db:"is_active"`
+	AppOnly        bool             `db:"app_only"` // refused outside the mobile app (see Channel)
 	ValidFrom      *time.Time       `db:"valid_from"`
 	ValidUntil     *time.Time       `db:"valid_until"`
 	CreatedAt      time.Time        `db:"created_at"`
@@ -126,8 +147,9 @@ func (c *Coupon) Status() Status {
 }
 
 // Validate checks whether the coupon can be applied to an order with the given amount.
-// userUsageCount is the number of times the current user has already used this coupon.
-func (c *Coupon) Validate(orderAmount decimal.Decimal, userUsageCount int) error {
+// userUsageCount is the number of times the current user has already used this coupon,
+// channel is where the order comes from.
+func (c *Coupon) Validate(orderAmount decimal.Decimal, userUsageCount int, channel Channel) error {
 	if !c.IsActive {
 		return fmt.Errorf("coupon is not active")
 	}
@@ -146,6 +168,13 @@ func (c *Coupon) Validate(orderAmount decimal.Decimal, userUsageCount int) error
 
 	if c.MaxUsesPerUser != nil && userUsageCount >= *c.MaxUsesPerUser {
 		return fmt.Errorf("coupon per-user usage limit reached")
+	}
+
+	// After the state checks, so only a currently redeemable code says "app only" (an
+	// expired one stays generic), and before the minimum: a web customer cannot use the
+	// code at all, so "add more to your basket" would mislead them.
+	if c.AppOnly && channel != ChannelApp {
+		return &AppOnlyError{}
 	}
 
 	if c.MinOrderAmount != nil && orderAmount.LessThan(*c.MinOrderAmount) {

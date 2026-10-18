@@ -74,6 +74,7 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 		PreferredReadyTime: input.PreferredReadyTime,
 		Items:              pricingItemsFromOrder(input.Items),
 		CouponCode:         input.CouponCode,
+		Channel:            couponChannel(ctx),
 		SkipOrderingGate:   isTestOrder,
 		FailFast:           true,
 	})

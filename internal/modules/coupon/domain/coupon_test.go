@@ -91,22 +91,27 @@ func TestCouponValidate(t *testing.T) {
 		c         Coupon
 		amount    string
 		userUsage int
+		channel   Channel
 		wantErr   string
 	}{
-		{"valid", Coupon{IsActive: true}, "10", 0, ""},
-		{"inactive", Coupon{IsActive: false}, "10", 0, "coupon is not active"},
-		{"before its window", Coupon{IsActive: true, ValidFrom: timep(now.Add(time.Minute))}, "10", 0, "coupon is not yet valid"},
-		{"after its window", Coupon{IsActive: true, ValidUntil: timep(now.Add(-time.Minute))}, "10", 0, "coupon has expired"},
-		{"global cap reached", Coupon{IsActive: true, MaxUses: intp(2), UsedCount: 2}, "10", 0, "coupon usage limit reached"},
-		{"global cap not reached", Coupon{IsActive: true, MaxUses: intp(2), UsedCount: 1}, "10", 0, ""},
-		{"per-user cap reached", Coupon{IsActive: true, MaxUsesPerUser: intp(1)}, "10", 1, "per-user usage limit reached"},
-		{"per-user cap not reached", Coupon{IsActive: true, MaxUsesPerUser: intp(2)}, "10", 1, ""},
-		{"exactly the minimum is enough", Coupon{IsActive: true, MinOrderAmount: decp("25.00")}, "25.00", 0, ""},
-		{"below the minimum", Coupon{IsActive: true, MinOrderAmount: decp("25.00")}, "24.99", 0, "minimum order amount of 25 not met"},
+		{"valid", Coupon{IsActive: true}, "10", 0, ChannelWeb, ""},
+		{"inactive", Coupon{IsActive: false}, "10", 0, ChannelWeb, "coupon is not active"},
+		{"before its window", Coupon{IsActive: true, ValidFrom: timep(now.Add(time.Minute))}, "10", 0, ChannelWeb, "coupon is not yet valid"},
+		{"after its window", Coupon{IsActive: true, ValidUntil: timep(now.Add(-time.Minute))}, "10", 0, ChannelWeb, "coupon has expired"},
+		{"global cap reached", Coupon{IsActive: true, MaxUses: intp(2), UsedCount: 2}, "10", 0, ChannelWeb, "coupon usage limit reached"},
+		{"global cap not reached", Coupon{IsActive: true, MaxUses: intp(2), UsedCount: 1}, "10", 0, ChannelWeb, ""},
+		{"per-user cap reached", Coupon{IsActive: true, MaxUsesPerUser: intp(1)}, "10", 1, ChannelWeb, "per-user usage limit reached"},
+		{"per-user cap not reached", Coupon{IsActive: true, MaxUsesPerUser: intp(2)}, "10", 1, ChannelWeb, ""},
+		{"exactly the minimum is enough", Coupon{IsActive: true, MinOrderAmount: decp("25.00")}, "25.00", 0, ChannelWeb, ""},
+		{"below the minimum", Coupon{IsActive: true, MinOrderAmount: decp("25.00")}, "24.99", 0, ChannelWeb, "minimum order amount of 25 not met"},
+		{"app-only from the app", Coupon{IsActive: true, AppOnly: true}, "10", 0, ChannelApp, ""},
+		{"app-only from the website", Coupon{IsActive: true, AppOnly: true}, "10", 0, ChannelWeb, "only be used in the app"},
+		{"app-only from an unknown channel", Coupon{IsActive: true, AppOnly: true}, "10", 0, Channel(""), "only be used in the app"},
+		{"an ordinary coupon from the app", Coupon{IsActive: true}, "10", 0, ChannelApp, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := tc.c.Validate(d(tc.amount), tc.userUsage)
+			err := tc.c.Validate(d(tc.amount), tc.userUsage, tc.channel)
 			if tc.wantErr == "" {
 				assert.NoError(t, err)
 				return
@@ -117,21 +122,51 @@ func TestCouponValidate(t *testing.T) {
 	}
 
 	t.Run("the minimum failure is typed so callers can show it", func(t *testing.T) {
-		err := (&Coupon{IsActive: true, MinOrderAmount: decp("30")}).Validate(d("10"), 0)
+		err := (&Coupon{IsActive: true, MinOrderAmount: decp("30")}).Validate(d("10"), 0, ChannelWeb)
 		minErr, ok := errors.AsType[*MinOrderNotMetError](err)
 		require.True(t, ok)
 		assert.True(t, minErr.Required.Equal(d("30")))
 	})
 
 	t.Run("other failures are not the minimum error", func(t *testing.T) {
-		err := (&Coupon{IsActive: false}).Validate(d("10"), 0)
+		err := (&Coupon{IsActive: false}).Validate(d("10"), 0, ChannelWeb)
 		_, ok := errors.AsType[*MinOrderNotMetError](err)
 		assert.False(t, ok)
 	})
 
 	t.Run("checks run in order: inactive is reported before the minimum", func(t *testing.T) {
-		err := (&Coupon{IsActive: false, MinOrderAmount: decp("30")}).Validate(d("10"), 0)
+		err := (&Coupon{IsActive: false, MinOrderAmount: decp("30")}).Validate(d("10"), 0, ChannelWeb)
 		assert.Contains(t, err.Error(), "not active")
+	})
+
+	t.Run("the app-only failure is typed so callers can show it", func(t *testing.T) {
+		err := (&Coupon{IsActive: true, AppOnly: true}).Validate(d("10"), 0, ChannelWeb)
+		_, ok := errors.AsType[*AppOnlyError](err)
+		assert.True(t, ok)
+	})
+
+	t.Run("an expired or used-up app-only coupon stays generic on the website", func(t *testing.T) {
+		expired := Coupon{IsActive: true, AppOnly: true, ValidUntil: timep(now.Add(-time.Minute))}
+		err := expired.Validate(d("10"), 0, ChannelWeb)
+		_, ok := errors.AsType[*AppOnlyError](err)
+		assert.False(t, ok, "must not reveal app-only for a code that cannot be redeemed anyway")
+
+		usedUp := Coupon{IsActive: true, AppOnly: true, MaxUsesPerUser: intp(1)}
+		err = usedUp.Validate(d("10"), 1, ChannelWeb)
+		_, ok = errors.AsType[*AppOnlyError](err)
+		assert.False(t, ok)
+	})
+
+	t.Run("app-only is reported before the minimum", func(t *testing.T) {
+		err := (&Coupon{IsActive: true, AppOnly: true, MinOrderAmount: decp("25")}).Validate(d("10"), 0, ChannelWeb)
+		_, ok := errors.AsType[*AppOnlyError](err)
+		assert.True(t, ok, "a web customer cannot use it at all, so the minimum is beside the point")
+	})
+
+	t.Run("the minimum still applies in the app", func(t *testing.T) {
+		err := (&Coupon{IsActive: true, AppOnly: true, MinOrderAmount: decp("25")}).Validate(d("10"), 0, ChannelApp)
+		_, ok := errors.AsType[*MinOrderNotMetError](err)
+		assert.True(t, ok)
 	})
 }
 

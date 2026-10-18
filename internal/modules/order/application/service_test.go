@@ -105,7 +105,7 @@ func (f *fakeCouponService) DecrementUsageAtomic(_ context.Context, id uuid.UUID
 	return nil
 }
 
-func (f *fakeCouponService) ValidateCoupon(context.Context, string, decimal.Decimal, uuid.UUID) (*couponDomain.Coupon, decimal.Decimal, error) {
+func (f *fakeCouponService) ValidateCoupon(context.Context, string, decimal.Decimal, uuid.UUID, couponDomain.Channel) (*couponDomain.Coupon, decimal.Decimal, error) {
 	panic("unused")
 }
 func (f *fakeCouponService) IncrementUsage(context.Context, uuid.UUID) error { return nil }

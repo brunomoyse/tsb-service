@@ -50,7 +50,7 @@ func TestValidateCoupon_InfrastructureFailuresAreNotRefusals(t *testing.T) {
 	}
 	for name, repo := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, _, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(20), uuid.New())
+			_, _, err := NewCouponService(repo).ValidateCoupon(t.Context(), "X", decimal.NewFromInt(20), uuid.New(), domain.ChannelWeb)
 			if _, ok := errors.AsType[*domain.CheckFailedError](err); !ok {
 				t.Fatalf("err = %v, want *CheckFailedError", err)
 			}
@@ -66,7 +66,7 @@ func TestValidateCoupon_InfrastructureFailuresAreNotRefusals(t *testing.T) {
 
 func TestValidateCoupon_UnknownCodeIsARefusalThatCounts(t *testing.T) {
 	repo := &fakeRepo{findErr: fmt.Errorf("coupon not found: %w", sql.ErrNoRows)}
-	_, _, err := NewCouponService(repo).ValidateCoupon(t.Context(), "NOPE", decimal.NewFromInt(20), uuid.New())
+	_, _, err := NewCouponService(repo).ValidateCoupon(t.Context(), "NOPE", decimal.NewFromInt(20), uuid.New(), domain.ChannelWeb)
 	var checkErr *domain.CheckFailedError
 	if err == nil || errors.As(err, &checkErr) {
 		t.Fatalf("err = %v, want a plain refusal", err)

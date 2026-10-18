@@ -56,6 +56,7 @@ func (r *Resolver) quoteOrder(ctx context.Context, input model.QuoteOrderInput) 
 		PreferredReadyTime: input.PreferredReadyTime,
 		Items:              items,
 		CouponCode:         input.CouponCode,
+		Channel:            couponChannel(ctx),
 		SkipOrderingGate:   skipGate,
 	})
 	if err != nil {

@@ -20,6 +20,7 @@ import (
 	restaurantDomain "tsb-service/internal/modules/restaurant/domain"
 	userDomain "tsb-service/internal/modules/user/domain"
 	"tsb-service/pkg/timezone"
+	"tsb-service/pkg/utils"
 
 	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
@@ -434,6 +435,7 @@ func ToGQLCoupon(c *couponDomain.Coupon) *model.Coupon {
 		MaxUsesPerUser: c.MaxUsesPerUser,
 		UsedCount:      c.UsedCount,
 		IsActive:       c.IsActive,
+		AppOnly:        c.AppOnly,
 		Status:         model.CouponStatus(strings.ToUpper(string(c.Status()))),
 		ValidFrom:      c.ValidFrom,
 		ValidUntil:     c.ValidUntil,
@@ -654,17 +656,29 @@ func isOrderUpdateTooLate(now time.Time, estimatedReadyTime *time.Time) bool {
 	return now.Sub(*estimatedReadyTime) > lateNotificationThreshold
 }
 
+// couponChannel is where the request comes from, for app-only coupons: the app when the access
+// token was issued to the native client (set by the auth middleware), the website otherwise.
+func couponChannel(ctx context.Context) couponDomain.Channel {
+	if utils.GetIsAppClient(ctx) {
+		return couponDomain.ChannelApp
+	}
+	return couponDomain.ChannelWeb
+}
+
 // couponErrorCode maps a REFUSAL returned by CouponService.ValidateCoupon to the stable code the
-// clients translate. Only the two actionable refusals are told apart; every other refusal stays the
+// clients translate. Only the actionable refusals are told apart; every other refusal stays the
 // generic COUPON_INVALID so an enumeration attempt learns nothing about why a code was refused.
 // It must only be given refusals: infrastructure failures (couponDomain.CheckFailedError) are server
 // faults and callers branch on couponCheckFailure before reaching it.
 func couponErrorCode(err error) apperr.Code {
 	var minErr *couponDomain.MinOrderNotMetError
+	var appErr *couponDomain.AppOnlyError
 	var limitErr *couponDomain.DailyAttemptLimitError
 	switch {
 	case errors.As(err, &minErr):
 		return apperr.CodeCouponMinOrderNotMet
+	case errors.As(err, &appErr):
+		return apperr.CodeCouponAppOnly
 	case errors.As(err, &limitErr):
 		return apperr.CodeCouponRateLimited
 	default:

@@ -23,7 +23,7 @@ func NewCouponRepository(pool *db.DBPool) domain.CouponRepository {
 func (r *CouponRepository) FindByCode(ctx context.Context, code string) (*domain.Coupon, error) {
 	var coupon domain.Coupon
 	err := r.pool.ForContext(ctx).GetContext(ctx, &coupon,
-		`SELECT id, code, discount_type, discount_value, min_order_amount, max_uses, max_uses_per_user, used_count, is_active, valid_from, valid_until, created_at
+		`SELECT id, code, discount_type, discount_value, min_order_amount, max_uses, max_uses_per_user, used_count, is_active, app_only, valid_from, valid_until, created_at
 		 FROM coupons WHERE code = $1`, domain.NormalizeCode(code))
 	if err != nil {
 		return nil, fmt.Errorf("coupon not found: %w", err)
@@ -34,7 +34,7 @@ func (r *CouponRepository) FindByCode(ctx context.Context, code string) (*domain
 func (r *CouponRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.Coupon, error) {
 	var coupon domain.Coupon
 	err := r.pool.ForContext(ctx).GetContext(ctx, &coupon,
-		`SELECT id, code, discount_type, discount_value, min_order_amount, max_uses, max_uses_per_user, used_count, is_active, valid_from, valid_until, created_at
+		`SELECT id, code, discount_type, discount_value, min_order_amount, max_uses, max_uses_per_user, used_count, is_active, app_only, valid_from, valid_until, created_at
 		 FROM coupons WHERE id = $1`, id)
 	if err != nil {
 		return nil, fmt.Errorf("coupon not found: %w", err)
@@ -45,7 +45,7 @@ func (r *CouponRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.
 func (r *CouponRepository) FindAll(ctx context.Context) ([]*domain.Coupon, error) {
 	var coupons []*domain.Coupon
 	err := r.pool.ForContext(ctx).SelectContext(ctx, &coupons,
-		`SELECT id, code, discount_type, discount_value, min_order_amount, max_uses, max_uses_per_user, used_count, is_active, valid_from, valid_until, created_at
+		`SELECT id, code, discount_type, discount_value, min_order_amount, max_uses, max_uses_per_user, used_count, is_active, app_only, valid_from, valid_until, created_at
 		 FROM coupons ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch coupons: %w", err)
@@ -55,12 +55,12 @@ func (r *CouponRepository) FindAll(ctx context.Context) ([]*domain.Coupon, error
 
 func (r *CouponRepository) Save(ctx context.Context, coupon *domain.Coupon) error {
 	err := r.pool.ForContext(ctx).QueryRowxContext(ctx,
-		`INSERT INTO coupons (id, code, discount_type, discount_value, min_order_amount, max_uses, max_uses_per_user, used_count, is_active, valid_from, valid_until)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		`INSERT INTO coupons (id, code, discount_type, discount_value, min_order_amount, max_uses, max_uses_per_user, used_count, is_active, valid_from, valid_until, app_only)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		 RETURNING created_at`,
 		coupon.ID, coupon.Code, coupon.DiscountType, coupon.DiscountValue,
 		coupon.MinOrderAmount, coupon.MaxUses, coupon.MaxUsesPerUser, coupon.UsedCount, coupon.IsActive,
-		coupon.ValidFrom, coupon.ValidUntil).Scan(&coupon.CreatedAt)
+		coupon.ValidFrom, coupon.ValidUntil, coupon.AppOnly).Scan(&coupon.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to save coupon: %w", err)
 	}
@@ -69,11 +69,11 @@ func (r *CouponRepository) Save(ctx context.Context, coupon *domain.Coupon) erro
 
 func (r *CouponRepository) Update(ctx context.Context, coupon *domain.Coupon) error {
 	_, err := r.pool.ForContext(ctx).ExecContext(ctx,
-		`UPDATE coupons SET code = $2, discount_type = $3, discount_value = $4, min_order_amount = $5, max_uses = $6, max_uses_per_user = $7, is_active = $8, valid_from = $9, valid_until = $10
+		`UPDATE coupons SET code = $2, discount_type = $3, discount_value = $4, min_order_amount = $5, max_uses = $6, max_uses_per_user = $7, is_active = $8, valid_from = $9, valid_until = $10, app_only = $11
 		 WHERE id = $1`,
 		coupon.ID, coupon.Code, coupon.DiscountType, coupon.DiscountValue,
 		coupon.MinOrderAmount, coupon.MaxUses, coupon.MaxUsesPerUser, coupon.IsActive,
-		coupon.ValidFrom, coupon.ValidUntil)
+		coupon.ValidFrom, coupon.ValidUntil, coupon.AppOnly)
 	if err != nil {
 		return fmt.Errorf("failed to update coupon: %w", err)
 	}

@@ -42,6 +42,7 @@ func (r *mutationResolver) CreateCoupon(ctx context.Context, input model.CreateC
 		DiscountType:   discountType,
 		DiscountValue:  discountValue,
 		IsActive:       input.IsActive,
+		AppOnly:        input.AppOnly != nil && *input.AppOnly,
 		ValidFrom:      input.ValidFrom,
 		ValidUntil:     input.ValidUntil,
 		MaxUses:        input.MaxUses,
@@ -134,6 +135,9 @@ func (r *mutationResolver) UpdateCoupon(ctx context.Context, id uuid.UUID, input
 	if input.IsActive != nil {
 		coupon.IsActive = *input.IsActive
 	}
+	if input.AppOnly != nil {
+		coupon.AppOnly = *input.AppOnly
+	}
 	if input.ValidFrom != nil {
 		coupon.ValidFrom = input.ValidFrom
 	}
@@ -178,19 +182,21 @@ func (r *queryResolver) ValidateCoupon(ctx context.Context, code string, orderAm
 		}, nil
 	}
 
-	_, discount, err := r.CouponService.ValidateCoupon(ctx, code, amount, userUUID)
+	_, discount, err := r.CouponService.ValidateCoupon(ctx, code, amount, userUUID, couponChannel(ctx))
 	if err != nil {
 		// An infrastructure failure is a server fault, not a refusal: return it as a GraphQL error
 		// (Sentry; the presenter hides the raw text from the client).
 		if checkErr, ok := couponCheckFailure(err); ok {
 			return nil, checkErr
 		}
-		// Only refusals reach this point. The min-order and daily-limit messages are user-safe;
-		// any other refusal gets the fixed generic text, so no raw error text can ever leak here.
+		// Only refusals reach this point. The min-order, app-only and daily-limit messages are
+		// user-safe; any other refusal gets the fixed generic text, so no raw error text can ever
+		// leak here.
 		errMsg := "invalid or expired coupon"
 		var minErr *couponDomain.MinOrderNotMetError
+		var appErr *couponDomain.AppOnlyError
 		var limitErr *couponDomain.DailyAttemptLimitError
-		if errors.As(err, &minErr) || errors.As(err, &limitErr) {
+		if errors.As(err, &minErr) || errors.As(err, &appErr) || errors.As(err, &limitErr) {
 			errMsg = err.Error()
 		}
 		errCode := string(couponErrorCode(err))

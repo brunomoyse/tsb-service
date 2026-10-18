@@ -15,7 +15,9 @@ import (
 )
 
 type CouponService interface {
-	ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal, userID uuid.UUID) (*domain.Coupon, decimal.Decimal, error)
+	// ValidateCoupon checks the code for this user and channel (where the order comes from) and
+	// returns the coupon and its discount on orderAmount.
+	ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal, userID uuid.UUID, channel domain.Channel) (*domain.Coupon, decimal.Decimal, error)
 	IncrementUsage(ctx context.Context, id uuid.UUID) error
 	// IncrementUsageAtomic atomically increments and returns false if the coupon is no longer valid.
 	IncrementUsageAtomic(ctx context.Context, id uuid.UUID, userID uuid.UUID) (bool, error)
@@ -39,7 +41,7 @@ func NewCouponService(repo domain.CouponRepository) CouponService {
 	return &couponService{repo: repo}
 }
 
-func (s *couponService) ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal, userID uuid.UUID) (*domain.Coupon, decimal.Decimal, error) {
+func (s *couponService) ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal, userID uuid.UUID, channel domain.Channel) (*domain.Coupon, decimal.Decimal, error) {
 	// Daily brute-force guard: block before any lookup once the user has spent
 	// their failed attempts for the day (Europe/Brussels). Fail-open if the
 	// counter read itself errors: never lock a user out on infra failure.
@@ -66,14 +68,18 @@ func (s *couponService) ValidateCoupon(ctx context.Context, code string, orderAm
 		return nil, decimal.Zero, &domain.CheckFailedError{Err: fmt.Errorf("failed to check user usage: %w", err)}
 	}
 
-	if err := coupon.Validate(orderAmount, userUsageCount); err != nil {
-		// Surface the actionable "minimum order amount not met" message so the
-		// customer knows how to proceed; keep existence/expiry/limit failures
-		// generic to avoid leaking coupon state to enumeration attempts.
-		// A valid-but-min-not-met code is not enumeration, so it doesn't count
-		// toward the daily limit; every other failure does.
+	if err := coupon.Validate(orderAmount, userUsageCount, channel); err != nil {
+		// Surface the actionable "minimum order amount not met" and "app only"
+		// messages so the customer knows how to proceed; keep existence/expiry/limit
+		// failures generic to avoid leaking coupon state to enumeration attempts.
+		// Both fire only for a code that is currently redeemable, which is not
+		// enumeration, so they don't count toward the daily limit; every other
+		// failure does.
 		if minErr, ok := errors.AsType[*domain.MinOrderNotMetError](err); ok {
 			return coupon, decimal.Zero, minErr
+		}
+		if appErr, ok := errors.AsType[*domain.AppOnlyError](err); ok {
+			return coupon, decimal.Zero, appErr
 		}
 		s.recordFailedAttempt(ctx, userID)
 		return coupon, decimal.Zero, fmt.Errorf("invalid or expired coupon")

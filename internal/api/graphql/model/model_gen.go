@@ -69,19 +69,21 @@ type ChoiceTranslationInput struct {
 }
 
 type Coupon struct {
-	ID             uuid.UUID    `json:"id"`
-	Code           string       `json:"code"`
-	DiscountType   string       `json:"discountType"`
-	DiscountValue  string       `json:"discountValue"`
-	MinOrderAmount *string      `json:"minOrderAmount,omitempty"`
-	MaxUses        *int         `json:"maxUses,omitempty"`
-	MaxUsesPerUser *int         `json:"maxUsesPerUser,omitempty"`
-	UsedCount      int          `json:"usedCount"`
-	IsActive       bool         `json:"isActive"`
-	Status         CouponStatus `json:"status"`
-	ValidFrom      *time.Time   `json:"validFrom,omitempty"`
-	ValidUntil     *time.Time   `json:"validUntil,omitempty"`
-	CreatedAt      time.Time    `json:"createdAt"`
+	ID             uuid.UUID `json:"id"`
+	Code           string    `json:"code"`
+	DiscountType   string    `json:"discountType"`
+	DiscountValue  string    `json:"discountValue"`
+	MinOrderAmount *string   `json:"minOrderAmount,omitempty"`
+	MaxUses        *int      `json:"maxUses,omitempty"`
+	MaxUsesPerUser *int      `json:"maxUsesPerUser,omitempty"`
+	UsedCount      int       `json:"usedCount"`
+	IsActive       bool      `json:"isActive"`
+	// Refused on orders from the website: only the iOS/Android app can redeem it.
+	AppOnly    bool         `json:"appOnly"`
+	Status     CouponStatus `json:"status"`
+	ValidFrom  *time.Time   `json:"validFrom,omitempty"`
+	ValidUntil *time.Time   `json:"validUntil,omitempty"`
+	CreatedAt  time.Time    `json:"createdAt"`
 }
 
 type CouponValidation struct {
@@ -89,21 +91,23 @@ type CouponValidation struct {
 	DiscountAmount string `json:"discountAmount"`
 	// English message, for logs and old clients: show errorCode translated instead.
 	ErrorMessage *string `json:"errorMessage,omitempty"`
-	// Stable code when valid is false: COUPON_INVALID, COUPON_MIN_ORDER_NOT_MET or COUPON_RATE_LIMITED.
+	// Stable code when valid is false: COUPON_INVALID, COUPON_MIN_ORDER_NOT_MET, COUPON_APP_ONLY or COUPON_RATE_LIMITED.
 	ErrorCode *string `json:"errorCode,omitempty"`
 }
 
 type CreateCouponInput struct {
 	// Optional. When omitted or blank, the server generates a unique code.
-	Code           *string    `json:"code,omitempty"`
-	DiscountType   string     `json:"discountType"`
-	DiscountValue  string     `json:"discountValue"`
-	MinOrderAmount *string    `json:"minOrderAmount,omitempty"`
-	MaxUses        *int       `json:"maxUses,omitempty"`
-	MaxUsesPerUser *int       `json:"maxUsesPerUser,omitempty"`
-	IsActive       bool       `json:"isActive"`
-	ValidFrom      *time.Time `json:"validFrom,omitempty"`
-	ValidUntil     *time.Time `json:"validUntil,omitempty"`
+	Code           *string `json:"code,omitempty"`
+	DiscountType   string  `json:"discountType"`
+	DiscountValue  string  `json:"discountValue"`
+	MinOrderAmount *string `json:"minOrderAmount,omitempty"`
+	MaxUses        *int    `json:"maxUses,omitempty"`
+	MaxUsesPerUser *int    `json:"maxUsesPerUser,omitempty"`
+	IsActive       bool    `json:"isActive"`
+	// Only the iOS/Android app can redeem it. Defaults to false.
+	AppOnly    *bool      `json:"appOnly,omitempty"`
+	ValidFrom  *time.Time `json:"validFrom,omitempty"`
+	ValidUntil *time.Time `json:"validUntil,omitempty"`
 }
 
 type CreateOrderInput struct {
@@ -558,6 +562,7 @@ type UpdateCouponInput struct {
 	MaxUses        *int       `json:"maxUses,omitempty"`
 	MaxUsesPerUser *int       `json:"maxUsesPerUser,omitempty"`
 	IsActive       *bool      `json:"isActive,omitempty"`
+	AppOnly        *bool      `json:"appOnly,omitempty"`
 	ValidFrom      *time.Time `json:"validFrom,omitempty"`
 	ValidUntil     *time.Time `json:"validUntil,omitempty"`
 }

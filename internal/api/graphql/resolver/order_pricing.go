@@ -42,7 +42,7 @@ type (
 		GetByPlaceID(ctx context.Context, placeID string) (*addressDomain.Address, error)
 	}
 	pricingCoupons interface {
-		ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal, userID uuid.UUID) (*couponDomain.Coupon, decimal.Decimal, error)
+		ValidateCoupon(ctx context.Context, code string, orderAmount decimal.Decimal, userID uuid.UUID, channel couponDomain.Channel) (*couponDomain.Coupon, decimal.Decimal, error)
 	}
 	pricingOrders interface {
 		HasActiveCouponOrder(ctx context.Context, userID uuid.UUID) (bool, error)
@@ -102,6 +102,9 @@ type pricingInput struct {
 	PreferredReadyTime *time.Time
 	Items              []pricingItem
 	CouponCode         *string
+	// Channel is where the order comes from (app or website), for app-only coupons. Derived from
+	// the caller's access token (couponChannel), never from the request.
+	Channel couponDomain.Channel
 	// SkipOrderingGate lets store-review accounts order outside opening hours (see CreateOrder).
 	SkipOrderingGate bool
 	// FailFast stops at the first problem (createOrder); false reports all of them (quoteOrder).
@@ -629,7 +632,7 @@ func (p *orderPricer) priceCoupon(ctx context.Context, res *pricingResult, in pr
 		res.addOrder(err).Minimum = minimum
 	}
 
-	coupon, discount, err := p.coupons.ValidateCoupon(ctx, code, orderAmount, *in.UserID)
+	coupon, discount, err := p.coupons.ValidateCoupon(ctx, code, orderAmount, *in.UserID, in.Channel)
 	if err != nil {
 		// A failure to run the check is ours, not the customer's: surface it as a server fault
 		// (createOrder / quoteOrder return it as a GraphQL error), never as "invalid coupon".

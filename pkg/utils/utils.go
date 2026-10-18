@@ -26,6 +26,7 @@ const IsPOSKey contextKey = "isPOS"
 const ZitadelSubKey contextKey = "zitadelSub"
 const TokenExpiryKey contextKey = "tokenExpiry"
 const ClientIPKey contextKey = "clientIP"
+const IsAppClientKey contextKey = "isAppClient"
 
 // SetClientIP stores the caller's IP (as resolved by the HTTP layer's trusted-proxy logic).
 func SetClientIP(ctx context.Context, ip string) context.Context {
@@ -97,6 +98,21 @@ func GetIsPOS(ctx context.Context) bool {
 // GetIsStaff reports whether the caller is an admin or a POS device.
 func GetIsStaff(ctx context.Context) bool {
 	return GetIsAdmin(ctx) || GetIsPOS(ctx)
+}
+
+// SetIsAppClient records whether the caller's access token was issued to one
+// of the mobile app OIDC clients (iOS/Android), as opposed to the website, the
+// dashboard or a POS device. Set by the auth middleware from the verified token,
+// so a client cannot claim it.
+func SetIsAppClient(ctx context.Context, isApp bool) context.Context {
+	return context.WithValue(ctx, IsAppClientKey, isApp)
+}
+
+// GetIsAppClient reports whether the request comes from the mobile app (see
+// SetIsAppClient). False when unauthenticated or never set.
+func GetIsAppClient(ctx context.Context) bool {
+	isApp, _ := ctx.Value(IsAppClientKey).(bool)
+	return isApp
 }
 
 // SetTokenExpiry stores the JWT exp claim (UTC) in the context. Zero means

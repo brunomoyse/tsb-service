@@ -27,6 +27,7 @@ func TestContextHelpers(t *testing.T) {
 		assert.False(t, GetIsAdmin(bg))
 		assert.False(t, GetIsPOS(bg))
 		assert.False(t, GetIsStaff(bg))
+		assert.False(t, GetIsAppClient(bg), "a request is from the website unless the token says app")
 		assert.True(t, GetTokenExpiry(bg).IsZero())
 	})
 
@@ -57,11 +58,19 @@ func TestContextHelpers(t *testing.T) {
 		assert.False(t, GetIsStaff(SetIsPOS(SetIsAdmin(bg, false), false)))
 	})
 
+	t.Run("the app client flag round-trips", func(t *testing.T) {
+		assert.True(t, GetIsAppClient(SetIsAppClient(bg, true)))
+		assert.False(t, GetIsAppClient(SetIsAppClient(bg, false)))
+		assert.False(t, GetIsStaff(SetIsAppClient(bg, true)), "the app is not staff")
+	})
+
 	t.Run("a value of the wrong type reads as the zero value", func(t *testing.T) {
 		ctx := context.WithValue(bg, UserIDKey, 42)
 		ctx = context.WithValue(ctx, IsAdminKey, "yes")
+		ctx = context.WithValue(ctx, IsAppClientKey, "yes")
 		assert.Empty(t, GetUserID(ctx))
 		assert.False(t, GetIsAdmin(ctx))
+		assert.False(t, GetIsAppClient(ctx))
 	})
 }
 

@@ -16,6 +16,8 @@ type Coupon {
     maxUsesPerUser: Int
     usedCount: Int!
     isActive: Boolean!
+    "Refused on orders from the website: only the iOS/Android app can redeem it."
+    appOnly: Boolean!
     status: CouponStatus!
     validFrom: DateTime
     validUntil: DateTime
@@ -27,7 +29,7 @@ type CouponValidation {
     discountAmount: String!
     "English message, for logs and old clients: show errorCode translated instead."
     errorMessage: String
-    "Stable code when valid is false: COUPON_INVALID, COUPON_MIN_ORDER_NOT_MET or COUPON_RATE_LIMITED."
+    "Stable code when valid is false: COUPON_INVALID, COUPON_MIN_ORDER_NOT_MET, COUPON_APP_ONLY or COUPON_RATE_LIMITED."
     errorCode: String
 }
 
@@ -40,6 +42,8 @@ input CreateCouponInput {
     maxUses: Int
     maxUsesPerUser: Int
     isActive: Boolean!
+    "Only the iOS/Android app can redeem it. Defaults to false."
+    appOnly: Boolean
     validFrom: DateTime
     validUntil: DateTime
 }
@@ -52,6 +56,7 @@ input UpdateCouponInput {
     maxUses: Int
     maxUsesPerUser: Int
     isActive: Boolean
+    appOnly: Boolean
     validFrom: DateTime
     validUntil: DateTime
 }

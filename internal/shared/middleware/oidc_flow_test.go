@@ -81,6 +81,7 @@ type seen struct {
 	reached           bool
 	userID, sub       string
 	admin, pos, staff bool
+	app               bool
 	exp               time.Time
 	ginUserID         string
 	ginHasUserID      bool
@@ -97,6 +98,7 @@ func (e *authEnv) run(t *testing.T, mw gin.HandlerFunc, configure func(*http.Req
 		s.reached = true
 		s.userID, s.sub = utils.GetUserID(ctx), utils.GetZitadelSub(ctx)
 		s.admin, s.pos, s.staff = utils.GetIsAdmin(ctx), utils.GetIsPOS(ctx), utils.GetIsStaff(ctx)
+		s.app = utils.GetIsAppClient(ctx)
 		s.exp = utils.GetTokenExpiry(ctx)
 		if v, ok := c.Get(string(utils.UserIDKey)); ok {
 			s.ginUserID, _ = v.(string)
@@ -309,6 +311,36 @@ func TestStrictAuthMiddleware_AdminScope(t *testing.T) {
 		_, shop := e.run(t, e.v.StrictAuthMiddleware(), bearer(e.token(t, roles)))
 		assert.True(t, shop.reached, "a customer-site token is still a valid customer")
 		assert.False(t, shop.admin, "but the admin role is not honored for it")
+	})
+}
+
+func TestStrictAuthMiddleware_AppClient(t *testing.T) {
+	t.Run("a token issued to the native client marks the request as the app", func(t *testing.T) {
+		e := newAuthEnv(t)
+		e.v.SetAppClientIDs([]string{"native"})
+
+		_, app := e.run(t, e.v.StrictAuthMiddleware(), bearer(e.token(t, jwt.MapClaims{"sub": testSub, "client_id": "native"})))
+		assert.True(t, app.reached)
+		assert.True(t, app.app)
+
+		_, web := e.run(t, e.v.StrictAuthMiddleware(), bearer(e.token(t, jwt.MapClaims{"sub": testSub, "client_id": "customer-site"})))
+		assert.True(t, web.reached)
+		assert.False(t, web.app, "a website token is not the app")
+	})
+
+	t.Run("without an app client configured even a native token is not the app", func(t *testing.T) {
+		e := newAuthEnv(t)
+		_, s := e.run(t, e.v.StrictAuthMiddleware(), bearer(e.token(t, jwt.MapClaims{"sub": testSub, "client_id": "native"})))
+		assert.True(t, s.reached)
+		assert.False(t, s.app)
+	})
+
+	t.Run("an unauthenticated request through the optional middleware is not the app", func(t *testing.T) {
+		e := newAuthEnv(t)
+		e.v.SetAppClientIDs([]string{"native"})
+		_, s := e.run(t, e.v.OptionalAuthMiddleware(), nil)
+		assert.True(t, s.reached)
+		assert.False(t, s.app)
 	})
 }
 

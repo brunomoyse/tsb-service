@@ -62,6 +62,7 @@ func NewGraphQLTestClient(r *resolver.Resolver, jwtSecret string) *GraphQLTestCl
 			if err == nil {
 				ctx = utils.SetUserID(ctx, userID)
 				ctx = utils.SetIsAdmin(ctx, isAdmin)
+				ctx = utils.SetIsAppClient(ctx, testTokenIsApp(token, jwtSecret))
 			}
 		}
 
