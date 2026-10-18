@@ -78,6 +78,7 @@ type CouponInput struct {
 	MaxUses        *int       `json:"maxUses,omitempty"`
 	MaxUsesPerUser *int       `json:"maxUsesPerUser,omitempty"`
 	IsActive       *bool      `json:"isActive,omitempty"`
+	AppOnly        *bool      `json:"appOnly,omitempty"`
 	ValidFrom      *time.Time `json:"validFrom,omitempty"`
 	ValidUntil     *time.Time `json:"validUntil,omitempty"`
 }

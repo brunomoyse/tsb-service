@@ -86,6 +86,7 @@ type CouponCreateParams struct {
 	MaxUses        *int        `json:"max_uses,omitempty"`
 	MaxUsesPerUser *int        `json:"max_uses_per_user,omitempty"`
 	Active         bool        `json:"active"`
+	AppOnly        bool        `json:"app_only,omitempty"`
 	ValidFrom      *time.Time  `json:"valid_from,omitempty"`
 	ValidUntil     *time.Time  `json:"valid_until,omitempty"`
 }
@@ -111,8 +112,11 @@ func validateLimits(minOrder *int64, maxUses, perUser *int, from, until *time.Ti
 	return nil
 }
 
-func couponDetails(min *int64, maxUses, perUser *int, from, until *time.Time, loc *time.Location) string {
+func couponDetails(appOnly bool, min *int64, maxUses, perUser *int, from, until *time.Time, loc *time.Location) string {
 	var parts []string
+	if appOnly {
+		parts = append(parts, "app only")
+	}
 	if min != nil {
 		parts = append(parts, "minimum order "+money.Format(*min))
 	}
@@ -172,13 +176,13 @@ func couponCreate() handler {
 				state = "active"
 			}
 			return &prepared{EntityType: "coupon", EntityID: "new", Before: map[string]any{},
-				Summary:   fmt.Sprintf("New coupon %s: %s%s, %s", code, p.Discount, couponDetails(p.MinOrderCents, p.MaxUses, p.MaxUsesPerUser, p.ValidFrom, p.ValidUntil, env.Loc), state),
-				SummaryZh: fmt.Sprintf("新优惠码 %s：%s%s，%s", codeZh, couponValueZh(p.Discount), couponDetailsZh(p.MinOrderCents, p.MaxUses, p.MaxUsesPerUser, p.ValidFrom, p.ValidUntil, env.Loc), activeZh(p.Active))}, nil
+				Summary:   fmt.Sprintf("New coupon %s: %s%s, %s", code, p.Discount, couponDetails(p.AppOnly, p.MinOrderCents, p.MaxUses, p.MaxUsesPerUser, p.ValidFrom, p.ValidUntil, env.Loc), state),
+				SummaryZh: fmt.Sprintf("新优惠码 %s：%s%s，%s", codeZh, couponValueZh(p.Discount), couponDetailsZh(p.AppOnly, p.MinOrderCents, p.MaxUses, p.MaxUsesPerUser, p.ValidFrom, p.ValidUntil, env.Loc), activeZh(p.Active))}, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p CouponCreateParams, _ []byte) (any, error) {
 			typ, val := p.Discount.upstream()
 			in := upstream.CouponInput{DiscountType: &typ, DiscountValue: &val, MaxUses: p.MaxUses, MaxUsesPerUser: p.MaxUsesPerUser,
-				IsActive: &p.Active, ValidFrom: p.ValidFrom, ValidUntil: p.ValidUntil}
+				IsActive: &p.Active, AppOnly: &p.AppOnly, ValidFrom: p.ValidFrom, ValidUntil: p.ValidUntil}
 			if p.Code != "" {
 				in.Code = &p.Code
 			}
@@ -214,6 +218,7 @@ type CouponUpdateParams struct {
 	MinOrderCents  *int64       `json:"min_order_cents,omitempty"`
 	MaxUses        *int         `json:"max_uses,omitempty"`
 	MaxUsesPerUser *int         `json:"max_uses_per_user,omitempty"`
+	AppOnly        *bool        `json:"app_only,omitempty"`
 	ValidFrom      *time.Time   `json:"valid_from,omitempty"`
 	ValidUntil     *time.Time   `json:"valid_until,omitempty"`
 }
@@ -224,12 +229,13 @@ type couponTerms struct {
 	MinOrderCents  *int64      `json:"min_order_cents"`
 	MaxUses        *int        `json:"max_uses"`
 	MaxUsesPerUser *int        `json:"max_uses_per_user"`
+	AppOnly        bool        `json:"app_only"`
 	ValidFrom      *time.Time  `json:"valid_from"`
 	ValidUntil     *time.Time  `json:"valid_until"`
 }
 
 func termsOf(c *upstream.Coupon) couponTerms {
-	t := couponTerms{Code: c.Code, Discount: couponValueOf(c), MaxUses: c.MaxUses, MaxUsesPerUser: c.MaxUsesPerUser, ValidFrom: c.ValidFrom, ValidUntil: c.ValidUntil}
+	t := couponTerms{Code: c.Code, Discount: couponValueOf(c), MaxUses: c.MaxUses, MaxUsesPerUser: c.MaxUsesPerUser, AppOnly: c.AppOnly, ValidFrom: c.ValidFrom, ValidUntil: c.ValidUntil}
 	if c.MinOrderAmount != nil {
 		m := money.MustCents(*c.MinOrderAmount)
 		t.MinOrderCents = &m
@@ -311,6 +317,13 @@ func couponUpdate() handler {
 			}
 			intField("max uses", "最多使用次数", &p.MaxUses, cur.MaxUses)
 			intField("max uses per customer", "每位顾客最多使用次数", &p.MaxUsesPerUser, cur.MaxUsesPerUser)
+			if p.AppOnly != nil {
+				if *p.AppOnly == cur.AppOnly {
+					p.AppOnly = nil
+				} else {
+					diffs.add(fmt.Sprintf("app only: %s -> %s", yesNo(cur.AppOnly), yesNo(*p.AppOnly)), appOnlyZh+"："+yesNoZh(cur.AppOnly)+arrowZh+yesNoZh(*p.AppOnly))
+				}
+			}
 			timeField := func(name, nameZh string, want **time.Time, cur *time.Time) {
 				if *want == nil {
 					return
@@ -346,7 +359,7 @@ func couponUpdate() handler {
 			return pr, nil
 		},
 		Execute: func(ctx context.Context, env *Env, p CouponUpdateParams, _ []byte) (any, error) {
-			in := upstream.CouponInput{Code: p.Code, MaxUses: p.MaxUses, MaxUsesPerUser: p.MaxUsesPerUser, ValidFrom: p.ValidFrom, ValidUntil: p.ValidUntil}
+			in := upstream.CouponInput{Code: p.Code, MaxUses: p.MaxUses, MaxUsesPerUser: p.MaxUsesPerUser, AppOnly: p.AppOnly, ValidFrom: p.ValidFrom, ValidUntil: p.ValidUntil}
 			if p.Discount != nil {
 				typ, val := p.Discount.upstream()
 				in.DiscountType, in.DiscountValue = &typ, &val
@@ -371,6 +384,9 @@ func couponUpdate() handler {
 			}
 			if p.Discount != nil {
 				inv.Discount = &b.Discount
+			}
+			if p.AppOnly != nil {
+				inv.AppOnly = &b.AppOnly
 			}
 			if p.MinOrderCents != nil {
 				if b.MinOrderCents == nil {

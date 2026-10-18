@@ -56,7 +56,7 @@ Directive legend: `public` (no auth), `@auth` (any user), `@admin` (admin role),
 | /settings (`pages/settings.vue:696`) | Add / edit a date override (closed all day, or special hours + note) | `upsertScheduleOverride(input)` @admin | pubsub ×2, audit. See the UTC pitfall in gap 5. | **sensitive** | `propose_schedule_override` |
 | /settings (`pages/settings.vue:704`) | Delete a date override | `deleteScheduleOverride(date)` @admin | pubsub ×2, audit | **sensitive** | `propose_schedule_override_removal` |
 | /coupons (`pages/coupons.vue:409`) | Create coupon | `createCoupon(input)` @staff | pubsub `couponUpdated`, audit | **sensitive** | `propose_coupon_creation` |
-| /coupons (`pages/coupons.vue:429`) | Edit coupon (value, min amount, limits, validity) | `updateCoupon(id, input)` @admin | pubsub, audit. Nullable fields cannot be cleared (null is ignored). | **sensitive** | `propose_coupon_update` |
+| /coupons (`pages/coupons.vue:429`) | Edit coupon (value, min amount, limits, validity, app only) | `updateCoupon(id, input)` @admin | pubsub, audit. Nullable fields cannot be cleared (null is ignored). | **sensitive** | `propose_coupon_update` |
 | /coupons inline toggle (`pages/coupons.vue:449`) | Deactivate coupon | `updateCoupon(id, {isActive: false})` @admin | pubsub, audit | **low** | `deactivate_coupon` |
 | /coupons inline toggle | Activate coupon (gives discounts) | `updateCoupon(id, {isActive: true})` @admin | pubsub, audit | **sensitive** | `propose_coupon_activation` |
 | (MCP only) | Undo the last change (< 30 min) | replays the before-state with the mutations above | as the original mutation | low or sensitive, per the original change | `undo_last_change` |

@@ -210,7 +210,7 @@ func TestReadTools(t *testing.T) {
 		t.Errorf("search_coupons: %v", r)
 	}
 	r = h.call("get_coupon", map[string]any{"coupon_id": "cp-old"})
-	if num(r["amount_off_cents"]) != 500 || num(r["min_order_cents"]) != 3000 {
+	if num(r["amount_off_cents"]) != 500 || num(r["min_order_cents"]) != 3000 || r["app_only"] != false {
 		t.Errorf("get_coupon: %v", r)
 	}
 

@@ -154,6 +154,7 @@ type Coupon struct {
 	MaxUsesPerUser *int       `json:"maxUsesPerUser"`
 	UsedCount      int        `json:"usedCount"`
 	IsActive       bool       `json:"isActive"`
+	AppOnly        bool       `json:"appOnly"`
 	Status         string     `json:"status"`
 	ValidFrom      *time.Time `json:"validFrom"`
 	ValidUntil     *time.Time `json:"validUntil"`

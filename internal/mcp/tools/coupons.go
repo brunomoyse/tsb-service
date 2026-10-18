@@ -26,13 +26,14 @@ type CouponOut struct {
 	MaxUsesPerUser int    `json:"max_uses_per_user,omitempty"`
 	UsedCount      int    `json:"used_count"`
 	Active         bool   `json:"active"`
+	AppOnly        bool   `json:"app_only" jsonschema:"true: only the iOS/Android app can redeem it, the website refuses it"`
 	Status         string `json:"status" jsonschema:"ACTIVE, INACTIVE, SCHEDULED, EXPIRED or EXHAUSTED"`
 	ValidFrom      string `json:"valid_from,omitempty"`
 	ValidUntil     string `json:"valid_until,omitempty"`
 }
 
 func (d *Deps) couponOut(c *upstream.Coupon) CouponOut {
-	o := CouponOut{CouponID: c.ID, Code: c.Code, Currency: money.Currency, UsedCount: c.UsedCount, Active: c.IsActive, Status: c.Status,
+	o := CouponOut{CouponID: c.ID, Code: c.Code, Currency: money.Currency, UsedCount: c.UsedCount, Active: c.IsActive, AppOnly: c.AppOnly, Status: c.Status,
 		ValidFrom: d.fmtTimePtr(c.ValidFrom), ValidUntil: d.fmtTimePtr(c.ValidUntil)}
 	if strings.EqualFold(c.DiscountType, "percentage") {
 		o.DiscountType, o.PercentOff = "percentage", int(money.MustCents(c.DiscountValue)/100)
@@ -121,7 +122,7 @@ func registerCoupons(s *mcp.Server, d *Deps) {
 	}
 	add(s, d, &mcp.Tool{
 		Name: "get_coupon", Annotations: readOnly,
-		Description: describe(`Details of one coupon: discount, limits, usage, validity and status.`,
+		Description: describe(`Details of one coupon: discount, limits, usage, validity, app-only flag and status.`,
 			`get_coupon({"coupon_id": "3b2f5c1d-0a9e-4c8b-9d7f-abcdef012345"})`),
 	}, func(ctx context.Context, in GetIn) (CouponOut, error) {
 		c, err := d.Up.Coupon(ctx, in.CouponID)
@@ -162,13 +163,14 @@ func registerCoupons(s *mcp.Server, d *Deps) {
 		MaxUses        *int   `json:"max_uses,omitempty" jsonschema:"total uses allowed"`
 		MaxUsesPerUser *int   `json:"max_uses_per_user,omitempty"`
 		Active         *bool  `json:"active,omitempty" jsonschema:"default true"`
+		AppOnly        *bool  `json:"app_only,omitempty" jsonschema:"true: only the iOS/Android app can redeem it, the website refuses it; default false"`
 		ValidFrom      string `json:"valid_from,omitempty" jsonschema:"ISO 8601"`
 		ValidUntil     string `json:"valid_until,omitempty" jsonschema:"ISO 8601"`
 		WriteContext
 	}
 	add(s, d, &mcp.Tool{
 		Name: "propose_coupon_creation", Annotations: proposeOnly,
-		Description: describe(`Propose a new discount coupon (percentage or fixed amount) with optional minimum order, usage limits and validity period. Creates a pending change only.`,
+		Description: describe(`Propose a new discount coupon (percentage or fixed amount) with optional minimum order, usage limits, validity period and app-only flag (app_only: redeemable only in the iOS/Android app). Creates a pending change only.`,
 			`propose_coupon_creation({"code": "NOEL15", "discount_type": "percentage", "percent_off": 15, "min_order_cents": 3000, "valid_until": "2026-12-31T23:59", "request_context": "圣诞节优惠码15%"})`),
 	}, func(ctx context.Context, in CreateIn) (actions.Proposal, error) {
 		v, err := discountValue(in.DiscountType, in.PercentOff, in.AmountOffCents)
@@ -178,7 +180,7 @@ func registerCoupons(s *mcp.Server, d *Deps) {
 		if v == nil {
 			return actions.Proposal{}, actions.Userf("discount_type is required.")
 		}
-		p := actions.CouponCreateParams{Code: in.Code, Discount: *v, MinOrderCents: in.MinOrderCents, MaxUses: in.MaxUses, MaxUsesPerUser: in.MaxUsesPerUser, Active: valueOr(in.Active, true)}
+		p := actions.CouponCreateParams{Code: in.Code, Discount: *v, MinOrderCents: in.MinOrderCents, MaxUses: in.MaxUses, MaxUsesPerUser: in.MaxUsesPerUser, Active: valueOr(in.Active, true), AppOnly: valueOr(in.AppOnly, false)}
 		if p.ValidFrom, err = d.optTime("valid_from", in.ValidFrom); err != nil {
 			return actions.Proposal{}, err
 		}
@@ -197,20 +199,21 @@ func registerCoupons(s *mcp.Server, d *Deps) {
 		MinOrderCents  *int64 `json:"min_order_cents,omitempty"`
 		MaxUses        *int   `json:"max_uses,omitempty"`
 		MaxUsesPerUser *int   `json:"max_uses_per_user,omitempty"`
+		AppOnly        *bool  `json:"app_only,omitempty" jsonschema:"true: only the iOS/Android app can redeem it; false: the website accepts it too"`
 		ValidFrom      string `json:"valid_from,omitempty"`
 		ValidUntil     string `json:"valid_until,omitempty"`
 		WriteContext
 	}
 	add(s, d, &mcp.Tool{
 		Name: "propose_coupon_update", Annotations: proposeOnly,
-		Description: describe(`Propose changing a coupon's code, discount, minimum order, usage limits or validity. Only the given fields change; a limit cannot be removed once set. To switch a coupon on or off use propose_coupon_activation / deactivate_coupon. Creates a pending change only.`,
+		Description: describe(`Propose changing a coupon's code, discount, minimum order, usage limits, validity or app-only flag. Only the given fields change; a limit cannot be removed once set. To switch a coupon on or off use propose_coupon_activation / deactivate_coupon. Creates a pending change only.`,
 			`propose_coupon_update({"coupon_id": "3b2f5c1d-0a9e-4c8b-9d7f-abcdef012345", "valid_until": "2027-01-15T23:59", "request_context": "优惠码延长到一月十五号"})`),
 	}, func(ctx context.Context, in UpdateIn) (actions.Proposal, error) {
 		v, err := discountValue(in.DiscountType, in.PercentOff, in.AmountOffCents)
 		if err != nil {
 			return actions.Proposal{}, err
 		}
-		p := actions.CouponUpdateParams{CouponID: in.CouponID, Discount: v, MinOrderCents: in.MinOrderCents, MaxUses: in.MaxUses, MaxUsesPerUser: in.MaxUsesPerUser}
+		p := actions.CouponUpdateParams{CouponID: in.CouponID, Discount: v, MinOrderCents: in.MinOrderCents, MaxUses: in.MaxUses, MaxUsesPerUser: in.MaxUsesPerUser, AppOnly: in.AppOnly}
 		if in.Code != "" {
 			p.Code = &in.Code
 		}

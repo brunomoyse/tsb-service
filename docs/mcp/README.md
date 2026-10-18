@@ -37,6 +37,7 @@ Conventions:
 - **Times** are ISO 8601. A time without an offset is read in `TZ_DEFAULT` (Europe/Brussels). Dates are `yyyy-mm-dd`.
 - **Every write** accepts `request_context`: the owner's original message, stored in the audit log.
 - **Errors** are short, safe sentences. Tokens, stack traces and upstream bodies only go to the logs.
+- **App-only coupons.** `app_only: true` (coupon tools, read and write) means the website refuses the code and only the iOS/Android app can redeem it. It defaults to false on creation and can be switched both ways with `propose_coupon_update`; undo restores the previous value.
 - **Customer privacy.** Tools give a customer's first name and last-name initial only (`Marie D.`). The upstream queries never ask for phone numbers or emails; the last name is reduced to its initial while decoding (`upstream.Initial`), and phone numbers and emails typed into order notes, address details or cancellation reasons are masked (`internal/mcp/privacy`). The owner finds contact details in the dashboard. `internal/mcp/tools/privacy_test.go` proves nothing leaks even when the backend returns everything.
 - **Product identity** is category + name. The same name exists in several categories (三文鱼 is a maki, a sushi, a sashimi and a poke bowl; about fifteen products are a "salmon roll"). Every product output carries `labels` (category + name per language) and `category_names`, order items carry `product_labels`, and summaries read `卷寿司「三文鱼」` / `Maki "Saumon" (卷寿司「三文鱼」)`.
 
@@ -180,6 +181,7 @@ Suggested agent flow:
 go test -race ./internal/mcp/... ./cmd/tsb-mcp/...
 ```
 
+- **`upstream`:** every GraphQL document is validated against tsb-service's schema files (`internal/api/graphql/schema`, read from disk, not imported), and `CouponInput` against both coupon inputs.
 - **`fakeupstream`:** an in-memory tsb-service GraphQL API with the real response shapes (decimal strings, `categoryID`, `locale`, DATE-backed overrides).
 - **`tools`:** every tool end to end through the SDK's in-memory transport, plus the tool list, safe errors, and checks that no order write is reachable.
 - **`actions`:** price bounds, closure planning, expiry, conflicts, idempotence and undo.
