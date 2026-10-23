@@ -84,3 +84,6 @@ jobs:
         with:
           name: tsb-service-binary
           path: tsb-service
+          # Nothing downloads it; a short life keeps the account's shared
+          # artifact quota free (65 copies at 90 days filled it in Oct 2026).
+          retention-days: 3
