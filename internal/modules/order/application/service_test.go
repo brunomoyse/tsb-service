@@ -59,8 +59,8 @@ func (f *fakeOrderRepo) HasActiveCouponOrder(_ context.Context, _ uuid.UUID) (bo
 	return false, nil
 }
 
-func (f *fakeOrderRepo) InsertStatusHistory(_ context.Context, _ uuid.UUID, _ domain.OrderStatus) error {
-	return nil
+func (f *fakeOrderRepo) InsertStatusHistory(_ context.Context, _ uuid.UUID, _ domain.OrderStatus) (uuid.UUID, error) {
+	return uuid.New(), nil
 }
 
 func (f *fakeOrderRepo) CancelStaleTestOrders(_ context.Context, _ time.Duration) ([]domain.CancelledOrderRef, error) {

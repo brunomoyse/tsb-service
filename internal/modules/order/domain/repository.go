@@ -40,7 +40,8 @@ type OrderRepository interface {
 	// orders and returns the affected orders (id, user, status, type, language) so
 	// callers can re-push their Live Activities in the new language.
 	UpdateActiveOrdersLanguage(ctx context.Context, userID uuid.UUID, language string) ([]*Order, error)
-	InsertStatusHistory(ctx context.Context, orderID uuid.UUID, status OrderStatus) error
+	// InsertStatusHistory appends a row to the status history of the order and returns its id.
+	InsertStatusHistory(ctx context.Context, orderID uuid.UUID, status OrderStatus) (uuid.UUID, error)
 	// CancelStaleTestOrders cancels store-review test orders older than olderThan
 	// that are not already terminal, returning the affected orders. TEMPORARY.
 	CancelStaleTestOrders(ctx context.Context, olderThan time.Duration) ([]CancelledOrderRef, error)

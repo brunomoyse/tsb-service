@@ -603,12 +603,13 @@ func (r *OrderRepository) FindByUserIDs(ctx context.Context, userIDs []string) (
 	return result, nil
 }
 
-func (r *OrderRepository) InsertStatusHistory(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) error {
-	query := `INSERT INTO order_status_history (order_id, status) VALUES ($1, $2)`
-	if _, err := r.pool.ForContext(ctx).ExecContext(ctx, query, orderID, status); err != nil {
-		return fmt.Errorf("failed to insert status history: %w", err)
+func (r *OrderRepository) InsertStatusHistory(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) (uuid.UUID, error) {
+	query := `INSERT INTO order_status_history (order_id, status) VALUES ($1, $2) RETURNING id`
+	var id uuid.UUID
+	if err := r.pool.ForContext(ctx).GetContext(ctx, &id, query, orderID, status); err != nil {
+		return uuid.Nil, fmt.Errorf("failed to insert status history: %w", err)
 	}
-	return nil
+	return id, nil
 }
 
 // CancelStaleTestOrders cancels store-review test orders older than olderThan

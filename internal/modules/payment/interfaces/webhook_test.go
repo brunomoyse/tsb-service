@@ -250,11 +250,11 @@ func (o *memOrders) Update(_ context.Context, ord *orderDomain.Order) error {
 	return nil
 }
 
-func (o *memOrders) InsertStatusHistory(_ context.Context, _ uuid.UUID, s orderDomain.OrderStatus) error {
+func (o *memOrders) InsertStatusHistory(_ context.Context, _ uuid.UUID, s orderDomain.OrderStatus) (uuid.UUID, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.history = append(o.history, s)
-	return nil
+	return uuid.New(), nil
 }
 
 func (o *memOrders) snapshot() (orderDomain.OrderStatus, []orderDomain.OrderStatus) {

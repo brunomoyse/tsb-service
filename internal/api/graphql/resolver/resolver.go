@@ -62,6 +62,11 @@ type Resolver struct {
 	// PublicQueryLimiter throttles the unauthenticated, upstream-costly queries (quoteOrder,
 	// resolveAddress) per client IP. nil disables it.
 	PublicQueryLimiter *middleware.RateLimiter
+	// Hubrise lets the HubRise integration follow the shop; nil unless HubRise is configured on
+	// this deployment. Call it through the nil-safe helpers (OrderReady, OrderStatusChanged,
+	// AvailabilityChanged, ProductGuard) in hubrise_hooks.go. Set after NewResolver, and only to a
+	// non-nil implementation (a nil pointer inside the interface would defeat the nil checks).
+	Hubrise HubriseHooks
 }
 
 // NewResolver constructs the Resolver with required services.

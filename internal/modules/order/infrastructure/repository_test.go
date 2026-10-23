@@ -77,6 +77,15 @@ func (e *env) backdate(t *testing.T, orderID uuid.UUID, age time.Duration) {
 	e.exec(t, `UPDATE orders SET created_at = now() - make_interval(secs => $2) WHERE id = $1`, orderID, age.Seconds())
 }
 
+// mustInsertHistory appends a status history row and checks it got an id.
+func (e *env) mustInsertHistory(t *testing.T, orderID uuid.UUID, status domain.OrderStatus) uuid.UUID {
+	t.Helper()
+	id, err := e.repo.InsertStatusHistory(e.ctx, orderID, status)
+	require.NoError(t, err)
+	require.NotEqual(t, uuid.Nil, id)
+	return id
+}
+
 func (e *env) pay(t *testing.T, orderID uuid.UUID, status string) {
 	e.exec(t, `INSERT INTO mollie_payments (mollie_payment_id, status, order_id, amount) VALUES ($1, $2, $3, 10)`,
 		"tr_"+uuid.NewString()[:8], status, orderID)
@@ -256,7 +265,7 @@ func TestOrderRepository(t *testing.T) {
 	t.Run("InsertStatusHistory and FindStatusHistoryByOrderID keep chronological order", func(t *testing.T) {
 		saved := e.save(t, e.newOrder(domain.OrderStatusPending, nil))
 		for _, st := range []domain.OrderStatus{domain.OrderStatusPending, domain.OrderStatusConfirmed, domain.OrderStatusPreparing} {
-			require.NoError(t, e.repo.InsertStatusHistory(e.ctx, saved.ID, st))
+			e.mustInsertHistory(t, saved.ID, st)
 		}
 		hist, err := e.repo.FindStatusHistoryByOrderID(e.ctx, saved.ID)
 		require.NoError(t, err)
@@ -270,7 +279,13 @@ func TestOrderRepository(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, none)
 
-		require.Error(t, e.repo.InsertStatusHistory(e.ctx, uuid.New(), domain.OrderStatusPending), "unknown order violates the foreign key")
+		_, err = e.repo.InsertStatusHistory(e.ctx, uuid.New(), domain.OrderStatusPending)
+		require.Error(t, err, "unknown order violates the foreign key")
+
+		id := e.mustInsertHistory(t, saved.ID, domain.OrderStatusDelivered)
+		hist, err = e.repo.FindStatusHistoryByOrderID(e.ctx, saved.ID)
+		require.NoError(t, err)
+		assert.Equal(t, id, hist[len(hist)-1].ID, "the returned id is the id of the stored row")
 	})
 
 	t.Run("HasActiveCouponOrder only counts non-terminal orders holding a coupon", func(t *testing.T) {
@@ -358,7 +373,7 @@ func TestOrderRepository(t *testing.T) {
 		l := e.line(tuna, 1, "14.00", "14.00")
 		l.Selections = []domain.OrderProductSelection{{GroupID: group, ChoiceID: choice, Quantity: 1}}
 		saved := e.save(t, e.newOrder(domain.OrderStatusPending, nil), l)
-		require.NoError(t, e.repo.InsertStatusHistory(e.ctx, saved.ID, domain.OrderStatusPending))
+		e.mustInsertHistory(t, saved.ID, domain.OrderStatusPending)
 		keep := e.save(t, e.newOrder(domain.OrderStatusPending, nil), e.line(tuna, 1, "14.00", "14.00"))
 
 		require.NoError(t, e.repo.DeleteOrder(e.ctx, saved.ID))

@@ -41,7 +41,8 @@ func TestOrderRepositoryDatabaseFailures(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to select order products")
 		_, err = repo.FindByUserIDs(ctx, []string{id.String()})
 		assert.Error(t, err)
-		assert.ErrorContains(t, repo.InsertStatusHistory(ctx, id, domain.OrderStatusPending), "failed to insert status history")
+		_, err = repo.InsertStatusHistory(ctx, id, domain.OrderStatusPending)
+		assert.ErrorContains(t, err, "failed to insert status history")
 		_, err = repo.CancelStaleTestOrders(ctx, time.Hour)
 		assert.ErrorContains(t, err, "failed to cancel stale test orders")
 		_, err = repo.FindStatusHistoryByOrderID(ctx, id)
@@ -69,7 +70,7 @@ func TestOrderRepositoryDatabaseFailures(t *testing.T) {
 
 	t.Run("DeleteOrder rolls back when removing the lines fails", func(t *testing.T) {
 		saved := e.save(t, e.newOrder(domain.OrderStatusPending, nil), e.line(salmon, 1, "12.50", "12.50"))
-		require.NoError(t, e.repo.InsertStatusHistory(e.ctx, saved.ID, domain.OrderStatusPending))
+		e.mustInsertHistory(t, saved.ID, domain.OrderStatusPending)
 		failingTrigger(t, "order_product", "DELETE", false)
 		err := e.repo.DeleteOrder(e.ctx, saved.ID)
 		require.ErrorContains(t, err, "failed to delete order products")
@@ -78,7 +79,7 @@ func TestOrderRepositoryDatabaseFailures(t *testing.T) {
 
 	t.Run("DeleteOrder reports a failure removing the history", func(t *testing.T) {
 		saved := e.save(t, e.newOrder(domain.OrderStatusPending, nil))
-		require.NoError(t, e.repo.InsertStatusHistory(e.ctx, saved.ID, domain.OrderStatusPending))
+		e.mustInsertHistory(t, saved.ID, domain.OrderStatusPending)
 		failingTrigger(t, "order_status_history", "DELETE", false)
 		require.ErrorContains(t, e.repo.DeleteOrder(e.ctx, saved.ID), "failed to delete status history")
 	})
