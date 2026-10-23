@@ -348,7 +348,6 @@ func TestInventoryBaselinePushesTheShopsSoldOutProductsOnce(t *testing.T) {
 	// HubRise already knows both.
 	tuna := ie.catalogLink(domain.EntityProduct, refTuna)
 	require.NoError(t, ie.mod.CatalogLinks.SetCatalogDisabled(t.Context(), tuna.ID, true))
-	ie.setAvailable(ie.fx.GreenTea.ID, false)
 	tea := ie.catalogLink(domain.EntityProduct, refTea)
 	_, err := ie.mod.Availability.TakeOver(t.Context(), tea, domain.InventoryState{SyncedAt: ie.clock.Now()})
 	require.NoError(t, err)

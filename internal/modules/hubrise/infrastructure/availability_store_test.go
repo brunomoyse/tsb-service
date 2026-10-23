@@ -115,11 +115,35 @@ func TestAvailabilityStore(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("a product that was already unavailable is taken over without a change", func(t *testing.T) {
+	t.Run("a product staff sold out by hand is not taken over", func(t *testing.T) {
 		l := e.link(t, links, domain.EntityProduct, e.fx.TunaSushi.ID, "SKU-2") // unavailable since the first subtest
 		ch, err := store.TakeOver(ctx, l, state)
 		require.NoError(t, err)
+		assert.Equal(t, domain.InventoryChange{}, ch, "refused: the row stays theirs")
+		got, err := links.FindByKey(ctx, domain.EntityProduct, "SKU-2")
+		require.NoError(t, err)
+		assert.False(t, got.InventorySoldOut, "the flip was rolled back")
+		assert.Nil(t, got.Stock)
+		assert.False(t, e.available(t, "products", e.fx.TunaSushi.ID))
+	})
+
+	t.Run("a product HubRise disabled is taken over without a change", func(t *testing.T) {
+		l, err := links.FindByKey(ctx, domain.EntityProduct, "SKU-2")
+		require.NoError(t, err)
+		require.NoError(t, links.SetCatalogDisabled(ctx, l.ID, true))
+		ch, err := store.TakeOver(ctx, l, state)
+		require.NoError(t, err)
 		assert.Equal(t, domain.InventoryChange{Done: true, Changed: false, ProductID: e.fx.TunaSushi.ID}, ch)
+	})
+
+	t.Run("a choice staff sold out by hand is not taken over", func(t *testing.T) {
+		_, id := e.newChoice(t)
+		_, err := e.db.ExecContext(ctx, `UPDATE product_choices SET is_available = false WHERE id = $1`, id)
+		require.NoError(t, err)
+		l := e.link(t, links, domain.EntityChoice, id, "SKU-1|L|HAND")
+		ch, err := store.TakeOver(ctx, l, state)
+		require.NoError(t, err)
+		assert.Equal(t, domain.InventoryChange{}, ch)
 	})
 
 	t.Run("choices are switched and report their product", func(t *testing.T) {

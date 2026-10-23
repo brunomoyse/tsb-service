@@ -626,6 +626,10 @@ func (w *OutboxWorker) sendInventory(ctx context.Context, b *batch, item domain.
 		w.park(ctx, item, "unreadable inventory payload")
 		return
 	}
+	if !b.conn.SyncInventory {
+		w.skip(ctx, item, "inventory sync is off") // switched off since the toggle queued the row
+		return
+	}
 	link, err := w.d.Links.FindByLocal(ctx, domain.EntityProduct, payload.ProductID)
 	if errors.Is(err, domain.ErrNotFound) {
 		w.skip(ctx, item, "the product is no longer linked")

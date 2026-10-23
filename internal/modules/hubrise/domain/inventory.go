@@ -58,7 +58,8 @@ type AvailabilityStore interface {
 	Availability(ctx context.Context, t EntityType, ids []uuid.UUID) (map[uuid.UUID]Availability, error)
 	// TakeOver marks the link as sold out by inventory (the provenance flag, the stock, the expiry
 	// in st) and makes the local row unavailable, in one transaction. It does nothing (Done false)
-	// when the link already owns the sold-out state.
+	// when the link already owns the sold-out state, or when the local row is unavailable although
+	// HubRise does not disable it (staff sold it out by hand since it was read): that stays theirs.
 	TakeOver(ctx context.Context, link *CatalogLink, st InventoryState) (InventoryChange, error)
 	// Release gives a sold-out link back (clears the provenance flag and the expiry, stores the stock
 	// in st) and makes the local row available again unless HubRise restrictions disable it, in one

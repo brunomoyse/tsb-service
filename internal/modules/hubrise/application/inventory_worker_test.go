@@ -1,6 +1,7 @@
 package application_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -189,4 +190,38 @@ func TestInventoryFirstEnableBaselineEndToEnd(t *testing.T) {
 	assert.Equal(t, application.InventoryResult{}, ie.sync())
 	assert.Zero(t, ie.inventoryWrites())
 	assert.False(t, ie.available(ie.fx.SalmonSushi.ID))
+}
+
+// flipOutbox switches inventory sync off right after a claim: the window in which the owner can turn
+// the sync off under rows that are already leased.
+type flipOutbox struct {
+	domain.OutboxRepository
+	off func()
+}
+
+func (f flipOutbox) Claim(ctx context.Context, now time.Time, lease time.Duration, limit int, kinds ...domain.OutboxKind) ([]domain.OutboxItem, error) {
+	items, err := f.OutboxRepository.Claim(ctx, now, lease, limit, kinds...)
+	f.off()
+	return items, err
+}
+
+func TestInventoryWorkerSkipsARowOnceInventorySyncIsOff(t *testing.T) {
+	ie := newInvEnv(t)
+	ie.linkAll()
+	ie.stampBaseline()
+	w := application.NewOutboxWorker(application.WorkerDeps{
+		Connections: ie.mod.Connections, Orders: ie.mod.Orders, Links: ie.mod.CatalogLinks,
+		Outbox:       flipOutbox{ie.mod.Outbox, func() { ie.exec(`UPDATE hubrise_connection SET sync_inventory = false`) }},
+		Availability: ie.mod.Availability, Source: ie.mod.Source, Clock: ie.clock, Clients: ie.opts.Clients,
+	})
+	id := ie.inventoryRow(inventoryPayload(ie.fx.SalmonSushi.ID, refSalmon))
+	before := len(ie.srv.Requests())
+
+	n, err := w.DrainOnce(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+	got := ie.rowState(id)
+	assert.Equal(t, domain.OutboxSkipped, got.State)
+	assert.Contains(t, *got.LastError, "inventory sync is off")
+	assert.Len(t, ie.srv.Requests(), before, "nothing was sent")
 }

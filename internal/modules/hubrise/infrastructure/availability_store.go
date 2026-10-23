@@ -23,9 +23,9 @@ func NewAvailabilityStore(db *sqlx.DB) domain.AvailabilityStore {
 
 // availabilityTargets maps an entity type to the table that holds its availability. The names are
 // constants, never user input. A choice has no updated_at column.
-var availabilityTargets = map[domain.EntityType]struct{ table, touched string }{
-	domain.EntityProduct: {"products", ", updated_at = now()"},
-	domain.EntityChoice:  {"product_choices", ""},
+var availabilityTargets = map[domain.EntityType]struct{ table, productColumn, touched string }{
+	domain.EntityProduct: {"products", "id", ", updated_at = now()"},
+	domain.EntityChoice:  {"product_choices", "product_id", ""},
 }
 
 func (s *availabilityStore) Availability(ctx context.Context, t domain.EntityType, ids []uuid.UUID) (map[uuid.UUID]domain.Availability, error) {
@@ -74,7 +74,8 @@ func (s *availabilityStore) Release(ctx context.Context, link *domain.CatalogLin
 // switchLink flips the provenance flag with a compare-and-set statement (flip, whose $1 is the link,
 // $2 the expiry, $3 the stock and $4 the sync time, and which returns the link's catalog_disabled)
 // and, when it won, the availability of the local row, in one transaction. A released row becomes
-// available unless HubRise restrictions disable its entry; a taken over one becomes unavailable.
+// available unless HubRise restrictions disable its entry; a taken over one becomes unavailable,
+// unless staff sold the row out meanwhile (the take-over is then refused).
 func (s *availabilityStore) switchLink(ctx context.Context, what string, link *domain.CatalogLink, st domain.InventoryState, flip string, release bool) (domain.InventoryChange, error) {
 	target, ok := availabilityTargets[link.EntityType]
 	if !ok {
@@ -98,13 +99,23 @@ func (s *availabilityStore) switchLink(ctx context.Context, what string, link *d
 		return fail(err)
 	}
 
-	productID := link.LocalID()
-	if link.EntityType == domain.EntityChoice {
-		// The link has a foreign key on the choice, so the choice is there.
-		if err = tx.GetContext(ctx, &productID, `SELECT product_id FROM product_choices WHERE id = $1`, link.LocalID()); err != nil {
-			return fail(err)
-		}
+	// Lock the local row. Sync read it as available some time ago and holds no lock against staff: a
+	// row staff sold out by hand in between stays theirs (the provenance flag would otherwise let a
+	// later stock or the expiry make it available against their intent). A row HubRise restrictions
+	// disable is unavailable for a reason that is taken over with it.
+	var row struct {
+		Available bool      `db:"is_available"`
+		ProductID uuid.UUID `db:"product_id"`
 	}
+	// The link has a foreign key on the row, so it is there.
+	if err = tx.GetContext(ctx, &row, fmt.Sprintf(`SELECT is_available, %s AS product_id FROM %s WHERE id = $1 FOR UPDATE`,
+		target.productColumn, target.table), link.LocalID()); err != nil {
+		return fail(err)
+	}
+	if !release && !row.Available && !disabled {
+		return domain.InventoryChange{}, nil // the deferred rollback undoes the flip
+	}
+
 	res, err := tx.ExecContext(ctx, fmt.Sprintf(`UPDATE %s SET is_available = $2%s WHERE id = $1 AND is_available <> $2`,
 		target.table, target.touched), link.LocalID(), release && !disabled)
 	if err != nil {
@@ -114,5 +125,5 @@ func (s *availabilityStore) switchLink(ctx context.Context, what string, link *d
 	if err := tx.Commit(); err != nil {
 		return fail(err)
 	}
-	return domain.InventoryChange{Done: true, Changed: changed > 0, ProductID: productID}, nil
+	return domain.InventoryChange{Done: true, Changed: changed > 0, ProductID: row.ProductID}, nil
 }
