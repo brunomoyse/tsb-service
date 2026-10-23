@@ -1,0 +1,38 @@
+query Product($id: ID!) {
+    product(id: $id) {
+      id
+      name
+      description
+      price
+      slug
+      isAvailable
+      category {
+        name
+        slug
+      }
+      choices {
+        id
+        productId
+        choiceGroupId
+        priceModifier
+        sortOrder
+        name
+      }
+      choiceGroups {
+        id
+        productId
+        minSelections
+        maxSelections
+        sortOrder
+        name
+        choices {
+          id
+          productId
+          choiceGroupId
+          priceModifier
+          sortOrder
+          name
+        }
+      }
+    }
+  }

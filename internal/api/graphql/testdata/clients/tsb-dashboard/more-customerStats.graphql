@@ -1,0 +1,10 @@
+query MoreCounts {
+    customerStats {
+      summary {
+        totalCustomers
+      }
+    }
+    coupons {
+      status
+    }
+  }

@@ -1,0 +1,21 @@
+query QuoteOrder($input: QuoteOrderInput!) {
+        quoteOrder(input: $input) {
+            subtotal
+            deliveryFee
+            pickupDiscount
+            couponDiscount
+            onlineFee
+            total
+            coupon { code valid errorCode }
+            issues { code minimum }
+            lines {
+                productId
+                quantity
+                productPrice
+                unitPrice
+                lineTotal
+                selections { groupId choiceId quantity priceModifier }
+                issues { code currentPrice }
+            }
+        }
+    }

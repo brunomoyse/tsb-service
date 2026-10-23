@@ -1,0 +1,20 @@
+query OrderHistory($input: OrderHistoryInput) {
+    orderHistory(input: $input) {
+      summary {
+        totalOrders
+        totalRevenue
+        averageOrder
+      }
+      orders {
+        id
+        createdAt
+        status
+        type
+        totalPrice
+        displayCustomerName
+        items {
+          quantity
+        }
+      }
+    }
+  }

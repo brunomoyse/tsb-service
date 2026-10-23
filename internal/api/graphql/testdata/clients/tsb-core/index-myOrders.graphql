@@ -1,0 +1,6 @@
+query {
+    myOrders(first: 5) {
+      id
+      status
+    }
+  }

@@ -1,0 +1,9 @@
+query ProductChoiceNames($id: ID!) {
+    product(id: $id) {
+        id
+        choices {
+            id
+            name
+        }
+    }
+}

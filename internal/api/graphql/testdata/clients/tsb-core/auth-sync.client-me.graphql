@@ -1,0 +1,20 @@
+query AuthSyncMe {
+    me {
+      id
+      email
+      firstName
+      lastName
+      phoneNumber
+      notifyMarketing
+      notifyOrderUpdates
+      deletionRequestedAt
+      address {
+        id
+        streetName
+        houseNumber
+        municipalityName
+        postcode
+        distance
+      }
+    }
+  }

@@ -1,0 +1,21 @@
+query Me {
+    me {
+      id
+      email
+      firstName
+      lastName
+      phoneNumber
+      notifyMarketing
+      notifyOrderUpdates
+      deletionRequestedAt
+      address {
+        id
+        streetName
+        houseNumber
+        boxNumber
+        postcode
+        municipalityName
+        distance
+      }
+    }
+  }

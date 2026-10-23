@@ -1,0 +1,6 @@
+query PopularProducts {
+    popularProducts {
+      productId
+      orderCount
+    }
+  }

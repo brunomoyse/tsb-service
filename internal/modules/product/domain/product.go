@@ -109,6 +109,9 @@ func (g *ProductChoiceGroup) GetTranslationFor(locale string) string {
 // is unique, so two products cannot share a French name within one category.
 var ErrDuplicateProductName = errors.New("a product with this name already exists in this category")
 
+// ErrProductNotFound is returned when no product has the requested id.
+var ErrProductNotFound = errors.New("product not found")
+
 func NewProduct(price decimal.Decimal, categoryID uuid.UUID, isVisible bool, isAvailable bool, vatCategory VatCategory, translations []Translation) (*Product, error) {
 	if isVisible {
 		// For visible products, require at least 3 translations.

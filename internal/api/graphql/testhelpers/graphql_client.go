@@ -52,6 +52,7 @@ func NewGraphQLTestClient(r *resolver.Resolver, jwtSecret string) *GraphQLTestCl
 		ctx = paymentApplication.AttachDataLoaders(ctx, r.PaymentService)
 		ctx = orderApplication.AttachDataLoaders(ctx, r.OrderService)
 		ctx = userApplication.AttachDataLoaders(ctx, r.UserService)
+		ctx = resolver.AttachHubriseLoaders(ctx, r)
 
 		// Extract Authorization header and set user context if present
 		authHeader := req.Header.Get("Authorization")

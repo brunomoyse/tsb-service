@@ -1,0 +1,6 @@
+query MyOrderedProducts {
+    myOrderedProducts {
+      productId
+      orderCount
+    }
+  }

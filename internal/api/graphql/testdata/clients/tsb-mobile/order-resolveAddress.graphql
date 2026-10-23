@@ -1,0 +1,11 @@
+query ResolveAddress($placeId: String!, $sessionToken: String!) {
+    resolveAddress(placeId: $placeId, sessionToken: $sessionToken) {
+      id
+      streetName
+      houseNumber
+      boxNumber
+      postcode
+      municipalityName
+      distance
+    }
+  }

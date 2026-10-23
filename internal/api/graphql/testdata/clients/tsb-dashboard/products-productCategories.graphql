@@ -1,0 +1,13 @@
+query {
+    productCategories {
+      id
+      name
+      order
+      slug
+      translations {
+        language
+        name
+        description
+      }
+    }
+  }

@@ -1,0 +1,13 @@
+query RestaurantConfig {
+    restaurantConfig {
+      orderingEnabled
+      isOrderingCurrentlyOpen
+      preparationMinutes
+      availableSlotsToday {
+        label
+        value
+        isLunchOnlyAllowed
+      }
+      nextOpeningAt
+    }
+  }

@@ -1,0 +1,233 @@
+[
+  {
+    "file": "tsb-core/useMenuPickCounts-popularProducts.graphql",
+    "source": "tsb-core/layers/engine/composables/useMenuPickCounts.ts",
+    "variables": null
+  },
+  {
+    "file": "tsb-core/useMenuPickCounts-myOrderedProducts.graphql",
+    "source": "tsb-core/layers/engine/composables/useMenuPickCounts.ts",
+    "variables": null
+  },
+  {
+    "file": "tsb-core/useAuthCallback-me.graphql",
+    "source": "tsb-core/layers/engine/composables/useAuthCallback.ts",
+    "variables": null
+  },
+  {
+    "file": "tsb-core/useAuthCallback-restaurantConfig.graphql",
+    "source": "tsb-core/layers/engine/composables/useAuthCallback.ts",
+    "variables": null
+  },
+  {
+    "file": "tsb-core/useAddressAutocomplete-autocompleteAddresses.graphql",
+    "source": "tsb-core/layers/engine/composables/useAddressAutocomplete.ts",
+    "variables": {
+      "input": "rue de la",
+      "sessionToken": "session-1"
+    }
+  },
+  {
+    "file": "tsb-core/useAddressAutocomplete-resolveAddress.graphql",
+    "source": "tsb-core/layers/engine/composables/useAddressAutocomplete.ts",
+    "variables": {
+      "placeId": "place-1",
+      "sessionToken": "session-1"
+    }
+  },
+  {
+    "file": "tsb-core/useCouponCode-validateCoupon.graphql",
+    "source": "tsb-core/layers/engine/composables/useCouponCode.ts",
+    "variables": {
+      "code": "SAKURA5",
+      "orderAmount": "20.00"
+    }
+  },
+  {
+    "file": "tsb-core/useCouponCode-validateCoupon-2.graphql",
+    "source": "tsb-core/layers/engine/composables/useCouponCode.ts",
+    "variables": {
+      "code": "SAKURA5",
+      "orderAmount": "20.00"
+    }
+  },
+  {
+    "file": "tsb-core/auth-sync.client-me.graphql",
+    "source": "tsb-core/layers/engine/plugins/auth-sync.client.ts",
+    "variables": null
+  },
+  {
+    "file": "tsb-core/orderQuote-quoteOrder.graphql",
+    "source": "tsb-core/layers/engine/utils/orderQuote.ts",
+    "variables": {
+      "input": {
+        "orderType": "PICKUP",
+        "isOnlinePayment": false,
+        "items": [
+          {
+            "productId": "{{salmon}}",
+            "quantity": 2
+          }
+        ]
+      }
+    }
+  },
+  {
+    "file": "tsb-core/index-myOrders.graphql",
+    "source": "tsb-core/layers/engine/pages/me/index.vue",
+    "variables": null
+  },
+  {
+    "file": "tsb-core/ProductModal-product.graphql",
+    "source": "tsb-core/apps/tokyosushi/components/menu/ProductModal.vue",
+    "variables": {
+      "id": "{{salmon}}"
+    }
+  },
+  {
+    "file": "tsb-core/menu-productCategories.graphql",
+    "source": "tsb-core/apps/tokyosushi/pages/menu.vue",
+    "variables": null
+  },
+  {
+    "file": "tsb-core/BowlComposer-product.graphql",
+    "source": "tsb-core/apps/ygfliege/components/menu/BowlComposer.vue",
+    "variables": {
+      "id": "{{salmon}}"
+    }
+  },
+  {
+    "file": "tsb-core/index-productCategories.graphql",
+    "source": "tsb-core/apps/ygfliege/pages/index.vue",
+    "variables": null
+  },
+  {
+    "file": "tsb-dashboard/useOrderingStatus-restaurantConfig.graphql",
+    "source": "tsb-dashboard/composables/useOrderingStatus.ts",
+    "variables": null
+  },
+  {
+    "file": "tsb-dashboard/useAuthCallback-me.graphql",
+    "source": "tsb-dashboard/composables/useAuthCallback.ts",
+    "variables": null
+  },
+  {
+    "file": "tsb-dashboard/useOrderActions-order.graphql",
+    "source": "tsb-dashboard/composables/useOrderActions.ts",
+    "variables": {
+      "id": "{{order}}"
+    }
+  },
+  {
+    "file": "tsb-dashboard/settings-restaurantConfig.graphql",
+    "source": "tsb-dashboard/pages/settings.vue",
+    "variables": null
+  },
+  {
+    "file": "tsb-dashboard/settings-scheduleOverrides.graphql",
+    "source": "tsb-dashboard/pages/settings.vue",
+    "variables": {
+      "from": "2026-01-01T00:00:00Z",
+      "to": "2026-12-31T00:00:00Z"
+    }
+  },
+  {
+    "file": "tsb-dashboard/order-history-orderHistory.graphql",
+    "source": "tsb-dashboard/pages/order-history.vue",
+    "variables": null
+  },
+  {
+    "file": "tsb-dashboard/coupons-coupons.graphql",
+    "source": "tsb-dashboard/pages/coupons.vue",
+    "variables": null
+  },
+  {
+    "file": "tsb-dashboard/orders-orders.graphql",
+    "source": "tsb-dashboard/pages/orders.vue",
+    "variables": null
+  },
+  {
+    "file": "tsb-dashboard/products-products.graphql",
+    "source": "tsb-dashboard/pages/products.vue",
+    "variables": null
+  },
+  {
+    "file": "tsb-dashboard/products-productCategories.graphql",
+    "source": "tsb-dashboard/pages/products.vue",
+    "variables": null
+  },
+  {
+    "file": "tsb-dashboard/more-customerStats.graphql",
+    "source": "tsb-dashboard/pages/more.vue",
+    "variables": null
+  },
+  {
+    "file": "tsb-dashboard/customers-customerStats.graphql",
+    "source": "tsb-dashboard/pages/customers.vue",
+    "variables": null
+  },
+  {
+    "file": "tsb-dashboard/customers-customerOrders.graphql",
+    "source": "tsb-dashboard/pages/customers.vue",
+    "variables": {
+      "userId": "{{customer}}",
+      "first": 5,
+      "page": 1
+    }
+  },
+  {
+    "file": "tsb-mobile/order-restaurantConfig.graphql",
+    "source": "tsb-mobile/src/graphql/order.ts",
+    "variables": null
+  },
+  {
+    "file": "tsb-mobile/order-autocompleteAddresses.graphql",
+    "source": "tsb-mobile/src/graphql/order.ts",
+    "variables": {
+      "input": "rue de la",
+      "sessionToken": "session-1"
+    }
+  },
+  {
+    "file": "tsb-mobile/order-resolveAddress.graphql",
+    "source": "tsb-mobile/src/graphql/order.ts",
+    "variables": {
+      "placeId": "place-1",
+      "sessionToken": "session-1"
+    }
+  },
+  {
+    "file": "tsb-mobile/auth-me.graphql",
+    "source": "tsb-mobile/src/graphql/auth.ts",
+    "variables": null
+  },
+  {
+    "file": "tsb-mobile/catalog-productCategories.graphql",
+    "source": "tsb-mobile/src/graphql/catalog.ts",
+    "variables": null
+  },
+  {
+    "file": "tsb-mobile/catalog-product.graphql",
+    "source": "tsb-mobile/src/graphql/catalog.ts",
+    "variables": {
+      "id": "{{salmon}}"
+    }
+  },
+  {
+    "file": "tsb-pos-android/Orders-orders.graphql",
+    "source": "moyun-handheld/app/src/main/graphql/dev/nuagemagique/pos/graphql/operations/Orders.graphql",
+    "variables": null
+  },
+  {
+    "file": "tsb-pos-android/Orders-me.graphql",
+    "source": "moyun-handheld/app/src/main/graphql/dev/nuagemagique/pos/graphql/operations/Orders.graphql",
+    "variables": null
+  },
+  {
+    "file": "tsb-pos-android/Products-product.graphql",
+    "source": "moyun-handheld/app/src/main/graphql/dev/nuagemagique/pos/graphql/operations/Products.graphql",
+    "variables": {
+      "id": "{{salmon}}"
+    }
+  }
+]

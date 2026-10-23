@@ -1,0 +1,8 @@
+query ($input: String!, $sessionToken: String!) {
+    autocompleteAddresses(input: $input, sessionToken: $sessionToken) {
+      placeId
+      description
+      mainText
+      secondaryText
+    }
+  }

@@ -1,0 +1,18 @@
+query {
+    me {
+      id
+      email
+      firstName
+      lastName
+      phoneNumber
+      isAdmin
+      address {
+        id
+        streetName
+        houseNumber
+        municipalityName
+        postcode
+        distance
+      }
+    }
+  }

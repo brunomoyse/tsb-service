@@ -294,7 +294,7 @@ func (r *ProductRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain
 		return nil, err
 	}
 	if len(products) == 0 {
-		return nil, errors.New("product not found")
+		return nil, domain.ErrProductNotFound
 	}
 	return products[0], nil
 }

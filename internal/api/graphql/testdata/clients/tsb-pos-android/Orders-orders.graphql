@@ -1,0 +1,75 @@
+query Orders {
+    orders {
+        ...OrderFull
+    }
+}
+
+fragment OrderFull on Order {
+    id
+    createdAt
+    updatedAt
+    status
+    type
+    isOnlinePayment
+    couponCode
+    discountAmount
+    deliveryFee
+    transactionFee
+    totalPrice
+    preferredReadyTime
+    estimatedReadyTime
+    addressExtra
+    orderNote
+    orderExtra
+    cashPaymentAmount
+    isManualAddress
+    displayCustomerName
+    displayAddress
+    address {
+        id
+        streetName
+        houseNumber
+        boxNumber
+        municipalityName
+        postcode
+        distance
+    }
+    customer {
+        id
+        firstName
+        lastName
+        phoneNumber
+    }
+    payment {
+        status
+        paidAt
+    }
+    items {
+        unitPrice
+        quantity
+        totalPrice
+        vatRateApplied
+        product {
+            id
+            code
+            name
+            translations {
+                language
+                name
+            }
+            vatCategory
+            category {
+                id
+                name
+            }
+        }
+        choice {
+            id
+            name
+        }
+        selections {
+            choiceId
+            quantity
+        }
+    }
+}

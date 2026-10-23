@@ -1,0 +1,40 @@
+query {
+    products {
+      id
+      price
+      code
+      slug
+      pieceCount
+      isVisible
+      isAvailable
+      isHalal
+      isLunchOnly
+      isSpicy
+      isVegetarian
+      isDiscountable
+      vatCategory
+      name
+      description
+      category {
+        id
+        name
+      }
+      choices {
+        id
+        productId
+        choiceGroupId
+        priceModifier
+        sortOrder
+        name
+        translations {
+          locale
+          name
+        }
+      }
+      translations {
+        language
+        name
+        description
+      }
+    }
+  }

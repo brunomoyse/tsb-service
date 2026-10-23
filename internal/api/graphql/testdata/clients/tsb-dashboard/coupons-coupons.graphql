@@ -1,0 +1,18 @@
+query {
+    coupons {
+      id
+      code
+      discountType
+      discountValue
+      minOrderAmount
+      maxUses
+      maxUsesPerUser
+      usedCount
+      isActive
+      appOnly
+      status
+      validFrom
+      validUntil
+      createdAt
+    }
+  }

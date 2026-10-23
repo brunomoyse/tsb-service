@@ -2,7 +2,6 @@ package resolver
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"tsb-service/internal/api/graphql/model"
 	hubriseApplication "tsb-service/internal/modules/hubrise/application"
 	hubriseDomain "tsb-service/internal/modules/hubrise/domain"
+	productDomain "tsb-service/internal/modules/product/domain"
 	"tsb-service/pkg/db"
 	pkghubrise "tsb-service/pkg/hubrise"
 	"tsb-service/pkg/logging"
@@ -237,11 +237,9 @@ func (r *Resolver) linkHubriseProduct(ctx context.Context, productID uuid.UUID, 
 	if err != nil {
 		return false, err
 	}
-	p, err := r.ProductService.GetProduct(ctx, productID)
-	if (err != nil && errors.Is(err, sql.ErrNoRows)) || (err == nil && p == nil) {
+	if _, err := r.ProductService.GetProduct(ctx, productID); errors.Is(err, productDomain.ErrProductNotFound) {
 		return false, apperr.New(apperr.CodeProductNotFound, "the product does not exist").With("productId", productID.String())
-	}
-	if err != nil {
+	} else if err != nil {
 		return false, err
 	}
 	if err := admin.LinkProduct(ctx, productID, skuRef); err != nil {
