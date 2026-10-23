@@ -146,7 +146,7 @@ func (e *covEnv) orderStatus(t *testing.T, id string) string {
 func (e *covEnv) webhook() func(payID string) *httptest.ResponseRecorder {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.POST("/webhook", paymentInterfaces.NewPaymentHandler(e.Resolver.PaymentService, e.Resolver.Broker, nil).UpdatePaymentStatusHandler)
+	router.POST("/webhook", paymentInterfaces.NewPaymentHandler(e.Resolver.PaymentService, e.Resolver.Broker, nil, nil).UpdatePaymentStatusHandler)
 	return func(payID string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodPost, "/webhook", strings.NewReader("id="+payID))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

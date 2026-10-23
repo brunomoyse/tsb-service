@@ -68,7 +68,8 @@ type OutboxCounts struct {
 
 // OutboxRepository is the durable queue of everything that leaves for HubRise.
 type OutboxRepository interface {
-	// Enqueue inserts the item. An inventory item whose dedupe key already has a pending row
+	// Enqueue inserts the item (its CreatedAt is stored when set, so the age of a row follows the
+	// application clock; the database clock otherwise). An inventory item whose dedupe key already has a pending row
 	// replaces that row's payload and due time instead (latest state wins). merged reports that
 	// case; the returned id is the row's.
 	Enqueue(ctx context.Context, item OutboxItem) (id int64, merged bool, err error)
@@ -76,8 +77,9 @@ type OutboxRepository interface {
 	// attempts and sets the lease, in one statement. Pending rows are due when next_attempt_at has
 	// passed; sending rows whose lease expired are reclaimed. Only the first row of an order (or
 	// of a dedupe key) is claimable, and only while the connection is active with the matching
-	// feature toggle on.
-	Claim(ctx context.Context, now time.Time, lease time.Duration, limit int) ([]OutboxItem, error)
+	// feature toggle on. When kinds is not empty only rows of those kinds are claimed (a worker
+	// that handles some kinds must never lease the others).
+	Claim(ctx context.Context, now time.Time, lease time.Duration, limit int, kinds ...OutboxKind) ([]OutboxItem, error)
 	// MarkSent completes a claimed row; false when it was no longer sending.
 	MarkSent(ctx context.Context, id int64, now time.Time) (bool, error)
 	// MarkParked parks a claimed row with the reason; false when it was no longer sending.
@@ -93,6 +95,14 @@ type OutboxRepository interface {
 	List(ctx context.Context, state *OutboxState, limit int) ([]OutboxItem, error)
 	// Counts summarizes the backlog.
 	Counts(ctx context.Context) (OutboxCounts, error)
+	// MaxPendingID returns the highest id among the pending rows of the order with the kind, 0
+	// when there is none.
+	MaxPendingID(ctx context.Context, orderID uuid.UUID, kind OutboxKind) (int64, error)
+	// SkipPendingUpTo skips the pending rows of the order with the kind whose id is at most upTo,
+	// with the reason, and returns how many.
+	SkipPendingUpTo(ctx context.Context, orderID uuid.UUID, kind OutboxKind, upTo int64, reason string) (int64, error)
+	// CountForOrder counts the rows of the order with the kind, in any state.
+	CountForOrder(ctx context.Context, orderID uuid.UUID, kind OutboxKind) (int, error)
 	// RetryParked reactivates the whole parked chain of the order of row id (all its parked rows),
 	// or, for an inventory row, the parked rows of its dedupe key. Parked inventory rows replaced by a
 	// newer pending, sending or parked row of the same key are skipped instead (only the newest state

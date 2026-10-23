@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 
 	"tsb-service/internal/modules/hubrise/domain"
@@ -43,7 +44,7 @@ func (r *orderLinkRepository) EnqueueCreate(ctx context.Context, orderID uuid.UU
 		return false, nil
 	}
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO hubrise_outbox (kind, order_id, payload, next_attempt_at) VALUES ('order_create', $1, $2, $3)`,
+		`INSERT INTO hubrise_outbox (kind, order_id, payload, next_attempt_at, created_at) VALUES ('order_create', $1, $2, $3, $3)`,
 		orderID, []byte(payload), due); err != nil {
 		return false, fmt.Errorf("hubrise: enqueue order create: %w", err)
 	}
@@ -110,6 +111,57 @@ func (r *orderLinkRepository) SetRemoteTotal(ctx context.Context, orderID uuid.U
 func (r *orderLinkRepository) SetNeedsAttention(ctx context.Context, orderID uuid.UUID, code string) error {
 	return r.mustChange(ctx, "set needs attention",
 		`UPDATE hubrise_orders SET needs_attention = NULLIF($2, ''), updated_at = now() WHERE order_id = $1`, orderID, code)
+}
+
+func (r *orderLinkRepository) FlagAttention(ctx context.Context, orderID uuid.UUID, code string) error {
+	return r.exec(ctx, "flag attention",
+		`UPDATE hubrise_orders SET needs_attention = $2, updated_at = now() WHERE order_id = $1 AND needs_attention IS NULL`, orderID, code)
+}
+
+func (r *orderLinkRepository) ClearAttention(ctx context.Context, orderID uuid.UUID, codes ...string) error {
+	return r.exec(ctx, "clear attention",
+		`UPDATE hubrise_orders SET needs_attention = NULL, updated_at = now() WHERE order_id = $1 AND needs_attention = ANY($2)`,
+		orderID, pq.Array(codes))
+}
+
+func (r *orderLinkRepository) StampRemoteRead(ctx context.Context, orderID uuid.UUID, at time.Time) error {
+	return r.mustChange(ctx, "stamp remote read",
+		`UPDATE hubrise_orders SET last_remote_event_at = $2, updated_at = now() WHERE order_id = $1`, orderID, at)
+}
+
+func (r *orderLinkRepository) Recreate(ctx context.Context, orderID uuid.UUID, payload json.RawMessage, due time.Time) error {
+	if len(payload) == 0 {
+		payload = json.RawMessage(`{}`)
+	}
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("hubrise: recreate order: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE hubrise_outbox SET state = 'skipped', leased_until = NULL, last_error = 'covered by the re-created order'
+		WHERE order_id = $1 AND kind = 'order_status' AND state IN ('pending', 'sending')`, orderID); err != nil {
+		return fmt.Errorf("hubrise: recreate order: %w", err)
+	}
+	res, err := tx.ExecContext(ctx, `
+		UPDATE hubrise_orders SET hubrise_order_id = NULL, push_state = 'pending', pushed_at = NULL,
+			last_remote_status = NULL, last_remote_event_at = NULL, remote_total = NULL, updated_at = now()
+		WHERE order_id = $1`, orderID)
+	if err != nil {
+		return fmt.Errorf("hubrise: recreate order: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 { // lib/pq always reports it
+		return domain.ErrNotFound
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO hubrise_outbox (kind, order_id, payload, next_attempt_at, created_at) VALUES ('order_create', $1, $2, $3, $3)`,
+		orderID, []byte(payload), due); err != nil {
+		return fmt.Errorf("hubrise: recreate order: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("hubrise: recreate order: %w", err)
+	}
+	return nil
 }
 
 func (r *orderLinkRepository) CountNeedsAttention(ctx context.Context) (int, error) {

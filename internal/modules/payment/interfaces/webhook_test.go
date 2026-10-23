@@ -428,7 +428,7 @@ func newWebhookEnv(t *testing.T, orderStatus orderDomain.OrderStatus, paymentSta
 	broker := pubsub.NewBroker()
 	t.Cleanup(broker.Shutdown)
 	notifier := &countingNotifier{}
-	h := NewPaymentHandler(paySvc, broker, notifier)
+	h := NewPaymentHandler(paySvc, broker, notifier, nil)
 
 	router := gin.New()
 	router.POST("/webhook", h.UpdatePaymentStatusHandler)
@@ -639,7 +639,7 @@ func TestWebhook_Paid_NilNotifierDoesNotPanic(t *testing.T) {
 	broker := pubsub.NewBroker()
 	t.Cleanup(broker.Shutdown)
 	router := gin.New()
-	router.POST("/webhook", NewPaymentHandler(buildService(e), broker, nil).UpdatePaymentStatusHandler)
+	router.POST("/webhook", NewPaymentHandler(buildService(e), broker, nil, nil).UpdatePaymentStatusHandler)
 	e.router = router
 	e.mollie.set("paid")
 	e.expect(e.deliver("tr_1"), http.StatusOK, "processed")

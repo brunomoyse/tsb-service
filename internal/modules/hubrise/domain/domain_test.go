@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -209,5 +210,38 @@ func TestNewOutboxItem(t *testing.T) {
 	it = domain.NewOutboxItem(domain.OutboxInventory, nil, "inv:sku:A", json.RawMessage(`{"a":1}`), due)
 	if it.DedupeKey == nil || *it.DedupeKey != "inv:sku:A" || string(it.Payload) != `{"a":1}` || it.OrderID != nil {
 		t.Errorf("item = %+v", it)
+	}
+}
+
+func TestIsTerminalLocal(t *testing.T) {
+	for _, s := range []string{domain.LocalPickedUp, domain.LocalDelivered, domain.LocalCancelled, domain.LocalFailed} {
+		if !domain.IsTerminalLocal(s) {
+			t.Errorf("%s ends an order", s)
+		}
+	}
+	for _, s := range []string{domain.LocalPending, domain.LocalConfirmed, domain.LocalPreparing, domain.LocalAwaitingPickUp, domain.LocalOutForDelivery, "", "SOMETHING"} {
+		if domain.IsTerminalLocal(s) {
+			t.Errorf("%q does not end an order", s)
+		}
+	}
+}
+
+func TestCreatePayloadRoundTrips(t *testing.T) {
+	in := domain.CreatePayload{
+		Version: domain.PayloadVersion, Ref: "AB12", Total: decimal.RequireFromString("12.50"), UserID: uuid.New(),
+		Items:   []domain.PayloadItem{{ProductID: uuid.New(), ProductName: "Sushi", Price: decimal.RequireFromString("6.25"), Quantity: 2}},
+		Charges: []domain.PayloadAdjustment{{Kind: domain.AdjustmentDelivery, Name: "Livraison", Amount: decimal.RequireFromString("2.5")}},
+	}
+	raw, err := in.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out domain.CreatePayload
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Ref != in.Ref || !out.Total.Equal(in.Total) || len(out.Items) != 1 || out.Items[0].Quantity != 2 ||
+		!out.Charges[0].Amount.Equal(in.Charges[0].Amount) || out.UserID != in.UserID {
+		t.Fatalf("round trip changed the payload: %+v", out)
 	}
 }

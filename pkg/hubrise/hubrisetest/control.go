@@ -75,3 +75,21 @@ func (s *Server) OrderByPrivateRef(privateRef string) (hubrise.Order, bool) {
 	}
 	return hubrise.Order{}, false
 }
+
+// DeleteOrder removes an order, as if it had been deleted at HubRise, so that the system under test
+// meets a 404 for an order it believes it created. It reports whether the order existed.
+func (s *Server) DeleteOrder(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.orders[id] == nil {
+		return false
+	}
+	delete(s.orders, id)
+	for i, known := range s.orderID {
+		if known == id {
+			s.orderID = append(s.orderID[:i], s.orderID[i+1:]...)
+			break
+		}
+	}
+	return true
+}

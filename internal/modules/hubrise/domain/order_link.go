@@ -64,6 +64,19 @@ type OrderLinkRepository interface {
 	SetRemoteTotal(ctx context.Context, orderID uuid.UUID, total decimal.Decimal) error
 	// SetNeedsAttention flags the order for staff (empty clears the flag).
 	SetNeedsAttention(ctx context.Context, orderID uuid.UUID, code string) error
+	// FlagAttention flags the order for staff unless it is already flagged (the first problem
+	// stays visible).
+	FlagAttention(ctx context.Context, orderID uuid.UUID, code string) error
+	// ClearAttention removes the flag when it is one of codes.
+	ClearAttention(ctx context.Context, orderID uuid.UUID, codes ...string) error
+	// StampRemoteRead records that the order was read from HubRise at the time, without touching
+	// the status (the time of remote data, see LastRemoteEventAt).
+	StampRemoteRead(ctx context.Context, orderID uuid.UUID, at time.Time) error
+	// Recreate is used when HubRise does not know an order it was sent: in one transaction it skips
+	// the status rows of the order that are still queued or sending (the new create is built with
+	// the current status, so they are covered), resets the link to pending and inserts a new
+	// order_create row.
+	Recreate(ctx context.Context, orderID uuid.UUID, payload json.RawMessage, due time.Time) error
 	// CountNeedsAttention counts the flagged orders.
 	CountNeedsAttention(ctx context.Context) (int, error)
 }

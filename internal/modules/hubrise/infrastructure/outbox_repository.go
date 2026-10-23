@@ -6,7 +6,9 @@ import (
 	"slices"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 
 	"tsb-service/internal/modules/hubrise/domain"
 )
@@ -21,6 +23,15 @@ func NewOutboxRepository(db *sqlx.DB) domain.OutboxRepository {
 	return &outboxRepository{store{db}}
 }
 
+// createdAt is the creation time to store: the item's own when the caller set one (so ages follow the
+// application clock), the database's otherwise.
+func createdAt(t time.Time) any {
+	if t.IsZero() {
+		return nil
+	}
+	return t
+}
+
 // Enqueue inserts the item. The ON CONFLICT clause names the partial unique index of pending
 // inventory rows, so any other kind (or an inventory row whose twin is already sending) just
 // inserts. xmax is non-zero only when the existing row was updated instead.
@@ -33,12 +44,12 @@ func (r *outboxRepository) Enqueue(ctx context.Context, item domain.OutboxItem) 
 		Merged bool  `db:"merged"`
 	}
 	err := r.get(ctx, "enqueue", &row, `
-		INSERT INTO hubrise_outbox (kind, order_id, dedupe_key, payload, next_attempt_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO hubrise_outbox (kind, order_id, dedupe_key, payload, next_attempt_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, COALESCE($6, now()))
 		ON CONFLICT (dedupe_key) WHERE state = 'pending' AND kind = 'inventory'
 		DO UPDATE SET payload = EXCLUDED.payload, next_attempt_at = EXCLUDED.next_attempt_at
 		RETURNING id, (xmax <> 0) AS merged`,
-		item.Kind, item.OrderID, item.DedupeKey, []byte(item.Payload), item.NextAttemptAt)
+		item.Kind, item.OrderID, item.DedupeKey, []byte(item.Payload), item.NextAttemptAt, createdAt(item.CreatedAt))
 	return row.ID, row.Merged, err
 }
 
@@ -48,7 +59,8 @@ func (r *outboxRepository) Enqueue(ctx context.Context, item domain.OutboxItem) 
 //     toggle of the row's kind on, re-read here so a disable bites on the very next claim;
 //   - due rows are pending rows whose time came and sending rows whose lease expired;
 //   - only the first row of an order (or of a dedupe key) is claimable: any earlier pending,
-//     sending or parked row of the same order blocks it, so a PATCH never overtakes its create.
+//     sending or parked row of the same order blocks it, so a PATCH never overtakes its create;
+//   - $4 lists the kinds the caller handles (NULL = all).
 const claimSQL = `
 WITH conn AS (
 	SELECT * FROM hubrise_connection
@@ -56,6 +68,7 @@ WITH conn AS (
 ), candidates AS (
 	SELECT o.id FROM hubrise_outbox o, conn c
 	WHERE ((o.state = 'pending' AND o.next_attempt_at <= $1) OR (o.state = 'sending' AND o.leased_until < $1))
+	  AND ($4::text[] IS NULL OR o.kind = ANY($4))
 	  AND CASE o.kind
 	        WHEN 'order_create' THEN c.push_orders
 	        WHEN 'order_status' THEN c.sync_status
@@ -75,9 +88,17 @@ UPDATE hubrise_outbox SET state = 'sending', attempts = attempts + 1, leased_unt
 WHERE id IN (SELECT id FROM candidates)
 RETURNING ` + outboxColumns
 
-func (r *outboxRepository) Claim(ctx context.Context, now time.Time, lease time.Duration, limit int) ([]domain.OutboxItem, error) {
+func (r *outboxRepository) Claim(ctx context.Context, now time.Time, lease time.Duration, limit int, kinds ...domain.OutboxKind) ([]domain.OutboxItem, error) {
+	var filter any // NULL claims every kind
+	if len(kinds) > 0 {
+		names := make([]string, len(kinds))
+		for i, k := range kinds {
+			names[i] = string(k)
+		}
+		filter = pq.Array(names)
+	}
 	items := []domain.OutboxItem{}
-	if err := r.sel(ctx, "claim outbox", &items, claimSQL, now, now.Add(lease), limit); err != nil {
+	if err := r.sel(ctx, "claim outbox", &items, claimSQL, now, now.Add(lease), limit, filter); err != nil {
 		return nil, err
 	}
 	slices.SortFunc(items, func(a, b domain.OutboxItem) int { return int(a.ID - b.ID) })
@@ -147,8 +168,8 @@ const supersedeParkedInventorySQL = `
 	          AND (t.state = 'pending' OR (t.id > o.id AND t.state IN ('sending', 'parked'))))`
 
 const retryParkedSQL = `
-	UPDATE hubrise_outbox o SET state = 'pending', next_attempt_at = $%d, parked_at = NULL, last_error = NULL
-	WHERE o.state = 'parked' AND %s`
+	UPDATE hubrise_outbox o SET state = 'pending', next_attempt_at = $%[1]d, created_at = $%[1]d, parked_at = NULL, last_error = NULL
+	WHERE o.state = 'parked' AND %[2]s`
 
 // retryParked supersedes, then reactivates, the parked rows matching scope. The two statements share
 // a transaction so a failure leaves the parked rows untouched. scopeArgs fill the scope placeholders
@@ -174,7 +195,8 @@ func (r *outboxRepository) retryParked(ctx context.Context, what, scope string, 
 }
 
 // RetryParked keeps attempts as they are: a row parked after it may have been sent still needs the
-// idempotency lookup on its next claim. The chain is the parked rows of the row's order or, for an
+// idempotency lookup on its next claim. It restarts the age of the rows (created_at), so a retry of a
+// row that was parked for being too old is not parked again at once. The chain is the parked rows of the row's order or, for an
 // inventory row, the parked rows of its dedupe key (of which only the newest is re-pended).
 func (r *outboxRepository) RetryParked(ctx context.Context, id int64, now time.Time) (int64, error) {
 	return r.retryParked(ctx, "retry parked chain", `
@@ -185,4 +207,24 @@ func (r *outboxRepository) RetryParked(ctx context.Context, id int64, now time.T
 
 func (r *outboxRepository) RetryAllParked(ctx context.Context, now time.Time) (int64, error) {
 	return r.retryParked(ctx, "retry all parked", `TRUE`, now)
+}
+
+func (r *outboxRepository) MaxPendingID(ctx context.Context, orderID uuid.UUID, kind domain.OutboxKind) (int64, error) {
+	var id int64
+	err := r.get(ctx, "max pending outbox id", &id,
+		`SELECT COALESCE(MAX(id), 0) FROM hubrise_outbox WHERE order_id = $1 AND kind = $2 AND state = 'pending'`, orderID, kind)
+	return id, err
+}
+
+func (r *outboxRepository) SkipPendingUpTo(ctx context.Context, orderID uuid.UUID, kind domain.OutboxKind, upTo int64, reason string) (int64, error) {
+	return r.execN(ctx, "skip covered outbox rows", `
+		UPDATE hubrise_outbox SET state = 'skipped', last_error = $4
+		WHERE order_id = $1 AND kind = $2 AND state = 'pending' AND id <= $3`, orderID, kind, upTo, reason)
+}
+
+func (r *outboxRepository) CountForOrder(ctx context.Context, orderID uuid.UUID, kind domain.OutboxKind) (int, error) {
+	var n int
+	err := r.get(ctx, "count outbox rows of an order", &n,
+		`SELECT count(*) FROM hubrise_outbox WHERE order_id = $1 AND kind = $2`, orderID, kind)
+	return n, err
 }

@@ -381,7 +381,7 @@ func main() {
 
 	// Payment webhook depends on the resolver to fan out the new-order push
 	// notification once the Mollie payment transitions to paid.
-	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, broker, rootResolver)
+	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, broker, rootResolver, rootResolver)
 	auditRecorder := audit.NewRecorder(dbPool.Admin)
 	auth.SetAuditFunc(func(c *gin.Context, action string, success bool) {
 		ctx := utils.SetClientIP(c.Request.Context(), c.ClientIP())

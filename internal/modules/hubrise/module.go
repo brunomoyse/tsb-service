@@ -9,6 +9,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
+	"tsb-service/internal/modules/hubrise/application"
 	"tsb-service/internal/modules/hubrise/domain"
 	"tsb-service/internal/modules/hubrise/infrastructure"
 	"tsb-service/internal/modules/hubrise/infrastructure/tokencrypt"
@@ -28,6 +29,7 @@ type Module struct {
 	Orders       domain.OrderLinkRepository
 	Events       domain.EventRepository
 	Foreign      domain.ForeignOrderRepository
+	Source       domain.OrderSource
 }
 
 // NewModule builds the module on the admin pool (the hubrise tables get no per-role grants). It
@@ -56,9 +58,54 @@ func NewModule(cfg Config, adminDB *sqlx.DB, clock domain.Clock) (*Module, error
 		Orders:       infrastructure.NewOrderLinkRepository(adminDB),
 		Events:       infrastructure.NewEventRepository(adminDB),
 		Foreign:      infrastructure.NewForeignOrderRepository(adminDB),
+		Source:       infrastructure.NewOrderSource(adminDB),
 	}, nil
 }
 
 // Enabled reports whether the module exists (HubRise is available on this deployment). It is safe
 // on a nil Module.
 func (m *Module) Enabled() bool { return m != nil }
+
+// PushOptions customizes NewPush; every field is optional.
+type PushOptions struct {
+	// Clients builds the API clients; the default opens the stored token against Config.APIBaseURL
+	// with the default rate limits. Production builds the limiter from Limits.Split(replicas).
+	Clients    application.ClientProvider
+	Worker     application.WorkerConfig
+	Reconciler application.ReconcilerConfig
+	// Schedule, Alerter and Remote are the optional ports of the reconciler.
+	Schedule application.Schedule
+	Alerter  application.Alerter
+	Remote   application.RemoteOrderHandler
+}
+
+// Push is the order push: the hooks that queue orders and status changes, the outbox worker that
+// sends them, and the reconciler that backs them up.
+type Push struct {
+	Pusher     *application.OrderPusher
+	Worker     *application.OutboxWorker
+	Reconciler *application.Reconciler
+}
+
+// NewPush builds the order push on the module's repositories. The worker is not started: the caller
+// runs Worker.Run and Reconciler.Run (the composition root does, once, when the module exists).
+func (m *Module) NewPush(o PushOptions) *Push {
+	clients := o.Clients
+	if clients == nil {
+		clients = application.NewPooledClients(m.Codec, m.Config.APIBaseURL, nil, nil)
+	}
+	pusher := application.NewOrderPusher(application.PusherDeps{
+		Connections: m.Connections, Orders: m.Orders, Outbox: m.Outbox, Source: m.Source, Clock: m.Clock,
+	})
+	worker := application.NewOutboxWorker(application.WorkerDeps{
+		Connections: m.Connections, Outbox: m.Outbox, Orders: m.Orders, Links: m.CatalogLinks,
+		Source: m.Source, Clients: clients, Clock: m.Clock, Config: o.Worker,
+	})
+	pusher.SetWake(worker.Wake)
+	reconciler := application.NewReconciler(application.ReconcilerDeps{
+		Connections: m.Connections, Orders: m.Orders, Source: m.Source, Leases: m.Leases, Events: m.Events,
+		Foreign: m.Foreign, OAuthStates: m.OAuthStates, Clients: clients, Pusher: pusher, Clock: m.Clock,
+		Config: o.Reconciler, Schedule: o.Schedule, Alerter: o.Alerter, Remote: o.Remote,
+	})
+	return &Push{Pusher: pusher, Worker: worker, Reconciler: reconciler}
+}

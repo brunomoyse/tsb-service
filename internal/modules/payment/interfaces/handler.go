@@ -27,14 +27,24 @@ type NewOrderNotifier interface {
 	SendNewOrderPush(order *orderDomain.Order)
 }
 
-type PaymentHandler struct {
-	service  paymentApplication.PaymentService
-	broker   *pubsub.Broker
-	notifier NewOrderNotifier
+// OrderReadyHook is told when an online-payment order becomes actionable (the Mollie payment is
+// confirmed), so an integration such as HubRise can pick it up. It is a port defined here so that the
+// payment module never imports the integration: main passes an adapter, usually the resolver, whose
+// OrderReady is a no-op when no integration is configured. A nil hook is allowed and does nothing.
+// The hook is best effort and must not fail the webhook, which has already committed the payment.
+type OrderReadyHook interface {
+	OrderReady(ctx context.Context, orderID uuid.UUID)
 }
 
-func NewPaymentHandler(service paymentApplication.PaymentService, broker *pubsub.Broker, notifier NewOrderNotifier) *PaymentHandler {
-	return &PaymentHandler{service: service, broker: broker, notifier: notifier}
+type PaymentHandler struct {
+	service    paymentApplication.PaymentService
+	broker     *pubsub.Broker
+	notifier   NewOrderNotifier
+	orderReady OrderReadyHook
+}
+
+func NewPaymentHandler(service paymentApplication.PaymentService, broker *pubsub.Broker, notifier NewOrderNotifier, orderReady OrderReadyHook) *PaymentHandler {
+	return &PaymentHandler{service: service, broker: broker, notifier: notifier, orderReady: orderReady}
 }
 
 // UpdatePaymentStatusHandler handles Mollie webhook callbacks.
@@ -150,6 +160,11 @@ func (h *PaymentHandler) UpdatePaymentStatusHandler(c *gin.Context) {
 				// admin phones and POS handhelds once the payment is confirmed.
 				if h.notifier != nil {
 					h.notifier.SendNewOrderPush(order)
+				}
+				// The order is paid, so it is now actionable for an integration. Redelivered webhooks
+				// stop at the "already processed" check above, and the hook is idempotent anyway.
+				if h.orderReady != nil {
+					h.orderReady.OrderReady(adminCtx, orderID)
 				}
 				h.sendConfirmation(adminCtx, orderID)
 			}

@@ -53,7 +53,10 @@ type dbStack struct {
 	fx       *testhelpers.TestFixtures
 }
 
-func newDBStack(t *testing.T) *dbStack {
+func newDBStack(t *testing.T) *dbStack { return newDBStackWithHook(t, nil) }
+
+// newDBStackWithHook is newDBStack with an order-ready hook (an integration) on the webhook handler.
+func newDBStackWithHook(t *testing.T, hook OrderReadyHook) *dbStack {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	tdb := testhelpers.SetupTestDatabase(t)
@@ -78,7 +81,7 @@ func newDBStack(t *testing.T) *dbStack {
 	broker := pubsub.NewBroker()
 	t.Cleanup(broker.Shutdown)
 	notifier := &countingNotifier{}
-	h := NewPaymentHandler(paySvc, broker, notifier)
+	h := NewPaymentHandler(paySvc, broker, notifier, hook)
 	router := gin.New()
 	router.POST("/webhook", h.UpdatePaymentStatusHandler)
 

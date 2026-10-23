@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -76,4 +77,25 @@ func TestNewModuleWiresTheStorageLayer(t *testing.T) {
 	assert.True(t, ok)
 	_, _, err = m.OAuthStates.Consume(t.Context(), "none", clock.Now())
 	require.NoError(t, err)
+}
+
+func TestNewPushBuildsTheOrderPushOnTheModuleStores(t *testing.T) {
+	td := testhelpers.SetupTestDatabase(t)
+	cfg, err := hubrise.LoadConfig(env(validEnv()))
+	require.NoError(t, err)
+	m, err := hubrise.NewModule(cfg, td.DB, hubtest.NewFakeClock(time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC)))
+	require.NoError(t, err)
+	require.NotNil(t, m.Source)
+
+	// The defaults: pooled clients on the configured API, no optional port.
+	push := m.NewPush(hubrise.PushOptions{})
+	require.NotNil(t, push.Pusher)
+	require.NotNil(t, push.Worker)
+	require.NotNil(t, push.Reconciler)
+
+	// Nothing is connected: the hooks do nothing and the worker has nothing to claim.
+	require.NoError(t, push.Pusher.OrderReady(t.Context(), uuid.New()))
+	n, err := push.Worker.DrainOnce(t.Context())
+	require.NoError(t, err)
+	assert.Zero(t, n)
 }

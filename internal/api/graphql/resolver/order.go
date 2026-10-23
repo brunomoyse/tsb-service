@@ -134,6 +134,8 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	)
 	tempOrder.CouponCode = couponCode
 	tempOrder.IsTest = isTestOrder
+	channel := string(couponChannel(ctx))
+	tempOrder.Channel = &channel
 
 	// Atomically reserve coupon usage BEFORE creating the order to prevent race conditions
 	if validatedCouponID != nil {
@@ -247,6 +249,9 @@ func (r *mutationResolver) CreateOrder(ctx context.Context, input model.CreateOr
 	// order that may never be paid.
 	if !input.IsOnlinePayment && !order.IsTest {
 		r.SendNewOrderPush(order)
+		// A cash order is actionable as soon as it is placed. An integration (HubRise) queues its
+		// push now, after the order is committed. Online orders do the same from the paid webhook.
+		r.OrderReady(ctx, order.ID)
 	}
 
 	return gql, nil
