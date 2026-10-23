@@ -189,19 +189,28 @@ const restartDelay = 5 * time.Second
 // run as the system (admin context): the HubRise tables and the shop tables they touch are reached
 // through the admin pool.
 func (rt *Runtime) Run(ctx context.Context) {
-	ctx = utils.SetIsAdmin(ctx, true)
-	var wg sync.WaitGroup
-	for name, run := range map[string]func(context.Context){
+	runAll(utils.SetIsAdmin(ctx, true), restartDelay, rt.workers())
+}
+
+// workers are the background workers by name, the names the crash log carries.
+func (rt *Runtime) workers() map[string]func(context.Context) {
+	return map[string]func(context.Context){
 		"outbox":     rt.Push.Worker.Run,
 		"reconciler": rt.Push.Reconciler.Run,
 		"events":     rt.Sync.Processor.Run,
 		"poller":     rt.Sync.Poller.Run,
 		"inventory":  rt.Inventory.Run,
-	} {
+	}
+}
+
+// runAll runs every worker under supervise until ctx ends and returns when all of them have stopped.
+func runAll(ctx context.Context, delay time.Duration, workers map[string]func(context.Context)) {
+	var wg sync.WaitGroup
+	for name, run := range workers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			supervise(ctx, name, restartDelay, run)
+			supervise(ctx, name, delay, run)
 		}()
 	}
 	wg.Wait()

@@ -171,3 +171,59 @@ func TestSafelyReportsAPanic(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bad")
 }
+
+func TestRunStartsEveryRegisteredWorker(t *testing.T) {
+	rt, err := Install(Options{Module: testModule(t), Resolver: func() *resolver.Resolver { r, _, _ := testResolver(); return r }(),
+		APIBaseURL: "https://shop.example.test/api/v1", Images: noImages{}})
+	require.NoError(t, err)
+	require.NotNil(t, rt)
+	t.Cleanup(rt.Stop)
+
+	workers := rt.workers()
+	names := make([]string, 0, len(workers))
+	for name, run := range workers {
+		assert.NotNil(t, run, name)
+		names = append(names, name)
+	}
+	assert.ElementsMatch(t, []string{"outbox", "reconciler", "events", "poller", "inventory"}, names,
+		"the outbox drain, the reconciler, the callback event processor, the callback poller and the inventory side")
+}
+
+func TestRunAllStartsEachWorkerAndWaitsForAllOfThem(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	started := map[string]chan struct{}{"a": make(chan struct{}), "b": make(chan struct{}), "c": make(chan struct{})}
+	workers := map[string]func(context.Context){}
+	var crashed atomic.Bool
+	for name, ch := range started {
+		workers[name] = func(ctx context.Context) {
+			if name == "c" && !crashed.Swap(true) {
+				panic("boom") // supervised: it starts again after the delay
+			}
+			close(ch)
+			<-ctx.Done()
+		}
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		runAll(ctx, time.Millisecond, workers)
+	}()
+	for name, ch := range started {
+		select {
+		case <-ch:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("worker %s was never started", name)
+		}
+	}
+	select {
+	case <-done:
+		t.Fatal("runAll returned while its workers ran")
+	case <-time.After(20 * time.Millisecond):
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("runAll did not return after the context ended")
+	}
+}
