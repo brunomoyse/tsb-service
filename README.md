@@ -24,6 +24,17 @@ Repository `nuagemagique-dev/pili-api`, local folder and internal name `tsb-serv
 - Idempotent Mollie webhook handling
 - Request-scoped structured logs with request/user context
 
+## HubRise (optional EPOS integration)
+
+When `HUBRISE_CLIENT_ID`, `HUBRISE_CLIENT_SECRET` and `HUBRISE_TOKEN_KEY` are set, the API can push
+orders to a HubRise location, follow the status the EPOS gives them, keep the HubRise customer list,
+sync sold-out products and use the HubRise catalog as the menu. Without them none of it exists and the
+API behaves as before. Setup, rollout and rollback steps, and what the order flags mean:
+[docs/hubrise/README.md](docs/hubrise/README.md). Design: [docs/hubrise/PLAN.md](docs/hubrise/PLAN.md).
+
+Extra routes when it is available: `POST /api/v1/hubrise/callback` (HubRise events, HMAC signed) and
+`GET /api/v1/hubrise/oauth/callback` (return of the OAuth connection).
+
 ## Local setup
 
 ### 1) Environment
