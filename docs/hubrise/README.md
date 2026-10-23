@@ -66,8 +66,9 @@ inventory `update/patch`) and sends the browser to `<APP_DASHBOARD_URL>/hubrise?
 the outcome `connected`, `relink_required`, `denied`, `invalid_state`, `authorization_failed` or `error`.
 Nothing else travels in that address.
 
-Connected is **not** enabled: the connection starts paused. The admin turns the switch and the features
-on one by one (section 2). The status shows the account, location, catalog and customer list names and
+Connected is **not** enabled: the connection starts paused. Every feature switch (`pushOrders`,
+`syncStatus`, `syncInventory`, `syncCustomers`) is already on, though, so `enabled` is the moment they all
+start: switch the ones that must wait off in the same call that sets `enabled` (section 2, step 4). The status shows the account, location, catalog and customer list names and
 ids to give HubRise when they review the integration.
 
 Disconnecting revokes the token at HubRise, deletes the callback and forgets the token. The settings and
@@ -84,13 +85,17 @@ each before the next.
    catalog sync is ever enabled, otherwise a price edit on a managed product answers `HUBRISE_MANAGED` to a
    screen that does not know the code.
 3. **Set the variables, restart, connect.**
-4. **Adopt the menu you already have (`LINK_ONLY`).** `previewHubriseCatalogSync(mode: LINK_ONLY)` lists
+4. **Adopt the menu you already have (`LINK_ONLY`).** An import is refused (`HUBRISE_NOT_ENABLED`) while the
+   integration is paused, and turning `enabled` on starts every feature switch that is on, so do both in one
+   call: `updateHubriseSettings(input: {enabled: true, pushOrders: false, syncStatus: false,
+   syncInventory: false, syncCustomers: false})`. Nothing leaves yet; an order placed now would carry no SKU
+   refs, which is why `pushOrders` waits for the links. `previewHubriseCatalogSync(mode: LINK_ONLY)` lists
    the products that match a HubRise SKU; `syncHubriseCatalog(mode: LINK_ONLY)` records the links and
    touches no product data. This gives the orders their SKU refs. A product matches by the menu code
    (`custom_fields.code` of the SKU equals `products.code`), then by its normalized name inside the
    category of the same name. Anything ambiguous is listed as a conflict and never guessed; link it by
    hand with `linkHubriseProduct`.
-5. **Turn on `enabled` and `pushOrders`.** Only the open orders from this moment (and the last hour,
+5. **Turn on `pushOrders`.** Only the open orders from this moment (and the last hour,
    for the ones in flight) are pushed. History is never replayed. Place a test order and watch it in the
    EPOS. Then `syncStatus`, `syncCustomers` and `syncInventory`; the first time inventory sync becomes
    effective, the products the shop already marks sold out are pushed to HubRise as the baseline.
