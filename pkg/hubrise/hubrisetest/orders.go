@@ -254,6 +254,11 @@ func (s *Server) createAs(c *client, o hubrise.Order) (hubrise.Order, *apiError)
 	if err := validateOrder(&o); err != nil {
 		return hubrise.Order{}, err
 	}
+	if o.CustomerID != "" {
+		if sc := s.customers[o.CustomerID]; sc == nil || sc.customer.Anonymised {
+			return hubrise.Order{}, errField("customer_id", "customer not found")
+		}
+	}
 	o.ID = s.nextID("o")
 	o.LocationID = LocationID
 	o.CreatedAt = s.now()

@@ -63,6 +63,25 @@ func TestContractDocSamples(t *testing.T) {
 		assert.Equal(t, "3345", orders[0].PrivateRef)
 	})
 
+	// The customer samples follow the field list of the customer resource in the documentation
+	// (docs/hubrise/API_NOTES.md); the moyun-pos recordings hold no customer list exchange.
+	t.Run("customer create body and resource", func(t *testing.T) {
+		in := decodeAs[hubrise.Customer](t, "customer_create_doc", doc("customer_create_doc.json"))
+		assert.Equal(t, "5f0b8a0e-3d38-4c3b-9d63-2b1e7f7f2f10", in.PrivateRef)
+		assert.Equal(t, "BE", in.Country)
+		assert.True(t, in.EmailMarketing)
+
+		re := decodeAs[hubrise.Customer](t, "customer_retrieve_doc", doc("customer_retrieve_doc.json"))
+		assert.Equal(t, "wd9lz", re.ID)
+		assert.Equal(t, "cl1x9", re.CustomerListID)
+		assert.False(t, re.Anonymised)
+		assert.Equal(t, 3, re.NbOrders)
+		cents, err := re.OrderTotal.Cents()
+		require.NoError(t, err)
+		assert.EqualValues(t, 5240, cents)
+		require.NotNil(t, re.LastOrderDate)
+	})
+
 	t.Run("catalog upload", func(t *testing.T) {
 		var body struct {
 			Data hubrise.CatalogData `json:"data"`

@@ -141,6 +141,10 @@ func TestEveryEndpointReportsFailures(t *testing.T) {
 		"UpdateOrder":           func() error { _, err := c.UpdateOrder(ctx, "o", &hubrise.OrderPatch{}); return err },
 		"ListOrders":            func() error { _, err := c.ListOrders(ctx, hubrise.OrderFilter{}, ""); return err },
 		"FindOrderByPrivateRef": func() error { _, err := c.FindOrderByPrivateRef(ctx, "r"); return err },
+		"CreateCustomer":        func() error { _, err := c.CreateCustomer(ctx, "l", &hubrise.Customer{}); return err },
+		"UpdateCustomer":        func() error { _, err := c.UpdateCustomer(ctx, "l", "c", &hubrise.Customer{}); return err },
+		"AnonymiseCustomer":     func() error { _, err := c.AnonymiseCustomer(ctx, "l", "c"); return err },
+		"FindCustomer":          func() error { _, err := c.FindCustomerByPrivateRef(ctx, "l", "r"); return err },
 		"GetCatalog":            func() error { _, err := c.GetCatalog(ctx, "c"); return err },
 		"GetImage":              func() error { _, err := c.GetImage(ctx, "c", "i"); return err },
 		"GetImageData":          func() error { _, err := c.GetImageData(ctx, "c", "i"); return err },
@@ -170,6 +174,21 @@ func TestFindOrderByPrivateRefChecksTheMatch(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, found)
 	assert.Equal(t, "o3", found.ID, "the earliest of the matches")
+}
+
+// The same for customers: a server that ignores the filter must not make the client adopt somebody
+// else's customer.
+func TestFindCustomerByPrivateRefChecksTheMatch(t *testing.T) {
+	c, _ := stub(t, func(w http.ResponseWriter, r *http.Request) {
+		respond(200, `[{"id":"c1","private_ref":"other"},{"id":"c2","private_ref":"wanted","created_at":"2026-10-24T12:00:00+02:00"},{"id":"c3","private_ref":"wanted","created_at":"2026-10-24T11:00:00+02:00"}]`)(w, r)
+	})
+	found, err := c.FindCustomerByPrivateRef(ctx, "l", "wanted")
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.Equal(t, "c3", found.ID, "the earliest of the matches")
+	none, err := c.FindCustomerByPrivateRef(ctx, "l", "ghost")
+	require.NoError(t, err)
+	assert.Nil(t, none)
 }
 
 func TestOAuthBodyReadFailure(t *testing.T) {

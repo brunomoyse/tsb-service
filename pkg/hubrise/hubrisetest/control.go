@@ -93,3 +93,44 @@ func (s *Server) DeleteOrder(id string) bool {
 	}
 	return true
 }
+
+// Customers returns every customer of the customer list as stored, private refs included, oldest
+// first.
+func (s *Server) Customers() []hubrise.Customer {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]hubrise.Customer, 0, len(s.customerID))
+	for _, id := range s.customerID {
+		out = append(out, cloneCustomer(s.customers[id].customer))
+	}
+	return out
+}
+
+// Customer returns a customer as stored.
+func (s *Server) Customer(id string) (hubrise.Customer, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sc := s.customers[id]
+	if sc == nil {
+		return hubrise.Customer{}, false
+	}
+	return cloneCustomer(sc.customer), true
+}
+
+// DeleteCustomer removes a customer, as if it had been deleted at HubRise, so that the system under
+// test meets a 404 for a customer it believes exists. It reports whether the customer existed.
+func (s *Server) DeleteCustomer(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.customers[id] == nil {
+		return false
+	}
+	delete(s.customers, id)
+	for i, known := range s.customerID {
+		if known == id {
+			s.customerID = append(s.customerID[:i], s.customerID[i+1:]...)
+			break
+		}
+	}
+	return true
+}

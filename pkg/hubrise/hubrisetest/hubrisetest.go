@@ -2,13 +2,14 @@
 // order push, the status sync, the catalog import, the inventory sync and the OAuth connection.
 //
 // It serves the endpoints the integration uses (the OAuth token and revoke, GET /location, the
-// catalog, the images, orders with private_ref lookups, the inventory, the callback registration
-// and its events) and follows the rules of the real API that the integration depends on:
+// catalog, the images, orders with private_ref lookups, the customer list, the inventory, the
+// callback registration and its events) and follows the rules of the real API that the integration depends on:
 //
 //   - the order total is calculated (items + charges - discounts), never taken from the request,
 //   - private_ref is only visible to the client that created the order,
 //   - a callback registration naming an unknown resource or event is a 422,
 //   - a client never receives the events of its own writes,
+//   - private_ref of a customer is only visible to the client that created it,
 //   - the list endpoints are limited to 10 requests a minute on top of the connection wide limits,
 //   - a request body with a field the API does not know is a 422,
 //   - a revoked token is a 401.
@@ -78,7 +79,8 @@ func WithStrictTransitions() Option { return func(s *Server) { s.strict = true }
 // Limits are the rate limits of the mock, per access token. A value <= 0 disables the window.
 type Limits struct {
 	PerMinute, PerHour, PerDay int
-	// HeavyPerMinute is the shared bucket of GET /catalogs/:id and the order list endpoint.
+	// HeavyPerMinute is the shared bucket of GET /catalogs/:id and the list endpoints (orders and
+	// customers).
 	HeavyPerMinute int
 }
 
@@ -124,6 +126,9 @@ type Server struct {
 	orders  map[string]*storedOrder
 	orderID []string
 
+	customers  map[string]*storedCustomer
+	customerID []string
+
 	catalog   hubrise.Catalog
 	inventory []hubrise.InventoryEntry
 	images    map[string]image
@@ -149,15 +154,16 @@ func New(tb testing.TB, opts ...Option) *Server {
 // server). Use New in tests.
 func NewHandler(opts ...Option) *Server {
 	s := &Server{
-		clock:   time.Now,
-		clients: map[string]*client{},
-		revoked: map[string]bool{},
-		codes:   map[string]bool{},
-		orders:  map[string]*storedOrder{},
-		images:  map[string]image{},
-		limits:  DefaultLimits(),
-		windows: map[string][]time.Time{},
-		heavy:   map[string][]time.Time{},
+		clock:     time.Now,
+		clients:   map[string]*client{},
+		revoked:   map[string]bool{},
+		codes:     map[string]bool{},
+		orders:    map[string]*storedOrder{},
+		customers: map[string]*storedCustomer{},
+		images:    map[string]image{},
+		limits:    DefaultLimits(),
+		windows:   map[string][]time.Time{},
+		heavy:     map[string][]time.Time{},
 	}
 	s.clients[Token] = &client{token: Token, name: "tsb-webshop"}
 	s.clients[EPOSToken] = &client{token: EPOSToken, name: "pili-pos"}
@@ -578,6 +584,11 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /v1/location/orders", s.api(listOrders, true))
 	m.HandleFunc("GET /v1/location/orders/{id}", s.api(getOrder, false))
 	m.HandleFunc("PATCH /v1/location/orders/{id}", s.api(patchOrder, false))
+	// Customer list.
+	m.HandleFunc("POST /v1/customer_lists/{list}/customers", s.api(createCustomer, false))
+	m.HandleFunc("GET /v1/customer_lists/{list}/customers", s.api(listCustomers, true))
+	m.HandleFunc("PATCH /v1/customer_lists/{list}/customers/{id}", s.api(patchCustomer, false))
+	m.HandleFunc("POST /v1/customer_lists/{list}/customers/{id}/anonymise", s.api(anonymiseCustomer, false))
 	// Catalog and images.
 	m.HandleFunc("GET /v1/catalogs/{id}", s.api(getCatalog, true))
 	m.HandleFunc("GET /v1/catalogs/{id}/images/{image}", s.api(getImage, false))
