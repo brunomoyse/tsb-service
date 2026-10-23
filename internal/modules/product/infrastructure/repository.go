@@ -231,7 +231,8 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 	//
 	// The dashboard sends every language on every save, so the row only becomes a manual override
 	// (source = 'manual') when its text really changed: a price edit must not turn the names the
-	// HubRise import wrote into manual ones, which the import would then never refresh.
+	// HubRise import wrote into manual ones, which the import would then never refresh. The import
+	// stores an empty description as NULL, so NULL and '' compare equal.
 	upsertQuery := `
 		INSERT INTO product_translations AS t (product_id, language, name, description)
 		VALUES ($1, $2, $3, $4)
@@ -239,7 +240,7 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 		DO UPDATE SET
 		    name = EXCLUDED.name,
 		    description = EXCLUDED.description,
-		    source = CASE WHEN (t.name, t.description) IS DISTINCT FROM (EXCLUDED.name, EXCLUDED.description)
+		    source = CASE WHEN (t.name, COALESCE(t.description, '')) IS DISTINCT FROM (EXCLUDED.name, COALESCE(EXCLUDED.description, ''))
 		                  THEN 'manual' ELSE t.source END
 	`
 	for _, t := range product.Translations {

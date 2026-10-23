@@ -70,6 +70,23 @@ func TestDashboardSavesOnlyOverrideTheTranslationsTheyChange(t *testing.T) {
 			e.sources(t, "product_translations", "product_id", "language", p.ID))
 	})
 
+	t.Run("an empty description resent for a NULL one is not a change", func(t *testing.T) {
+		p := e.newProduct(t, cat, nil)
+		// The import stores an empty description as NULL.
+		_, err := e.tdb.DB.ExecContext(ctx, `UPDATE product_translations SET source = 'hubrise', description = NULL WHERE product_id = $1`, p.ID)
+		require.NoError(t, err)
+
+		got, err := e.repo.FindByID(ctx, p.ID)
+		require.NoError(t, err)
+		empty := ""
+		for i := range got.Translations {
+			got.Translations[i].Description = &empty
+		}
+		require.NoError(t, e.repo.Update(ctx, got))
+		assert.Equal(t, map[string]string{"fr": "hubrise", "en": "hubrise", "nl": "hubrise"},
+			e.sources(t, "product_translations", "product_id", "language", p.ID))
+	})
+
 	t.Run("a language added in the dashboard is manual", func(t *testing.T) {
 		p := e.newProduct(t, cat, func(p *domain.Product) {
 			p.Translations = []domain.Translation{tr("fr", "Thon "+uuid.NewString()[:6])}
