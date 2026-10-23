@@ -303,6 +303,39 @@ func TestEveryStorageFailureOfCompletingAConnectionSurfaces(t *testing.T) {
 	assert.GreaterOrEqual(t, runs, 4, "consume, previous, connect, callback stamp, then the relink checks")
 }
 
+// A reconnect to another location must never leave the new ids enabled over the old links, whatever
+// storage call fails after the connection was stored; and the old location's token is only given up
+// once everything succeeded.
+func TestAFailedReconnectToAnotherLocationNeverLeavesTheOldLinksActive(t *testing.T) {
+	r := newAdminRig(t)
+	r.srv.SetOAuthTarget(&hubrisetest.OAuthTarget{LocationID: "loc-2", LocationName: "Other", CatalogID: "cat-2", CatalogName: "Other menu"})
+	stored := 0
+	for failAt := 1; failAt < 100; failAt++ {
+		r.exec(`DELETE FROM hubrise_orders; DELETE FROM hubrise_outbox; DELETE FROM hubrise_catalog_links;
+			DELETE FROM hubrise_oauth_states; DELETE FROM hubrise_job_leases; DELETE FROM hubrise_connection`)
+		r.reconnect(hubtest.WithToken(hubrisetest.EPOSToken))
+		state, code := r.authorize(uuid.New())
+		f := &adminFaults{failAt: failAt}
+		res, err := r.faultyAdmin(f).CompleteConnection(t.Context(), state, code)
+		if !f.hit {
+			require.NoError(t, err)
+			assert.True(t, res.RelinkRequired)
+			break
+		}
+		require.ErrorIs(t, err, errInjected, "%s", f.hitName)
+		assert.False(t, r.srv.TokenRevoked(hubrisetest.EPOSToken), "failing %s: the old token is kept until the reconnect succeeded", f.hitName)
+		c := r.conn()
+		if *c.LocationID == "loc-2" { // the new ids were stored
+			stored++
+			assert.False(t, c.Enabled, "failing %s: the new ids must not be live over the old links", f.hitName)
+			assert.NotNil(t, c.RelinkRequiredAt, "failing %s", f.hitName)
+			assert.False(t, c.SyncCatalog)
+			assert.False(t, c.SyncInventory)
+		}
+	}
+	assert.Positive(t, stored, "some failures land after the connection was stored")
+}
+
 func TestEveryStorageFailureOfADisconnectSurfaces(t *testing.T) {
 	r := newAdminRig(t)
 	runs := sweepAdmin(t, r, nil, func() { r.reconnect() }, func(a *application.Admin) error {

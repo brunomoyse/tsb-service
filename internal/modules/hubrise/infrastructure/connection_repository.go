@@ -43,9 +43,9 @@ func (r *connectionRepository) Connect(ctx context.Context, p domain.ConnectPara
 	var c domain.Connection
 	err := r.get(ctx, "connect", &c, `
 		INSERT INTO hubrise_connection (id, access_token_enc, account_id, account_name, location_id, location_name,
-			catalog_id, catalog_name, customer_list_id, customer_list_name, scope, push_orders_since)
+			catalog_id, catalog_name, customer_list_id, customer_list_name, scope, push_orders_since, relink_required_at)
 		VALUES (TRUE, $1, NULLIF($2, ''), NULLIF($3, ''), NULLIF($4, ''), NULLIF($5, ''),
-			NULLIF($6, ''), NULLIF($7, ''), NULLIF($8, ''), NULLIF($9, ''), NULLIF($10, ''), $11)
+			NULLIF($6, ''), NULLIF($7, ''), NULLIF($8, ''), NULLIF($9, ''), NULLIF($10, ''), $11, $12)
 		ON CONFLICT (id) DO UPDATE SET
 			access_token_enc = EXCLUDED.access_token_enc,
 			account_id = EXCLUDED.account_id, account_name = EXCLUDED.account_name,
@@ -54,10 +54,14 @@ func (r *connectionRepository) Connect(ctx context.Context, p domain.ConnectPara
 			customer_list_id = EXCLUDED.customer_list_id, customer_list_name = EXCLUDED.customer_list_name,
 			scope = EXCLUDED.scope,
 			push_orders_since = COALESCE(EXCLUDED.push_orders_since, hubrise_connection.push_orders_since),
+			enabled = CASE WHEN $12::timestamptz IS NULL THEN hubrise_connection.enabled ELSE FALSE END,
+			sync_catalog = CASE WHEN $12::timestamptz IS NULL THEN hubrise_connection.sync_catalog ELSE FALSE END,
+			sync_inventory = CASE WHEN $12::timestamptz IS NULL THEN hubrise_connection.sync_inventory ELSE FALSE END,
+			relink_required_at = COALESCE($12::timestamptz, hubrise_connection.relink_required_at),
 			auth_error_at = NULL, last_error = NULL, updated_at = now()
 		RETURNING `+connectionColumns,
 		p.AccessTokenEnc, p.AccountID, p.AccountName, p.LocationID, p.LocationName,
-		p.CatalogID, p.CatalogName, p.CustomerListID, p.CustomerListName, p.Scope, since)
+		p.CatalogID, p.CatalogName, p.CustomerListID, p.CustomerListName, p.Scope, since, p.RelinkRequiredAt)
 	if err != nil {
 		return nil, err
 	}

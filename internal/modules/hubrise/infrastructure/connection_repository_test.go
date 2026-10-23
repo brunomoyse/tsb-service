@@ -177,6 +177,25 @@ func TestConnectionRepository(t *testing.T) {
 		assert.Equal(t, "loc-2", *c.LocationID, "ids and settings stay")
 		assert.True(t, c.SyncCatalog)
 	})
+
+	t.Run("reconnect that needs a relink switches the integration off in the same statement", func(t *testing.T) {
+		on := true
+		_, err := repo.UpdateSettings(ctx, domain.SettingsPatch{Enabled: &on, SyncCatalog: &on, SyncInventory: &on})
+		require.NoError(t, err)
+		c, err := repo.Connect(ctx, domain.ConnectParams{AccessTokenEnc: []byte("sealed-3"), LocationID: "loc-3", RelinkRequiredAt: &now})
+		require.NoError(t, err)
+		assert.Equal(t, "loc-3", *c.LocationID)
+		assert.False(t, c.Enabled)
+		assert.False(t, c.SyncCatalog)
+		assert.False(t, c.SyncInventory)
+		require.NotNil(t, c.RelinkRequiredAt)
+		assert.WithinDuration(t, now, *c.RelinkRequiredAt, time.Millisecond)
+
+		c, err = repo.Connect(ctx, domain.ConnectParams{AccessTokenEnc: []byte("sealed-4"), LocationID: "loc-3"})
+		require.NoError(t, err)
+		assert.NotNil(t, c.RelinkRequiredAt, "a plain reconnect does not lift the flag")
+		require.NoError(t, repo.SetRelinkRequired(ctx, nil))
+	})
 }
 
 func TestSeedConnection(t *testing.T) {

@@ -191,10 +191,13 @@ type ConnectResult struct {
 
 // CompleteConnection finishes the authorization the browser comes back from. The state must be one
 // StartConnection issued, unexpired and unused (domain.ErrInvalidState otherwise: nothing is
-// exchanged). The code is traded for a token, the callback registered at HubRise, and only then
-// is the connection stored, so a failure leaves the previous connection as it was. Reconnecting to
-// another location or catalog than the links were made for switches the integration off until the
-// owner forgets them. The returned error never carries the code or the token.
+// exchanged). The code is traded for a token and the callback registered at HubRise before
+// anything is stored, so those failures leave the previous connection as it was. Reconnecting to
+// another location or catalog than the links were made for switches the integration off in the
+// very statement that stores the new ids (until the owner forgets the links), so a failure after
+// that point can no longer push with links of the old catalog. The previous location's token is
+// only given up once everything else succeeded. The returned error never carries the code or the
+// token.
 func (a *Admin) CompleteConnection(ctx context.Context, state, code string) (*ConnectResult, error) {
 	now := a.d.Clock.Now()
 	adminID, ok, err := a.d.OAuthStates.Consume(ctx, state, now)
@@ -247,18 +250,26 @@ func (a *Admin) CompleteConnection(ctx context.Context, state, code string) (*Co
 	if !previous.Connected() { // pushing becomes possible now: only orders from here on are pushed
 		params.PushOrdersSince = now
 	}
+	// Decided before the row changes and stored with it: whatever fails later, links made for
+	// another location or catalog are never used with the new ids.
+	needsRelink, err := a.d.Catalog.RelinkNeeded(ctx, previous, tok.LocationID, tok.CatalogID)
+	if err != nil {
+		return fail(err)
+	}
+	if needsRelink {
+		params.RelinkRequiredAt = &now
+	}
 	if _, err := a.d.Connections.Connect(ctx, params); err != nil {
 		return fail(err)
 	}
 	if err := a.d.Connections.SetCallbackRegistered(ctx, &now); err != nil {
 		return fail(err)
 	}
-	a.releaseOldLocation(ctx, previous, tok.LocationID)
-
 	relink, err := a.d.Catalog.AfterConnect(ctx, previous)
 	if err != nil {
 		return fail(err)
 	}
+	a.releaseOldLocation(ctx, previous, tok.LocationID)
 	a.audit(actx, AuditConnect, true, map[string]any{
 		"location_id": tok.LocationID, "catalog_id": tok.CatalogID, "relink_required": relink,
 	})
@@ -267,7 +278,7 @@ func (a *Admin) CompleteConnection(ctx context.Context, state, code string) (*Co
 
 // releaseOldLocation gives up the previous token when the authorization moved to another location:
 // its callback would keep posting events of a location this installation no longer serves. It is
-// best effort, the new connection is already stored.
+// best effort, the new connection is already stored and settled.
 func (a *Admin) releaseOldLocation(ctx context.Context, previous *domain.Connection, newLocation string) {
 	if !previous.Connected() || previous.LocationID == nil || *previous.LocationID == newLocation {
 		return

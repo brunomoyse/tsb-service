@@ -412,12 +412,12 @@ func (s *CatalogService) AfterConnect(ctx context.Context, previous *domain.Conn
 	if err != nil {
 		return false, err
 	}
-	if sameValue(previous.LocationID, current.LocationID) && sameValue(previous.CatalogID, current.CatalogID) {
-		return current.RelinkRequiredAt != nil, nil
-	}
-	n, err := s.Links.Count(ctx, true)
-	if err != nil || n == 0 {
+	changed, err := s.RelinkNeeded(ctx, previous, deref2(current.LocationID), deref2(current.CatalogID))
+	if err != nil {
 		return false, err
+	}
+	if !changed {
+		return current.RelinkRequiredAt != nil, nil
 	}
 	off := false
 	if _, err := s.Connections.UpdateSettings(ctx, domain.SettingsPatch{Enabled: &off, SyncCatalog: &off, SyncInventory: &off}); err != nil {
@@ -425,6 +425,21 @@ func (s *CatalogService) AfterConnect(ctx context.Context, previous *domain.Conn
 	}
 	now := s.now()
 	return true, s.Connections.SetRelinkRequired(ctx, &now)
+}
+
+// RelinkNeeded reports whether connecting to the given HubRise location and catalog would leave
+// links that were made for another one (previous is the row as it is now, nil when there is none).
+// The OAuth callback asks it before storing the connection and hands the answer to
+// ConnectionRepository.Connect, so the integration is already off when the new ids land.
+func (s *CatalogService) RelinkNeeded(ctx context.Context, previous *domain.Connection, locationID, catalogID string) (bool, error) {
+	if previous == nil {
+		return false, nil
+	}
+	if sameValue(previous.LocationID, &locationID) && sameValue(previous.CatalogID, &catalogID) {
+		return false, nil
+	}
+	n, err := s.Links.Count(ctx, true)
+	return n > 0, err
 }
 
 func sameValue(a, b *string) bool {

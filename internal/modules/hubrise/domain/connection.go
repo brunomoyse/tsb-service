@@ -124,6 +124,11 @@ type ConnectParams struct {
 	Scope            string
 	// PushOrdersSince stamps the moment order pushing becomes effective (see Connection).
 	PushOrdersSince time.Time
+	// RelinkRequiredAt, when set, is stored in the same statement as the new ids and switches the
+	// integration and the catalog and inventory sync off: the connection names another location or
+	// catalog than the existing links were made for, so nothing may be pushed with them even for a
+	// moment. Nil keeps the flag as it is.
+	RelinkRequiredAt *time.Time
 }
 
 // SettingsPatch changes settings; nil fields stay as they are. For the text options an empty
@@ -154,7 +159,8 @@ type ConnectionRepository interface {
 	// Get returns the row, or ErrNotFound when the installation never connected.
 	Get(ctx context.Context) (*Connection, error)
 	// Connect creates the row or re-authorizes it (new token and ids, auth error and relink flag
-	// cleared). The settings of an existing row are kept.
+	// cleared). The settings of an existing row are kept, except that a RelinkRequiredAt in p
+	// stamps the flag and switches the integration off atomically with the new ids.
 	Connect(ctx context.Context, p ConnectParams) (*Connection, error)
 	// Disconnect removes the token and switches the integration off; the row, its settings and
 	// ids stay. It returns ErrNotFound when there is no row.
