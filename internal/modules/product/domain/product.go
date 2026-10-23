@@ -31,12 +31,16 @@ type Product struct {
 
 // ProductChoice represents a selectable option for a product.
 type ProductChoice struct {
-	ID            uuid.UUID           `db:"id" json:"id"`
-	ProductID     uuid.UUID           `db:"product_id" json:"productId"`
-	ChoiceGroupID uuid.UUID           `db:"choice_group_id" json:"choiceGroupId"`
-	PriceModifier decimal.Decimal     `db:"price_modifier" json:"priceModifier"`
-	SortOrder     int                 `db:"sort_order" json:"sortOrder"`
-	Translations  []ChoiceTranslation `json:"translations"`
+	ID            uuid.UUID       `db:"id" json:"id"`
+	ProductID     uuid.UUID       `db:"product_id" json:"productId"`
+	ChoiceGroupID uuid.UUID       `db:"choice_group_id" json:"choiceGroupId"`
+	PriceModifier decimal.Decimal `db:"price_modifier" json:"priceModifier"`
+	SortOrder     int             `db:"sort_order" json:"sortOrder"`
+	// Unavailable is true while the choice cannot be selected: HubRise took it off sale or sold it
+	// out. It is the inverse of the is_available column, so a choice built without the flag (every
+	// caller that does not know about HubRise) is available.
+	Unavailable  bool                `json:"unavailable"`
+	Translations []ChoiceTranslation `json:"translations"`
 }
 
 type ProductChoiceGroup struct {
