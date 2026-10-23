@@ -3,6 +3,7 @@ package hubrise
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"tsb-service/internal/modules/hubrise/domain"
@@ -16,7 +17,12 @@ const (
 	EnvTokenKey     = "HUBRISE_TOKEN_KEY"
 	EnvAPIBaseURL   = "HUBRISE_API_BASE_URL"
 	EnvOAuthBaseURL = "HUBRISE_OAUTH_BASE_URL"
+	EnvReplicas     = "HUBRISE_REPLICAS"
 )
+
+// DefaultReplicas is the number of API replicas assumed when HUBRISE_REPLICAS is not set: production
+// runs two, and a single instance that thinks there are two only spends half of its rate budget.
+const DefaultReplicas = 2
 
 // Production HubRise endpoints, used when the env does not override them (tests and local
 // development point both at the Go mock).
@@ -35,6 +41,11 @@ type Config struct {
 
 	APIBaseURL   string
 	OAuthBaseURL string
+
+	// Replicas is how many API replicas share the HubRise rate budget of the connection. The client
+	// limiter of each one is built from the default limits divided by it (HubRise counts the calls
+	// of all the replicas together).
+	Replicas int
 }
 
 // LoadConfig reads the configuration through getenv (os.Getenv in production). An installation
@@ -54,7 +65,11 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		}
 		cfg.TokenKey = key
 	}
-	var err error
+	replicas, err := replicaCount(getenv)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Replicas = replicas
 	if cfg.APIBaseURL, err = baseURL(getenv, EnvAPIBaseURL, DefaultAPIBaseURL); err != nil {
 		return Config{}, err
 	}
@@ -62,6 +77,19 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// replicaCount reads HUBRISE_REPLICAS (a positive integer, DefaultReplicas when unset).
+func replicaCount(getenv func(string) string) (int, error) {
+	raw := strings.TrimSpace(getenv(EnvReplicas))
+	if raw == "" {
+		return DefaultReplicas, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 || n > 100 {
+		return 0, fmt.Errorf("hubrise: %s must be a number of replicas between 1 and 100", EnvReplicas)
+	}
+	return n, nil
 }
 
 // baseURL returns the variable's value (or the default) without a trailing slash, and refuses

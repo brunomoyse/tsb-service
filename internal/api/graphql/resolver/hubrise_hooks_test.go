@@ -132,3 +132,49 @@ func TestNoopHubriseHooks(t *testing.T) {
 	assert.NoError(t, h.ChoiceGroupGuard(ctx, nil, nil))
 	assert.NoError(t, h.ChoiceGuard(ctx, nil, nil))
 }
+
+// HubriseHooksSet sends every hook to the part of the integration that owns it and to no other.
+func TestHubriseHooksSetRoutesEachHookToItsOwner(t *testing.T) {
+	order, inventory, catalog := &spyHooks{}, &spyHooks{}, &spyHooks{}
+	set := HubriseHooksSet{Order: order, Inventory: inventory, Catalog: catalog}
+	ctx := t.Context()
+	id, history := uuid.New(), uuid.New()
+	product := &productDomain.Product{}
+
+	require.NoError(t, set.OrderReady(ctx, id))
+	require.NoError(t, set.OrderStatusChanged(ctx, id, orderDomain.OrderStatusConfirmed, history))
+	require.NoError(t, set.AvailabilityChanged(ctx, id, false))
+	require.NoError(t, set.ProductGuard(ctx, product, product))
+	require.NoError(t, set.ChoiceGroupGuard(ctx, nil, &productDomain.ProductChoiceGroup{}))
+	require.NoError(t, set.ChoiceGuard(ctx, &productDomain.ProductChoice{}, nil))
+
+	assert.Equal(t, []uuid.UUID{id}, order.ready)
+	assert.Equal(t, []orderDomain.OrderStatus{orderDomain.OrderStatusConfirmed}, order.statuses)
+	assert.Equal(t, []uuid.UUID{history}, order.history)
+	assert.Equal(t, map[uuid.UUID]bool{id: false}, inventory.avail)
+	assert.Len(t, catalog.guarded, 1)
+	assert.Len(t, catalog.groups, 1)
+	assert.Len(t, catalog.choices, 1)
+	for name, other := range map[string]*spyHooks{"order": order, "inventory": inventory, "catalog": catalog} {
+		if name != "order" {
+			assert.Empty(t, other.ready, name)
+			assert.Empty(t, other.statuses, name)
+		}
+		if name != "inventory" {
+			assert.Empty(t, other.avail, name)
+		}
+		if name != "catalog" {
+			assert.Empty(t, other.guarded, name)
+			assert.Empty(t, other.groups, name)
+			assert.Empty(t, other.choices, name)
+		}
+	}
+
+	t.Run("a refusal of the owner comes back", func(t *testing.T) {
+		boom := errors.New("boom")
+		failing := HubriseHooksSet{Order: &spyHooks{err: boom}, Inventory: &spyHooks{err: boom}, Catalog: &spyHooks{err: boom}}
+		assert.ErrorIs(t, failing.ProductGuard(ctx, product, product), boom)
+		assert.ErrorIs(t, failing.AvailabilityChanged(ctx, id, true), boom)
+		assert.ErrorIs(t, failing.OrderReady(ctx, id), boom)
+	})
+}

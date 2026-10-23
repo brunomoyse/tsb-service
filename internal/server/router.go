@@ -33,6 +33,9 @@ type Config struct {
 	// WebOrigins are the browser origins of the customer site and the dashboard (plus any extra origin kept allowed
 	// while a host moves). The Capacitor and localhost origins of the apps are added here.
 	WebOrigins []string
+	// Mount, when set, adds the routes of an optional integration (HubRise) to the /api/v1 group,
+	// after the built-in routes and behind the same middlewares. nil adds nothing.
+	Mount func(api *gin.RouterGroup)
 }
 
 // Handlers are the endpoints and middlewares the router mounts. Every field is required: New refuses a nil one, so a
@@ -216,6 +219,10 @@ func New(cfg Config, h Handlers) (*gin.Engine, func(), error) {
 
 	feedbackLimiter := middleware.NewRateLimiter(2.0/60, 2) // 2 req/min per IP
 	api.POST("/feedback", feedbackLimiter.Middleware(), h.Feedback)
+
+	if cfg.Mount != nil {
+		cfg.Mount(api)
+	}
 
 	stop := func() {
 		authLimiter.Stop()

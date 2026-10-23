@@ -77,6 +77,25 @@ func TestLoadConfigBaseURLs(t *testing.T) {
 	}
 }
 
+func TestLoadConfigReplicas(t *testing.T) {
+	cfg, err := hubrise.LoadConfig(env(validEnv()))
+	require.NoError(t, err)
+	assert.Equal(t, hubrise.DefaultReplicas, cfg.Replicas, "production runs two replicas")
+
+	m := validEnv()
+	m["HUBRISE_REPLICAS"] = " 1 "
+	cfg, err = hubrise.LoadConfig(env(m))
+	require.NoError(t, err)
+	assert.Equal(t, 1, cfg.Replicas)
+
+	for _, bad := range []string{"0", "-1", "two", "1.5", "101"} {
+		m["HUBRISE_REPLICAS"] = bad
+		_, err := hubrise.LoadConfig(env(m))
+		require.Error(t, err, bad)
+		assert.Contains(t, err.Error(), "HUBRISE_REPLICAS")
+	}
+}
+
 func TestLoadConfigBadKeyIsLoud(t *testing.T) {
 	for name, key := range map[string]string{
 		"not base64": "%%%not-base64%%%",

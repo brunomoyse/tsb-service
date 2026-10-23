@@ -515,3 +515,25 @@ func TestTrailingSlashRedirects(t *testing.T) {
 	assert.Equal(t, http.StatusMovedPermanently, rec.Code)
 	assert.Equal(t, "/api/v1/up", rec.Header().Get("Location"))
 }
+
+func TestMountAddsRoutesBehindTheAPIMiddlewares(t *testing.T) {
+	router, stop, err := server.New(server.Config{
+		WebOrigins: []string{shopOrigin},
+		Mount: func(api *gin.RouterGroup) {
+			api.POST("/hubrise/callback", stub("HubriseCallback"))
+		},
+	}, handlers())
+	require.NoError(t, err)
+	t.Cleanup(stop)
+
+	rec := request{method: http.MethodPost, path: "/api/v1/hubrise/callback"}.do(router)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "HubriseCallback", rec.Body.String())
+	assert.Equal(t, "attached", rec.Header().Get("X-Dataloader"), "a mounted route sits in the /api/v1 group")
+	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"), "a mounted route gets the security headers")
+
+	tooBig := request{method: http.MethodPost, path: "/api/v1/hubrise/callback", body: bytes.Repeat([]byte("a"), server.BodyLimit+1)}
+	assert.Equal(t, http.StatusRequestEntityTooLarge, tooBig.do(router).Code, "a mounted route keeps the 1MB body cap")
+
+	assert.Equal(t, len(newRouter(t).Routes())+1, len(router.Routes()), "Mount adds exactly its routes")
+}
