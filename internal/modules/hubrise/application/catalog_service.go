@@ -130,8 +130,9 @@ func (s *CatalogService) noteAuthError(ctx context.Context, err error) {
 //     catalog sync).
 //   - LINK_ONLY records links for the entries that match existing rows and touches no product data.
 //   - FULL adopts, creates, updates and retires. Retiring more than 30 % of the linked products
-//     (and at least 5) needs ConfirmRetire; a scheduled import never has it, so it stops, stores
-//     the situation for the dashboard and applies nothing.
+//     (and at least 5) needs ConfirmRetire; a scheduled import never carries it (only a human
+//     confirms, so ConfirmRetire is ignored when Scheduled is set): it stops, stores the situation
+//     for the dashboard and applies nothing.
 func (s *CatalogService) Sync(ctx context.Context, req SyncRequest) (*SyncResult, error) {
 	if !req.Mode.Valid() {
 		return nil, fmt.Errorf("hubrise: unknown sync mode %q", req.Mode)
@@ -181,7 +182,7 @@ func (s *CatalogService) Sync(ctx context.Context, req SyncRequest) (*SyncResult
 		return res, s.Connections.RecordCatalogPreview(ctx, diff.CatalogHash, s.now())
 	}
 
-	if diff.RetireNeedsConfirm && !req.ConfirmRetire {
+	if diff.RetireNeedsConfirm && (!req.ConfirmRetire || req.Scheduled) {
 		confirm := &domain.RetireConfirmError{Retiring: diff.RetiringProducts, Linked: diff.LinkedProducts}
 		if !req.Scheduled {
 			return res, confirm

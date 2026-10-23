@@ -261,7 +261,14 @@ func TestAMassRetirementWaitsForAConfirmation(t *testing.T) {
 	assert.Contains(t, *e.connection().LastError, domain.PendingReviewPrefix)
 
 	// A scheduled import with the confirmation flag still does not carry it: only a human does.
-	// The confirmed import applies it and clears the pending review.
+	res, err = e.svc.Sync(t.Context(), application.SyncRequest{Mode: domain.SyncFull, Scheduled: true, ConfirmRetire: true})
+	require.NoError(t, err)
+	assert.True(t, res.PendingReview)
+	assert.False(t, res.Applied)
+	assert.Equal(t, 8, e.count(`SELECT count(*) FROM products WHERE is_visible`))
+	assert.True(t, e.connection().CatalogPendingReview())
+
+	// The confirmed manual import applies it and clears the pending review.
 	res, err = e.svc.Sync(t.Context(), application.SyncRequest{Mode: domain.SyncFull, ConfirmRetire: true})
 	require.NoError(t, err)
 	assert.True(t, res.Applied)
