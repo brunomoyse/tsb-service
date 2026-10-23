@@ -182,15 +182,21 @@ func (s *orderSource) Snapshot(ctx context.Context, orderID uuid.UUID) (*domain.
 
 func (s *orderSource) State(ctx context.Context, orderID uuid.UUID) (*domain.OrderState, error) {
 	var st struct {
-		Status string          `db:"order_status"`
-		Type   string          `db:"order_type"`
-		Total  decimal.Decimal `db:"total_price"`
+		Status     string          `db:"order_status"`
+		Type       string          `db:"order_type"`
+		Total      decimal.Decimal `db:"total_price"`
+		ReadyTime  *time.Time      `db:"estimated_ready_time"`
+		OnlinePaid bool            `db:"online_paid"`
 	}
-	if err := s.get(ctx, "read order state", &st,
-		`SELECT order_status, order_type, total_price FROM orders WHERE id = $1`, orderID); err != nil {
+	if err := s.get(ctx, "read order state", &st, `
+		SELECT o.order_status, o.order_type, o.total_price, o.estimated_ready_time,
+		       EXISTS (SELECT 1 FROM mollie_payments p WHERE p.order_id = o.id AND p.status = 'paid') AS online_paid
+		FROM orders o WHERE o.id = $1`, orderID); err != nil {
 		return nil, err
 	}
-	return &domain.OrderState{Status: st.Status, Type: st.Type, Total: st.Total}, nil
+	return &domain.OrderState{
+		Status: st.Status, Type: st.Type, Total: st.Total, OnlinePaid: st.OnlinePaid, EstimatedReadyTime: st.ReadyTime,
+	}, nil
 }
 
 func (s *orderSource) OpenUnpushed(ctx context.Context, createdAfter time.Time, limit int) ([]uuid.UUID, error) {
@@ -241,6 +247,7 @@ func (s *orderSource) StatusMismatches(ctx context.Context, pairs []domain.Statu
 		JOIN unnest($1::text[], $2::text[]) AS m(local_status, remote_status) ON m.local_status = o.order_status
 		WHERE ho.push_state = 'sent' AND ho.hubrise_order_id IS NOT NULL
 		  AND ho.last_remote_status IS DISTINCT FROM m.remote_status
+		  AND NOT (COALESCE(ho.last_remote_status, '') = 'awaiting_collection' AND o.order_type = 'DELIVERY')
 		  AND (ho.last_remote_status IS NULL
 		       OR ho.last_remote_status NOT IN ('completed', 'cancelled', 'rejected', 'delivery_failed'))
 		  AND NOT EXISTS (SELECT 1 FROM hubrise_outbox x

@@ -43,3 +43,31 @@ func initialRemoteStatus(local string) hubrise.OrderStatus {
 	}
 	return RemoteStatusFor(local)
 }
+
+// LocalStatusFor is the inbound direction of the mapping: the local status a HubRise status asks
+// for on an order of the given type, "" when it asks for none. new and received change nothing,
+// awaiting_collection means nothing for a delivery (a "ready for pickup" e-mail would be wrong),
+// delivery_failed is never applied by itself, and the deprecated awaiting_shipment reads as
+// awaiting_collection. rejected and cancelled both cancel.
+func LocalStatusFor(remote hubrise.OrderStatus, orderType string) string {
+	switch remote.Canonical() {
+	case hubrise.StatusAccepted:
+		return domain.LocalConfirmed
+	case hubrise.StatusInPreparation:
+		return domain.LocalPreparing
+	case hubrise.StatusAwaitingCollection:
+		if orderType == domain.TypePickUp {
+			return domain.LocalAwaitingPickUp
+		}
+	case hubrise.StatusInDelivery:
+		return domain.LocalOutForDelivery
+	case hubrise.StatusCompleted:
+		if orderType == domain.TypeDelivery {
+			return domain.LocalDelivered
+		}
+		return domain.LocalPickedUp
+	case hubrise.StatusCancelled, hubrise.StatusRejected:
+		return domain.LocalCancelled
+	}
+	return ""
+}

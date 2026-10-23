@@ -108,6 +108,11 @@ func NewReconciler(d ReconcilerDeps) *Reconciler {
 	return &Reconciler{d: d, cfg: d.Config.withDefaults()}
 }
 
+// SetRemote installs the handler that applies the state read back from HubRise to the local order.
+// The status sync is built after the reconciler (both hang on the same repositories), so the
+// composition root plugs it in here. It must be called before Run.
+func (r *Reconciler) SetRemote(h RemoteOrderHandler) { r.d.Remote = h }
+
 // Run ticks until ctx ends.
 func (r *Reconciler) Run(ctx context.Context) {
 	ticker := time.NewTicker(r.cfg.Interval)

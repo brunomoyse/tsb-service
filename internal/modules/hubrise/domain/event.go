@@ -39,8 +39,10 @@ type EventRepository interface {
 	Insert(ctx context.Context, e Event) (inserted bool, err error)
 	// Claim leases up to limit pending events that are due (run_after and next_attempt_at passed),
 	// oldest first: it increments attempts and pushes next_attempt_at out by lease, so a crashed
-	// worker's events come back after the lease.
-	Claim(ctx context.Context, now time.Time, lease time.Duration, limit int) ([]Event, error)
+	// worker's events come back after the lease. When resourceTypes is not empty only events of those
+	// resource types are claimed (a processor that handles some resources must never lease the
+	// others).
+	Claim(ctx context.Context, now time.Time, lease time.Duration, limit int, resourceTypes ...string) ([]Event, error)
 	// MarkDone, MarkIgnored and MarkFailed end the processing of a claimed event.
 	MarkDone(ctx context.Context, id string, now time.Time) error
 	MarkIgnored(ctx context.Context, id string, now time.Time, reason string) error

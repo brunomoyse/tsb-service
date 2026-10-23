@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 
 	"tsb-service/internal/modules/hubrise/domain"
 )
@@ -32,7 +33,7 @@ func (r *eventRepository) Insert(ctx context.Context, e domain.Event) (bool, err
 		e.ID, e.ResourceType, e.EventType, []byte(e.Payload), e.ReceivedAt, e.RunAfter)
 }
 
-func (r *eventRepository) Claim(ctx context.Context, now time.Time, lease time.Duration, limit int) ([]domain.Event, error) {
+func (r *eventRepository) Claim(ctx context.Context, now time.Time, lease time.Duration, limit int, resourceTypes ...string) ([]domain.Event, error) {
 	events := []domain.Event{}
 	err := r.sel(ctx, "claim events", &events, `
 		UPDATE hubrise_events SET attempts = attempts + 1, next_attempt_at = $2
@@ -41,10 +42,11 @@ func (r *eventRepository) Claim(ctx context.Context, now time.Time, lease time.D
 			WHERE state = 'pending'
 			  AND (run_after IS NULL OR run_after <= $1)
 			  AND (next_attempt_at IS NULL OR next_attempt_at <= $1)
+			  AND (cardinality($4::text[]) = 0 OR resource_type = ANY($4))
 			ORDER BY received_at, id
 			LIMIT $3
 			FOR UPDATE SKIP LOCKED)
-		RETURNING `+eventColumns, now, now.Add(lease), limit)
+		RETURNING `+eventColumns, now, now.Add(lease), limit, pq.Array(append([]string{}, resourceTypes...)))
 	if err != nil {
 		return nil, err
 	}

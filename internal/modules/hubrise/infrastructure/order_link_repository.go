@@ -93,7 +93,7 @@ func (r *orderLinkRepository) ResetToPending(ctx context.Context, orderID uuid.U
 func (r *orderLinkRepository) RecordRemoteStatus(ctx context.Context, orderID uuid.UUID, status string, eventAt *time.Time) error {
 	return r.mustChange(ctx, "record remote status", `
 		UPDATE hubrise_orders SET last_remote_status = $2,
-			last_remote_event_at = COALESCE($3, last_remote_event_at), updated_at = now()
+			last_remote_event_at = GREATEST($3, last_remote_event_at), updated_at = now()
 		WHERE order_id = $1`, orderID, status, eventAt)
 }
 
@@ -168,6 +168,16 @@ func (r *orderLinkRepository) Recreate(ctx context.Context, orderID uuid.UUID, p
 		return fmt.Errorf("hubrise: recreate order: %w", err)
 	}
 	return nil
+}
+
+func (r *orderLinkRepository) HasUnsettledCreate(ctx context.Context) (bool, error) {
+	var busy bool
+	err := r.get(ctx, "check unsettled creates", &busy, `
+		SELECT EXISTS (
+			SELECT 1 FROM hubrise_orders h
+			JOIN hubrise_outbox o ON o.order_id = h.order_id AND o.kind = 'order_create'
+			WHERE h.hubrise_order_id IS NULL AND h.push_state = 'pending' AND o.state IN ('pending', 'sending'))`)
+	return busy, err
 }
 
 func (r *orderLinkRepository) CountNeedsAttention(ctx context.Context) (int, error) {

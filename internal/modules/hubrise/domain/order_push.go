@@ -23,6 +23,19 @@ const (
 	AttentionNotAccepted = "NOT_ACCEPTED"
 	// AttentionRemoteMissing: HubRise no longer knows the order.
 	AttentionRemoteMissing = "REMOTE_MISSING"
+	// AttentionRemoteCancelledPaid: the order was cancelled or rejected at HubRise but it was paid
+	// online and the connection does not refund by itself. Staff cancel it in the dashboard, which
+	// refunds the customer.
+	AttentionRemoteCancelledPaid = "REMOTE_CANCELLED_PAID"
+	// AttentionRemoteCancelFailed: the order was cancelled at HubRise and the shop could not cancel
+	// it (the payment cannot be refunded through Mollie, or the cancel keeps failing).
+	AttentionRemoteCancelFailed = "REMOTE_CANCEL_FAILED"
+	// AttentionDeliveryFailed: the delivery failed according to HubRise. Staff decide what happens
+	// to the order and to the payment.
+	AttentionDeliveryFailed = "DELIVERY_FAILED"
+	// AttentionStatusConflict: HubRise moved an order the shop had already finished. The shop keeps
+	// its status.
+	AttentionStatusConflict = "STATUS_CONFLICT"
 )
 
 // Local order statuses, as stored in orders.order_status. The hubrise module does not import the
@@ -228,6 +241,10 @@ type OrderState struct {
 	Status string
 	Type   string
 	Total  decimal.Decimal
+	// OnlinePaid is true when a Mollie payment of the order was paid: cancelling the order moves
+	// money.
+	OnlinePaid         bool
+	EstimatedReadyTime *time.Time
 }
 
 // OpenLink is a pushed, still open order seen by the reconciler.

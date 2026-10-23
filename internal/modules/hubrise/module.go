@@ -85,6 +85,9 @@ type Push struct {
 	Pusher     *application.OrderPusher
 	Worker     *application.OutboxWorker
 	Reconciler *application.Reconciler
+	// Clients builds the API clients; the status sync reuses the same provider (and so the same
+	// rate limiter).
+	Clients application.ClientProvider
 }
 
 // NewPush builds the order push on the module's repositories. The worker is not started: the caller
@@ -107,5 +110,58 @@ func (m *Module) NewPush(o PushOptions) *Push {
 		Foreign: m.Foreign, OAuthStates: m.OAuthStates, Clients: clients, Pusher: pusher, Clock: m.Clock,
 		Config: o.Reconciler, Schedule: o.Schedule, Alerter: o.Alerter, Remote: o.Remote,
 	})
-	return &Push{Pusher: pusher, Worker: worker, Reconciler: reconciler}
+	return &Push{Pusher: pusher, Worker: worker, Reconciler: reconciler, Clients: clients}
+}
+
+// SyncOptions customizes NewSync.
+type SyncOptions struct {
+	// Transitioner applies a remote change to the local order (required). The resolver package
+	// implements it on top of ApplyOrderUpdate.
+	Transitioner application.OrderTransitioner
+	// Clients overrides the provider of the push.
+	Clients   application.ClientProvider
+	Processor application.EventProcessorConfig
+	Poller    application.CallbackPollerConfig
+	// Holder identifies this process in the lease table (a random one by default).
+	Holder string
+}
+
+// Sync is the inbound side: the callback receiver the HTTP handler calls, the event processor, the
+// status sync shared with the reconciler, and the poller that recovers lost events.
+type Sync struct {
+	Receiver  *application.CallbackReceiver
+	Processor *application.EventProcessor
+	Status    *application.StatusSync
+	Poller    *application.CallbackPoller
+}
+
+// NewSync builds the inbound side on the module's repositories and plugs the status sync into the
+// reconciler of push, which must not be nil. Nothing is started: the caller runs Processor.Run and
+// Poller.Run, and serves the callback endpoint.
+func (m *Module) NewSync(push *Push, o SyncOptions) *Sync {
+	clients := o.Clients
+	if clients == nil {
+		clients = push.Clients
+	}
+	status := application.NewStatusSync(application.StatusSyncDeps{
+		Connections: m.Connections, Orders: m.Orders, Source: m.Source, Leases: m.Leases,
+		Transitioner: o.Transitioner, Clock: m.Clock, Holder: o.Holder,
+	})
+	processor := application.NewEventProcessor(application.EventProcessorDeps{
+		Connections: m.Connections, Orders: m.Orders, Events: m.Events, Foreign: m.Foreign,
+		Clients: clients, Sync: status, Clock: m.Clock, Config: o.Processor,
+	})
+	pcfg := o.Poller
+	if pcfg.Holder == "" {
+		pcfg.Holder = o.Holder
+	}
+	poller := application.NewCallbackPoller(application.CallbackPollerDeps{
+		Connections: m.Connections, Events: m.Events, Leases: m.Leases, Clients: clients, Clock: m.Clock,
+		Config: pcfg, Wake: []func(){processor.Wake},
+	})
+	push.Reconciler.SetRemote(status)
+	return &Sync{
+		Receiver:  application.NewCallbackReceiver(string(m.Config.ClientSecret), m.Connections, m.Events, m.Clock, processor.Wake),
+		Processor: processor, Status: status, Poller: poller,
+	}
 }

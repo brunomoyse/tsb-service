@@ -64,7 +64,12 @@ type envConfig struct {
 	push      hubrise.PushOptions
 	srvOpts   []hubrisetest.Option
 	startTime time.Time
+	// sharedClock makes the mock read the shop's fake clock, so the timestamps of its events and the
+	// ones the shop stamps can be compared.
+	sharedClock bool
 }
+
+func withSharedClock() envOption { return func(c *envConfig) { c.sharedClock = true } }
 
 // withSeed adds options to the seeded connection.
 func withSeed(o ...hubtest.SeedOption) envOption {
@@ -87,6 +92,9 @@ func newEnv(t *testing.T, options ...envOption) *env {
 	}
 	td := testhelpers.SetupTestDatabase(t)
 	e := &env{t: t, db: td.DB, td: td, fx: testhelpers.SeedTestData(t, td.DB), clock: hubtest.NewFakeClock(cfg.startTime)}
+	if cfg.sharedClock {
+		cfg.srvOpts = append(cfg.srvOpts, hubrisetest.WithClock(e.clock.Now))
+	}
 	e.srv = hubrisetest.New(t, cfg.srvOpts...)
 
 	hcfg := hubrise.Config{

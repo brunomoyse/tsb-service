@@ -56,7 +56,8 @@ type OrderLinkRepository interface {
 	// order: the create is enqueued again).
 	ResetToPending(ctx context.Context, orderID uuid.UUID) error
 	// RecordRemoteStatus stores the last status seen at HubRise and, when eventAt is non-nil, the
-	// time of the remote event or read it came from.
+	// time of the remote event or read it came from (the stored time never goes backwards: a late
+	// event does not rewind it).
 	RecordRemoteStatus(ctx context.Context, orderID uuid.UUID, status string, eventAt *time.Time) error
 	// RecordLocalPatch stamps a status PATCH we sent and the status it carried.
 	RecordLocalPatch(ctx context.Context, orderID uuid.UUID, status string, at time.Time) error
@@ -81,6 +82,10 @@ type OrderLinkRepository interface {
 	// the current status, so they are covered), resets the link to pending and inserts a new
 	// order_create row.
 	Recreate(ctx context.Context, orderID uuid.UUID, payload json.RawMessage, due time.Time) error
+	// HasUnsettledCreate reports whether some order is being pushed and HubRise has not answered
+	// yet: its link has no HubRise id and its order_create is queued or being sent. An event for an
+	// order we do not know may be the echo of such a push, whose answer was lost.
+	HasUnsettledCreate(ctx context.Context) (bool, error)
 	// CountNeedsAttention counts the flagged orders.
 	CountNeedsAttention(ctx context.Context) (int, error)
 }
