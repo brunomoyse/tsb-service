@@ -105,6 +105,9 @@ type OutboxRepository interface {
 	// SkipPendingUpTo skips the pending rows of the order with the kind whose id is at most upTo,
 	// with the reason, and returns how many.
 	SkipPendingUpTo(ctx context.Context, orderID uuid.UUID, kind OutboxKind, upTo int64, reason string) (int64, error)
+	// ActiveDedupeKeys returns the dedupe keys of the rows of the kind that are pending or being sent:
+	// what is still on its way to HubRise.
+	ActiveDedupeKeys(ctx context.Context, kind OutboxKind) (map[string]bool, error)
 	// CountForOrder counts the rows of the order with the kind, in any state.
 	CountForOrder(ctx context.Context, orderID uuid.UUID, kind OutboxKind) (int, error)
 	// RetryParked reactivates the whole parked chain of the order of row id (all its parked rows),

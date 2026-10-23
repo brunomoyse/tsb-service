@@ -63,13 +63,16 @@ type WorkerDeps struct {
 	Outbox      domain.OutboxRepository
 	Orders      domain.OrderLinkRepository
 	Links       domain.CatalogLinkRepository
-	Source      domain.OrderSource
-	Clients     ClientProvider
-	Clock       domain.Clock
-	Config      WorkerConfig
+	// Availability reads the product state an inventory row is built from; without it inventory rows
+	// are not claimed.
+	Availability domain.AvailabilityStore
+	Source       domain.OrderSource
+	Clients      ClientProvider
+	Clock        domain.Clock
+	Config       WorkerConfig
 }
 
-// OutboxWorker drains the order_create and order_status rows of the outbox to HubRise.
+// OutboxWorker drains the order_create, order_status and inventory rows of the outbox to HubRise.
 //
 // Rows are claimed in one statement that leases them and counts the attempt before the HTTP call, so
 // a crash between the send and the acknowledgement is recognised on the next claim (attempts > 1) and
@@ -79,14 +82,18 @@ type OutboxWorker struct {
 	d    WorkerDeps
 	cfg  WorkerConfig
 	wake chan struct{}
+	// kinds are the outbox kinds this worker handles; a worker must never lease the others.
+	kinds []domain.OutboxKind
 }
-
-// workerKinds are the outbox kinds this worker handles.
-var workerKinds = []domain.OutboxKind{domain.OutboxOrderCreate, domain.OutboxOrderStatus}
 
 // NewOutboxWorker returns the worker.
 func NewOutboxWorker(d WorkerDeps) *OutboxWorker {
-	return &OutboxWorker{d: d, cfg: d.Config.withDefaults(), wake: make(chan struct{}, 1)}
+	w := &OutboxWorker{d: d, cfg: d.Config.withDefaults(), wake: make(chan struct{}, 1)}
+	w.kinds = []domain.OutboxKind{domain.OutboxOrderCreate, domain.OutboxOrderStatus}
+	if d.Availability != nil {
+		w.kinds = append(w.kinds, domain.OutboxInventory)
+	}
+	return w
 }
 
 // Wake asks the worker to drain now. It never blocks and a pending wake-up absorbs the next ones.
@@ -141,7 +148,7 @@ type batch struct {
 // DrainOnce claims one batch and processes it. It returns how many rows it claimed.
 func (w *OutboxWorker) DrainOnce(ctx context.Context) (int, error) {
 	now := w.d.Clock.Now()
-	items, err := w.d.Outbox.Claim(ctx, now, w.cfg.Lease, w.cfg.BatchSize, workerKinds...)
+	items, err := w.d.Outbox.Claim(ctx, now, w.cfg.Lease, w.cfg.BatchSize, w.kinds...)
 	if err != nil || len(items) == 0 {
 		return 0, err
 	}
@@ -194,6 +201,8 @@ func (w *OutboxWorker) process(ctx context.Context, b *batch, item domain.Outbox
 		w.sendCreate(ctx, b, item)
 	case domain.OutboxOrderStatus:
 		w.sendStatus(ctx, b, item)
+	case domain.OutboxInventory:
+		w.sendInventory(ctx, b, item)
 	}
 }
 
@@ -603,4 +612,52 @@ func (w *OutboxWorker) recoverMissing(ctx context.Context, b *batch, item domain
 		return *link.HubriseOrderID, err
 	}
 	return "", nil
+}
+
+// ---- inventory ----
+
+// sendInventory sends the stock of one SKU. The row only names the product and its SKU: the PATCH is
+// built from the product's availability now, so a row that waited out an outage, or was queued before
+// a second toggle, still sends the truth. The SKU is sold out ("0") while the product is unavailable
+// and removed from the inventory (unlimited stock) when it is available.
+func (w *OutboxWorker) sendInventory(ctx context.Context, b *batch, item domain.OutboxItem) {
+	var payload domain.InventoryPayload
+	if err := json.Unmarshal(item.Payload, &payload); err != nil || payload.Version != domain.InventoryPayloadVersion || payload.SkuRef == "" {
+		w.park(ctx, item, "unreadable inventory payload")
+		return
+	}
+	link, err := w.d.Links.FindByLocal(ctx, domain.EntityProduct, payload.ProductID)
+	if errors.Is(err, domain.ErrNotFound) {
+		w.skip(ctx, item, "the product is no longer linked")
+		return
+	}
+	if err != nil {
+		w.release(ctx, item, w.backoff(item, nil), err.Error(), false)
+		return
+	}
+	if link.RetiredAt != nil || link.HubriseRef != payload.SkuRef {
+		w.skip(ctx, item, "the link of the product changed")
+		return
+	}
+	states, err := w.d.Availability.Availability(ctx, domain.EntityProduct, []uuid.UUID{payload.ProductID})
+	if err != nil {
+		w.release(ctx, item, w.backoff(item, nil), err.Error(), false)
+		return
+	}
+	state, ok := states[payload.ProductID]
+	if !ok {
+		w.skip(ctx, item, "the product no longer exists")
+		return
+	}
+	entry := hubrise.AvailableSku(payload.SkuRef)
+	if !state.Available {
+		entry = hubrise.SoldOutSku(payload.SkuRef, nil)
+	}
+	if _, err := call(ctx, w, func(c context.Context) ([]hubrise.InventoryEntry, error) {
+		return b.client.PatchInventory(c, []hubrise.InventoryEntry{entry})
+	}); err != nil {
+		w.fail(ctx, b, item, err)
+		return
+	}
+	w.markSent(ctx, item)
 }

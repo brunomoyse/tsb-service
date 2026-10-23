@@ -228,6 +228,20 @@ func (r *outboxRepository) SkipPendingUpTo(ctx context.Context, orderID uuid.UUI
 		WHERE order_id = $1 AND kind = $2 AND state = 'pending' AND id <= $3`, orderID, kind, upTo, reason)
 }
 
+func (r *outboxRepository) ActiveDedupeKeys(ctx context.Context, kind domain.OutboxKind) (map[string]bool, error) {
+	var keys []string
+	if err := r.sel(ctx, "list active dedupe keys", &keys, `
+		SELECT DISTINCT dedupe_key FROM hubrise_outbox
+		WHERE kind = $1 AND dedupe_key IS NOT NULL AND state IN ('pending', 'sending')`, kind); err != nil {
+		return nil, err
+	}
+	set := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		set[k] = true
+	}
+	return set, nil
+}
+
 func (r *outboxRepository) CountForOrder(ctx context.Context, orderID uuid.UUID, kind domain.OutboxKind) (int, error) {
 	var n int
 	err := r.get(ctx, "count outbox rows of an order", &n,

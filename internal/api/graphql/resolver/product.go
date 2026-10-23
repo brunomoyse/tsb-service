@@ -83,6 +83,8 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 		return nil, fmt.Errorf("failed to fetch product %s: %w", id, err)
 	}
 
+	wasAvailable := prod.IsAvailable
+
 	// 2. Apply changes from the GraphQL input.
 	if input.CategoryID != nil {
 		prod.CategoryID = *input.CategoryID
@@ -138,6 +140,12 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 	// 3. Persist the update with the single domain object.
 	if err := r.ProductService.UpdateProduct(ctx, prod); err != nil {
 		return nil, productWriteFailure("failed to update product", err)
+	}
+
+	// A sold-out toggle made by staff (dashboard or MCP, both come through this mutation) is told to
+	// HubRise. Best effort, and never for the changes HubRise itself makes.
+	if input.IsAvailable != nil && *input.IsAvailable != wasAvailable {
+		r.AvailabilityChanged(ctx, id, *input.IsAvailable)
 	}
 
 	// 4. Refetch to get latest DB state (e.g. regenerated slug).

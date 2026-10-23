@@ -212,3 +212,55 @@ func TestCatalogLinkCheckConstraint(t *testing.T) {
 		assert.Error(t, err, name)
 	}
 }
+
+func TestCatalogLinkRecordStockAndExpiry(t *testing.T) {
+	e := newEnv(t)
+	repo := infrastructure.NewCatalogLinkRepository(e.db)
+	store := infrastructure.NewAvailabilityStore(e.db)
+	ctx := t.Context()
+	now := time.Now().Truncate(time.Microsecond)
+	_, choiceID := e.newChoice(t)
+
+	sold := e.link(t, repo, domain.EntityProduct, e.fx.SalmonSushi.ID, "SKU-A")
+	soldChoice := e.link(t, repo, domain.EntityChoice, choiceID, "SKU-A|L|O")
+	later := e.link(t, repo, domain.EntityProduct, e.fx.TunaSushi.ID, "SKU-B")
+	free := e.link(t, repo, domain.EntityProduct, e.fx.GreenTea.ID, "SKU-C")
+	retired := e.link(t, repo, domain.EntityProduct, e.fx.MochiIce.ID, "SKU-D")
+	zero := decimal.Zero
+	for link, until := range map[*domain.CatalogLink]time.Time{
+		sold: now.Add(-time.Minute), soldChoice: now.Add(-time.Second), later: now.Add(time.Hour), retired: now.Add(-time.Hour),
+	} {
+		u := until
+		_, err := store.TakeOver(ctx, link, domain.InventoryState{Stock: &zero, SoldOut: true, SoldOutUntil: &u, SyncedAt: now})
+		require.NoError(t, err)
+	}
+	require.NoError(t, repo.SetRetired(ctx, retired.ID, &now))
+
+	expired, err := repo.ListSoldOutExpired(ctx, now)
+	require.NoError(t, err)
+	var keys []string
+	for _, l := range expired {
+		keys = append(keys, l.HubriseKey)
+	}
+	assert.Equal(t, []string{"SKU-A", "SKU-A|L|O"}, keys, "sold out by inventory, expired, not retired, in id order")
+
+	t.Run("RecordStock stores the figures and leaves the provenance flag alone", func(t *testing.T) {
+		five := decimal.RequireFromString("5")
+		require.NoError(t, repo.RecordStock(ctx, free.ID, &five, nil, now))
+		got, err := repo.FindByKey(ctx, domain.EntityProduct, "SKU-C")
+		require.NoError(t, err)
+		require.NotNil(t, got.Stock)
+		assert.True(t, got.Stock.Equal(five))
+		assert.False(t, got.InventorySoldOut)
+		assert.WithinDuration(t, now, *got.InventorySyncedAt, time.Millisecond)
+
+		got, _ = repo.FindByKey(ctx, domain.EntityProduct, "SKU-A")
+		require.NoError(t, repo.RecordStock(ctx, got.ID, nil, nil, now))
+		got, _ = repo.FindByKey(ctx, domain.EntityProduct, "SKU-A")
+		assert.True(t, got.InventorySoldOut, "still owned: only the figures changed")
+		assert.Nil(t, got.Stock)
+		assert.Nil(t, got.SoldOutUntil)
+
+		assert.ErrorIs(t, repo.RecordStock(ctx, 0, nil, nil, now), domain.ErrNotFound)
+	})
+}

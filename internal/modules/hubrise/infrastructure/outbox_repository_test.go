@@ -586,3 +586,27 @@ func TestOutboxRetryParkedFailuresRollBack(t *testing.T) {
 		})
 	}
 }
+
+func TestOutboxActiveDedupeKeys(t *testing.T) {
+	e := newEnv(t)
+	repo := infrastructure.NewOutboxRepository(e.db)
+	ctx := t.Context()
+	order := e.newOrder(t)
+
+	rawInventory(t, e, "inv:sku:pending", domain.OutboxPending)
+	rawInventory(t, e, "inv:sku:pending", domain.OutboxSent)
+	rawInventory(t, e, "inv:sku:sending", domain.OutboxSending)
+	rawInventory(t, e, "inv:sku:parked", domain.OutboxParked)
+	rawInventory(t, e, "inv:sku:sent", domain.OutboxSent)
+	rawInventory(t, e, "inv:sku:skipped", domain.OutboxSkipped)
+	enqueue(t, repo, domain.OutboxOrderCreate, &order, "order:key", `{}`, time.Now())
+
+	keys, err := repo.ActiveDedupeKeys(ctx, domain.OutboxInventory)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]bool{"inv:sku:pending": true, "inv:sku:sending": true}, keys,
+		"only what is still on its way, and only the kind asked for")
+
+	none, err := repo.ActiveDedupeKeys(ctx, domain.OutboxCustomer)
+	require.NoError(t, err)
+	assert.Empty(t, none)
+}

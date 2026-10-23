@@ -5,8 +5,12 @@
 package hubrise
 
 import (
+	"cmp"
+	"context"
 	"fmt"
+	"sync"
 
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 
 	"tsb-service/internal/modules/hubrise/application"
@@ -30,6 +34,7 @@ type Module struct {
 	Events       domain.EventRepository
 	Foreign      domain.ForeignOrderRepository
 	Source       domain.OrderSource
+	Availability domain.AvailabilityStore
 }
 
 // NewModule builds the module on the admin pool (the hubrise tables get no per-role grants). It
@@ -59,6 +64,7 @@ func NewModule(cfg Config, adminDB *sqlx.DB, clock domain.Clock) (*Module, error
 		Events:       infrastructure.NewEventRepository(adminDB),
 		Foreign:      infrastructure.NewForeignOrderRepository(adminDB),
 		Source:       infrastructure.NewOrderSource(adminDB),
+		Availability: infrastructure.NewAvailabilityStore(adminDB),
 	}, nil
 }
 
@@ -102,7 +108,7 @@ func (m *Module) NewPush(o PushOptions) *Push {
 	})
 	worker := application.NewOutboxWorker(application.WorkerDeps{
 		Connections: m.Connections, Outbox: m.Outbox, Orders: m.Orders, Links: m.CatalogLinks,
-		Source: m.Source, Clients: clients, Clock: m.Clock, Config: o.Worker,
+		Source: m.Source, Availability: m.Availability, Clients: clients, Clock: m.Clock, Config: o.Worker,
 	})
 	pusher.SetWake(worker.Wake)
 	reconciler := application.NewReconciler(application.ReconcilerDeps{
@@ -164,4 +170,93 @@ func (m *Module) NewSync(push *Push, o SyncOptions) *Sync {
 		Receiver:  application.NewCallbackReceiver(string(m.Config.ClientSecret), m.Connections, m.Events, m.Clock, processor.Wake),
 		Processor: processor, Status: status, Poller: poller,
 	}
+}
+
+// InventoryOptions customizes NewInventory; every field is optional.
+type InventoryOptions struct {
+	// Clients overrides the provider of the push.
+	Clients application.ClientProvider
+	// Notifier publishes productUpdated when inventory changes a product (the resolver).
+	Notifier application.ProductNotifier
+	// Drift is the catalog service seen by the drift job; without it no drift job runs.
+	Drift application.CatalogDriftChecker
+	// Holder identifies this process in the lease table (a random one by default).
+	Holder string
+
+	Service application.InventoryConfig
+	Events  application.InventoryEventsConfig
+	Jobs    application.InventoryJobsConfig
+	Catalog application.CatalogDriftConfig
+}
+
+// Inventory is the sold-out sync: the service (inbound sync, baseline, expiry, and the outbound hook
+// the resolver calls), the processor of inventory callback events, the periodic jobs, and the catalog
+// drift job.
+type Inventory struct {
+	Service *application.InventoryService
+	Events  *application.InventoryEvents
+	Jobs    *application.InventoryJobs
+	// Drift is nil without a catalog service.
+	Drift *application.CatalogDrift
+}
+
+// NewInventory builds the inventory sync on the module's repositories. The outbox worker of push sends
+// the inventory rows (it is built with the availability store), so a row queued by the hook is
+// drained at once. Nothing is started: the caller runs Run, and Attach wakes the event processor when
+// a callback arrives.
+func (m *Module) NewInventory(push *Push, o InventoryOptions) *Inventory {
+	clients := o.Clients
+	if clients == nil {
+		clients = push.Clients
+	}
+	holder := cmp.Or(o.Holder, uuid.NewString())
+	scfg, jcfg, ccfg := o.Service, o.Jobs, o.Catalog
+	scfg.Holder, jcfg.Holder, ccfg.Holder = holder, holder, holder
+	svc := application.NewInventoryService(application.InventoryDeps{
+		Connections: m.Connections, Links: m.CatalogLinks, Outbox: m.Outbox, Leases: m.Leases, Store: m.Availability,
+		Clients: clients, Clock: m.Clock, Config: scfg, Notifier: o.Notifier, Wake: push.Worker.Wake,
+	})
+	inv := &Inventory{
+		Service: svc,
+		Events: application.NewInventoryEvents(application.InventoryEventsDeps{
+			Connections: m.Connections, Events: m.Events, Inventory: svc, Clock: m.Clock, Config: o.Events,
+		}),
+		Jobs: application.NewInventoryJobs(application.InventoryJobsDeps{
+			Inventory: svc, Leases: m.Leases, Clock: m.Clock, Config: jcfg,
+		}),
+	}
+	if o.Drift != nil {
+		inv.Drift = application.NewCatalogDrift(application.CatalogDriftDeps{
+			Connections: m.Connections, Events: m.Events, Leases: m.Leases, Checker: o.Drift, Clock: m.Clock, Config: ccfg,
+		})
+	}
+	return inv
+}
+
+// Attach makes the callback receiver and the poller of inbound wake the inventory event processor when
+// they store events.
+func (i *Inventory) Attach(inbound *Sync) {
+	inbound.Receiver.AddWake(i.Events.Wake)
+	inbound.Poller.AddWake(i.Events.Wake)
+}
+
+// Run runs the inventory event processor, the periodic jobs and, when there is one, the drift job,
+// until ctx ends.
+func (i *Inventory) Run(ctx context.Context) {
+	var wg sync.WaitGroup
+	for _, run := range []func(context.Context){i.Events.Run, i.Jobs.Run} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			run(ctx)
+		}()
+	}
+	if i.Drift != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			i.Drift.Run(ctx)
+		}()
+	}
+	wg.Wait()
 }

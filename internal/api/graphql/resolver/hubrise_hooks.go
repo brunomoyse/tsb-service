@@ -9,6 +9,7 @@ import (
 	orderDomain "tsb-service/internal/modules/order/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
 	"tsb-service/pkg/logging"
+	"tsb-service/pkg/utils"
 )
 
 // HubriseHooks is what the resolvers (and the services wired next to them) call to let the HubRise
@@ -94,4 +95,17 @@ func (r *Resolver) ProductGuard(ctx context.Context, current, updated *productDo
 		return nil
 	}
 	return r.Hubrise.ProductGuard(ctx, current, updated)
+}
+
+// PublishProductUpdated publishes the current state of a product on the productUpdated topic, so
+// open dashboards and menus follow a change the shop did not make through a mutation (an inventory
+// sync that sold a product out). A failure is logged: the change itself is already stored.
+func (r *Resolver) PublishProductUpdated(ctx context.Context, productID uuid.UUID) {
+	prod, err := r.ProductService.GetProduct(ctx, productID)
+	if err != nil {
+		logging.FromContext(ctx).Warn("hubrise: cannot publish a product update",
+			zap.String("product_id", productID.String()), zap.Error(err))
+		return
+	}
+	r.Broker.Publish("productUpdated", ToGQLProduct(prod, utils.GetLang(ctx)))
 }

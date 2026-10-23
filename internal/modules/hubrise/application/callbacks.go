@@ -57,6 +57,10 @@ func NewCallbackReceiver(secret string, conns domain.ConnectionRepository, event
 	return &CallbackReceiver{secret: secret, conns: conns, events: events, clock: clock, wake: wake}
 }
 
+// AddWake registers another function to call after a new event was stored (the inventory processor
+// is built after the receiver). It must be called before the receiver serves requests.
+func (r *CallbackReceiver) AddWake(w ...func()) { r.wake = append(r.wake, w...) }
+
 // Receive handles the raw body of a callback request and the value of its signature header.
 func (r *CallbackReceiver) Receive(ctx context.Context, body []byte, signature string) (ReceiveOutcome, error) {
 	if !hubrise.VerifySignature(r.secret, body, signature) {
@@ -163,6 +167,10 @@ type CallbackPoller struct {
 func NewCallbackPoller(d CallbackPollerDeps) *CallbackPoller {
 	return &CallbackPoller{d: d, cfg: d.Config.withDefaults()}
 }
+
+// AddWake registers another function to call after the poll stored events, with the same rules as
+// CallbackReceiver.AddWake.
+func (p *CallbackPoller) AddWake(w ...func()) { p.d.Wake = append(p.d.Wake, w...) }
 
 // Run polls until ctx ends.
 func (p *CallbackPoller) Run(ctx context.Context) {

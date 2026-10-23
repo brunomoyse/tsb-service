@@ -57,6 +57,8 @@ func TestRepositoriesReportAStoreThatIsDown(t *testing.T) {
 		"link disabled": func() error { return links.SetCatalogDisabled(ctx, 1, true) },
 		"link stock":    func() error { return links.UpdateInventory(ctx, 1, domain.InventoryState{SyncedAt: now}) },
 		"link clear":    func() error { return links.ClearSoldOut(ctx, 1) },
+		"link record":   func() error { return links.RecordStock(ctx, 1, nil, nil, now) },
+		"link expired":  func() error { _, err := links.ListSoldOutExpired(ctx, now); return err },
 		"link delete":   func() error { return links.Delete(ctx, 1) },
 		"link purge":    func() error { _, err := links.DeleteAll(ctx); return err },
 
@@ -90,6 +92,7 @@ func TestRepositoriesReportAStoreThatIsDown(t *testing.T) {
 		"order recreate":  func() error { return orders.Recreate(ctx, id, nil, now) },
 		"outbox max id":   func() error { _, err := outbox.MaxPendingID(ctx, id, domain.OutboxOrderStatus); return err },
 		"outbox skip up":  func() error { _, err := outbox.SkipPendingUpTo(ctx, id, domain.OutboxOrderStatus, 1, "x"); return err },
+		"outbox keys":     func() error { _, err := outbox.ActiveDedupeKeys(ctx, domain.OutboxInventory); return err },
 		"outbox count":    func() error { _, err := outbox.CountForOrder(ctx, id, domain.OutboxOrderCreate); return err },
 
 		"event insert":   func() error { _, err := events.Insert(ctx, domain.Event{ID: "e"}); return err },

@@ -154,6 +154,12 @@ type CatalogLinkRepository interface {
 	SetCatalogDisabled(ctx context.Context, id int64, disabled bool) error
 	// UpdateInventory records the result of an inventory sync.
 	UpdateInventory(ctx context.Context, id int64, s InventoryState) error
+	// RecordStock stores the stock figure and the expiry HubRise reported, without touching the
+	// sold-out provenance flag (which only TakeOver, Release and the shop's own toggles change).
+	RecordStock(ctx context.Context, id int64, stock *decimal.Decimal, soldOutUntil *time.Time, at time.Time) error
+	// ListSoldOutExpired lists the non retired links that inventory sold out and whose expiry has
+	// passed at now.
+	ListSoldOutExpired(ctx context.Context, now time.Time) ([]CatalogLink, error)
 	// ClearSoldOut clears the sold-out provenance of a link: the shop now owns that state.
 	ClearSoldOut(ctx context.Context, id int64) error
 	// Delete removes one link (the local row stays).

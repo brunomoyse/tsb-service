@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/shopspring/decimal"
 
 	"tsb-service/internal/modules/hubrise/domain"
 )
@@ -114,6 +115,20 @@ func (r *catalogLinkRepository) UpdateInventory(ctx context.Context, id int64, s
 		UPDATE hubrise_catalog_links SET stock = $2, inventory_sold_out = $3, sold_out_until = $4,
 			inventory_synced_at = $5, updated_at = now() WHERE id = $1`,
 		id, s.Stock, s.SoldOut, s.SoldOutUntil, s.SyncedAt)
+}
+
+func (r *catalogLinkRepository) RecordStock(ctx context.Context, id int64, stock *decimal.Decimal, soldOutUntil *time.Time, at time.Time) error {
+	return r.mustChange(ctx, "record catalog link stock", `
+		UPDATE hubrise_catalog_links SET stock = $2, sold_out_until = $3, inventory_synced_at = $4, updated_at = now()
+		WHERE id = $1`, id, stock, soldOutUntil, at)
+}
+
+func (r *catalogLinkRepository) ListSoldOutExpired(ctx context.Context, now time.Time) ([]domain.CatalogLink, error) {
+	links := []domain.CatalogLink{}
+	err := r.sel(ctx, "list expired sold out links", &links, `SELECT `+catalogLinkColumns+` FROM hubrise_catalog_links
+		WHERE inventory_sold_out AND retired_at IS NULL AND sold_out_until IS NOT NULL AND sold_out_until <= $1
+		ORDER BY id`, now)
+	return links, err
 }
 
 func (r *catalogLinkRepository) ClearSoldOut(ctx context.Context, id int64) error {
