@@ -18,7 +18,7 @@ type availabilityStore struct{ store }
 // NewAvailabilityStore returns the store that switches the availability of products and choices on
 // behalf of the inventory sync.
 func NewAvailabilityStore(db *sqlx.DB) domain.AvailabilityStore {
-	return &availabilityStore{store{db}}
+	return &availabilityStore{newStore(db)}
 }
 
 // availabilityTargets maps an entity type to the table that holds its availability. The names are

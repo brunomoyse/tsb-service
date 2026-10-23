@@ -19,7 +19,13 @@ type catalogLinkRepository struct{ store }
 
 // NewCatalogLinkRepository returns the store of HubRise catalog links.
 func NewCatalogLinkRepository(db *sqlx.DB) domain.CatalogLinkRepository {
-	return &catalogLinkRepository{store{db}}
+	return &catalogLinkRepository{newStore(db)}
+}
+
+// NewCatalogLinkRepositoryTx returns the same repository bound to a transaction, for the import
+// batches that write links together with the menu rows.
+func NewCatalogLinkRepositoryTx(tx *sqlx.Tx) domain.CatalogLinkRepository {
+	return &catalogLinkRepository{newTxStore(tx)}
 }
 
 func (r *catalogLinkRepository) Upsert(ctx context.Context, l *domain.CatalogLink) error {
@@ -108,6 +114,11 @@ func (r *catalogLinkRepository) SetRetired(ctx context.Context, id int64, at *ti
 func (r *catalogLinkRepository) SetCatalogDisabled(ctx context.Context, id int64, disabled bool) error {
 	return r.mustChange(ctx, "set catalog link disabled",
 		`UPDATE hubrise_catalog_links SET catalog_disabled = $2, updated_at = now() WHERE id = $1`, id, disabled)
+}
+
+func (r *catalogLinkRepository) SetImageMD5(ctx context.Context, id int64, md5 string) error {
+	return r.mustChange(ctx, "set catalog link image md5",
+		`UPDATE hubrise_catalog_links SET image_md5 = $2, updated_at = now() WHERE id = $1`, id, md5)
 }
 
 func (r *catalogLinkRepository) UpdateInventory(ctx context.Context, id int64, s domain.InventoryState) error {

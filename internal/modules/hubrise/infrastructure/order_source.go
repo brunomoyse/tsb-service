@@ -20,7 +20,7 @@ import (
 type orderSource struct{ store }
 
 // NewOrderSource returns the reader of the shop's orders.
-func NewOrderSource(db *sqlx.DB) domain.OrderSource { return &orderSource{store{db}} }
+func NewOrderSource(db *sqlx.DB) domain.OrderSource { return &orderSource{newStore(db)} }
 
 // nameOrder picks a translation the way the shop does (fr first, then en, nl, zh); the push is for
 // the kitchen, which reads French.

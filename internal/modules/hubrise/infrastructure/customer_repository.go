@@ -16,7 +16,7 @@ type customerLinkRepository struct{ store }
 
 // NewCustomerLinkRepository returns the store of the links to the HubRise customer list.
 func NewCustomerLinkRepository(db *sqlx.DB) domain.CustomerLinkRepository {
-	return &customerLinkRepository{store{db}}
+	return &customerLinkRepository{newStore(db)}
 }
 
 func (r *customerLinkRepository) Get(ctx context.Context, userID uuid.UUID) (*domain.CustomerLink, error) {
@@ -70,7 +70,7 @@ func (r *customerLinkRepository) MarkAnonymised(ctx context.Context, userID uuid
 type customerSource struct{ store }
 
 // NewCustomerSource returns the reader of the shop's users.
-func NewCustomerSource(db *sqlx.DB) domain.CustomerSource { return &customerSource{store{db}} }
+func NewCustomerSource(db *sqlx.DB) domain.CustomerSource { return &customerSource{newStore(db)} }
 
 func (s *customerSource) Profile(ctx context.Context, userID uuid.UUID) (*domain.CustomerProfile, error) {
 	var row struct {

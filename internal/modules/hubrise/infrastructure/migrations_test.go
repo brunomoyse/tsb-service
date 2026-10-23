@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,6 +24,8 @@ const (
 	m1Version int64 = 20261026120000
 	m2Version int64 = 20261026130000
 	m3Version int64 = 20261026140000
+	// m4Version adds the source column to the translation tables.
+	m4Version int64 = 20261026150000
 	// m5Version adds product_choices.is_available (inventory can sell an option out).
 	m5Version int64 = 20261026160000
 	// m6Version adds orders.channel, the one change to an existing table.
@@ -146,7 +149,7 @@ func TestHubriseMigrationsApplyOneByOneWithoutMissingVersions(t *testing.T) {
 
 	// An environment that deployed task 1 only (the test server deploys on every push), then later
 	// tasks: each step must apply cleanly with out-of-order disabled.
-	for _, v := range []int64{m1Version, m2Version, m3Version, m5Version, m6Version, m7Version} {
+	for _, v := range []int64{m1Version, m2Version, m3Version, m4Version, m5Version, m6Version, m7Version} {
 		res, err := p.UpTo(ctx, v)
 		require.NoError(t, err, "UpTo %d", v)
 		require.Len(t, res, 1)
@@ -185,7 +188,8 @@ func TestMigrationVersionsAreStrictlyOrdered(t *testing.T) {
 	assert.Greater(t, m1Version, lastPreHubriseVersion)
 	assert.Less(t, m1Version, m2Version)
 	assert.Less(t, m2Version, m3Version)
-	assert.Less(t, m3Version, m5Version)
+	assert.Less(t, m3Version, m4Version)
+	assert.Less(t, m4Version, m5Version)
 	assert.Less(t, m5Version, m6Version)
 	assert.Less(t, m6Version, m7Version)
 
@@ -356,4 +360,96 @@ func TestChoiceIsAvailableMigrationDoesNotBlockChoicesForLong(t *testing.T) {
 	require.NoError(t, err)
 	_, _, ok = choiceAvailableColumn(t, td)
 	assert.True(t, ok)
+}
+
+// translationTables are the tables that got the source column.
+var translationTables = []string{
+	"product_translations", "product_category_translations", "product_choice_translations", "product_choice_group_translations",
+}
+
+func columnExists(t *testing.T, td *testhelpers.TestDatabase, table, column string) bool {
+	t.Helper()
+	var n int
+	require.NoError(t, td.DB.GetContext(t.Context(), &n, `
+		SELECT count(*) FROM information_schema.columns
+		WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2`, table, column))
+	return n == 1
+}
+
+// M4 adds a column to tables that hold production data: the existing rows must come out 'manual'
+// and Down must take the column away again.
+func TestTranslationSourceColumnBackfillsByDefault(t *testing.T) {
+	td := testhelpers.SetupTestDatabase(t)
+	ctx := t.Context()
+	p := newProvider(t, td)
+
+	_, err := p.DownTo(ctx, m3Version)
+	require.NoError(t, err)
+	for _, table := range translationTables {
+		assert.False(t, columnExists(t, td, table, "source"), table)
+	}
+
+	fx := testhelpers.SeedTestData(t, td.DB)
+	groupID, choiceID := uuid.New(), uuid.New()
+	_, err = td.DB.ExecContext(ctx, `INSERT INTO product_choice_groups (id, product_id) VALUES ($1, $2)`, groupID, fx.SalmonSushi.ID)
+	require.NoError(t, err)
+	_, err = td.DB.ExecContext(ctx, `INSERT INTO product_choices (id, product_id, choice_group_id) VALUES ($1, $2, $3)`, choiceID, fx.SalmonSushi.ID, groupID)
+	require.NoError(t, err)
+	_, err = td.DB.ExecContext(ctx, `INSERT INTO product_choice_translations (product_choice_id, locale, name) VALUES ($1, 'fr', 'Soja')`, choiceID)
+	require.NoError(t, err)
+	_, err = td.DB.ExecContext(ctx, `INSERT INTO product_choice_group_translations (product_choice_group_id, locale, name) VALUES ($1, 'fr', 'Sauce')`, groupID)
+	require.NoError(t, err)
+	before := tableCounts(t, td)
+
+	_, err = p.Up(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, before, tableCounts(t, td), "no row is lost")
+
+	for _, table := range translationTables {
+		require.True(t, columnExists(t, td, table, "source"), table)
+		var n, manual int
+		require.NoError(t, td.DB.GetContext(ctx, &n, `SELECT count(*) FROM `+table))
+		require.NoError(t, td.DB.GetContext(ctx, &manual, `SELECT count(*) FROM `+table+` WHERE source = 'manual'`))
+		assert.Positive(t, n, table)
+		assert.Equal(t, n, manual, "%s: every existing translation is manual", table)
+	}
+
+	_, err = p.DownTo(ctx, m3Version)
+	require.NoError(t, err)
+	for _, table := range translationTables {
+		assert.False(t, columnExists(t, td, table, "source"), "%s: Down drops the column", table)
+	}
+}
+
+// A migration that cannot get its lock must fail within lock_timeout instead of queueing every
+// writer of the table behind an ACCESS EXCLUSIVE request.
+func TestTranslationSourceMigrationFailsFastWhenTheTableIsBusy(t *testing.T) {
+	td := testhelpers.SetupTestDatabase(t)
+	ctx := t.Context()
+	p := newProvider(t, td)
+	_, err := p.DownTo(ctx, m3Version)
+	require.NoError(t, err)
+
+	// An open transaction that has read the table holds ACCESS SHARE until it ends.
+	tx, err := td.DB.BeginTxx(ctx, nil)
+	require.NoError(t, err)
+	defer func() { _ = tx.Rollback() }()
+	var n int
+	require.NoError(t, tx.GetContext(ctx, &n, `SELECT count(*) FROM product_translations`))
+
+	start := time.Now()
+	_, err = p.UpTo(ctx, m4Version)
+	elapsed := time.Since(start)
+	require.Error(t, err, "the busy table makes the migration fail")
+	assert.Contains(t, err.Error(), "lock timeout")
+	assert.GreaterOrEqual(t, elapsed, 4*time.Second, "it waited for the lock timeout")
+	assert.Less(t, elapsed, 20*time.Second, "and no longer")
+
+	v, err := p.GetDBVersion(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, m3Version, v, "the failed migration changed nothing")
+
+	require.NoError(t, tx.Rollback())
+	_, err = p.UpTo(ctx, m4Version)
+	require.NoError(t, err)
 }

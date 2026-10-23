@@ -82,6 +82,7 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch product %s: %w", id, err)
 	}
+	before := *prod // what the HubRise ownership guard compares the edit with
 
 	wasAvailable := prod.IsAvailable
 
@@ -135,6 +136,11 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 	}
 	if input.Translations != nil {
 		prod.Translations = toDomainTranslations(input.Translations)
+	}
+
+	// A product HubRise owns cannot have its HubRise fields edited here (a no-op without HubRise).
+	if err := r.ProductGuard(ctx, &before, prod); err != nil {
+		return nil, err
 	}
 
 	// 3. Persist the update with the single domain object.
@@ -206,6 +212,9 @@ func (r *mutationResolver) CreateProductChoiceGroup(ctx context.Context, input m
 		Translations:  translations,
 	}
 
+	if err := r.ChoiceGroupGuard(ctx, nil, group); err != nil {
+		return nil, err
+	}
 	if err := r.ProductService.CreateChoiceGroup(ctx, group); err != nil {
 		return nil, fmt.Errorf("failed to create product choice group: %w", err)
 	}
@@ -221,6 +230,7 @@ func (r *mutationResolver) UpdateProductChoiceGroup(ctx context.Context, id uuid
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch product choice group: %w", err)
 	}
+	before := *group
 
 	if input.MinSelections != nil {
 		group.MinSelections = *input.MinSelections
@@ -252,6 +262,9 @@ func (r *mutationResolver) UpdateProductChoiceGroup(ctx context.Context, id uuid
 		group.Translations = translations
 	}
 
+	if err := r.ChoiceGroupGuard(ctx, &before, group); err != nil {
+		return nil, err
+	}
 	if err := r.ProductService.UpdateChoiceGroup(ctx, group); err != nil {
 		return nil, fmt.Errorf("failed to update product choice group: %w", err)
 	}
@@ -261,6 +274,13 @@ func (r *mutationResolver) UpdateProductChoiceGroup(ctx context.Context, id uuid
 
 // DeleteProductChoiceGroup is the resolver for the deleteProductChoiceGroup field.
 func (r *mutationResolver) DeleteProductChoiceGroup(ctx context.Context, id uuid.UUID) (bool, error) {
+	if r.Hubrise != nil { // standalone: no extra read
+		if current, err := r.ProductService.GetChoiceGroupByID(ctx, id); err == nil {
+			if err := r.ChoiceGroupGuard(ctx, current, nil); err != nil {
+				return false, err
+			}
+		}
+	}
 	if err := r.ProductService.DeleteChoiceGroup(ctx, id); err != nil {
 		return false, fmt.Errorf("failed to delete product choice group: %w", err)
 	}
@@ -313,6 +333,9 @@ func (r *mutationResolver) CreateProductChoice(ctx context.Context, input model.
 					{Locale: "zh", Name: "选择"},
 				},
 			}
+			if err := r.ChoiceGroupGuard(ctx, nil, defaultGroup); err != nil {
+				return nil, err
+			}
 			if err := r.ProductService.CreateChoiceGroup(ctx, defaultGroup); err != nil {
 				return nil, fmt.Errorf("failed to create default choice group: %w", err)
 			}
@@ -333,6 +356,9 @@ func (r *mutationResolver) CreateProductChoice(ctx context.Context, input model.
 		Translations:  translations,
 	}
 
+	if err := r.ChoiceGuard(ctx, nil, choice); err != nil {
+		return nil, err
+	}
 	if err := r.ProductService.CreateChoice(ctx, choice); err != nil {
 		return nil, fmt.Errorf("failed to create product choice: %w", err)
 	}
@@ -348,6 +374,7 @@ func (r *mutationResolver) UpdateProductChoice(ctx context.Context, id uuid.UUID
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch product choice: %w", err)
 	}
+	before := *choice
 
 	if input.PriceModifier != nil {
 		clean := strings.ReplaceAll(strings.TrimSpace(*input.PriceModifier), ",", ".")
@@ -375,6 +402,9 @@ func (r *mutationResolver) UpdateProductChoice(ctx context.Context, id uuid.UUID
 		choice.Translations = translations
 	}
 
+	if err := r.ChoiceGuard(ctx, &before, choice); err != nil {
+		return nil, err
+	}
 	if err := r.ProductService.UpdateChoice(ctx, choice); err != nil {
 		return nil, fmt.Errorf("failed to update product choice: %w", err)
 	}
@@ -384,6 +414,13 @@ func (r *mutationResolver) UpdateProductChoice(ctx context.Context, id uuid.UUID
 
 // DeleteProductChoice is the resolver for the deleteProductChoice field.
 func (r *mutationResolver) DeleteProductChoice(ctx context.Context, id uuid.UUID) (bool, error) {
+	if r.Hubrise != nil { // standalone: no extra read
+		if current, err := r.ProductService.GetChoiceByID(ctx, id); err == nil {
+			if err := r.ChoiceGuard(ctx, current, nil); err != nil {
+				return false, err
+			}
+		}
+	}
 	if err := r.ProductService.DeleteChoice(ctx, id); err != nil {
 		return false, fmt.Errorf("failed to delete product choice: %w", err)
 	}

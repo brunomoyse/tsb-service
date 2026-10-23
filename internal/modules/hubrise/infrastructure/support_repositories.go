@@ -15,7 +15,7 @@ type oauthStateRepository struct{ store }
 
 // NewOAuthStateRepository returns the store of one-time OAuth state nonces.
 func NewOAuthStateRepository(db *sqlx.DB) domain.OAuthStateRepository {
-	return &oauthStateRepository{store{db}}
+	return &oauthStateRepository{newStore(db)}
 }
 
 func (r *oauthStateRepository) Create(ctx context.Context, state string, adminUserID uuid.UUID, expiresAt time.Time) error {
@@ -52,7 +52,7 @@ type leaseRepository struct{ store }
 
 // NewLeaseRepository returns the job lease store (compare-and-set leases between replicas).
 func NewLeaseRepository(db *sqlx.DB) domain.LeaseRepository {
-	return &leaseRepository{store{db}}
+	return &leaseRepository{newStore(db)}
 }
 
 // Acquire is a single atomic statement: the row is created, or taken over when the lease expired
@@ -73,7 +73,7 @@ type foreignOrderRepository struct{ store }
 
 // NewForeignOrderRepository returns the cache of HubRise orders that are not ours.
 func NewForeignOrderRepository(db *sqlx.DB) domain.ForeignOrderRepository {
-	return &foreignOrderRepository{store{db}}
+	return &foreignOrderRepository{newStore(db)}
 }
 
 func (r *foreignOrderRepository) Mark(ctx context.Context, hubriseOrderID string, at time.Time) error {

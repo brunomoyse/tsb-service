@@ -21,7 +21,7 @@ type outboxRepository struct{ store }
 
 // NewOutboxRepository returns the durable outbox.
 func NewOutboxRepository(db *sqlx.DB) domain.OutboxRepository {
-	return &outboxRepository{store{db}}
+	return &outboxRepository{newStore(db)}
 }
 
 // createdAt is the creation time to store: the item's own when the caller set one (so ages follow the

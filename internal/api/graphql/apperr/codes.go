@@ -142,6 +142,22 @@ const (
 	CodeAssistantLimitReached Code = "ASSISTANT_LIMIT_REACHED"
 )
 
+// HubRise integration (dashboard). The shop's customers never see these.
+const (
+	// CodeHubriseManaged: the edit touches a field HubRise owns on a linked product (price,
+	// category, VAT category, code, choice groups and choices). `fields` in the extensions names them.
+	CodeHubriseManaged Code = "HUBRISE_MANAGED"
+	// CodeHubriseRelinkRequired: the connection now points at another HubRise location or catalog
+	// than the existing links were made for; forget the links before enabling the integration.
+	CodeHubriseRelinkRequired Code = "HUBRISE_RELINK_REQUIRED"
+	// CodeHubrisePreviewRequired: catalog sync can only be enabled after a successful dry run of the
+	// current catalog, less than a day old.
+	CodeHubrisePreviewRequired Code = "HUBRISE_PREVIEW_REQUIRED"
+	// CodeHubriseRetireConfirmRequired: the import would retire a large part of the menu
+	// (`retiring` of `linked` products in the extensions); repeat it with the confirmation.
+	CodeHubriseRetireConfirmRequired Code = "HUBRISE_RETIRE_CONFIRM_REQUIRED"
+)
+
 // expected lists the codes that are the customer's / the world's doing rather than ours: they are
 // logged as warnings and never sent to Sentry. Everything else is a server fault.
 var expected = map[Code]bool{
@@ -186,6 +202,11 @@ var expected = map[Code]bool{
 	CodePaymentSettlementFailed: true,
 	// Staff must act (refund by hand); the resolver logs the cause at error level itself.
 	CodePaymentNotRefundable: true,
+	// The operator's doing: an edit of a managed field, a step done out of order.
+	CodeHubriseManaged:               true,
+	CodeHubriseRelinkRequired:        true,
+	CodeHubrisePreviewRequired:       true,
+	CodeHubriseRetireConfirmRequired: true,
 }
 
 // IsExpected reports whether the code is a user-side error (warn log, no Sentry event).

@@ -60,6 +60,8 @@ func TestIsExpected(t *testing.T) {
 		apperr.CodeSlotTooSoon, apperr.CodeLunchSlotRequired, apperr.CodeProductNotFound,
 		apperr.CodeSelectionInvalid, apperr.CodeDeliveryMinimumNotMet, apperr.CodeCouponAlreadyActive,
 		apperr.CodeCouponAppOnly,
+		// The operator's doing, not a fault.
+		apperr.CodeHubriseManaged, apperr.CodeHubriseRelinkRequired, apperr.CodeHubrisePreviewRequired, apperr.CodeHubriseRetireConfirmRequired,
 		// A provider outage while cancelling: not a bug of ours, and the message is for the staff member who retries.
 		apperr.CodePaymentSettlementFailed,
 		// A paid payment Mollie cannot refund: the staff member refunds by hand, the resolver logs it at error level itself.

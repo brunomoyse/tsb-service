@@ -19,7 +19,7 @@ type eventRepository struct{ store }
 
 // NewEventRepository returns the store of received callback events.
 func NewEventRepository(db *sqlx.DB) domain.EventRepository {
-	return &eventRepository{store{db}}
+	return &eventRepository{newStore(db)}
 }
 
 func (r *eventRepository) Insert(ctx context.Context, e domain.Event) (bool, error) {

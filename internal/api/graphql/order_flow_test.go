@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -619,6 +620,41 @@ func TestOrderingChoicesAndGroups(t *testing.T) {
 			assert.Contains(t, got, "Nori", "[%s]", lang)
 		}
 	})
+}
+
+// A choice HubRise sold out (or took off sale) cannot be ordered. The refusal uses the code the
+// stored apps already know, and a quote reports it before the customer pays.
+func TestOrderingRefusesAnUnavailableChoice(t *testing.T) {
+	shop := setupShop(t)
+	tc := shop.tc
+	b := seedBowl(t, shop)
+	_, token := shop.customer(t, "soldout")
+	items := []map[string]any{{"productId": b.product.String(), "quantity": 1, "selections": []map[string]any{sel(b.broth, b.mild, 1), sel(b.toppings, b.corn, 1)}}}
+	legacy := []map[string]any{{"productId": b.product.String(), "quantity": 1, "choiceId": b.spicy.String()}}
+
+	// Available: both ways of selecting it are accepted.
+	require.Empty(t, quoteCodes(quoteAs(t, tc, token, "nl", quoteInput("PICKUP", items, nil))))
+	require.Empty(t, quoteCodes(quoteAs(t, tc, token, "nl", quoteInput("PICKUP", legacy, nil))))
+
+	_, err := tc.DB.DB.ExecContext(t.Context(), `UPDATE product_choices SET is_available = false WHERE id = ANY($1)`, pq.Array([]string{b.corn.String(), b.spicy.String()}))
+	require.NoError(t, err)
+
+	for name, in := range map[string][]map[string]any{"a selection": items, "the legacy single choice": legacy} {
+		t.Run(name, func(t *testing.T) {
+			got, orderErr := createOrderAs(t, tc, token, "nl", createOrderInput("PICKUP", in, nil))
+			e := requireOrderError(t, got, orderErr, apperr.CodeSelectionInvalid)
+			assert.Equal(t, b.product.String(), e.Extensions["productId"])
+			assert.Contains(t, e.Message, "not available")
+			assert.Contains(t, quoteCodes(quoteAs(t, tc, token, "nl", quoteInput("PICKUP", in, nil))), "SELECTION_INVALID")
+		})
+	}
+
+	// The other choices of the product are unaffected, and the choice is orderable again once restored.
+	ok := []map[string]any{{"productId": b.product.String(), "quantity": 1, "selections": []map[string]any{sel(b.broth, b.mild, 1), sel(b.toppings, b.nori, 1)}}}
+	require.Empty(t, quoteCodes(quoteAs(t, tc, token, "nl", quoteInput("PICKUP", ok, nil))))
+	_, err = tc.DB.DB.ExecContext(t.Context(), `UPDATE product_choices SET is_available = true WHERE id = $1`, b.corn)
+	require.NoError(t, err)
+	require.Empty(t, quoteCodes(quoteAs(t, tc, token, "nl", quoteInput("PICKUP", items, nil))))
 }
 
 func TestOrderingCoupons(t *testing.T) {
