@@ -394,7 +394,7 @@ New env vars (documented in `.env.example` and CLAUDE.md): `HUBRISE_CLIENT_ID`, 
 | Remote cancel of an online-paid order | no automatic refund unless `auto_refund_on_cancel`; flagged for staff otherwise |
 | Stale rows after a long pause | aged out per kind (section 6.1), never replayed |
 | Migration cannot get its lock | `lock_timeout` aborts it, deploy job fails, old pods keep serving, deploy is re-run |
-| Two replicas | SKIP LOCKED claims, advisory locks on singleton jobs and on the catalog import |
+| Two replicas | SKIP LOCKED claims, advisory locks on singleton jobs and on the catalog import; the API client Limiter is per process: build it from `DefaultLimits().Split(replicas)` so the replicas together stay under the per connection caps |
 | Catalog invalid, empty or suspicious | an empty catalog is rejected; retiring more than 30 % of linked products (min 5) needs `confirmRetire` and is never applied by a scheduled import; partial failure rolls back the batch |
 | HubRise order never accepted | after 5 min in `new` the order is flagged for staff (visible in `hubriseStatus.attention`) |
 

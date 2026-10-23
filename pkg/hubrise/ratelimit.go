@@ -69,12 +69,43 @@ type Limits struct {
 // DefaultLimits are HubRise's documented limits (500/min, 2,500/h, 10,000/day, 10/min on the list
 // bucket) with headroom: 400, 2,000 and 8,000, and the list bucket split 6 order lookups, 3
 // catalog reads and 1 spare.
+//
+// A Limiter lives in process memory, while HubRise counts per connection and production runs two
+// replicas. These ceilings are therefore per process: with N replicas sending HubRise traffic the
+// connection can see N times as much, and a 429 pause only stops the replica that received it.
+// Every caller that can send from several replicas (the outbox drain claims rows on each one)
+// must build its Limiter from DefaultLimits().Split(replicas), so that the sum stays under the
+// documented caps. The lease guarded singleton jobs share the connection with the other replicas
+// too, so the split applies to them as well.
 func DefaultLimits() Limits {
 	return Limits{
 		PerMinute: 400, PerHour: 2000, PerDay: 8000,
 		OrderLookupPerMinute: 6, CatalogPerMinute: 3, SparePerMinute: 1,
 		BackgroundShare: 0.6,
 	}
+}
+
+// Split returns the limits one of n replicas may spend so that all n together stay within l. Each
+// positive window is divided by n, rounded down but never below 1 (0 would disable the window);
+// the spare list slot rounds down to 0. A window <= 0 (disabled) stays as it is and n < 2 returns
+// l unchanged.
+func (l Limits) Split(n int) Limits {
+	if n < 2 {
+		return l
+	}
+	div := func(v, floor int) int {
+		if v <= 0 {
+			return v
+		}
+		return max(v/n, floor)
+	}
+	l.PerMinute = div(l.PerMinute, 1)
+	l.PerHour = div(l.PerHour, 1)
+	l.PerDay = div(l.PerDay, 1)
+	l.OrderLookupPerMinute = div(l.OrderLookupPerMinute, 1)
+	l.CatalogPerMinute = div(l.CatalogPerMinute, 1)
+	l.SparePerMinute = div(l.SparePerMinute, 0)
+	return l
 }
 
 // Clock is the time source of the limiter, replaceable in tests.

@@ -372,3 +372,25 @@ func TestWindowHelpers(t *testing.T) {
 	assert.True(t, sort.SliceIsSorted(kept, func(i, j int) bool { return kept[i].Before(kept[j]) }))
 	assert.Len(t, dropBefore(events, base.Add(-time.Second)), 3)
 }
+
+func TestLimitsSplit(t *testing.T) {
+	d := DefaultLimits()
+	assert.Equal(t, d, d.Split(0))
+	assert.Equal(t, d, d.Split(1))
+
+	half := d.Split(2)
+	assert.Equal(t, Limits{
+		PerMinute: 200, PerHour: 1000, PerDay: 4000,
+		OrderLookupPerMinute: 3, CatalogPerMinute: 1, SparePerMinute: 0,
+		BackgroundShare: 0.6,
+	}, half)
+	// Two replicas together stay under the real HubRise caps.
+	assert.LessOrEqual(t, 2*half.PerMinute, 500)
+	assert.LessOrEqual(t, 2*half.PerHour, 2500)
+	assert.LessOrEqual(t, 2*half.PerDay, 10000)
+	assert.LessOrEqual(t, 2*(half.OrderLookupPerMinute+half.CatalogPerMinute+half.SparePerMinute), 10)
+
+	// A positive window never rounds down to zero (that would disable it), a disabled one stays so.
+	in := Limits{PerMinute: 1, PerHour: 0, PerDay: -1, OrderLookupPerMinute: 1}
+	assert.Equal(t, in, in.Split(4))
+}
