@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
+	"github.com/google/uuid"
 	"github.com/nyaruka/phonenumbers"
 	"go.uber.org/zap"
 
 	"tsb-service/internal/modules/user/domain"
+	"tsb-service/pkg/logging"
 )
 
 // ErrInvalidPhoneNumber is returned when a phone number cannot be parsed into E.164 form.
@@ -39,7 +42,24 @@ func normalizePhoneNumber(raw string) (*string, error) {
 	return &e164, nil
 }
 
+// ProfileObserver is told about the changes of a user that an outside system keeping a copy of the
+// customer (the HubRise customer list) has to follow. It exists so that system can be notified
+// without the user module knowing about it. It is called on the caller's goroutine after the change
+// is stored, so an implementation must be quick (a queue insert, never a network call); an error is
+// logged and never fails the change, and a panic is recovered.
+type ProfileObserver interface {
+	// ProfileChanged reports that the name, email or phone of the user changed.
+	ProfileChanged(ctx context.Context, userID uuid.UUID) error
+	// AccountDeleted reports that the user asked for the deletion of the account. It is called before
+	// the personal data of the row is erased, once the user can no longer sign in.
+	AccountDeleted(ctx context.Context, userID uuid.UUID) error
+}
+
 type UserService interface {
+	// SetProfileObserver installs the observer of profile changes; nil (the default) removes it. It
+	// is meant to be called once at startup, before the service takes requests.
+	SetProfileObserver(observer ProfileObserver)
+
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	UpdateMe(ctx context.Context, userID string, firstName *string, lastName *string, email *string, phoneNumber *string, addressPlaceID *string, notifyMarketing *bool, notifyOrderUpdates *bool) (*domain.User, error)
@@ -65,6 +85,9 @@ type ZitadelUserFetcher interface {
 type userService struct {
 	repo           domain.UserRepository
 	zitadelFetcher ZitadelUserFetcher
+
+	observerMu sync.RWMutex
+	observer   ProfileObserver
 }
 
 func NewUserService(repo domain.UserRepository, zitadelFetcher ZitadelUserFetcher) UserService {
@@ -72,6 +95,49 @@ func NewUserService(repo domain.UserRepository, zitadelFetcher ZitadelUserFetche
 		repo:           repo,
 		zitadelFetcher: zitadelFetcher,
 	}
+}
+
+func (s *userService) SetProfileObserver(observer ProfileObserver) {
+	s.observerMu.Lock()
+	defer s.observerMu.Unlock()
+	s.observer = observer
+}
+
+// notifyObserver calls f on the observer, if there is one. Nothing the observer does, not even a
+// panic, can fail the change that was already stored.
+func (s *userService) notifyObserver(ctx context.Context, what string, userID uuid.UUID, f func(ProfileObserver) error) {
+	s.observerMu.RLock()
+	observer := s.observer
+	s.observerMu.RUnlock()
+	if observer == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			logging.FromContext(ctx).Error("user profile observer panicked",
+				zap.String("event", what), zap.String("user_id", userID.String()), zap.Any("panic", r))
+		}
+	}()
+	if err := f(observer); err != nil {
+		logging.FromContext(ctx).Error("user profile observer failed",
+			zap.String("event", what), zap.String("user_id", userID.String()), zap.Error(err))
+	}
+}
+
+// profileChanged tells the observer that the profile fields of the user differ from the ones in before.
+func (s *userService) profileChanged(ctx context.Context, before domain.User, after *domain.User) {
+	if before.FirstName == after.FirstName && before.LastName == after.LastName &&
+		before.Email == after.Email && ptrValue(before.PhoneNumber) == ptrValue(after.PhoneNumber) {
+		return
+	}
+	s.notifyObserver(ctx, "profile changed", after.ID, func(o ProfileObserver) error { return o.ProfileChanged(ctx, after.ID) })
+}
+
+func ptrValue(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 func (s *userService) GetUserByID(ctx context.Context, id string) (*domain.User, error) {
@@ -87,6 +153,7 @@ func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *st
 	if err != nil {
 		return nil, err
 	}
+	before := *user
 
 	if firstName != nil {
 		user.FirstName = *firstName
@@ -119,7 +186,17 @@ func (s *userService) UpdateMe(ctx context.Context, userID string, firstName *st
 		user.NotifyOrderUpdates = *notifyOrderUpdates
 	}
 
-	return s.repo.UpdateUser(ctx, user)
+	return s.updateAndNotify(ctx, before, user)
+}
+
+// updateAndNotify stores the user and tells the observer if the profile changed.
+func (s *userService) updateAndNotify(ctx context.Context, before domain.User, user *domain.User) (*domain.User, error) {
+	updated, err := s.repo.UpdateUser(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	s.profileChanged(ctx, before, updated)
+	return updated, nil
 }
 
 // DeleteMe permanently deletes the caller's account in one in-app step
@@ -142,7 +219,11 @@ func (s *userService) DeleteMe(ctx context.Context, userID string) error {
 		}
 	}
 
-	// 2. Anonymise the app user row (erase PII, drop push tokens). The identity
+	// 2. Tell the systems that hold a copy of the customer. This comes before the erasure so they
+	//    can still read what they need, and cannot fail it.
+	s.notifyObserver(ctx, "account deleted", user.ID, func(o ProfileObserver) error { return o.AccountDeleted(ctx, user.ID) })
+
+	// 3. Anonymise the app user row (erase PII, drop push tokens). The identity
 	//    is already gone, so if this fails the account is still unusable; log
 	//    loudly so residual PII can be cleaned up out of band.
 	if err := s.repo.AnonymizeForDeletion(ctx, userID); err != nil {
@@ -164,6 +245,7 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 		// Backfill empty profile fields, e.g. Apple/Google users who were
 		// JIT-created before the Zitadel fallback existed have blank name/email.
 		if user.Email == "" || user.FirstName == "" || user.LastName == "" {
+			before := *user
 			email, firstName, lastName = s.enrichFromZitadel(ctx, zitadelID, email, firstName, lastName)
 			changed := false
 			if user.Email == "" && email != "" {
@@ -180,7 +262,7 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 			}
 			if changed {
 				log.Info("backfilling app user profile from Zitadel", zap.String("user_id", user.ID.String()))
-				return s.repo.UpdateUser(ctx, user)
+				return s.updateAndNotify(ctx, before, user)
 			}
 		}
 		return user, nil
@@ -199,6 +281,7 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 				log.Warn("refusing to relink app user to a second Zitadel identity", zap.String("user_id", user.ID.String()))
 				return nil, domain.ErrIdentityConflict
 			}
+			before := *user
 			user.ZitadelUserID = &zitadelID
 			if user.FirstName == "" && firstName != "" {
 				user.FirstName = firstName
@@ -207,7 +290,7 @@ func (s *userService) FindOrCreateByZitadelID(ctx context.Context, zitadelID, em
 				user.LastName = lastName
 			}
 			log.Info("linking existing app user to Zitadel", zap.String("user_id", user.ID.String()))
-			return s.repo.UpdateUser(ctx, user)
+			return s.updateAndNotify(ctx, before, user)
 		}
 	}
 

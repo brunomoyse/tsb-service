@@ -49,6 +49,8 @@ func (m *mockUserService) UpdateMe(ctx context.Context, userID string, firstName
 	return nil, fmt.Errorf("not implemented")
 }
 
+func (m *mockUserService) SetProfileObserver(application.ProfileObserver) {}
+
 func (m *mockUserService) DeleteMe(ctx context.Context, userID string) error {
 	return fmt.Errorf("not implemented")
 }

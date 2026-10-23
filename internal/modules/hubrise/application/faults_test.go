@@ -59,6 +59,20 @@ func (o faultOutbox) Enqueue(ctx context.Context, i domain.OutboxItem) (int64, b
 	return o.OutboxRepository.Enqueue(ctx, i)
 }
 
+func (o faultOutbox) EnqueueIfNoPending(ctx context.Context, i domain.OutboxItem) (int64, bool, error) {
+	if err := o.f.hit("Outbox.EnqueueIfNoPending"); err != nil {
+		return 0, false, err
+	}
+	return o.OutboxRepository.EnqueueIfNoPending(ctx, i)
+}
+
+func (o faultOutbox) SkipOpenByDedupeKey(ctx context.Context, k domain.OutboxKind, key, reason string) (int64, error) {
+	if err := o.f.hit("Outbox.SkipOpenByDedupeKey"); err != nil {
+		return 0, err
+	}
+	return o.OutboxRepository.SkipOpenByDedupeKey(ctx, k, key, reason)
+}
+
 func (o faultOutbox) Claim(ctx context.Context, now time.Time, lease time.Duration, limit int, kinds ...domain.OutboxKind) ([]domain.OutboxItem, error) {
 	if err := o.f.hit("Outbox.Claim"); err != nil {
 		return nil, err

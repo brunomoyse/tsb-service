@@ -32,6 +32,8 @@ func TestRepositoriesReportAStoreThatIsDown(t *testing.T) {
 	orders := infrastructure.NewOrderLinkRepository(db)
 	events := infrastructure.NewEventRepository(db)
 	foreign := infrastructure.NewForeignOrderRepository(db)
+	customers := infrastructure.NewCustomerLinkRepository(db)
+	source := infrastructure.NewCustomerSource(db)
 
 	calls := map[string]func() error{
 		"conn get":        func() error { _, err := conns.Get(ctx); return err },
@@ -101,6 +103,23 @@ func TestRepositoriesReportAStoreThatIsDown(t *testing.T) {
 		"event collapse": func() error { _, err := events.CollapsePending(ctx, "catalog", now, now); return err },
 		"event oldest":   func() error { _, err := events.OldestPendingReceivedAt(ctx, "catalog"); return err },
 		"event purge":    func() error { _, err := events.PurgeFinished(ctx, now); return err },
+
+		"outbox once": func() error {
+			_, _, err := outbox.EnqueueIfNoPending(ctx, domain.NewOutboxItem(domain.OutboxCustomer, nil, "cust:x", nil, now))
+			return err
+		},
+		"outbox skip key": func() error {
+			_, err := outbox.SkipOpenByDedupeKey(ctx, domain.OutboxCustomer, "cust:x", "x")
+			return err
+		},
+
+		"customer get":       func() error { _, err := customers.Get(ctx, id); return err },
+		"customer begin":     func() error { _, _, err := customers.Begin(ctx, id); return err },
+		"customer set":       func() error { return customers.SetCustomer(ctx, id, "cu1", "h", now) },
+		"customer hash":      func() error { return customers.SetHash(ctx, id, "h", now) },
+		"customer forget":    func() error { return customers.Forget(ctx, id) },
+		"customer anonymise": func() error { return customers.MarkAnonymised(ctx, id, now) },
+		"customer profile":   func() error { _, err := source.Profile(ctx, id); return err },
 
 		"foreign mark":  func() error { return foreign.Mark(ctx, "h", now) },
 		"foreign is":    func() error { _, err := foreign.IsForeign(ctx, "h"); return err },

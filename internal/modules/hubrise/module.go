@@ -35,6 +35,9 @@ type Module struct {
 	Foreign      domain.ForeignOrderRepository
 	Source       domain.OrderSource
 	Availability domain.AvailabilityStore
+	// CustomerLinks and Customers link shop users to their HubRise customers and read their profiles.
+	CustomerLinks domain.CustomerLinkRepository
+	Customers     domain.CustomerSource
 }
 
 // NewModule builds the module on the admin pool (the hubrise tables get no per-role grants). It
@@ -65,6 +68,9 @@ func NewModule(cfg Config, adminDB *sqlx.DB, clock domain.Clock) (*Module, error
 		Foreign:      infrastructure.NewForeignOrderRepository(adminDB),
 		Source:       infrastructure.NewOrderSource(adminDB),
 		Availability: infrastructure.NewAvailabilityStore(adminDB),
+
+		CustomerLinks: infrastructure.NewCustomerLinkRepository(adminDB),
+		Customers:     infrastructure.NewCustomerSource(adminDB),
 	}, nil
 }
 
@@ -79,6 +85,10 @@ type PushOptions struct {
 	Clients    application.ClientProvider
 	Worker     application.WorkerConfig
 	Reconciler application.ReconcilerConfig
+	// Customer tunes the customer list sync; Holder identifies this process in its lease table (a
+	// random one by default).
+	Customer application.CustomerConfig
+	Holder   string
 	// Schedule, Alerter and Remote are the optional ports of the reconciler.
 	Schedule application.Schedule
 	Alerter  application.Alerter
@@ -91,6 +101,10 @@ type Push struct {
 	Pusher     *application.OrderPusher
 	Worker     *application.OutboxWorker
 	Reconciler *application.Reconciler
+	// Customers keeps the HubRise customer list in step with the shop's users. Its hooks
+	// (ProfileChanged, AccountDeleted) are the profile observer of the user service; the worker
+	// sends what they queue and upserts the customer of every order it pushes.
+	Customers *application.CustomerSync
 	// Clients builds the API clients; the status sync reuses the same provider (and so the same
 	// rate limiter).
 	Clients application.ClientProvider
@@ -106,17 +120,22 @@ func (m *Module) NewPush(o PushOptions) *Push {
 	pusher := application.NewOrderPusher(application.PusherDeps{
 		Connections: m.Connections, Orders: m.Orders, Outbox: m.Outbox, Source: m.Source, Clock: m.Clock,
 	})
+	customers := application.NewCustomerSync(application.CustomerDeps{
+		Connections: m.Connections, Links: m.CustomerLinks, Source: m.Customers, Outbox: m.Outbox,
+		Leases: m.Leases, Clock: m.Clock, Holder: o.Holder, Config: o.Customer,
+	})
 	worker := application.NewOutboxWorker(application.WorkerDeps{
 		Connections: m.Connections, Outbox: m.Outbox, Orders: m.Orders, Links: m.CatalogLinks,
-		Source: m.Source, Availability: m.Availability, Clients: clients, Clock: m.Clock, Config: o.Worker,
+		Source: m.Source, Availability: m.Availability, Customers: customers, Clients: clients, Clock: m.Clock, Config: o.Worker,
 	})
 	pusher.SetWake(worker.Wake)
+	customers.SetWake(worker.Wake)
 	reconciler := application.NewReconciler(application.ReconcilerDeps{
 		Connections: m.Connections, Orders: m.Orders, Source: m.Source, Leases: m.Leases, Events: m.Events,
 		Foreign: m.Foreign, OAuthStates: m.OAuthStates, Clients: clients, Pusher: pusher, Clock: m.Clock,
 		Config: o.Reconciler, Schedule: o.Schedule, Alerter: o.Alerter, Remote: o.Remote,
 	})
-	return &Push{Pusher: pusher, Worker: worker, Reconciler: reconciler, Clients: clients}
+	return &Push{Pusher: pusher, Worker: worker, Reconciler: reconciler, Customers: customers, Clients: clients}
 }
 
 // SyncOptions customizes NewSync.

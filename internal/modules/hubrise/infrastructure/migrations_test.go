@@ -27,11 +27,13 @@ const (
 	m5Version int64 = 20261026160000
 	// m6Version adds orders.channel, the one change to an existing table.
 	m6Version int64 = 20261026170000
+	// m7Version creates hubrise_customers, the link to the customer list.
+	m7Version int64 = 20261026180000
 )
 
 var hubriseTables = []string{
 	"hubrise_connection", "hubrise_oauth_states", "hubrise_job_leases", "hubrise_catalog_links",
-	"hubrise_orders", "hubrise_outbox", "hubrise_events", "hubrise_foreign_orders",
+	"hubrise_orders", "hubrise_outbox", "hubrise_events", "hubrise_foreign_orders", "hubrise_customers",
 }
 
 func newProvider(t *testing.T, td *testhelpers.TestDatabase) *goose.Provider {
@@ -144,7 +146,7 @@ func TestHubriseMigrationsApplyOneByOneWithoutMissingVersions(t *testing.T) {
 
 	// An environment that deployed task 1 only (the test server deploys on every push), then later
 	// tasks: each step must apply cleanly with out-of-order disabled.
-	for _, v := range []int64{m1Version, m2Version, m3Version, m5Version, m6Version} {
+	for _, v := range []int64{m1Version, m2Version, m3Version, m5Version, m6Version, m7Version} {
 		res, err := p.UpTo(ctx, v)
 		require.NoError(t, err, "UpTo %d", v)
 		require.Len(t, res, 1)
@@ -153,7 +155,7 @@ func TestHubriseMigrationsApplyOneByOneWithoutMissingVersions(t *testing.T) {
 	res, err := p.Up(ctx)
 	require.NoError(t, err, "the later HubRise migrations apply after the earlier ones")
 	for _, r := range res {
-		assert.Greater(t, r.Source.Version, m6Version)
+		assert.Greater(t, r.Source.Version, m7Version)
 	}
 	pending, err := p.HasPending(ctx)
 	require.NoError(t, err)
@@ -185,6 +187,7 @@ func TestMigrationVersionsAreStrictlyOrdered(t *testing.T) {
 	assert.Less(t, m2Version, m3Version)
 	assert.Less(t, m3Version, m5Version)
 	assert.Less(t, m5Version, m6Version)
+	assert.Less(t, m6Version, m7Version)
 
 	// The database really is at the newest version after the template migrations.
 	v, err := p.GetDBVersion(context.Background())

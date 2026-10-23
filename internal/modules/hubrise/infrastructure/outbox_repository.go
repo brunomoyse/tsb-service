@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -51,6 +52,31 @@ func (r *outboxRepository) Enqueue(ctx context.Context, item domain.OutboxItem) 
 		RETURNING id, (xmax <> 0) AS merged`,
 		item.Kind, item.OrderID, item.DedupeKey, []byte(item.Payload), item.NextAttemptAt, createdAt(item.CreatedAt))
 	return row.ID, row.Merged, err
+}
+
+// EnqueueIfNoPending relies on the partial unique index of pending customer rows (a bare ON CONFLICT
+// DO NOTHING swallows that one conflict and nothing else: the id never conflicts).
+func (r *outboxRepository) EnqueueIfNoPending(ctx context.Context, item domain.OutboxItem) (int64, bool, error) {
+	if len(item.Payload) == 0 {
+		item.Payload = []byte(`{}`) // a nil json.RawMessage would be written as SQL NULL
+	}
+	var id int64
+	err := r.get(ctx, "enqueue unless pending", &id, `
+		INSERT INTO hubrise_outbox (kind, order_id, dedupe_key, payload, next_attempt_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, COALESCE($6, now()))
+		ON CONFLICT DO NOTHING
+		RETURNING id`,
+		item.Kind, item.OrderID, item.DedupeKey, []byte(item.Payload), item.NextAttemptAt, createdAt(item.CreatedAt))
+	if errors.Is(err, domain.ErrNotFound) {
+		return 0, false, nil // the conflict inserted nothing, so RETURNING gave no row
+	}
+	return id, err == nil, err
+}
+
+func (r *outboxRepository) SkipOpenByDedupeKey(ctx context.Context, kind domain.OutboxKind, dedupeKey, reason string) (int64, error) {
+	return r.execN(ctx, "skip open outbox rows", `
+		UPDATE hubrise_outbox SET state = 'skipped', last_error = $3
+		WHERE kind = $1 AND dedupe_key = $2 AND state IN ('pending', 'parked')`, kind, dedupeKey, reason)
 }
 
 // claimSQL is the whole claim in one statement, so the lease and the attempts increment are durable
@@ -129,11 +155,25 @@ func (r *outboxRepository) MarkSkipped(ctx context.Context, id int64, reason str
 		WHERE id = $1 AND state IN ('pending', 'sending')`, id, reason)
 }
 
+// supersededSQL is true for a sending row of a kind whose pending rows are unique per dedupe key
+// (inventory, customer) when a newer pending twin was queued while it was on its way. Putting the row
+// back to pending would then violate the partial unique index, and the twin carries the latest state
+// anyway: both kinds are built from the current data when they are sent.
+const supersededSQL = `o.kind IN ('inventory', 'customer') AND EXISTS (
+	SELECT 1 FROM hubrise_outbox t
+	WHERE t.kind = o.kind AND t.dedupe_key = o.dedupe_key AND t.state = 'pending' AND t.id <> o.id)`
+
+// Release gives a claimed row back. A row that a pending twin supersedes (see supersededSQL) is
+// skipped instead of re-pended.
 func (r *outboxRepository) Release(ctx context.Context, id int64, next time.Time, reason string, revertAttempt bool) (bool, error) {
 	return r.affected(ctx, "release outbox row", `
-		UPDATE hubrise_outbox SET state = 'pending', next_attempt_at = $2, last_error = NULLIF($3, ''), leased_until = NULL,
-			attempts = CASE WHEN $4 THEN GREATEST(attempts - 1, 0) ELSE attempts END
-		WHERE id = $1 AND state = 'sending'`, id, next, reason, revertAttempt)
+		UPDATE hubrise_outbox o SET
+			state = CASE WHEN `+supersededSQL+` THEN 'skipped' ELSE 'pending' END,
+			next_attempt_at = $2,
+			last_error = CASE WHEN `+supersededSQL+` THEN 'superseded by a newer row' ELSE NULLIF($3, '') END,
+			leased_until = NULL,
+			attempts = CASE WHEN $4 THEN GREATEST(o.attempts - 1, 0) ELSE o.attempts END
+		WHERE o.id = $1 AND o.state = 'sending'`, id, next, reason, revertAttempt)
 }
 
 func (r *outboxRepository) Get(ctx context.Context, id int64) (*domain.OutboxItem, error) {

@@ -11,6 +11,7 @@ import (
 
 	"tsb-service/internal/api/graphql/testhelpers"
 	"tsb-service/internal/modules/hubrise"
+	"tsb-service/internal/modules/hubrise/domain"
 	"tsb-service/internal/modules/hubrise/infrastructure"
 	hubtest "tsb-service/internal/modules/hubrise/testhelpers"
 )
@@ -77,6 +78,10 @@ func TestNewModuleWiresTheStorageLayer(t *testing.T) {
 	assert.True(t, ok)
 	_, _, err = m.OAuthStates.Consume(t.Context(), "none", clock.Now())
 	require.NoError(t, err)
+	_, err = m.CustomerLinks.Get(t.Context(), uuid.New())
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	_, err = m.Customers.Profile(t.Context(), uuid.New())
+	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
 func TestNewPushBuildsTheOrderPushOnTheModuleStores(t *testing.T) {
@@ -92,6 +97,11 @@ func TestNewPushBuildsTheOrderPushOnTheModuleStores(t *testing.T) {
 	require.NotNil(t, push.Pusher)
 	require.NotNil(t, push.Worker)
 	require.NotNil(t, push.Reconciler)
+	require.NotNil(t, push.Customers)
+
+	// Nothing is connected: the customer hooks do nothing either.
+	require.NoError(t, push.Customers.ProfileChanged(t.Context(), uuid.New()))
+	require.NoError(t, push.Customers.AccountDeleted(t.Context(), uuid.New()))
 
 	// Nothing is connected: the hooks do nothing and the worker has nothing to claim.
 	require.NoError(t, push.Pusher.OrderReady(t.Context(), uuid.New()))

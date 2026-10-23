@@ -109,6 +109,8 @@ func newEnv(t *testing.T, options ...envOption) *env {
 		seed := append([]hubtest.SeedOption{
 			hubtest.WithToken(hubrisetest.Token),
 			hubtest.WithPushOrdersSince(e.clock.Now().Add(-time.Minute)),
+			// No customer list unless a test asks for one: orders carry the guest object, as before.
+			hubtest.WithCustomerList("", ""),
 		}, cfg.seed...)
 		hubtest.SeedConnection(t, td.DB, seed...)
 	}

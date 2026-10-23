@@ -49,6 +49,7 @@ type seed struct {
 	pushOrders, syncStatus, syncInventory, syncCatalog, syncCustomers bool
 	pushSince                                                         *time.Time
 	locationID, catalogID                                             string
+	customerListID, customerListName                                  string
 }
 
 // SeedOption customizes SeedConnection.
@@ -77,6 +78,12 @@ func WithLocation(locationID, catalogID string) SeedOption {
 	return func(s *seed) { s.locationID, s.catalogID = locationID, catalogID }
 }
 
+// WithCustomerList sets the customer list id and name (default: DefaultCustomerListID). An empty id
+// seeds a connection without a customer list.
+func WithCustomerList(id, name string) SeedOption {
+	return func(s *seed) { s.customerListID, s.customerListName = id, name }
+}
+
 // Seeded describes what SeedConnection wrote.
 type Seeded struct {
 	// Token is the plain access token (what the mock expects in X-Access-Token).
@@ -94,6 +101,7 @@ func SeedConnection(tb testing.TB, db sqlx.ExecerContext, opts ...SeedOption) Se
 		token: DefaultToken, enabled: true,
 		pushOrders: true, syncStatus: true, syncInventory: true, syncCatalog: false, syncCustomers: true,
 		locationID: DefaultLocationID, catalogID: DefaultCatalogID,
+		customerListID: DefaultCustomerListID, customerListName: DefaultCustomerListName,
 	}
 	for _, o := range opts {
 		o(s)
@@ -118,12 +126,20 @@ func SeedConnection(tb testing.TB, db sqlx.ExecerContext, opts ...SeedOption) Se
 			sync_customers = EXCLUDED.sync_customers, push_orders_since = EXCLUDED.push_orders_since,
 			auth_error_at = NULL, relink_required_at = NULL, updated_at = now()`,
 		s.enabled, enc, DefaultAccountID, DefaultAccountName, s.locationID, DefaultLocationName,
-		s.catalogID, DefaultCatalogName, DefaultCustomerListID, DefaultCustomerListName, DefaultScope,
+		s.catalogID, DefaultCatalogName, nullable(s.customerListID), nullable(s.customerListName), DefaultScope,
 		s.pushOrders, s.syncStatus, s.syncInventory, s.syncCatalog, s.syncCustomers, s.pushSince)
 	if err != nil {
 		tb.Fatalf("testhelpers: seed connection: %v", err)
 	}
 	return Seeded{Token: s.token, LocationID: s.locationID, CatalogID: s.catalogID}
+}
+
+// nullable stores an empty string as NULL.
+func nullable(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 // FakeClock is a manually advanced clock, safe for concurrent use. It implements domain.Clock.

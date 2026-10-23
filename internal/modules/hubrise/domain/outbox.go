@@ -73,6 +73,13 @@ type OutboxRepository interface {
 	// replaces that row's payload and due time instead (latest state wins). merged reports that
 	// case; the returned id is the row's.
 	Enqueue(ctx context.Context, item OutboxItem) (id int64, merged bool, err error)
+	// EnqueueIfNoPending inserts a customer row unless the dedupe key already has a pending row of
+	// that kind (the profile is read when the row is sent, so a second row would only repeat the
+	// first). inserted is false in that case; the returned id is the new row's, 0 when not inserted.
+	EnqueueIfNoPending(ctx context.Context, item OutboxItem) (id int64, inserted bool, err error)
+	// SkipOpenByDedupeKey skips the pending and parked rows of the kind with the dedupe key, with the
+	// reason, and returns how many. A sending row is left alone: it is on its way.
+	SkipOpenByDedupeKey(ctx context.Context, kind OutboxKind, dedupeKey, reason string) (int64, error)
 	// Claim leases up to limit due rows to a worker: it flips them to sending, increments
 	// attempts and sets the lease, in one statement. Pending rows are due when next_attempt_at has
 	// passed; sending rows whose lease expired are reclaimed. Only the first row of an order (or

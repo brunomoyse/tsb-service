@@ -35,6 +35,11 @@ type WorkerConfig struct {
 	BackoffBase, BackoffMax time.Duration
 	// CreateMaxAge, StatusMaxAge: older rows are not sent (48 h parks a create, 6 h skips a status).
 	CreateMaxAge, StatusMaxAge time.Duration
+	// CustomerMaxAge: a profile update older than this is skipped (24 h): the customer is brought up
+	// to date by the next order anyway. An anonymisation never ages out.
+	CustomerMaxAge time.Duration
+	// CustomerBusyDelay is how long a row waits when another process is writing the same customer (5 s).
+	CustomerBusyDelay time.Duration
 }
 
 func (c WorkerConfig) withDefaults() WorkerConfig {
@@ -54,6 +59,8 @@ func (c WorkerConfig) withDefaults() WorkerConfig {
 	def(&c.BackoffMax, 30*time.Minute)
 	def(&c.CreateMaxAge, 48*time.Hour)
 	def(&c.StatusMaxAge, 6*time.Hour)
+	def(&c.CustomerMaxAge, 24*time.Hour)
+	def(&c.CustomerBusyDelay, 5*time.Second)
 	return c
 }
 
@@ -66,13 +73,17 @@ type WorkerDeps struct {
 	// Availability reads the product state an inventory row is built from; without it inventory rows
 	// are not claimed.
 	Availability domain.AvailabilityStore
-	Source       domain.OrderSource
-	Clients      ClientProvider
-	Clock        domain.Clock
-	Config       WorkerConfig
+	// Customers keeps the HubRise customer list; without it customer rows are not claimed and an order
+	// always carries a guest customer.
+	Customers *CustomerSync
+	Source    domain.OrderSource
+	Clients   ClientProvider
+	Clock     domain.Clock
+	Config    WorkerConfig
 }
 
-// OutboxWorker drains the order_create, order_status and inventory rows of the outbox to HubRise.
+// OutboxWorker drains the order_create, order_status, inventory, customer and customer_anonymise rows of
+// the outbox to HubRise.
 //
 // Rows are claimed in one statement that leases them and counts the attempt before the HTTP call, so
 // a crash between the send and the acknowledgement is recognised on the next claim (attempts > 1) and
@@ -92,6 +103,9 @@ func NewOutboxWorker(d WorkerDeps) *OutboxWorker {
 	w.kinds = []domain.OutboxKind{domain.OutboxOrderCreate, domain.OutboxOrderStatus}
 	if d.Availability != nil {
 		w.kinds = append(w.kinds, domain.OutboxInventory)
+	}
+	if d.Customers != nil {
+		w.kinds = append(w.kinds, domain.OutboxCustomer, domain.OutboxCustomerAnonymise)
 	}
 	return w
 }
@@ -203,6 +217,10 @@ func (w *OutboxWorker) process(ctx context.Context, b *batch, item domain.Outbox
 		w.sendStatus(ctx, b, item)
 	case domain.OutboxInventory:
 		w.sendInventory(ctx, b, item)
+	case domain.OutboxCustomer:
+		w.sendCustomer(ctx, b, item)
+	case domain.OutboxCustomerAnonymise:
+		w.sendCustomerAnonymise(ctx, b, item)
 	}
 }
 
@@ -403,6 +421,14 @@ func (w *OutboxWorker) sendCreate(ctx context.Context, b *batch, item domain.Out
 	env, err := w.sendEnv(ctx, b.conn, orderID, status, payload)
 	if err != nil {
 		w.release(ctx, item, w.backoff(item, nil), err.Error(), false)
+		return
+	}
+	if env.CustomerID, err = w.customerFor(ctx, b, item, payload); err != nil {
+		if errors.Is(err, ErrCustomerBusy) {
+			w.release(ctx, item, w.d.Clock.Now().Add(w.cfg.CustomerBusyDelay), "the customer is being written elsewhere", true)
+			return
+		}
+		w.fail(ctx, b, item, err)
 		return
 	}
 	order, unlinked := BuildOrder(payload, env)
@@ -664,4 +690,55 @@ func (w *OutboxWorker) sendInventory(ctx context.Context, b *batch, item domain.
 		return
 	}
 	w.markSent(ctx, item)
+}
+
+// ---- customer ----
+
+// customerFor returns the HubRise customer id to send with an order, after creating or updating the
+// customer; "" sends the guest customer object (the customer sync is off or refused the customer).
+func (w *OutboxWorker) customerFor(ctx context.Context, b *batch, item domain.OutboxItem, p domain.CreatePayload) (string, error) {
+	if w.d.Customers == nil {
+		return "", nil
+	}
+	return w.d.Customers.ForOrder(ctx, b.client, b.conn, p, item.Attempts)
+}
+
+// sendCustomer sends the current profile of a user to its HubRise customer.
+func (w *OutboxWorker) sendCustomer(ctx context.Context, b *batch, item domain.OutboxItem) {
+	var payload domain.CustomerPayload
+	if err := json.Unmarshal(item.Payload, &payload); err != nil || payload.Version != domain.CustomerPayloadVersion || payload.UserID == uuid.Nil {
+		w.park(ctx, item, "unreadable customer payload")
+		return
+	}
+	if w.d.Clock.Now().Sub(item.CreatedAt) > w.cfg.CustomerMaxAge {
+		w.skip(ctx, item, "customer update too old") // the next order brings the customer up to date
+		return
+	}
+	skip, err := w.d.Customers.SendProfile(ctx, b.client, b.conn, payload.UserID)
+	w.finishCustomer(ctx, b, item, skip, err)
+}
+
+// sendCustomerAnonymise anonymises the HubRise customer of a deleted account.
+func (w *OutboxWorker) sendCustomerAnonymise(ctx context.Context, b *batch, item domain.OutboxItem) {
+	var payload domain.CustomerAnonymisePayload
+	if err := json.Unmarshal(item.Payload, &payload); err != nil || payload.Version != domain.CustomerPayloadVersion || payload.UserID == uuid.Nil {
+		w.park(ctx, item, "unreadable customer payload")
+		return
+	}
+	skip, err := w.d.Customers.SendAnonymise(ctx, b.client, b.conn, payload)
+	w.finishCustomer(ctx, b, item, skip, err)
+}
+
+// finishCustomer settles a customer row after its send.
+func (w *OutboxWorker) finishCustomer(ctx context.Context, b *batch, item domain.OutboxItem, skip string, err error) {
+	switch {
+	case errors.Is(err, ErrCustomerBusy):
+		w.release(ctx, item, w.d.Clock.Now().Add(w.cfg.CustomerBusyDelay), "the customer is being written elsewhere", true)
+	case err != nil:
+		w.fail(ctx, b, item, err)
+	case skip != "":
+		w.skip(ctx, item, skip)
+	default:
+		w.markSent(ctx, item)
+	}
 }
