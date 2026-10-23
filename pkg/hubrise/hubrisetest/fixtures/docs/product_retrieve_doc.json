@@ -1,0 +1,37 @@
+{
+  "id": "abg5a",
+  "category_id": "lsndh",
+  "name": "Margarita",
+  "description": "A classic pizza with tomato sauce and mozzarella",
+  "tags": [],
+  "nutrition": {
+    "legal_name": "Pizza with tomato sauce and mozzarella cheese",
+    "allergens": [
+      "gluten_wheat",
+      "milk"
+    ]
+  },
+  "tax_rate": {
+    "delivery": "20.0",
+    "collection": "10.0",
+    "eat_in": null
+  },
+  "images_ids": [],
+  "skus": [
+    {
+      "id": "sb65k",
+      "name": "Small",
+      "ref": "MAR-SM",
+      "price": "9.80 EUR",
+      "option_list_ids": [
+        "e2sfj"
+      ]
+    },
+    {
+      "id": "xps5s",
+      "name": "Large",
+      "ref": "MAR-LG",
+      "price": "16.80 EUR"
+    }
+  ]
+}

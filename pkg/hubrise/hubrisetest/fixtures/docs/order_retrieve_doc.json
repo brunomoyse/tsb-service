@@ -1,0 +1,169 @@
+{
+  "id": "5dpm9",
+  "location_id": "3r4s3-1",
+  "ref": "17654321",
+  "private_ref": null,
+  "status": "in_delivery",
+  "service_type": "delivery",
+  "service_type_ref": null,
+  "created_at": "2021-06-24T17:07:53+02:00",
+  "created_by": "MyClient",
+  "channel": "Website",
+  "connection_name": null,
+  "expected_time": "2021-06-24T19:07:52+02:00",
+  "expected_time_pickup": false,
+  "asap": true,
+  "confirmed_time": null,
+  "driver_pickup_url": "https://driver.ups.com/pickup/1Z12345E0291980793",
+  "customer_notes": null,
+  "seller_notes": null,
+  "collection_code": null,
+  "coupon_codes": [],
+  "total": "18.90 EUR",
+  "total_discrepancy": null,
+  "payment_discrepancy": "0.00 EUR",
+  "items": [
+    {
+      "id": "w6nd4",
+      "private_ref": null,
+      "product_name": "Carbonara",
+      "sku_name": "Large",
+      "sku_ref": "3",
+      "price": "11.90 EUR",
+      "quantity": "1.0",
+      "subtotal": "11.90 EUR",
+      "tax_rate": null,
+      "subset": null,
+      "customer_notes": null,
+      "points_earned": null,
+      "points_used": null,
+      "options": [],
+      "deleted": false,
+      "deal_line": {
+        "deal_key": "0",
+        "position": null,
+        "label": null,
+        "pricing_effect": null,
+        "pricing_value": null
+      }
+    },
+    {
+      "id": "zvme8",
+      "private_ref": null,
+      "product_name": "Basil and Pesto",
+      "sku_name": null,
+      "sku_ref": "17",
+      "price": "3.00 EUR",
+      "quantity": "2.0",
+      "subtotal": "7.00 EUR",
+      "tax_rate": null,
+      "subset": null,
+      "customer_notes": null,
+      "points_earned": null,
+      "points_used": null,
+      "options": [
+        {
+          "option_list_name": "Sauce",
+          "name": "BBQ",
+          "ref": "31",
+          "price": "0.50 EUR",
+          "quantity": 1
+        }
+      ],
+      "deleted": false
+    }
+  ],
+  "deals": {
+    "0": {
+      "name": "30% off on pasta",
+      "ref": "10"
+    }
+  },
+  "discounts": [
+    {
+      "id": "wv281",
+      "private_ref": null,
+      "name": "2€ off",
+      "ref": "45",
+      "pricing_effect": "price_off",
+      "pricing_value": "2.00 EUR",
+      "price_off": "2.00 EUR",
+      "deleted": false
+    }
+  ],
+  "charges": [
+    {
+      "id": "wk843",
+      "private_ref": null,
+      "type": "other",
+      "name": "Courier Service",
+      "ref": "DEL",
+      "price": "2.00 EUR",
+      "tax_rate": null,
+      "charge_type": "other",
+      "charge_ref": "DEL",
+      "charge_price": "2.00 EUR",
+      "deleted": false
+    }
+  ],
+  "payments": [
+    {
+      "id": "w2qq8",
+      "private_ref": null,
+      "type": "online",
+      "name": "Payment by cash",
+      "ref": "CSH",
+      "amount": "18.90 EUR",
+      "info": null,
+      "deleted": false
+    }
+  ],
+  "customer": {
+    "id": "wbq93",
+    "customer_list_id": "1dmy1",
+    "anonymised": false,
+    "private_ref": "49751",
+    "email": "charles.moore@dummy-mail.org",
+    "first_name": "Charles",
+    "last_name": "Moore",
+    "gender": "male",
+    "birth_date": "1999-01-01",
+    "company_name": "HubRise",
+    "phone": "+33123456789",
+    "phone_access_code": "8888",
+    "address_1": "1 avenue des Champs Elysées",
+    "address_2": null,
+    "postal_code": "75001",
+    "city": "Paris",
+    "state": null,
+    "country": "FR",
+    "latitude": "48.858951",
+    "longitude": "2.277021",
+    "delivery_notes": null,
+    "sms_marketing": false,
+    "email_marketing": false,
+    "nb_orders": 8,
+    "order_total": "151.20 EUR",
+    "first_order_date": "2021-06-22T11:04:27+02:00",
+    "last_order_date": "2021-06-24T17:07:53+02:00",
+    "loyalty_cards": [],
+    "custom_fields": {}
+  },
+  "delivery": {
+    "carrier": "Uber Direct",
+    "carrier_ref": "uber",
+    "ref": "1Z12345E0291980793",
+    "status": "pickup_approaching",
+    "fee": "4.00 EUR",
+    "estimated_pickup_at": "2021-06-24T19:01:00+02:00",
+    "estimated_dropoff_at": "2021-06-24T19:07:00+02:00",
+    "tracking_url": "https://uber.com/track/1Z12345E0291980793",
+    "driver_name": "John",
+    "driver_phone": "+33612345678",
+    "driver_phone_access_code": "1234",
+    "driver_latitude": "48.856614",
+    "driver_longitude": "2.3522219"
+  },
+  "loyalty_operations": [],
+  "custom_fields": {}
+}

@@ -1,0 +1,92 @@
+{
+  "ref": "17654321",
+  "status": "new",
+  "service_type": "delivery",
+  "service_type_ref": "WEBSITE-DEL",
+  "expected_time": "2021-06-24T11:30:00+02:00",
+  "expected_time_pickup": false,
+  "asap": true,
+  "items": [
+    {
+      "product_name": "Margarita",
+      "sku_name": "Small",
+      "sku_ref": "MAR-SM",
+      "price": "9.00 EUR",
+      "quantity": "2",
+      "options": [
+        {
+          "option_list_name": "Sauce",
+          "name": "Barbecue",
+          "ref": "BBQ",
+          "price": "1.00 EUR",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "product_name": "Brownie",
+      "sku_ref": "BROWN",
+      "price": "3.00 EUR",
+      "quantity": "1",
+      "deal_line": {
+        "deal_key": "0",
+        "label": "Dessert"
+      }
+    },
+    {
+      "product_name": "Coke",
+      "sku_ref": "COK",
+      "price": "1.00 EUR",
+      "quantity": "1",
+      "deal_line": {
+        "deal_key": "0",
+        "label": "Drink"
+      }
+    },
+    {
+      "product_name": "Wings BBQ",
+      "sku_ref": "WBBQ",
+      "price": "4.00 EUR",
+      "quantity": "1",
+      "points_used": "5.0"
+    }
+  ],
+  "deals": {
+    "0": {
+      "name": "Buy a dessert, get a drink for 1€",
+      "ref": "FREEDRINK"
+    }
+  },
+  "discounts": [
+    {
+      "name": "5€ off your order",
+      "ref": "5OFF",
+      "price_off": "5.00 EUR"
+    }
+  ],
+  "charges": [
+    {
+      "name": "Delivery < 15 km",
+      "ref": "DEL",
+      "price": "1.50 EUR"
+    }
+  ],
+  "payments": [
+    {
+      "name": "PayPal",
+      "ref": "PP",
+      "amount": "23.50 EUR",
+      "info": {
+        "email": "john@doe.com"
+      }
+    }
+  ],
+  "customer_id": "ve343",
+  "loyalty_operations": [
+    {
+      "ref": "LOY",
+      "delta": "-5",
+      "reason": "Points used on order"
+    }
+  ]
+}

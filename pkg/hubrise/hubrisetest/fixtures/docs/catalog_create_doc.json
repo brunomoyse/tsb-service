@@ -1,0 +1,53 @@
+{
+  "name": "In Store",
+  "data": {
+    "categories": [
+      {
+        "name": "Cars",
+        "ref": "1"
+      },
+      {
+        "name": "Electric cars",
+        "ref": "2",
+        "parent_ref": "1"
+      }
+    ],
+    "products": [
+      {
+        "name": "Tesla model S",
+        "ref": "TESLA_S",
+        "category_ref": "2",
+        "skus": [
+          {
+            "ref": "TS_DUAL",
+            "name": "Dual Motor",
+            "price": "80000.00 USD",
+            "option_list_refs": [
+              "TES_COL"
+            ]
+          }
+        ]
+      }
+    ],
+    "option_lists": [
+      {
+        "ref": "TES_COL",
+        "name": "Tesla Color",
+        "min_selections": 1,
+        "max_selections": 1,
+        "multiple_selection": false,
+        "options": [
+          {
+            "name": "White",
+            "ref": "COLOR_WHITE"
+          },
+          {
+            "name": "Vantablack",
+            "ref": "COLOR_VANTABLACK",
+            "price": "4500.00 USD"
+          }
+        ]
+      }
+    ]
+  }
+}

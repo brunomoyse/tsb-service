@@ -1,0 +1,10 @@
+{
+  "method": "GET",
+  "path": "/v1/callback",
+  "request": null,
+  "response": {
+    "events": {},
+    "url": null
+  },
+  "status": 200
+}

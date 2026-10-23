@@ -1,0 +1,17 @@
+[
+  {
+    "id": "5dpm9",
+    "location_id": "3r4s3-1",
+    "private_ref": "3345",
+    "status": "new",
+    "service_type": "collection",
+    "service_type_ref": null,
+    "created_at": "2021-06-24T17:07:53+02:00",
+    "created_by": "MyClient",
+    "expected_time": "2021-06-24T19:07:52+02:00",
+    "expected_time_pickup": null,
+    "asap": true,
+    "confirmed_time": null,
+    "items": []
+  }
+]

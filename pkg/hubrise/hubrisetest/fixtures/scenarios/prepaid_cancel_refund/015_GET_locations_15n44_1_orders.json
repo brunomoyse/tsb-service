@@ -1,0 +1,7 @@
+{
+  "method": "GET",
+  "path": "/v1/locations/15n44-1/orders?status=new",
+  "request": null,
+  "response": [],
+  "status": 200
+}
