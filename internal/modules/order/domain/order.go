@@ -84,6 +84,9 @@ type Order struct {
 	// IsTest flags orders placed by store-review accounts. TEMPORARY (revert
 	// after launch): such orders are hidden from staff and auto-cancelled.
 	IsTest bool `db:"is_test" json:"isTest"`
+	// Channel is where the order was placed from, "web" or "app". NULL (nil) on orders that
+	// predate the column, which readers treat as "web".
+	Channel *string `db:"channel" json:"channel,omitempty"`
 }
 
 type OrderStatusHistory struct {

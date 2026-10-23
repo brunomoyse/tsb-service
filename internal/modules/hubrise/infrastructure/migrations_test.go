@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
@@ -22,6 +23,8 @@ const (
 	m1Version int64 = 20261026120000
 	m2Version int64 = 20261026130000
 	m3Version int64 = 20261026140000
+	// m6Version adds orders.channel, the one change to an existing table.
+	m6Version int64 = 20261026170000
 )
 
 var hubriseTables = []string{
@@ -139,7 +142,7 @@ func TestHubriseMigrationsApplyOneByOneWithoutMissingVersions(t *testing.T) {
 
 	// An environment that deployed task 1 only (the test server deploys on every push), then later
 	// tasks: each step must apply cleanly with out-of-order disabled.
-	for _, v := range []int64{m1Version, m2Version, m3Version} {
+	for _, v := range []int64{m1Version, m2Version, m3Version, m6Version} {
 		res, err := p.UpTo(ctx, v)
 		require.NoError(t, err, "UpTo %d", v)
 		require.Len(t, res, 1)
@@ -148,7 +151,7 @@ func TestHubriseMigrationsApplyOneByOneWithoutMissingVersions(t *testing.T) {
 	res, err := p.Up(ctx)
 	require.NoError(t, err, "the later HubRise migrations apply after the earlier ones")
 	for _, r := range res {
-		assert.Greater(t, r.Source.Version, m3Version)
+		assert.Greater(t, r.Source.Version, m6Version)
 	}
 	pending, err := p.HasPending(ctx)
 	require.NoError(t, err)
@@ -178,6 +181,7 @@ func TestMigrationVersionsAreStrictlyOrdered(t *testing.T) {
 	assert.Greater(t, m1Version, lastPreHubriseVersion)
 	assert.Less(t, m1Version, m2Version)
 	assert.Less(t, m2Version, m3Version)
+	assert.Less(t, m3Version, m6Version)
 
 	// The database really is at the newest version after the template migrations.
 	v, err := p.GetDBVersion(context.Background())
@@ -193,4 +197,78 @@ func indexOfLastPre(sources []*goose.Source) int {
 		}
 	}
 	return idx
+}
+
+func ordersChannelColumn(t *testing.T, td *testhelpers.TestDatabase) (nullable string, exists bool) {
+	t.Helper()
+	var rows []string
+	require.NoError(t, td.DB.SelectContext(t.Context(), &rows, `
+		SELECT is_nullable FROM information_schema.columns
+		WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'channel'`))
+	if len(rows) == 0 {
+		return "", false
+	}
+	return rows[0], true
+}
+
+func TestOrdersChannelMigrationUpDownAndExistingRows(t *testing.T) {
+	td := testhelpers.SetupTestDatabase(t)
+	ctx := t.Context()
+	p := newProvider(t, td)
+
+	nullable, ok := ordersChannelColumn(t, td)
+	require.True(t, ok)
+	assert.Equal(t, "YES", nullable, "nullable: old orders and old code stay valid")
+
+	_, err := p.DownTo(ctx, m3Version)
+	require.NoError(t, err)
+	_, ok = ordersChannelColumn(t, td)
+	assert.False(t, ok, "Down drops the column")
+
+	// An order written before the migration reads back with a NULL channel afterwards.
+	fx := testhelpers.SeedTestData(t, td.DB)
+	var id string
+	require.NoError(t, td.DB.GetContext(ctx, &id, `
+		INSERT INTO orders (user_id, order_status, order_type, is_online_payment, total_price, language)
+		VALUES ($1, 'CONFIRMED', 'PICKUP', false, 10, 'fr') RETURNING id`, fx.RegularUser.ID))
+	_, err = p.Up(ctx)
+	require.NoError(t, err)
+	var channel *string
+	require.NoError(t, td.DB.GetContext(ctx, &channel, `SELECT channel FROM orders WHERE id = $1`, id))
+	assert.Nil(t, channel)
+	_, err = td.DB.ExecContext(ctx, `UPDATE orders SET channel = 'anything' WHERE id = $1`, id)
+	assert.NoError(t, err, "no CHECK: a new channel needs no migration")
+}
+
+// The ALTER needs an exclusive lock on orders. With a transaction holding the table open it must give
+// up after the 5 s lock_timeout instead of queueing behind it (and blocking every order query behind
+// itself). Once the blocker is gone the migration applies.
+func TestOrdersChannelMigrationDoesNotBlockOrdersForLong(t *testing.T) {
+	td := testhelpers.SetupTestDatabase(t)
+	ctx := t.Context()
+	p := newProvider(t, td)
+	_, err := p.DownTo(ctx, m3Version)
+	require.NoError(t, err)
+
+	blocker, err := td.DB.BeginTxx(ctx, nil)
+	require.NoError(t, err)
+	defer func() { _ = blocker.Rollback() }()
+	var n int
+	require.NoError(t, blocker.GetContext(ctx, &n, `SELECT count(*) FROM orders`)) // ACCESS SHARE until the end
+
+	start := time.Now()
+	_, err = p.UpTo(ctx, m6Version)
+	elapsed := time.Since(start)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "lock timeout")
+	assert.GreaterOrEqual(t, elapsed, 4*time.Second, "it waited for the lock")
+	assert.Less(t, elapsed, 15*time.Second, "and gave up")
+	_, ok := ordersChannelColumn(t, td)
+	assert.False(t, ok)
+
+	require.NoError(t, blocker.Rollback())
+	_, err = p.UpTo(ctx, m6Version)
+	require.NoError(t, err)
+	_, ok = ordersChannelColumn(t, td)
+	assert.True(t, ok)
 }

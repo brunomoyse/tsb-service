@@ -65,7 +65,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 			street_id, street_name, house_number, box_number,
 			municipality_name, postcode, address_distance, is_manual_address,
 			address_place_id, address_lat, address_lng,
-			cash_payment_amount, is_test
+			cash_payment_amount, is_test, channel
 		) VALUES (
 			$1, $2, $3, $4,
 			$5, $6, $7, $8, $9,
@@ -74,7 +74,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 			$18, $19, $20, $21,
 			$22, $23, $24, $25,
 			$26, $27, $28,
-			$29, $30
+			$29, $30, $31
 		)
 		RETURNING id, created_at, updated_at;
 	`
@@ -116,6 +116,7 @@ func (r *OrderRepository) Save(ctx context.Context, o *domain.Order, op *[]domai
 		o.AddressLng,
 		o.CashPaymentAmount,
 		o.IsTest,
+		o.Channel,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to insert order: %w", err)
