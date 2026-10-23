@@ -281,7 +281,8 @@ type OrderSource interface {
 	// RefreshCandidates lists open pushed orders, the ones read from HubRise longest ago first.
 	RefreshCandidates(ctx context.Context, limit int) ([]OpenLink, error)
 	// StuckNew lists open pushed orders still "new" at HubRise since before the cutoff that staff
-	// were not told about yet (see OrderLinkRepository.MarkNotAccepted) and that carry no flag
-	// other than a lesser one (UNLINKED_ITEM, TOTAL_MISMATCH).
+	// were not told about yet (see OrderLinkRepository.MarkStuckAlerted) and that carry no flag
+	// other than a lesser one (UNLINKED_ITEM, TOTAL_MISMATCH) or NOT_ACCEPTED itself (flagged, alert
+	// still to go out).
 	StuckNew(ctx context.Context, pushedBefore time.Time, limit int) ([]OpenLink, error)
 }

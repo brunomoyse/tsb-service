@@ -178,7 +178,8 @@ func TestReconcilerRefreshesAtMostFiveOpenOrdersPerRunOldestFirst(t *testing.T) 
 	}
 	assert.Len(t, covered, 7, "the orders not read yet come first, then the ones read longest ago")
 	for _, id := range ids {
-		assert.NotNil(t, e.link(id).LastRemoteEventAt, "stamped with the time of the read")
+		assert.Equal(t, 1, e.count(`SELECT count(*) FROM hubrise_orders WHERE order_id = $1 AND last_remote_read_at IS NOT NULL`, id), "stamped with the time of the read")
+		assert.Nil(t, e.link(id).LastRemoteEventAt, "our clock is never the time of remote data")
 	}
 }
 
@@ -218,7 +219,8 @@ func TestReconcilerRefreshWithoutAHandlerOnlyStampsTheRead(t *testing.T) {
 	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
 	link := e.link(id)
 	assert.Equal(t, "new", *link.LastRemoteStatus)
-	assert.NotNil(t, link.LastRemoteEventAt)
+	assert.Nil(t, link.LastRemoteEventAt, "our clock is never the time of remote data")
+	assert.Equal(t, 1, e.count(`SELECT count(*) FROM hubrise_orders WHERE order_id = $1 AND last_remote_read_at IS NOT NULL`, id))
 	assert.Nil(t, link.NeedsAttention)
 }
 
@@ -288,15 +290,16 @@ func TestReconcilerReadsAreBackgroundCalls(t *testing.T) {
 
 func TestReconcilerFlagsOrdersStuckInNew(t *testing.T) {
 	alerts := &alertRecorder{}
-	open := true
+	var closedFrom time.Time // the ordering hours end here; zero means they never do
 	handler := &remoteHandler{}
 	e := newEnv(t, withPush(hubrise.PushOptions{
 		Alerter:  alerts,
-		Schedule: scheduleFunc(func() bool { return open }),
+		Schedule: scheduleFunc(func(at time.Time) bool { return closedFrom.IsZero() || at.Before(closedFrom) }),
 		Remote:   handler,
 	}))
 	handler.record = e.mod.Orders
 	e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
+	pushedAt := e.clock.Now()
 	stuck := e.sentOrder(orderSpec{})
 	unlinked := e.sentOrder(orderSpec{lines: []lineSpec{{product: e.fx.TunaSushi.ID, qty: 1, total: "14.00"}}, total: "14.00"})
 	require.Equal(t, domain.AttentionUnlinkedItem, *e.link(unlinked).NeedsAttention)
@@ -305,12 +308,13 @@ func TestReconcilerFlagsOrdersStuckInNew(t *testing.T) {
 	assert.Nil(t, e.link(stuck).NeedsAttention, "not before 5 minutes")
 
 	e.clock.Advance(6 * time.Minute)
-	open = false
+	closedFrom = pushedAt // the orders were pushed when ordering was closed
 	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
 	assert.Nil(t, e.link(stuck).NeedsAttention, "an order nobody could accept outside the ordering hours is no alert")
 	assert.Empty(t, alerts.subjects)
 
-	open = true
+	// The ordering hours covered the push and ended since: the order is still waiting for somebody.
+	closedFrom = pushedAt.Add(time.Minute)
 	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
 	assert.Equal(t, domain.AttentionNotAccepted, *e.link(stuck).NeedsAttention)
 	assert.Equal(t, domain.AttentionUnlinkedItem, *e.link(unlinked).NeedsAttention, "the more specific diagnosis is kept")
@@ -330,6 +334,90 @@ func TestReconcilerFlagsOrdersStuckInNew(t *testing.T) {
 	assert.Nil(t, e.link(stuck).NeedsAttention)
 }
 
+// flakyAlerter fails until it is told to work.
+type flakyAlerter struct {
+	failing bool
+	sent    []string
+}
+
+func (a *flakyAlerter) Alert(_ context.Context, subject, _ string) error {
+	if a.failing {
+		return errors.New("smtp down")
+	}
+	a.sent = append(a.sent, subject)
+	return nil
+}
+
+func TestReconcilerRetriesAnAlertThatCouldNotBeSent(t *testing.T) {
+	alerts := &flakyAlerter{failing: true}
+	e := newEnv(t, withPush(hubrise.PushOptions{Alerter: alerts}))
+	e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
+	id := e.sentOrder(orderSpec{})
+	e.clock.Advance(6 * time.Minute)
+
+	require.Error(t, e.push.Reconciler.RunOnce(t.Context()), "the mail provider is down")
+	assert.Equal(t, domain.AttentionNotAccepted, *e.link(id).NeedsAttention, "the order is flagged anyway")
+	assert.Zero(t, e.count(`SELECT count(*) FROM hubrise_orders WHERE order_id = $1 AND stuck_alerted_at IS NOT NULL`, id), "the alert is not recorded")
+
+	alerts.failing = false
+	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
+	require.Len(t, alerts.sent, 1, "the next run alerts")
+	assert.Equal(t, 1, e.count(`SELECT count(*) FROM hubrise_orders WHERE order_id = $1 AND stuck_alerted_at IS NOT NULL`, id))
+
+	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
+	assert.Len(t, alerts.sent, 1, "and only once")
+}
+
+func TestReconcilerDoesNotAlertWhileTheStatusIsNotFollowed(t *testing.T) {
+	alerts := &alertRecorder{}
+	handler := &remoteHandler{}
+	e := newEnv(t, withPush(hubrise.PushOptions{Alerter: alerts, Remote: handler}))
+	handler.record = e.mod.Orders
+	e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
+	id := e.sentOrder(orderSpec{})
+	// The EPOS accepted it at once, but with the status sync off nothing reads that back: the order
+	// stays "new" for the shop and must not be reported as stuck.
+	e.exec(`UPDATE hubrise_connection SET sync_status = false`)
+	e.clock.Advance(10 * time.Minute)
+
+	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
+	assert.Nil(t, e.link(id).NeedsAttention)
+	assert.Empty(t, alerts.subjects)
+
+	e.exec(`UPDATE hubrise_connection SET sync_status = true`)
+	require.NoError(t, e.srv.SetOrderStatus(e.remote(id).ID, pkghubrise.StatusAccepted))
+	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
+	assert.Empty(t, alerts.subjects, "followed again, the accepted order is no longer new")
+}
+
+// noPushTimeSource reports the stuck orders without their push time.
+type noPushTimeSource struct{ domain.OrderSource }
+
+func (s noPushTimeSource) StuckNew(ctx context.Context, before time.Time, limit int) ([]domain.OpenLink, error) {
+	links, err := s.OrderSource.StuckNew(ctx, before, limit)
+	for i := range links {
+		links[i].PushedAt = nil
+	}
+	return links, err
+}
+
+func TestReconcilerJudgesAnOrderWithoutAPushTimeByTheCurrentHours(t *testing.T) {
+	e := newEnv(t)
+	e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
+	id := e.sentOrder(orderSpec{})
+	e.clock.Advance(6 * time.Minute)
+	var asked []time.Time
+	r := application.NewReconciler(application.ReconcilerDeps{
+		Connections: e.mod.Connections, Orders: e.mod.Orders, Source: noPushTimeSource{e.mod.Source},
+		Leases: e.mod.Leases, Events: e.mod.Events, Outbox: e.mod.Outbox, Foreign: e.mod.Foreign, OAuthStates: e.mod.OAuthStates,
+		Clients: e.opts.Clients, Pusher: e.push.Pusher, Clock: e.clock,
+		Schedule: scheduleFunc(func(at time.Time) bool { asked = append(asked, at); return true }),
+	})
+	require.NoError(t, r.RunOnce(t.Context()))
+	assert.Equal(t, []time.Time{e.clock.Now()}, asked)
+	assert.Equal(t, domain.AttentionNotAccepted, *e.link(id).NeedsAttention)
+}
+
 func TestReconcilerFlagsWithoutAnAlerterOrASchedule(t *testing.T) {
 	e := newEnv(t)
 	e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
@@ -345,7 +433,7 @@ func (failingAlerter) Alert(context.Context, string, string) error { return erro
 
 type failingSchedule struct{}
 
-func (failingSchedule) IsOrderingAllowed(context.Context) (bool, error) {
+func (failingSchedule) OrderingOpenAt(context.Context, time.Time) (bool, error) {
 	return false, errors.New("no schedule")
 }
 
@@ -405,7 +493,7 @@ func TestReconcilerRunReportsFailuresAndKeepsGoing(t *testing.T) {
 	closed := e.td.ClosedConnection(t)
 	broken := application.NewReconciler(application.ReconcilerDeps{
 		Connections: e.mod.Connections, Orders: e.mod.Orders, Source: e.mod.Source,
-		Leases: hubtestLeases{err: errors.New("db down")}, Events: e.mod.Events, Foreign: e.mod.Foreign,
+		Leases: hubtestLeases{err: errors.New("db down")}, Events: e.mod.Events, Outbox: e.mod.Outbox, Foreign: e.mod.Foreign,
 		OAuthStates: e.mod.OAuthStates, Clients: fixedClients{}, Pusher: e.push.Pusher, Clock: e.clock,
 		Config: application.ReconcilerConfig{Interval: 20 * time.Millisecond},
 	})
@@ -436,6 +524,20 @@ func TestReconcilerPurgesOldFinishedWork(t *testing.T) {
 	assert.Zero(t, e.count(`SELECT count(*) FROM hubrise_foreign_orders WHERE hubrise_order_id = 'foreign-old'`))
 	assert.Equal(t, 1, e.count(`SELECT count(*) FROM hubrise_foreign_orders WHERE hubrise_order_id = 'foreign-new'`))
 	assert.Zero(t, e.count(`SELECT count(*) FROM hubrise_oauth_states`))
+}
+
+func TestReconcilerAppliesTheRetentionOfTheOutbox(t *testing.T) {
+	e := newEnv(t)
+	old := e.clock.Now().Add(-10 * 24 * time.Hour)
+	order := e.order(orderSpec{})
+	e.exec(`INSERT INTO hubrise_outbox (kind, order_id, dedupe_key, state, sent_at, created_at) VALUES ('order_status', $1, 'old', 'sent', $2, $2)`, order, old)
+	e.exec(`INSERT INTO hubrise_outbox (kind, order_id, dedupe_key, state, sent_at, created_at) VALUES ('order_status', $1, 'new', 'sent', $2, $2)`, order, e.clock.Now())
+	e.exec(`INSERT INTO hubrise_outbox (kind, order_id, state, payload, sent_at, created_at) VALUES ('order_create', $1, 'sent', '{"customer":{"email":"a@b.c"},"customer_notes":"x"}', $2, $2)`, order, old)
+
+	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
+	assert.Zero(t, e.count(`SELECT count(*) FROM hubrise_outbox WHERE dedupe_key = 'old'`), "old finished rows go")
+	assert.Equal(t, 1, e.count(`SELECT count(*) FROM hubrise_outbox WHERE dedupe_key = 'new'`))
+	assert.Equal(t, 1, e.count(`SELECT count(*) FROM hubrise_outbox WHERE kind = 'order_create' AND payload = '{}'`), "the create row stays, without the customer")
 }
 
 func TestReconcilerDoesNothingWhileTheIntegrationIsOff(t *testing.T) {
@@ -473,7 +575,7 @@ func TestReconcilerReportsAStoreThatIsDown(t *testing.T) {
 	reconcilerOn := func(mutate func(*application.ReconcilerDeps)) *application.Reconciler {
 		d := application.ReconcilerDeps{
 			Connections: e.mod.Connections, Orders: e.mod.Orders, Source: e.mod.Source, Leases: e.mod.Leases,
-			Events: e.mod.Events, Foreign: e.mod.Foreign, OAuthStates: e.mod.OAuthStates,
+			Events: e.mod.Events, Outbox: e.mod.Outbox, Foreign: e.mod.Foreign, OAuthStates: e.mod.OAuthStates,
 			Clients: e.opts.Clients, Pusher: e.push.Pusher, Clock: e.clock,
 		}
 		mutate(&d)
@@ -491,6 +593,10 @@ func TestReconcilerReportsAStoreThatIsDown(t *testing.T) {
 		r := reconcilerOn(func(d *application.ReconcilerDeps) {
 			d.Events, d.Foreign, d.OAuthStates = infraEvents(closed), infraForeign(closed), infraStates(closed)
 		})
+		require.Error(t, r.RunOnce(t.Context()))
+	})
+	t.Run("the outbox retention", func(t *testing.T) {
+		r := reconcilerOn(func(d *application.ReconcilerDeps) { d.Outbox = infraOutbox(closed) })
 		require.Error(t, r.RunOnce(t.Context()))
 	})
 	t.Run("queueing a missed order", func(t *testing.T) {

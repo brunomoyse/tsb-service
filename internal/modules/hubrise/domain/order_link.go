@@ -76,14 +76,17 @@ type OrderLinkRepository interface {
 	// FlagAttention flags the order for staff unless it is already flagged (the first problem
 	// stays visible).
 	FlagAttention(ctx context.Context, orderID uuid.UUID, code string) error
-	// MarkNotAccepted records that staff were told the order is still new at HubRise, so the alert
-	// is sent once, and flags it NOT_ACCEPTED unless it already carries a flag: a more specific
+	// MarkNotAccepted flags the order NOT_ACCEPTED unless it already carries a flag: a more specific
 	// diagnosis (UNLINKED_ITEM, TOTAL_MISMATCH) is kept.
-	MarkNotAccepted(ctx context.Context, orderID uuid.UUID, at time.Time) error
+	MarkNotAccepted(ctx context.Context, orderID uuid.UUID) error
+	// MarkStuckAlerted records that staff were told the order is still new at HubRise, so the alert
+	// is sent once. It is called after the alert went out, so a failed alert is tried again.
+	MarkStuckAlerted(ctx context.Context, orderID uuid.UUID, at time.Time) error
 	// ClearAttention removes the flag when it is one of codes.
 	ClearAttention(ctx context.Context, orderID uuid.UUID, codes ...string) error
-	// StampRemoteRead records that the order was read from HubRise at the time, without touching
-	// the status (the time of remote data, see LastRemoteEventAt).
+	// StampRemoteRead records that the order was read from HubRise at the time (our clock), without
+	// touching the status or LastRemoteEventAt: the refresh uses it to read the order read longest
+	// ago first, and clock skew can therefore never make a new remote event look stale.
 	StampRemoteRead(ctx context.Context, orderID uuid.UUID, at time.Time) error
 	// Recreate is used when HubRise does not know an order it was sent: in one transaction it skips
 	// the status rows of the order that are still queued or sending (the new create is built with

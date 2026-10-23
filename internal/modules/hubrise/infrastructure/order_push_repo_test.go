@@ -137,8 +137,11 @@ func TestOrderLinkStampRemoteRead(t *testing.T) {
 	require.NoError(t, links.StampRemoteRead(ctx, order, at))
 	l, err := links.Get(ctx, order)
 	require.NoError(t, err)
-	require.NotNil(t, l.LastRemoteEventAt)
-	assert.WithinDuration(t, at, *l.LastRemoteEventAt, time.Millisecond)
+	assert.Nil(t, l.LastRemoteEventAt, "our own clock never becomes the time of remote data")
+	var read *time.Time
+	require.NoError(t, e.db.GetContext(ctx, &read, `SELECT last_remote_read_at FROM hubrise_orders WHERE order_id = $1`, order))
+	require.NotNil(t, read)
+	assert.WithinDuration(t, at, *read, time.Millisecond)
 
 	assert.ErrorIs(t, links.StampRemoteRead(ctx, uuid.New(), at), domain.ErrNotFound)
 }

@@ -130,10 +130,15 @@ func (r *orderLinkRepository) FlagAttention(ctx context.Context, orderID uuid.UU
 		`UPDATE hubrise_orders SET needs_attention = $2, updated_at = now() WHERE order_id = $1 AND needs_attention IS NULL`, orderID, code)
 }
 
-func (r *orderLinkRepository) MarkNotAccepted(ctx context.Context, orderID uuid.UUID, at time.Time) error {
+func (r *orderLinkRepository) MarkNotAccepted(ctx context.Context, orderID uuid.UUID) error {
 	return r.mustChange(ctx, "mark not accepted", `
-		UPDATE hubrise_orders SET needs_attention = COALESCE(needs_attention, $2), stuck_alerted_at = $3, updated_at = now()
-		WHERE order_id = $1`, orderID, domain.AttentionNotAccepted, at)
+		UPDATE hubrise_orders SET needs_attention = COALESCE(needs_attention, $2), updated_at = now()
+		WHERE order_id = $1`, orderID, domain.AttentionNotAccepted)
+}
+
+func (r *orderLinkRepository) MarkStuckAlerted(ctx context.Context, orderID uuid.UUID, at time.Time) error {
+	return r.mustChange(ctx, "mark stuck alerted",
+		`UPDATE hubrise_orders SET stuck_alerted_at = $2, updated_at = now() WHERE order_id = $1`, orderID, at)
 }
 
 func (r *orderLinkRepository) ClearAttention(ctx context.Context, orderID uuid.UUID, codes ...string) error {
@@ -144,7 +149,7 @@ func (r *orderLinkRepository) ClearAttention(ctx context.Context, orderID uuid.U
 
 func (r *orderLinkRepository) StampRemoteRead(ctx context.Context, orderID uuid.UUID, at time.Time) error {
 	return r.mustChange(ctx, "stamp remote read",
-		`UPDATE hubrise_orders SET last_remote_event_at = $2, updated_at = now() WHERE order_id = $1`, orderID, at)
+		`UPDATE hubrise_orders SET last_remote_read_at = $2, updated_at = now() WHERE order_id = $1`, orderID, at)
 }
 
 func (r *orderLinkRepository) Recreate(ctx context.Context, orderID uuid.UUID, payload json.RawMessage, due time.Time) error {
@@ -163,7 +168,7 @@ func (r *orderLinkRepository) Recreate(ctx context.Context, orderID uuid.UUID, p
 	}
 	res, err := tx.ExecContext(ctx, `
 		UPDATE hubrise_orders SET hubrise_order_id = NULL, push_state = 'pending', pushed_at = NULL,
-			last_remote_status = NULL, last_remote_event_at = NULL, last_remote_confirmed_time = NULL, remote_total = NULL, updated_at = now()
+			last_remote_status = NULL, last_remote_event_at = NULL, last_remote_read_at = NULL, last_remote_confirmed_time = NULL, remote_total = NULL, updated_at = now()
 		WHERE order_id = $1`, orderID)
 	if err != nil {
 		return fmt.Errorf("hubrise: recreate order: %w", err)

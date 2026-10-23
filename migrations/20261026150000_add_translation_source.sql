@@ -7,9 +7,8 @@
 --
 -- These are ADD COLUMN with a constant default: metadata only on PostgreSQL 11+, no table rewrite.
 -- No CHECK constraint (it would need a table scan under the same lock): the values are validated in
--- Go. lock_timeout bounds the wait for the lock, so a busy table fails the migration (and the
--- deploy job, before the new pods roll out) instead of queueing every writer behind an ACCESS
--- EXCLUSIVE request. SET LOCAL lasts for the migration's transaction only.
+-- Go. lock_timeout bounds the wait for the lock, so a busy table fails the migration (the deploy
+-- job retries it) instead of queueing every writer behind an ACCESS EXCLUSIVE request. SET LOCAL lasts for the migration's transaction only.
 SET LOCAL lock_timeout = '5s';
 
 ALTER TABLE product_translations ADD COLUMN source TEXT NOT NULL DEFAULT 'manual';

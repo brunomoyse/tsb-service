@@ -72,6 +72,21 @@ type customerSource struct{ store }
 // NewCustomerSource returns the reader of the shop's users.
 func NewCustomerSource(db *sqlx.DB) domain.CustomerSource { return &customerSource{newStore(db)} }
 
+func (s *customerSource) DeletedNotErased(ctx context.Context, limit int) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	err := s.sel(ctx, "list deleted customers not erased", &ids, `
+		SELECT l.user_id FROM hubrise_customers l
+		JOIN users u ON u.id = l.user_id
+		WHERE u.deletion_requested_at IS NOT NULL AND l.anonymised_at IS NULL
+		  AND NOT EXISTS (
+		        SELECT 1 FROM hubrise_outbox o
+		        WHERE o.kind = 'customer_anonymise' AND o.dedupe_key = 'cust:' || l.user_id::text
+		          AND o.state IN ('pending', 'sending', 'parked'))
+		ORDER BY u.deletion_requested_at, l.user_id
+		LIMIT $1`, limit)
+	return ids, err
+}
+
 func (s *customerSource) Profile(ctx context.Context, userID uuid.UUID) (*domain.CustomerProfile, error) {
 	var row struct {
 		FirstName string `db:"first_name"`

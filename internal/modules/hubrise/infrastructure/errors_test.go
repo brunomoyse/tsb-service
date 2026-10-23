@@ -82,6 +82,8 @@ func TestRepositoriesReportAStoreThatIsDown(t *testing.T) {
 		"outbox extend":  func() error { _, err := outbox.Extend(ctx, 1, now, now); return err },
 		"outbox retry":   func() error { _, err := outbox.RetryParked(ctx, 1, now); return err },
 		"outbox retry*":  func() error { _, err := outbox.RetryAllParked(ctx, now); return err },
+		"outbox scrub":   func() error { _, err := outbox.ScrubCustomerData(ctx, id); return err },
+		"outbox purge":   func() error { _, err := outbox.PurgeFinished(ctx, now); return err },
 
 		"order enqueue":   func() error { _, err := orders.EnqueueCreate(ctx, id, nil, now); return err },
 		"order get":       func() error { _, err := orders.Get(ctx, id); return err },
@@ -90,7 +92,8 @@ func TestRepositoriesReportAStoreThatIsDown(t *testing.T) {
 		"order total":     func() error { return orders.SetRemoteTotal(ctx, id, decimal.Zero) },
 		"order attention": func() error { _, err := orders.CountNeedsAttention(ctx); return err },
 		"order set flag":  func() error { return orders.SetNeedsAttention(ctx, id, "X") },
-		"order not accpt": func() error { return orders.MarkNotAccepted(ctx, id, now) },
+		"order not accpt": func() error { return orders.MarkNotAccepted(ctx, id) },
+		"order alerted":   func() error { return orders.MarkStuckAlerted(ctx, id, now) },
 		"order flag":      func() error { return orders.FlagAttention(ctx, id, "X") },
 		"order unflag":    func() error { return orders.ClearAttention(ctx, id, "X") },
 		"order stamp":     func() error { return orders.StampRemoteRead(ctx, id, now) },
@@ -123,6 +126,7 @@ func TestRepositoriesReportAStoreThatIsDown(t *testing.T) {
 		"customer forget":    func() error { return customers.Forget(ctx, id) },
 		"customer anonymise": func() error { return customers.MarkAnonymised(ctx, id, now) },
 		"customer profile":   func() error { _, err := source.Profile(ctx, id); return err },
+		"customer deleted":   func() error { _, err := source.DeletedNotErased(ctx, 1); return err },
 
 		"foreign mark":  func() error { return foreign.Mark(ctx, "h", now) },
 		"foreign is":    func() error { _, err := foreign.IsForeign(ctx, "h"); return err },

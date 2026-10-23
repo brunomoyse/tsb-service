@@ -266,7 +266,7 @@ func (s *orderSource) RefreshCandidates(ctx context.Context, limit int) ([]domai
 		JOIN orders o ON o.id = ho.order_id
 		WHERE ho.push_state = 'sent' AND ho.hubrise_order_id IS NOT NULL
 		  AND o.order_status NOT IN ('FAILED', 'CANCELLED', 'DELIVERED', 'PICKED_UP')
-		ORDER BY ho.last_remote_event_at NULLS FIRST, ho.pushed_at, ho.order_id
+		ORDER BY ho.last_remote_read_at NULLS FIRST, ho.pushed_at, ho.order_id
 		LIMIT $1`, limit)
 	return openLinks(rows), err
 }
@@ -280,7 +280,7 @@ func (s *orderSource) StuckNew(ctx context.Context, pushedBefore time.Time, limi
 		WHERE ho.push_state = 'sent' AND ho.hubrise_order_id IS NOT NULL
 		  AND ho.last_remote_status = 'new' AND ho.pushed_at < $1
 		  AND ho.stuck_alerted_at IS NULL
-		  AND (ho.needs_attention IS NULL OR ho.needs_attention IN ('UNLINKED_ITEM', 'TOTAL_MISMATCH'))
+		  AND (ho.needs_attention IS NULL OR ho.needs_attention IN ('UNLINKED_ITEM', 'TOTAL_MISMATCH', 'NOT_ACCEPTED'))
 		  AND o.order_status NOT IN ('FAILED', 'CANCELLED', 'DELIVERED', 'PICKED_UP')
 		ORDER BY ho.pushed_at, ho.order_id
 		LIMIT $2`, pushedBefore, limit)

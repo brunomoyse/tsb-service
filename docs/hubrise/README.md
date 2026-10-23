@@ -80,7 +80,9 @@ Each step can be undone by the one below it in section 3. Do them in this order 
 each before the next.
 
 1. **Deploy with the variables unset.** Only additive migrations run (new tables, six new columns). The
-   behaviour is unchanged. This release can stay like that.
+   behaviour is unchanged. This release can stay like that. The deploy job migrates right AFTER the new
+   pods roll, and until it finishes the menu, ordering and product edits fail on the old schema
+   (`docs/hubrise/PLAN.md` A10), so deploy off-peak and check that the migration step went green.
 2. **Deploy the dashboard** with the HubRise page and the "managed by HubRise" product states **before**
    catalog sync is ever enabled, otherwise a price edit on a managed product answers `HUBRISE_MANAGED` to a
    screen that does not know the code.
@@ -141,7 +143,7 @@ problem found stays on the order.
 | `UNLINKED_ITEM` | an item or option of the order has no HubRise ref, so the EPOS may ignore it | adopt the product (section 2 step 4) and tell the kitchen about this order |
 | `TOTAL_MISMATCH` | the total HubRise calculated differs from ours | compare the order in both systems; usually a price changed at HubRise |
 | `PUSH_PARKED` | HubRise refused the order (a 400 or 422) or it grew too old | read the message in `hubriseOutbox`, fix the cause, `retryHubriseOutbox` |
-| `NOT_ACCEPTED` | still `new` at HubRise after 5 minutes, within ordering hours | check the EPOS; an e-mail went to `ASSISTANT_ALERT_EMAIL` |
+| `NOT_ACCEPTED` | still `new` at HubRise after 5 minutes, for an order pushed within ordering hours (needs the status sync on; the alert is retried until the mail goes out) | check the EPOS; an e-mail went to `ASSISTANT_ALERT_EMAIL` |
 | `REMOTE_MISSING` | HubRise no longer knows the order (the periodic read finds it gone, or it was lost again after the shop had already created it a second time) | check at HubRise; a first loss is repaired by creating the order once more |
 | `REMOTE_CANCELLED_PAID` | cancelled or rejected at the EPOS, but it was paid online and `autoRefundOnCancel` is off | cancel the order in the dashboard if the cancel is right; that refunds the customer and is not sent back to HubRise |
 | `REMOTE_CANCEL_FAILED` | cancelled at the EPOS and we could not cancel it here (the payment cannot be refunded through Mollie, for example a voucher) | settle the payment by hand, then cancel |
@@ -217,7 +219,7 @@ The old token is revoked only after the new connection is stored.
   catalog import) take a lease row in `hubrise_job_leases`. A worker that panics is logged, reported to
   Sentry and restarted.
 - Workers: outbox drain (every row that leaves), event processor, reconciler (2 minutes: catch-up of
-  missed pushes, status differences, five order refreshes, orders stuck in `new`, purge), callback poller
+  missed pushes, status differences, five order refreshes, orders stuck in `new`, erasures the deletion hook missed, purge of finished outbox rows and of the customer data they froze), callback poller
   (10 minutes, picks up events HubRise could not deliver), inventory read (30 minutes and on every
   inventory event), sold-out sweeper (1 minute), catalog drift (6 hours and on catalog events, debounced).
 - HubRise limits: 500 calls a minute, 2,500 an hour, 10,000 a day, and 10 a minute for catalog and order

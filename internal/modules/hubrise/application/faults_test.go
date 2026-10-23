@@ -66,6 +66,13 @@ func (o faultOutbox) EnqueueIfNoPending(ctx context.Context, i domain.OutboxItem
 	return o.OutboxRepository.EnqueueIfNoPending(ctx, i)
 }
 
+func (o faultOutbox) ScrubCustomerData(ctx context.Context, user uuid.UUID) (int64, error) {
+	if err := o.f.hit("Outbox.ScrubCustomerData"); err != nil {
+		return 0, err
+	}
+	return o.OutboxRepository.ScrubCustomerData(ctx, user)
+}
+
 func (o faultOutbox) SkipOpenByDedupeKey(ctx context.Context, k domain.OutboxKind, key, reason string) (int64, error) {
 	if err := o.f.hit("Outbox.SkipOpenByDedupeKey"); err != nil {
 		return 0, err
@@ -169,11 +176,18 @@ func (l faultLinks) SetNeedsAttention(ctx context.Context, id uuid.UUID, code st
 	return l.OrderLinkRepository.SetNeedsAttention(ctx, id, code)
 }
 
-func (l faultLinks) MarkNotAccepted(ctx context.Context, id uuid.UUID, at time.Time) error {
+func (l faultLinks) MarkNotAccepted(ctx context.Context, id uuid.UUID) error {
 	if err := l.f.hit("Orders.MarkNotAccepted"); err != nil {
 		return err
 	}
-	return l.OrderLinkRepository.MarkNotAccepted(ctx, id, at)
+	return l.OrderLinkRepository.MarkNotAccepted(ctx, id)
+}
+
+func (l faultLinks) MarkStuckAlerted(ctx context.Context, id uuid.UUID, at time.Time) error {
+	if err := l.f.hit("Orders.MarkStuckAlerted"); err != nil {
+		return err
+	}
+	return l.OrderLinkRepository.MarkStuckAlerted(ctx, id, at)
 }
 
 func (l faultLinks) FlagAttention(ctx context.Context, id uuid.UUID, code string) error {
@@ -271,7 +285,7 @@ func (e *env) faultyPusher(f *faults) *application.OrderPusher {
 func (e *env) faultyReconciler(f *faults, remote application.RemoteOrderHandler) *application.Reconciler {
 	return application.NewReconciler(application.ReconcilerDeps{
 		Connections: e.mod.Connections, Orders: faultLinks{e.mod.Orders, f}, Source: faultSource{e.mod.Source, f},
-		Leases: e.mod.Leases, Events: e.mod.Events, Foreign: e.mod.Foreign, OAuthStates: e.mod.OAuthStates,
+		Leases: e.mod.Leases, Events: e.mod.Events, Outbox: e.mod.Outbox, Foreign: e.mod.Foreign, OAuthStates: e.mod.OAuthStates,
 		Clients: e.opts.Clients, Pusher: e.faultyPusher(f), Clock: e.clock, Remote: remote,
 	})
 }
@@ -619,6 +633,14 @@ func TestReconcilerSurvivesStoreFailures(t *testing.T) {
 		e.sentOrder(orderSpec{})
 		e.clock.Advance(6 * time.Minute)
 		r := e.faultyReconciler(newFaults("Orders.MarkNotAccepted"), nil)
+		require.Error(t, r.RunOnce(t.Context()))
+	})
+	t.Run("an alert it cannot record", func(t *testing.T) {
+		e := newEnv(t)
+		e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
+		e.sentOrder(orderSpec{})
+		e.clock.Advance(6 * time.Minute)
+		r := e.faultyReconciler(newFaults("Orders.MarkStuckAlerted"), nil)
 		require.Error(t, r.RunOnce(t.Context()))
 	})
 	t.Run("a stuck-order query that fails", func(t *testing.T) {

@@ -236,7 +236,7 @@ func TestSourceRefreshCandidatesOldestReadFirst(t *testing.T) {
 	src := infrastructure.NewOrderSource(e.db)
 	read := e.sourceOrder(t, sourceOrder{})
 	e.sentLink(t, read, "new", 10*time.Minute)
-	_, err := e.db.ExecContext(t.Context(), `UPDATE hubrise_orders SET last_remote_event_at = now() WHERE order_id = $1`, read)
+	_, err := e.db.ExecContext(t.Context(), `UPDATE hubrise_orders SET last_remote_read_at = now() WHERE order_id = $1`, read)
 	require.NoError(t, err)
 	never := e.sourceOrder(t, sourceOrder{})
 	e.sentLink(t, never, "new", 5*time.Minute)
@@ -283,7 +283,7 @@ func TestSourceStuckNew(t *testing.T) {
 	for _, l := range got {
 		orders = append(orders, l.OrderID)
 	}
-	assert.Equal(t, []uuid.UUID{lesser, stuck}, orders, "oldest first; a lesser flag does not hide the order, an alert flag or an alert already sent does")
+	assert.Equal(t, []uuid.UUID{lesser, stuck, flagged}, orders, "oldest first; a lesser flag or a stuck flag whose alert is still to go out does not hide the order, an alert already sent does")
 	assert.Equal(t, "UNLINKED_ITEM", got[0].NeedsAttention)
 
 	got, err = src.StuckNew(t.Context(), time.Now().Add(-5*time.Minute), 1)

@@ -209,10 +209,11 @@ func newStatusError(op string, status int, header http.Header, body []byte, now 
 	} else if text := strings.TrimSpace(string(body)); text != "" {
 		e.Message = text
 	}
-	e.Message = scrub(truncate(e.Message, maxErrorMessage), secrets...)
+	// Scrub first, then cut: a secret that straddles the cut would otherwise survive as a prefix.
+	e.Message = truncate(scrub(e.Message, secrets...), maxErrorMessage)
 	for i := range e.Fields {
-		e.Fields[i].Field = scrub(truncate(e.Fields[i].Field, maxErrorMessage), secrets...)
-		e.Fields[i].Message = scrub(truncate(e.Fields[i].Message, maxErrorMessage), secrets...)
+		e.Fields[i].Field = truncate(scrub(e.Fields[i].Field, secrets...), maxErrorMessage)
+		e.Fields[i].Message = truncate(scrub(e.Fields[i].Message, secrets...), maxErrorMessage)
 	}
 	return e
 }

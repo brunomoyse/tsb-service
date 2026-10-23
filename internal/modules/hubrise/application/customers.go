@@ -144,13 +144,40 @@ func (c *CustomerSync) ProfileChanged(ctx context.Context, userID uuid.UUID) err
 // user and of the link. The profile updates still queued for the user are dropped: they would only
 // write personal data the account no longer has. It is queued even while the integration is paused
 // or switched off (it is sent once the integration runs again), and only skipped when the
-// installation never connected.
+// installation never connected. The personal data frozen in the order rows already pushed (or
+// parked) is dropped as well; the reconciler repeats that for the accounts this call missed.
 func (c *CustomerSync) AccountDeleted(ctx context.Context, userID uuid.UUID) error {
 	conn, err := c.connection(ctx)
 	if err != nil {
 		return fmt.Errorf("hubrise: read connection: %w", err)
 	}
-	if conn == nil || conn.CustomerListID == nil {
+	if conn == nil {
+		return nil
+	}
+	_, scrubErr := c.d.Outbox.ScrubCustomerData(ctx, userID)
+	return errors.Join(scrubErr, c.queueAnonymise(ctx, conn, userID))
+}
+
+// EraseMissed queues the erasure of the accounts that were deleted while the hook failed (the
+// database was down, the process died between the Zitadel call and the hook): the deletion is
+// final, so nobody would ask again. The reconciler calls it on every run.
+func (c *CustomerSync) EraseMissed(ctx context.Context, limit int) error {
+	ids, err := c.d.Source.DeletedNotErased(ctx, limit)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, id := range ids {
+		if err := c.AccountDeleted(ctx, id); err != nil {
+			errs = append(errs, fmt.Errorf("user %s: %w", id, err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// queueAnonymise queues the anonymisation row of AccountDeleted.
+func (c *CustomerSync) queueAnonymise(ctx context.Context, conn *domain.Connection, userID uuid.UUID) error {
+	if conn.CustomerListID == nil {
 		return nil
 	}
 	link, err := c.d.Links.Get(ctx, userID)

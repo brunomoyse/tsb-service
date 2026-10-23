@@ -17,14 +17,21 @@ import (
 // LeaseReconciler is the name of the lease that makes the reconciler a singleton across replicas.
 const LeaseReconciler = "reconciler"
 
-// Schedule tells whether the shop is taking orders right now. The restaurant service satisfies it.
+// Schedule tells whether the ordering hours of the shop covered an instant. The composition root
+// adapts the restaurant service to it.
 type Schedule interface {
-	IsOrderingAllowed(ctx context.Context) (bool, error)
+	OrderingOpenAt(ctx context.Context, at time.Time) (bool, error)
 }
 
 // Alerter tells the owner about a problem that needs a human (an email). It may be nil.
 type Alerter interface {
 	Alert(ctx context.Context, subject, body string) error
+}
+
+// CustomerEraser queues the erasure of the deleted accounts the deletion hook missed. The customer
+// sync satisfies it.
+type CustomerEraser interface {
+	EraseMissed(ctx context.Context, limit int) error
 }
 
 // RemoteOrderHandler applies the state of an order read from HubRise to the local order. The status
@@ -48,7 +55,7 @@ type ReconcilerConfig struct {
 	NewAlertAfter time.Duration
 	// Batch caps the orders handled per step and run (50).
 	Batch int
-	// Retention is how long finished events and foreign order marks are kept (7 days).
+	// Retention is how long finished events, finished outbox rows and foreign order marks are kept (7 days).
 	Retention time.Duration
 }
 
@@ -81,6 +88,7 @@ type ReconcilerDeps struct {
 	Source      domain.OrderSource
 	Leases      domain.LeaseRepository
 	Events      domain.EventRepository
+	Outbox      domain.OutboxRepository
 	Foreign     domain.ForeignOrderRepository
 	OAuthStates domain.OAuthStateRepository
 	Clients     ClientProvider
@@ -88,16 +96,19 @@ type ReconcilerDeps struct {
 	Clock       domain.Clock
 	Config      ReconcilerConfig
 
-	// Schedule, Alerter and Remote are optional. Without a Schedule the shop counts as always open.
-	Schedule Schedule
-	Alerter  Alerter
-	Remote   RemoteOrderHandler
+	// Schedule, Alerter, Remote and Customers are optional. Without a Schedule the shop counts as
+	// always open.
+	Schedule  Schedule
+	Alerter   Alerter
+	Remote    RemoteOrderHandler
+	Customers CustomerEraser
 }
 
 // Reconciler is the safety net of the order push, run every two minutes by whichever replica holds
 // its lease. It catches what the hooks could miss (a crash between the order commit and the enqueue,
-// a status change made by a writer that bypassed the observer), reads a few open orders back from
-// HubRise, and tells staff about orders HubRise does not accept.
+// a status change made by a writer that bypassed the observer, an account erasure the deletion hook
+// failed to queue), reads a few open orders back from HubRise, and tells staff about orders HubRise
+// does not accept.
 type Reconciler struct {
 	d   ReconcilerDeps
 	cfg ReconcilerConfig
@@ -158,8 +169,13 @@ func (r *Reconciler) RunOnce(ctx context.Context) error {
 	if conn.SyncStatus {
 		errs = append(errs, r.statusDiff(ctx))
 		errs = append(errs, r.refresh(ctx, conn))
+		// Only while the status is followed: without it last_remote_status stays "new" for every
+		// pushed order, whatever the EPOS did.
+		errs = append(errs, r.flagStuck(ctx))
 	}
-	errs = append(errs, r.flagStuck(ctx))
+	if r.d.Customers != nil {
+		errs = append(errs, r.d.Customers.EraseMissed(ctx, r.cfg.Batch))
+	}
 	errs = append(errs, r.purge(ctx))
 	return errors.Join(errs...)
 }
@@ -274,46 +290,64 @@ func (r *Reconciler) afterRefresh(ctx context.Context, l domain.OpenLink, remote
 }
 
 // flagStuck flags the orders that HubRise still has as "new" after NewAlertAfter and, when an alerter
-// is set, emails the owner once per order. It only acts while the shop is taking orders: a night order
-// nobody could accept is not a problem to wake anyone for.
+// is set, emails the owner once per order. It only concerns the orders that were pushed while the
+// shop was taking orders: one nobody could accept at night is not a problem to wake anyone for,
+// while one pushed just before closing is, and a shop that paused ordering since still wants to
+// know. The alert is recorded once it went out, so a mail provider that is down is retried.
 func (r *Reconciler) flagStuck(ctx context.Context) error {
 	stuck, err := r.d.Source.StuckNew(ctx, r.d.Clock.Now().Add(-r.cfg.NewAlertAfter), r.cfg.Batch)
-	if err != nil || len(stuck) == 0 {
+	if err != nil {
 		return err
-	}
-	if r.d.Schedule != nil {
-		open, err := r.d.Schedule.IsOrderingAllowed(ctx)
-		if err != nil || !open {
-			return err
-		}
 	}
 	var errs []error
 	for _, l := range stuck {
-		if err := r.d.Orders.MarkNotAccepted(ctx, l.OrderID, r.d.Clock.Now()); err != nil {
+		if r.d.Schedule != nil {
+			at := r.d.Clock.Now()
+			if l.PushedAt != nil {
+				at = *l.PushedAt
+			}
+			open, err := r.d.Schedule.OrderingOpenAt(ctx, at)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			if !open {
+				continue
+			}
+		}
+		if err := r.d.Orders.MarkNotAccepted(ctx, l.OrderID); err != nil {
 			errs = append(errs, err)
 			continue
 		}
 		logging.FromContext(ctx).Error("hubrise: an order was not accepted at HubRise in time",
 			zap.String("order_id", l.OrderID.String()), zap.String("hubrise_order_id", l.HubriseOrderID))
-		if r.d.Alerter == nil {
-			continue
+		if r.d.Alerter != nil {
+			subject := "HubRise: order " + ShortRef(l.OrderID) + " not accepted"
+			body := fmt.Sprintf("Order %s was sent to HubRise (%s) more than %d minutes ago and is still new. Check the EPOS.",
+				ShortRef(l.OrderID), l.HubriseOrderID, int(r.cfg.NewAlertAfter.Minutes()))
+			if err := r.d.Alerter.Alert(ctx, subject, body); err != nil {
+				errs = append(errs, err)
+				continue
+			}
 		}
-		subject := "HubRise: order " + ShortRef(l.OrderID) + " not accepted"
-		body := fmt.Sprintf("Order %s was sent to HubRise (%s) more than %d minutes ago and is still new. Check the EPOS.",
-			ShortRef(l.OrderID), l.HubriseOrderID, int(r.cfg.NewAlertAfter.Minutes()))
-		if err := r.d.Alerter.Alert(ctx, subject, body); err != nil {
+		if err := r.d.Orders.MarkStuckAlerted(ctx, l.OrderID, r.d.Clock.Now()); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// purge forgets old finished events, foreign order marks and expired OAuth states.
+// purge forgets old finished events, foreign order marks and expired OAuth states, and applies the
+// retention of the outbox (finished rows go, the personal data of sent orders and of erased accounts
+// is dropped).
 func (r *Reconciler) purge(ctx context.Context) error {
 	now := r.d.Clock.Now()
 	cutoff := now.Add(-r.cfg.Retention)
 	var errs []error
 	if _, err := r.d.Events.PurgeFinished(ctx, cutoff); err != nil {
+		errs = append(errs, err)
+	}
+	if _, err := r.d.Outbox.PurgeFinished(ctx, cutoff); err != nil {
 		errs = append(errs, err)
 	}
 	if _, err := r.d.Foreign.Purge(ctx, cutoff); err != nil {

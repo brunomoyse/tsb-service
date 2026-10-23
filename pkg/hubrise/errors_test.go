@@ -146,3 +146,20 @@ func TestScrubAndTruncate(t *testing.T) {
 	assert.Equal(t, "unchanged", scrub("unchanged", ""))
 	assert.Equal(t, "short", truncate("short", 10))
 }
+
+func TestStatusErrorScrubsBeforeItCuts(t *testing.T) {
+	const token = "tok-abcdefghijklmnop"
+	// The token straddles byte 500: cutting first would leave "tok-abcde" behind.
+	text := strings.Repeat("x", maxErrorMessage-5) + token + " tail"
+	e := newStatusError("GET /x", 500, http.Header{}, []byte(text), time.Now(), token)
+	assert.NotContains(t, e.Message, "tok-", "no prefix of the token survives")
+	e = newStatusError("GET /x", 500, http.Header{}, []byte(strings.Repeat("x", 100)+token), time.Now(), token)
+	assert.Contains(t, e.Message, "[REDACTED]")
+
+	body := `{"message":"` + text + `","errors":[{"field":"` + text + `","message":"` + text + `"}]}`
+	e = newStatusError("GET /x", 422, http.Header{}, []byte(body), time.Now(), token)
+	assert.NotContains(t, e.Error(), "tok-")
+	require.Len(t, e.Fields, 1)
+	assert.NotContains(t, e.Fields[0].Field, "tok-")
+	assert.NotContains(t, e.Fields[0].Message, "tok-")
+}

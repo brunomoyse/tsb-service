@@ -4,6 +4,10 @@
 -- customer outbox kinds were created with the connection and the outbox. See docs/hubrise/PLAN.md
 -- section 19, amendment A1.
 
+-- The foreign keys below take SHARE ROW EXCLUSIVE on users, which conflicts with every
+-- writer of that table. lock_timeout bounds the wait: a long transaction there makes this
+-- migration fail fast (the deploy is simply re-run) instead of queueing every writer behind it.
+SET LOCAL lock_timeout = '5s';
 -- One row per user known to the customer list. A row without hubrise_customer_id records that the
 -- customer may exist at HubRise already (a creation was attempted and its answer may have been lost),
 -- so the next attempt looks the customer up by private_ref (= the user id) before it creates one.
@@ -29,5 +33,6 @@ CREATE UNIQUE INDEX hubrise_outbox_customer_pending_uidx ON hubrise_outbox (dedu
     WHERE state = 'pending' AND kind = 'customer';
 
 -- +goose Down
+SET LOCAL lock_timeout = '5s';
 DROP INDEX hubrise_outbox_customer_pending_uidx;
 DROP TABLE hubrise_customers;

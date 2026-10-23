@@ -453,3 +453,49 @@ func TestTranslationSourceMigrationFailsFastWhenTheTableIsBusy(t *testing.T) {
 	_, err = p.UpTo(ctx, m4Version)
 	require.NoError(t, err)
 }
+
+// The migrations that create a table with foreign keys to a hot table need SHARE ROW EXCLUSIVE on it,
+// which an open writer blocks. They must give up after lock_timeout instead of queueing every writer
+// of the table behind them, and apply once the writer is gone.
+func TestMigrationsWithForeignKeysFailFastWhenTheReferencedTableIsBusy(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		version int64
+		below   int64
+		table   string // a table the migration references
+		created string
+	}{
+		{"catalog links", m2Version, m1Version, "products", "hubrise_catalog_links"},
+		{"orders and outbox", m3Version, m2Version, "orders", "hubrise_orders"},
+		{"customers", m7Version, m6Version, "users", "hubrise_customers"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			td := testhelpers.SetupTestDatabase(t)
+			ctx := t.Context()
+			p := newProvider(t, td)
+			_, err := p.DownTo(ctx, tc.below)
+			require.NoError(t, err)
+
+			// An open writer holds ROW EXCLUSIVE on the table until it ends.
+			blocker, err := td.DB.BeginTxx(ctx, nil)
+			require.NoError(t, err)
+			defer func() { _ = blocker.Rollback() }()
+			_, err = blocker.ExecContext(ctx, `UPDATE `+tc.table+` SET id = id WHERE false`)
+			require.NoError(t, err)
+
+			start := time.Now()
+			_, err = p.UpTo(ctx, tc.version)
+			elapsed := time.Since(start)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "lock timeout")
+			assert.GreaterOrEqual(t, elapsed, 4*time.Second, "it waited for the lock")
+			assert.Less(t, elapsed, 20*time.Second, "and gave up")
+			assert.False(t, tableExists(t, td, tc.created), "the failed migration changed nothing")
+
+			require.NoError(t, blocker.Rollback())
+			_, err = p.UpTo(ctx, tc.version)
+			require.NoError(t, err)
+			assert.True(t, tableExists(t, td, tc.created))
+		})
+	}
+}

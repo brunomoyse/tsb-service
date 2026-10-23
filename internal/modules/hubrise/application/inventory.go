@@ -123,8 +123,29 @@ func (s *InventoryService) active(ctx context.Context) (*domain.Connection, erro
 	return conn, nil
 }
 
+// tracking is active for the shop's own decisions: it also answers while an authorization error
+// pauses the pipeline. What staff change in that time is queued like any other change (the outbox is
+// not claimed while the pause lasts) and goes out once the connection works again; dropping it would
+// leave HubRise and the shop apart until the next toggle.
+func (s *InventoryService) tracking(ctx context.Context) (*domain.Connection, error) {
+	conn, err := s.d.Connections.Get(ctx)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !conn.Connected() || !conn.Enabled || !conn.SyncInventory || conn.RelinkRequiredAt != nil {
+		return nil, nil
+	}
+	return conn, nil
+}
+
 func (s *InventoryService) lock(ctx context.Context) (release func(), err error) {
-	ok, err := s.d.Leases.Acquire(ctx, LeaseInventorySync, s.cfg.Holder, s.d.Clock.Now(), s.cfg.SyncLease)
+	// The holder is unique per call: the lease treats its own holder as a renewal, so a shared one
+	// would let two syncs of this process run at once.
+	holder := s.cfg.Holder + ":" + uuid.NewString()
+	ok, err := s.d.Leases.Acquire(ctx, LeaseInventorySync, holder, s.d.Clock.Now(), s.cfg.SyncLease)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +153,7 @@ func (s *InventoryService) lock(ctx context.Context) (release func(), err error)
 		return nil, ErrInventoryBusy
 	}
 	return func() {
-		if err := s.d.Leases.Release(context.WithoutCancel(ctx), LeaseInventorySync, s.cfg.Holder); err != nil {
+		if err := s.d.Leases.Release(context.WithoutCancel(ctx), LeaseInventorySync, holder); err != nil {
 			logging.FromContext(ctx).Warn("hubrise: cannot release the inventory lease", zap.Error(err))
 		}
 	}, nil
@@ -430,9 +451,10 @@ func (s *InventoryService) enqueueSku(ctx context.Context, l *domain.CatalogLink
 // HubriseHooks.AvailabilityChanged. It queues the PATCH first and then clears the sold-out
 // provenance of the link (the shop owns that state from now on), so a failure in between leaves the
 // pending PATCH to guard the product against a stale inbound answer. An unlinked product, a retired
-// one, or a paused or disconnected integration changes nothing.
+// one, or a switched off or disconnected integration changes nothing (switching it on again pushes
+// the whole state); a pause by an authorization error only delays the PATCH.
 func (s *InventoryService) AvailabilityChanged(ctx context.Context, productID uuid.UUID, _ bool) error {
-	conn, err := s.active(ctx)
+	conn, err := s.tracking(ctx)
 	if err != nil || conn == nil {
 		return err
 	}

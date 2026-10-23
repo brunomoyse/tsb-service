@@ -147,14 +147,17 @@ func (s *CatalogService) Sync(ctx context.Context, req SyncRequest) (*SyncResult
 		return nil, domain.ErrNotEnabled
 	}
 
-	ok, err := s.Leases.Acquire(ctx, catalogLease, s.Holder, s.now(), catalogLeaseTTL)
+	// The holder is unique per call: the lease treats its own holder as a renewal, so a shared one
+	// would let two imports of this process (a double click, a click and the drift job) both in.
+	holder := s.Holder + ":" + uuid.NewString()
+	ok, err := s.Leases.Acquire(ctx, catalogLease, holder, s.now(), catalogLeaseTTL)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		return nil, domain.ErrImportInProgress
 	}
-	defer func() { _ = s.Leases.Release(context.WithoutCancel(ctx), catalogLease, s.Holder) }()
+	defer func() { _ = s.Leases.Release(context.WithoutCancel(ctx), catalogLease, holder) }()
 
 	api, cat, err := s.fetch(ctx, conn, req.Scheduled)
 	if err != nil {

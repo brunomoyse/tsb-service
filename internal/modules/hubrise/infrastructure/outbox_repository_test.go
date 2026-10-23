@@ -142,15 +142,16 @@ func TestOutboxClaimGates(t *testing.T) {
 	assert.Empty(t, claim(), "connected but disabled: paused")
 
 	hubtest.SeedConnection(t, e.db, hubtest.WithFeatures(false, false, false, false, false))
-	assert.Empty(t, claim(), "every toggle off")
+	assert.Equal(t, []int64{anonymise}, claim(), "every toggle off: only the erasure of a deleted account still goes out")
+	reset()
 
 	for name, tc := range map[string]struct {
 		opt  hubtest.SeedOption
 		want []int64
 	}{
-		"push_orders only":    {hubtest.WithFeatures(true, false, false, false, false), []int64{create}},
-		"sync_status only":    {hubtest.WithFeatures(false, true, false, false, false), []int64{status}},
-		"sync_inventory only": {hubtest.WithFeatures(false, false, true, false, false), []int64{inventory}},
+		"push_orders only":    {hubtest.WithFeatures(true, false, false, false, false), []int64{create, anonymise}},
+		"sync_status only":    {hubtest.WithFeatures(false, true, false, false, false), []int64{status, anonymise}},
+		"sync_inventory only": {hubtest.WithFeatures(false, false, true, false, false), []int64{inventory, anonymise}},
 		"sync_customers only": {hubtest.WithFeatures(false, false, false, false, true), []int64{customer, anonymise}},
 	} {
 		hubtest.SeedConnection(t, e.db, tc.opt)
@@ -609,4 +610,187 @@ func TestOutboxActiveDedupeKeys(t *testing.T) {
 	none, err := repo.ActiveDedupeKeys(ctx, domain.OutboxCustomer)
 	require.NoError(t, err)
 	assert.Empty(t, none)
+}
+
+// piiPayload is an order_create payload as the pusher freezes it.
+func piiPayload(user uuid.UUID) string {
+	return `{"v":1,"ref":"AB12","user_id":"` + user.String() + `","customer_notes":"ring twice","total":"12.80",` +
+		`"customer":{"first_name":"John","last_name":"Doe","email":"john@example.com","phone":"+32470000000",` +
+		`"address_1":"1 Rue X","city":"Liege","latitude":"50.6","longitude":"5.5","delivery_notes":"3rd floor"},` +
+		`"items":[{"product_name":"Salmon","quantity":1}]}`
+}
+
+func payloadOf(t *testing.T, repo domain.OutboxRepository, id int64) string {
+	t.Helper()
+	got, err := repo.Get(t.Context(), id)
+	require.NoError(t, err)
+	return string(got.Payload)
+}
+
+func assertScrubbed(t *testing.T, payload string, msg string) {
+	t.Helper()
+	for _, pii := range []string{"john@example.com", "+32470000000", "Rue X", "ring twice", "3rd floor", `"customer"`} {
+		assert.NotContains(t, payload, pii, msg)
+	}
+	assert.Contains(t, payload, "Salmon", msg+": the items stay")
+	assert.Contains(t, payload, "12.80", msg+": and the total")
+}
+
+// The customer frozen in an order_create is dropped once the row is final, so a deleted account
+// leaves nothing behind in the outbox.
+func TestOutboxDropsThePersonalDataOfFinishedOrderCreates(t *testing.T) {
+	e := newEnv(t)
+	repo := infrastructure.NewOutboxRepository(e.db)
+	ctx := t.Context()
+	now := time.Now().Truncate(time.Microsecond)
+	hubtest.SeedConnection(t, e.db)
+	user := e.fx.RegularUser.ID
+
+	t.Run("sent", func(t *testing.T) {
+		id := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "", piiPayload(user), now)
+		assert.Contains(t, payloadOf(t, repo, id), "john@example.com", "queued rows keep it: they are about to be sent")
+		items, err := repo.Claim(ctx, now, time.Minute, 10)
+		require.NoError(t, err)
+		require.Equal(t, []int64{id}, ids(items))
+		assert.Contains(t, string(items[0].Payload), "john@example.com", "and the worker gets it")
+		ok, err := repo.MarkSent(ctx, id, now)
+		require.NoError(t, err)
+		require.True(t, ok)
+		assertScrubbed(t, payloadOf(t, repo, id), "sent")
+	})
+	t.Run("skipped", func(t *testing.T) {
+		id := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "", piiPayload(user), now)
+		ok, err := repo.MarkSkipped(ctx, id, "not worth sending")
+		require.NoError(t, err)
+		require.True(t, ok)
+		assertScrubbed(t, payloadOf(t, repo, id), "skipped")
+	})
+	t.Run("parked rows keep it for the retry", func(t *testing.T) {
+		id := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "", piiPayload(user), now)
+		_, err := repo.Claim(ctx, now, time.Minute, 10)
+		require.NoError(t, err)
+		ok, err := repo.MarkParked(ctx, id, now, "422")
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.Contains(t, payloadOf(t, repo, id), "john@example.com")
+	})
+	t.Run("other kinds are left as they are", func(t *testing.T) {
+		id := enqueue(t, repo, domain.OutboxOrderStatus, ptr(e.newOrder(t)), "o:1", `{"status":"accepted"}`, now)
+		_, err := repo.Claim(ctx, now, time.Minute, 10)
+		require.NoError(t, err)
+		ok, err := repo.MarkSent(ctx, id, now)
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.JSONEq(t, `{"status":"accepted"}`, payloadOf(t, repo, id))
+	})
+}
+
+func TestOutboxSkipsDropThePersonalDataToo(t *testing.T) {
+	e := newEnv(t)
+	repo := infrastructure.NewOutboxRepository(e.db)
+	ctx := t.Context()
+	now := time.Now().Truncate(time.Microsecond)
+	order := e.newOrder(t)
+	user := e.fx.RegularUser.ID
+
+	create := enqueue(t, repo, domain.OutboxOrderCreate, &order, "", piiPayload(user), now)
+	n, err := repo.SkipPendingUpTo(ctx, order, domain.OutboxOrderCreate, create, "covered")
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, n)
+	assertScrubbed(t, payloadOf(t, repo, create), "covered by another row")
+
+	keyed := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "k:1", piiPayload(user), now)
+	n, err = repo.SkipOpenByDedupeKey(ctx, domain.OutboxOrderCreate, "k:1", "superseded")
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, n)
+	assertScrubbed(t, payloadOf(t, repo, keyed), "skipped by key")
+}
+
+func TestOutboxScrubCustomerData(t *testing.T) {
+	e := newEnv(t)
+	repo := infrastructure.NewOutboxRepository(e.db)
+	ctx := t.Context()
+	now := time.Now().Truncate(time.Microsecond)
+	user, other := e.fx.RegularUser.ID, e.fx.AdminUser.ID
+	setState := func(id int64, state string) {
+		_, err := e.db.ExecContext(ctx, `UPDATE hubrise_outbox SET state = $2 WHERE id = $1`, id, state)
+		require.NoError(t, err)
+	}
+
+	parked := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "", piiPayload(user), now)
+	setState(parked, "parked")
+	sent := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "", piiPayload(user), now)
+	setState(sent, "sent") // a row of an older build, sent with its data
+	pending := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "", piiPayload(user), now)
+	someoneElse := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "", piiPayload(other), now)
+	setState(someoneElse, "parked")
+
+	n, err := repo.ScrubCustomerData(ctx, user)
+	require.NoError(t, err)
+	assert.EqualValues(t, 2, n)
+	assertScrubbed(t, payloadOf(t, repo, parked), "parked")
+	assertScrubbed(t, payloadOf(t, repo, sent), "sent")
+	assert.Contains(t, payloadOf(t, repo, pending), "john@example.com", "a row on its way is scrubbed once sent")
+	assert.Contains(t, payloadOf(t, repo, someoneElse), "john@example.com", "other users are untouched")
+
+	n, err = repo.ScrubCustomerData(ctx, user)
+	require.NoError(t, err)
+	assert.Zero(t, n, "nothing left to scrub")
+}
+
+func TestOutboxPurgeFinished(t *testing.T) {
+	e := newEnv(t)
+	repo := infrastructure.NewOutboxRepository(e.db)
+	ctx := t.Context()
+	now := time.Now().Truncate(time.Microsecond)
+	old := now.Add(-10 * 24 * time.Hour)
+	cutoff := now.Add(-7 * 24 * time.Hour)
+	user, erased := e.fx.RegularUser.ID, e.fx.AdminUser.ID
+	_, err := e.db.ExecContext(ctx, `UPDATE users SET deletion_requested_at = now() WHERE id = $1`, erased)
+	require.NoError(t, err)
+	set := func(id int64, state string, sentAt, createdAt any) {
+		_, err := e.db.ExecContext(ctx, `UPDATE hubrise_outbox SET state = $2, sent_at = $3, created_at = $4 WHERE id = $1`, id, state, sentAt, createdAt)
+		require.NoError(t, err)
+	}
+	exists := func(id int64) bool {
+		_, err := repo.Get(ctx, id)
+		return err == nil
+	}
+
+	oldSent := enqueue(t, repo, domain.OutboxOrderStatus, ptr(e.newOrder(t)), "o:1", `{}`, now)
+	set(oldSent, "sent", old, old)
+	oldSkipped := enqueue(t, repo, domain.OutboxInventory, nil, "inv:sku:A", `{}`, now)
+	set(oldSkipped, "skipped", nil, old)
+	recentSent := enqueue(t, repo, domain.OutboxCustomer, nil, "c:1", `{}`, now)
+	set(recentSent, "sent", now, now)
+	oldPending := enqueue(t, repo, domain.OutboxOrderStatus, ptr(e.newOrder(t)), "o:2", `{}`, now)
+	set(oldPending, "pending", nil, old)
+	oldParked := enqueue(t, repo, domain.OutboxOrderStatus, ptr(e.newOrder(t)), "o:3", `{}`, now)
+	set(oldParked, "parked", nil, old)
+
+	// order_create rows stay (the re-creation guard counts them), without personal data.
+	createSent := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "", piiPayload(user), now)
+	set(createSent, "sent", old, old)
+	createSkipped := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "", piiPayload(user), now)
+	set(createSkipped, "skipped", nil, now)
+	createParked := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "", piiPayload(user), now)
+	set(createParked, "parked", nil, now)
+	createParkedErased := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "", piiPayload(erased), now)
+	set(createParkedErased, "parked", nil, now)
+	createPendingErased := enqueue(t, repo, domain.OutboxOrderCreate, ptr(e.newOrder(t)), "", piiPayload(erased), now)
+
+	deleted, err := repo.PurgeFinished(ctx, cutoff)
+	require.NoError(t, err)
+	assert.EqualValues(t, 2, deleted)
+	assert.False(t, exists(oldSent))
+	assert.False(t, exists(oldSkipped))
+	for name, id := range map[string]int64{"recent": recentSent, "pending": oldPending, "parked": oldParked, "create": createSent} {
+		assert.True(t, exists(id), name)
+	}
+
+	assertScrubbed(t, payloadOf(t, repo, createSent), "sent create")
+	assertScrubbed(t, payloadOf(t, repo, createSkipped), "skipped create")
+	assert.Contains(t, payloadOf(t, repo, createParked), "john@example.com", "a parked row of a live account waits for its retry")
+	assertScrubbed(t, payloadOf(t, repo, createParkedErased), "parked create of an erased account")
+	assert.Contains(t, payloadOf(t, repo, createPendingErased), "john@example.com", "a row on its way is scrubbed once sent")
 }

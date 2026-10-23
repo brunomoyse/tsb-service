@@ -542,10 +542,9 @@ func TestInventoryHookIgnoresWhatIsNotLinkedOrNotActive(t *testing.T) {
 
 	// The toggles of the connection and its state.
 	for name, set := range map[string]string{
-		"disabled":              `enabled = false`,
-		"inventory sync off":    `sync_inventory = false`,
-		"authorization failure": `auth_error_at = now()`,
-		"relink pending":        `relink_required_at = now()`,
+		"disabled":           `enabled = false`,
+		"inventory sync off": `sync_inventory = false`,
+		"relink pending":     `relink_required_at = now()`,
 	} {
 		ie.exec(`UPDATE hubrise_connection SET ` + set)
 		require.NoError(t, ie.inv.Service.AvailabilityChanged(ctx, ie.fx.SalmonSushi.ID, false), name)
@@ -556,6 +555,33 @@ func TestInventoryHookIgnoresWhatIsNotLinkedOrNotActive(t *testing.T) {
 	ie.exec(`DELETE FROM hubrise_connection`)
 	require.NoError(t, ie.inv.Service.AvailabilityChanged(ctx, ie.fx.SalmonSushi.ID, false))
 	assert.Zero(t, ie.outboxCount(domain.OutboxInventory), "not connected")
+}
+
+// An authorization failure pauses the pipeline, not the shop: what staff change meanwhile is queued
+// and goes out when the connection works again, so HubRise and the shop do not stay apart.
+func TestInventoryTogglesMadeWhilePausedByAnAuthorizationErrorAreSentAfterwards(t *testing.T) {
+	ie := newInvEnv(t)
+	ie.linkAll()
+	ie.stampBaseline()
+	ie.setInventory(pkghubrise.SoldOutSku(refSalmon, nil))
+	ie.sync()
+	require.False(t, ie.available(ie.fx.SalmonSushi.ID))
+	require.True(t, ie.catalogLink(domain.EntityProduct, refSalmon).InventorySoldOut)
+
+	require.NoError(t, ie.mod.Connections.RecordAuthError(t.Context(), ie.clock.Now(), "revoked"))
+	ie.setAvailable(ie.fx.SalmonSushi.ID, true) // staff bring the product back
+	ie.setAvailable(ie.fx.TunaSushi.ID, false)  // and sell another one out
+	require.NoError(t, ie.inv.Service.AvailabilityChanged(t.Context(), ie.fx.SalmonSushi.ID, true))
+	require.NoError(t, ie.inv.Service.AvailabilityChanged(t.Context(), ie.fx.TunaSushi.ID, false))
+	assert.Equal(t, 2, ie.outboxCount(domain.OutboxInventory), "queued, not lost")
+	assert.False(t, ie.catalogLink(domain.EntityProduct, refSalmon).InventorySoldOut, "the stale provenance cannot release a staff decision later")
+	ie.srv.ClearRequests()
+	ie.drainAll()
+	assert.Empty(t, ie.srv.Requests(), "nothing leaves while the pause lasts")
+
+	require.NoError(t, ie.mod.Connections.ClearAuthError(t.Context()))
+	ie.drainAll()
+	assert.Equal(t, []pkghubrise.InventoryEntry{pkghubrise.SoldOutSku(refTuna, nil)}, ie.srv.Inventory(), "HubRise now has the shop's state")
 }
 
 func TestInventoryPausedOrDisconnectedDoesNothing(t *testing.T) {
@@ -681,4 +707,44 @@ func TestInventoryPollIsABackgroundCallAndEventsAreNot(t *testing.T) {
 	ran, err = e.replica("replica-b").Jobs.PollOnce(t.Context())
 	require.NoError(t, err)
 	assert.False(t, ran, "the poll runs once per interval across replicas")
+}
+
+// The lease treats its own holder as a renewal, so two syncs of one process must not share a holder:
+// the second is turned away while the first is reading the inventory.
+func TestInventoryTwoSyncsOfOneProcessDoNotRunAtTheSameTime(t *testing.T) {
+	entered, release := make(chan struct{}, 2), make(chan struct{})
+	e := newInvEnv(t, withClients(func(e *env) clientProvider {
+		return fixedClients{c: e.srv.NewClient(t, pkghubrise.WithHTTPClient(&http.Client{Transport: hookTransport{
+			next: http.DefaultTransport,
+			before: func(r *http.Request) {
+				if r.URL.Path != "/v1/location/inventory" {
+					return
+				}
+				entered <- struct{}{}
+				select {
+				case <-release:
+				case <-time.After(10 * time.Second): // a failing test must not hang
+				}
+			},
+		}}))}
+	}))
+	e.linkAll()
+	e.stampBaseline()
+
+	first := make(chan error, 1)
+	go func() {
+		_, err := e.inv.Service.Sync(context.WithoutCancel(t.Context()), false)
+		first <- err
+	}()
+	<-entered // the first sync holds the lease and waits in the read
+
+	_, err := e.inv.Service.Sync(t.Context(), false)
+	assert.ErrorIs(t, err, application.ErrInventoryBusy)
+	_, err = e.inv.Service.ReleaseExpired(t.Context())
+	assert.ErrorIs(t, err, application.ErrInventoryBusy)
+
+	close(release)
+	require.NoError(t, <-first)
+	_, err = e.inv.Service.Sync(t.Context(), false)
+	assert.NoError(t, err, "the lease is free again")
 }

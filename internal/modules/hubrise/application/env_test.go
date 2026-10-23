@@ -334,9 +334,12 @@ func (e *env) remote(id uuid.UUID) pkghubrise.Order {
 	return o
 }
 
-type scheduleFunc func() bool
+// scheduleFunc says whether the ordering hours covered an instant.
+type scheduleFunc func(at time.Time) bool
 
-func (f scheduleFunc) IsOrderingAllowed(context.Context) (bool, error) { return f(), nil }
+func (f scheduleFunc) OrderingOpenAt(_ context.Context, at time.Time) (bool, error) {
+	return f(at), nil
+}
 
 type alertRecorder struct{ subjects []string }
 
@@ -392,8 +395,9 @@ func (e *env) rawRow(kind string, orderID *uuid.UUID, payload string, state ...s
 func infraConnections(db *sqlx.DB) domain.ConnectionRepository {
 	return infrastructure.NewConnectionRepository(db)
 }
-func infraSource(db *sqlx.DB) domain.OrderSource     { return infrastructure.NewOrderSource(db) }
-func infraEvents(db *sqlx.DB) domain.EventRepository { return infrastructure.NewEventRepository(db) }
+func infraSource(db *sqlx.DB) domain.OrderSource      { return infrastructure.NewOrderSource(db) }
+func infraEvents(db *sqlx.DB) domain.EventRepository  { return infrastructure.NewEventRepository(db) }
+func infraOutbox(db *sqlx.DB) domain.OutboxRepository { return infrastructure.NewOutboxRepository(db) }
 func infraForeign(db *sqlx.DB) domain.ForeignOrderRepository {
 	return infrastructure.NewForeignOrderRepository(db)
 }

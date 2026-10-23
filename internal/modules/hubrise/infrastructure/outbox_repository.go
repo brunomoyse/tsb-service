@@ -73,16 +73,24 @@ func (r *outboxRepository) EnqueueIfNoPending(ctx context.Context, item domain.O
 	return id, err == nil, err
 }
 
+// scrubPayloadSQL is the payload expression of an order_create row that reached a final state: the
+// customer (name, email, phone, delivery address, coordinates) and the notes the customer typed are
+// dropped, nothing reads them once the order is at HubRise, and the row must not keep them after
+// the account is erased. Other kinds carry no personal data.
+const scrubPayloadSQL = `CASE WHEN kind = 'order_create' THEN payload - 'customer' - 'customer_notes' ELSE payload END`
+
 func (r *outboxRepository) SkipOpenByDedupeKey(ctx context.Context, kind domain.OutboxKind, dedupeKey, reason string) (int64, error) {
 	return r.execN(ctx, "skip open outbox rows", `
-		UPDATE hubrise_outbox SET state = 'skipped', last_error = $3
+		UPDATE hubrise_outbox SET state = 'skipped', last_error = $3, payload = `+scrubPayloadSQL+`
 		WHERE kind = $1 AND dedupe_key = $2 AND state IN ('pending', 'parked')`, kind, dedupeKey, reason)
 }
 
 // claimSQL is the whole claim in one statement, so the lease and the attempts increment are durable
 // before the HTTP call and two replicas never get the same row:
 //   - the connection must be active (enabled, token, no auth error, no relink pending) and the
-//     toggle of the row's kind on, re-read here so a disable bites on the very next claim;
+//     toggle of the row's kind on, re-read here so a disable bites on the very next claim. The
+//     erasure of a deleted account (customer_anonymise) depends on no toggle: switching the sync off
+//     must not leave an erasure request pending;
 //   - due rows are pending rows whose time came and sending rows whose lease expired;
 //   - only the first row of an order (or of a dedupe key) is claimable: any earlier pending,
 //     sending or parked row of the same order blocks it, so a PATCH never overtakes its create;
@@ -99,6 +107,7 @@ WITH conn AS (
 	        WHEN 'order_create' THEN c.push_orders
 	        WHEN 'order_status' THEN c.sync_status
 	        WHEN 'inventory' THEN c.sync_inventory
+	        WHEN 'customer_anonymise' THEN TRUE
 	        ELSE c.sync_customers
 	      END
 	  AND NOT EXISTS (
@@ -139,7 +148,8 @@ func (r *outboxRepository) Extend(ctx context.Context, id int64, now, until time
 
 func (r *outboxRepository) MarkSent(ctx context.Context, id int64, now time.Time) (bool, error) {
 	return r.affected(ctx, "mark outbox sent", `
-		UPDATE hubrise_outbox SET state = 'sent', sent_at = $2, leased_until = NULL, last_error = NULL
+		UPDATE hubrise_outbox SET state = 'sent', sent_at = $2, leased_until = NULL, last_error = NULL,
+			payload = `+scrubPayloadSQL+`
 		WHERE id = $1 AND state = 'sending'`, id, now)
 }
 
@@ -151,7 +161,7 @@ func (r *outboxRepository) MarkParked(ctx context.Context, id int64, now time.Ti
 
 func (r *outboxRepository) MarkSkipped(ctx context.Context, id int64, reason string) (bool, error) {
 	return r.affected(ctx, "skip outbox row", `
-		UPDATE hubrise_outbox SET state = 'skipped', leased_until = NULL, last_error = $2
+		UPDATE hubrise_outbox SET state = 'skipped', leased_until = NULL, last_error = $2, payload = `+scrubPayloadSQL+`
 		WHERE id = $1 AND state IN ('pending', 'sending')`, id, reason)
 }
 
@@ -264,7 +274,7 @@ func (r *outboxRepository) MaxPendingID(ctx context.Context, orderID uuid.UUID, 
 
 func (r *outboxRepository) SkipPendingUpTo(ctx context.Context, orderID uuid.UUID, kind domain.OutboxKind, upTo int64, reason string) (int64, error) {
 	return r.execN(ctx, "skip covered outbox rows", `
-		UPDATE hubrise_outbox SET state = 'skipped', last_error = $4
+		UPDATE hubrise_outbox SET state = 'skipped', last_error = $4, payload = `+scrubPayloadSQL+`
 		WHERE order_id = $1 AND kind = $2 AND state = 'pending' AND id <= $3`, orderID, kind, upTo, reason)
 }
 
@@ -287,4 +297,34 @@ func (r *outboxRepository) CountForOrder(ctx context.Context, orderID uuid.UUID,
 	err := r.get(ctx, "count outbox rows of an order", &n,
 		`SELECT count(*) FROM hubrise_outbox WHERE order_id = $1 AND kind = $2`, orderID, kind)
 	return n, err
+}
+
+// ScrubCustomerData drops the personal data frozen in the order_create rows of the user that no
+// longer need it: the sent and skipped ones (already scrubbed when they got there, this catches the
+// rows of an older build) and the parked ones (an erased account is not worth a retry with its
+// data). Pending and sending rows are left alone, they are on their way and are scrubbed once sent.
+func (r *outboxRepository) ScrubCustomerData(ctx context.Context, userID uuid.UUID) (int64, error) {
+	return r.execN(ctx, "scrub outbox customer data", `
+		UPDATE hubrise_outbox SET payload = payload - 'customer' - 'customer_notes'
+		WHERE kind = 'order_create' AND state IN ('sent', 'skipped', 'parked')
+		  AND payload->>'user_id' = $1::text
+		  AND payload <> payload - 'customer' - 'customer_notes'`, userID)
+}
+
+// PurgeFinished is the retention of the outbox: it scrubs the personal data of the order_create
+// rows that are final (or parked for an erased account), then deletes the finished rows of the other
+// kinds older than before. The order_create rows stay (one per order, without personal data): the
+// re-creation guard counts them.
+func (r *outboxRepository) PurgeFinished(ctx context.Context, before time.Time) (int64, error) {
+	if _, err := r.execN(ctx, "scrub outbox customer data", `
+		UPDATE hubrise_outbox o SET payload = payload - 'customer' - 'customer_notes'
+		WHERE o.kind = 'order_create' AND payload <> payload - 'customer' - 'customer_notes'
+		  AND (o.state IN ('sent', 'skipped')
+		       OR (o.state = 'parked' AND EXISTS (
+		             SELECT 1 FROM users u WHERE u.id::text = o.payload->>'user_id' AND u.deletion_requested_at IS NOT NULL)))`); err != nil {
+		return 0, err
+	}
+	return r.execN(ctx, "purge outbox", `
+		DELETE FROM hubrise_outbox
+		WHERE state IN ('sent', 'skipped') AND kind <> 'order_create' AND COALESCE(sent_at, created_at) < $1`, before)
 }

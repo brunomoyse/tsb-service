@@ -76,6 +76,13 @@ func (s faultCustSource) Profile(ctx context.Context, id uuid.UUID) (*domain.Cus
 	return s.CustomerSource.Profile(ctx, id)
 }
 
+func (s faultCustSource) DeletedNotErased(ctx context.Context, limit int) ([]uuid.UUID, error) {
+	if err := s.f.hit("Source.DeletedNotErased"); err != nil {
+		return nil, err
+	}
+	return s.CustomerSource.DeletedNotErased(ctx, limit)
+}
+
 type faultCustLeases struct {
 	domain.LeaseRepository
 	f *faults
@@ -685,4 +692,73 @@ func TestCustomerConfigDefaults(t *testing.T) {
 	id, err := cs.ForOrder(t.Context(), client, conn, e.payload(e.user), 1)
 	require.NoError(t, err)
 	assert.Empty(t, id)
+}
+
+// A deletion whose hook failed (the database was down, the process died) is final: nobody asks
+// again, so the reconciler finds the account and queues the erasure.
+func TestTheReconcilerQueuesTheErasureOfADeletionTheHookMissed(t *testing.T) {
+	e := newCustEnv(t)
+	e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
+	e.placed(orderSpec{})
+	e.drainAll()
+	cu := e.srv.Customers()[0]
+	// The account is deleted without the hook ever running.
+	e.exec(`UPDATE users SET deletion_requested_at = now(), first_name = 'Anonyme' WHERE id = $1`, e.user)
+	require.Empty(t, e.customerRows(domain.OutboxCustomerAnonymise))
+
+	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
+	rows := e.customerRows(domain.OutboxCustomerAnonymise)
+	require.Len(t, rows, 1)
+	var payload domain.CustomerAnonymisePayload
+	require.NoError(t, json.Unmarshal(rows[0].Payload, &payload))
+	assert.Equal(t, cu.ID, payload.HubriseCustomerID)
+
+	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
+	assert.Len(t, e.customerRows(domain.OutboxCustomerAnonymise), 1, "queued once")
+
+	e.drainAll()
+	cu, _ = e.srv.Customer(cu.ID)
+	assert.True(t, cu.Anonymised)
+	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
+	assert.Len(t, e.customerRows(domain.OutboxCustomerAnonymise), 1, "and never again once erased")
+}
+
+func TestErasingMissedAccountsReportsFailures(t *testing.T) {
+	setup := func(t *testing.T) *custEnv {
+		e := newCustEnv(t)
+		e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
+		e.placed(orderSpec{})
+		e.drainAll()
+		e.exec(`UPDATE users SET deletion_requested_at = now() WHERE id = $1`, e.user)
+		return e
+	}
+	t.Run("the list cannot be read", func(t *testing.T) {
+		e := setup(t)
+		cs := e.customerSync(newFaults("Source.DeletedNotErased"))
+		require.Error(t, cs.EraseMissed(t.Context(), 10))
+	})
+	t.Run("an account cannot be queued", func(t *testing.T) {
+		e := setup(t)
+		cs := e.customerSync(newFaults("Outbox.Enqueue"))
+		err := cs.EraseMissed(t.Context(), 10)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), e.user.String())
+		assert.Empty(t, e.customerRows(domain.OutboxCustomerAnonymise))
+		// The next run tries again.
+		require.NoError(t, e.customerSync(newFaults()).EraseMissed(t.Context(), 10))
+		assert.Len(t, e.customerRows(domain.OutboxCustomerAnonymise), 1)
+	})
+}
+
+// A scrub that fails is reported, but the erasure of the HubRise customer is queued all the same; the
+// reconciler repeats the scrub for the deleted accounts.
+func TestAFailedScrubDoesNotStopTheErasureFromBeingQueued(t *testing.T) {
+	e := newCustEnv(t)
+	e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
+	e.placed(orderSpec{})
+	e.drainAll()
+
+	err := e.customerSync(newFaults("Outbox.ScrubCustomerData")).AccountDeleted(t.Context(), e.user)
+	require.Error(t, err)
+	assert.Len(t, e.customerRows(domain.OutboxCustomerAnonymise), 1)
 }

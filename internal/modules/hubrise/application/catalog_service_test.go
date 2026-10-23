@@ -1,6 +1,7 @@
 package application_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -501,4 +502,53 @@ func TestImagesAreSkippedWhenTheSettingIsOff(t *testing.T) {
 	e.publish(m)
 	e.fullImport()
 	assert.Empty(t, e.images.uploaded, "no uploader configured")
+}
+
+// gatedCatalog holds a GetCatalog call until the test lets it go.
+type gatedCatalog struct {
+	application.CatalogAPI
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (g gatedCatalog) GetCatalog(ctx context.Context, id string) (*hubrise.Catalog, error) {
+	g.entered <- struct{}{}
+	select {
+	case <-g.release:
+	case <-time.After(10 * time.Second): // a failing test must not hang
+	}
+	return g.CatalogAPI.GetCatalog(ctx, id)
+}
+
+// The lease treats its own holder as a renewal, so two imports of one process (a double click, a click
+// and the drift job) must not share a holder: the second one is turned away while the first runs.
+func TestTwoImportsOfOneProcessDoNotRunAtTheSameTime(t *testing.T) {
+	e := newCatEnv(t)
+	e.publish(sushiMenu())
+	gate := gatedCatalog{entered: make(chan struct{}, 2), release: make(chan struct{})}
+	inner := e.svc.NewClient
+	e.svc.NewClient = func(c *domain.Connection) (application.CatalogAPI, error) {
+		api, err := inner(c)
+		gate.CatalogAPI = api
+		return gate, err
+	}
+
+	first := make(chan error, 1)
+	go func() {
+		_, err := e.svc.Sync(context.WithoutCancel(t.Context()), application.SyncRequest{Mode: domain.SyncFull})
+		first <- err
+	}()
+	<-gate.entered // the first import holds the lease and waits in the catalog read
+
+	_, err := e.svc.Sync(t.Context(), application.SyncRequest{Mode: domain.SyncFull})
+	assert.ErrorIs(t, err, domain.ErrImportInProgress)
+
+	close(gate.release)
+	require.NoError(t, <-first)
+	products := e.count(`SELECT count(*) FROM products`)
+	assert.Positive(t, products)
+
+	// The lease is free again, and a second import changes nothing.
+	e.fullImport()
+	assert.Equal(t, products, e.count(`SELECT count(*) FROM products`))
 }

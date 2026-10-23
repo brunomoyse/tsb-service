@@ -107,7 +107,9 @@ func Install(o Options) (*Runtime, error) {
 
 	push := o.Push
 	push.Clients, push.Holder = clients, holder
-	push.Schedule = r.RestaurantService
+	if r.RestaurantService != nil {
+		push.Schedule = orderingHours{r.RestaurantService}
+	}
 	push.Alerter = o.Alerter
 	pushed := m.NewPush(push)
 

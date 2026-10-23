@@ -141,7 +141,8 @@ func TestOrderLinkLifecycle(t *testing.T) {
 		"local patch":  links.RecordLocalPatch(ctx, order, "accepted", now),
 		"remote total": links.SetRemoteTotal(ctx, order, decimal.NewFromInt(1)),
 		"attention":    links.SetNeedsAttention(ctx, order, "X"),
-		"not accepted": links.MarkNotAccepted(ctx, order, now),
+		"not accepted": links.MarkNotAccepted(ctx, order),
+		"alerted":      links.MarkStuckAlerted(ctx, order, now),
 	} {
 		assert.ErrorIs(t, err, domain.ErrNotFound, name)
 	}
@@ -196,15 +197,19 @@ func TestOrderLinkLifecycle(t *testing.T) {
 	n, _ = links.CountNeedsAttention(ctx)
 	assert.Zero(t, n)
 
-	// The stuck alert flags an unflagged order and keeps a more specific diagnosis.
-	require.NoError(t, links.MarkNotAccepted(ctx, order, now))
+	// The stuck flag marks an unflagged order and keeps a more specific diagnosis; the alert is
+	// recorded on its own, once it went out.
+	require.NoError(t, links.MarkNotAccepted(ctx, order))
 	var alerted *time.Time
+	require.NoError(t, e.db.GetContext(ctx, &alerted, `SELECT stuck_alerted_at FROM hubrise_orders WHERE order_id = $1`, order))
+	assert.Nil(t, alerted, "flagging does not record an alert")
+	require.NoError(t, links.MarkStuckAlerted(ctx, order, now))
 	require.NoError(t, e.db.GetContext(ctx, &alerted, `SELECT stuck_alerted_at FROM hubrise_orders WHERE order_id = $1`, order))
 	require.NotNil(t, alerted)
 	got, _ = links.Get(ctx, order)
 	assert.Equal(t, domain.AttentionNotAccepted, *got.NeedsAttention)
 	require.NoError(t, links.SetNeedsAttention(ctx, order, "TOTAL_MISMATCH"))
-	require.NoError(t, links.MarkNotAccepted(ctx, order, now))
+	require.NoError(t, links.MarkNotAccepted(ctx, order))
 	got, _ = links.Get(ctx, order)
 	assert.Equal(t, "TOTAL_MISMATCH", *got.NeedsAttention)
 	require.NoError(t, links.SetNeedsAttention(ctx, order, ""))

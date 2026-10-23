@@ -136,9 +136,9 @@ func (m *Module) NewPush(o PushOptions) *Push {
 	pusher.SetWake(worker.Wake)
 	customers.SetWake(worker.Wake)
 	reconciler := application.NewReconciler(application.ReconcilerDeps{
-		Connections: m.Connections, Orders: m.Orders, Source: m.Source, Leases: m.Leases, Events: m.Events,
+		Connections: m.Connections, Orders: m.Orders, Source: m.Source, Leases: m.Leases, Events: m.Events, Outbox: m.Outbox,
 		Foreign: m.Foreign, OAuthStates: m.OAuthStates, Clients: clients, Pusher: pusher, Clock: m.Clock,
-		Config: o.Reconciler, Schedule: o.Schedule, Alerter: o.Alerter, Remote: o.Remote,
+		Config: o.Reconciler, Schedule: o.Schedule, Alerter: o.Alerter, Remote: o.Remote, Customers: customers,
 	})
 	return &Push{Pusher: pusher, Worker: worker, Reconciler: reconciler, Customers: customers, Clients: clients}
 }

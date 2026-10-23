@@ -62,6 +62,10 @@ type CustomerProfile struct {
 type CustomerSource interface {
 	// Profile returns the current profile of the user; ErrNotFound when there is no such user.
 	Profile(ctx context.Context, userID uuid.UUID) (*CustomerProfile, error)
+	// DeletedNotErased lists, oldest deletion first, the users whose account was deleted and whose
+	// HubRise customer was neither anonymised nor has an anonymisation queued: the erasure the
+	// deletion hook failed to queue.
+	DeletedNotErased(ctx context.Context, limit int) ([]uuid.UUID, error)
 }
 
 // CustomerPayloadVersion is the version of the payloads of the customer outbox rows.

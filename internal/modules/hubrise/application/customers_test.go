@@ -635,3 +635,49 @@ func TestSyncingCustomersDoesNotChangeWhatTheOrderCarries(t *testing.T) {
 	assert.Equal(t, "SUSHI-SALMON", remote.Items[0].SkuRef)
 	assert.Equal(t, "11.50 EUR", string(remote.Payments[0].Amount))
 }
+
+func TestDeletingTheAccountLeavesNoPersonalDataInTheOutbox(t *testing.T) {
+	e := newCustEnv(t)
+	e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
+	var email string
+	require.NoError(t, e.db.GetContext(t.Context(), &email, `SELECT email FROM users WHERE id = $1`, e.user))
+	leaks := func() int {
+		return e.count(`SELECT count(*) FROM hubrise_outbox WHERE payload::text LIKE '%' || $1 || '%'`, email)
+	}
+
+	queued := e.placed(orderSpec{})
+	assert.Equal(t, 1, leaks(), "the queued order carries the customer")
+	e.drainAll()
+	assert.Zero(t, leaks(), "an order that reached HubRise keeps nothing")
+
+	// An order the push gave up on keeps its data for the retry, until the account is erased.
+	parked := e.placed(orderSpec{})
+	e.exec(`UPDATE hubrise_outbox SET state = 'parked' WHERE order_id = $1 AND kind = 'order_create'`, parked)
+	require.Equal(t, 1, leaks())
+
+	require.NoError(t, e.users.DeleteMe(t.Context(), e.user.String()))
+	assert.Zero(t, leaks(), "nothing of the customer survives the deletion")
+	assert.NotEqual(t, queued, parked)
+}
+
+// The erasure of a deleted account is a legal duty: it must not wait for the customer sync to be
+// switched back on.
+func TestAnErasureIsSentWhileTheCustomerSyncIsOff(t *testing.T) {
+	e := newCustEnv(t)
+	e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
+	e.placed(orderSpec{})
+	e.drainAll()
+	cu := e.srv.Customers()[0]
+
+	e.exec(`UPDATE hubrise_connection SET sync_customers = FALSE`)
+	require.NoError(t, e.users.DeleteMe(t.Context(), e.user.String()))
+	e.srv.ClearRequests()
+	e.drainAll()
+
+	posts := e.customerRequests(http.MethodPost)
+	require.Len(t, posts, 1)
+	assert.Contains(t, posts[0].Path, cu.ID+"/anonymise")
+	cu, _ = e.srv.Customer(cu.ID)
+	assert.True(t, cu.Anonymised)
+	assert.NotNil(t, e.customerLink().AnonymisedAt)
+}

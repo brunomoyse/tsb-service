@@ -1,6 +1,12 @@
 -- +goose Up
 -- HubRise integration, part 2: links between HubRise catalog entries and local rows. One link
 -- table keeps the core catalog tables free of HubRise columns. See docs/hubrise/PLAN.md section 4.
+
+-- The foreign keys below take SHARE ROW EXCLUSIVE on products, product_categories,
+-- product_choice_groups and product_choices, which conflicts with every writer of those
+-- tables. lock_timeout bounds the wait: a long transaction there makes this migration fail fast
+-- (the deploy is simply re-run) instead of queueing every writer behind it.
+SET LOCAL lock_timeout = '5s';
 CREATE TABLE hubrise_catalog_links (
     id                  BIGSERIAL PRIMARY KEY,
     entity_type         TEXT NOT NULL CHECK (entity_type IN ('category', 'product', 'choice_group', 'choice')),
@@ -51,4 +57,5 @@ CREATE UNIQUE INDEX hubrise_catalog_links_key_uidx ON hubrise_catalog_links (ent
 CREATE INDEX hubrise_catalog_links_ref_idx ON hubrise_catalog_links (entity_type, hubrise_ref);
 
 -- +goose Down
+SET LOCAL lock_timeout = '5s';
 DROP TABLE hubrise_catalog_links;

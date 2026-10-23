@@ -412,8 +412,8 @@ func (p *EventProcessor) identify(ctx context.Context, r *run, ev domain.Event, 
 
 // guard decides which state of the order to trust (section 7.2 of the plan). Clocks differ, HubRise
 // timestamps have a second of precision and our own PATCHes generate no event for our client, so an
-// event that is not clearly newer than what we know, or that falls next to a PATCH of ours, or that
-// carries no state, is not trusted: the order is read again and what HubRise has now wins. An event
+// event that is not clearly newer than what we know, or that predates or falls next to a PATCH of
+// ours, or that carries no state, is not trusted: the order is read again and what HubRise has now wins. An event
 // clearly older than what we know is dropped. The returned order is nil when the event was settled.
 func (p *EventProcessor) guard(ctx context.Context, r *run, ev domain.Event, parsed hubrise.Event, link *domain.OrderLink, fresh *hubrise.Order, hubriseOrderID string) (*hubrise.Order, *time.Time) {
 	at := parsed.CreatedAt
@@ -426,7 +426,9 @@ func (p *EventProcessor) guard(ctx context.Context, r *run, ev domain.Event, par
 	}
 	payload, perr := parsed.NewOrder()
 	usable := perr == nil && payload.Status.Valid() && !at.IsZero()
-	nearPatch := link.LastLocalPatchAt != nil && absDuration(at.Sub(*link.LastLocalPatchAt)) <= p.cfg.PatchWindow
+	// An event from before our last PATCH is stale however long the PATCH waited in the queue: the
+	// payload shows a state we already moved past, and applying it would move the order back.
+	nearPatch := link.LastLocalPatchAt != nil && (at.Before(*link.LastLocalPatchAt) || at.Sub(*link.LastLocalPatchAt) <= p.cfg.PatchWindow)
 	last := link.LastRemoteEventAt
 
 	switch {
@@ -443,11 +445,4 @@ func (p *EventProcessor) guard(ctx context.Context, r *run, ev domain.Event, par
 		return nil, nil
 	}
 	return remote, eventAt
-}
-
-func absDuration(d time.Duration) time.Duration {
-	if d < 0 {
-		return -d
-	}
-	return d
 }

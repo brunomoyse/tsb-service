@@ -939,3 +939,27 @@ func TestClearingTheNotAcceptedFlagOnceHubRiseMovesOn(t *testing.T) {
 	s.epos(id, pkghubrise.StatusAccepted)
 	assert.Empty(t, s.attention(id))
 }
+
+func TestAnEventOlderThanOurLatestPatchIsReadAgainHoweverLongThePatchWaited(t *testing.T) {
+	s := newSyncEnv(t)
+	id := s.pushed(orderSpec{})
+	s.clock.Advance(time.Minute)
+	s.eposQuiet(id, pkghubrise.StatusAccepted)
+	stale := s.queued()[0]
+
+	// The shop moves the order on, but its PATCH only goes out half a minute later, long after the
+	// window around the event.
+	s.clock.Advance(30 * time.Second)
+	s.setStatus(id, "PREPARING")
+	s.drainAll()
+	require.NotNil(t, s.link(id).LastLocalPatchAt)
+	assert.Equal(t, "in_preparation", *s.link(id).LastRemoteStatus)
+	s.srv.ClearRequests()
+
+	// The event of the acceptance is delivered late: its payload must not move the order back.
+	assert.Equal(t, http.StatusOK, s.post(stale))
+	s.process()
+	assert.Len(t, s.gets(), 1, "read again")
+	assert.Equal(t, "PREPARING", s.localStatus(id))
+	assert.Equal(t, "in_preparation", *s.link(id).LastRemoteStatus)
+}

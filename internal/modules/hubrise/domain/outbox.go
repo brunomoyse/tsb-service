@@ -124,4 +124,11 @@ type OutboxRepository interface {
 	RetryParked(ctx context.Context, id int64, now time.Time) (int64, error)
 	// RetryAllParked reactivates every parked row, with the same inventory supersession rule.
 	RetryAllParked(ctx context.Context, now time.Time) (int64, error)
+	// ScrubCustomerData drops the customer and the customer notes from the sent, skipped and parked
+	// order_create rows of the user (the account was erased), and returns how many rows changed.
+	ScrubCustomerData(ctx context.Context, userID uuid.UUID) (int64, error)
+	// PurgeFinished is the retention of the outbox: it scrubs the personal data left in final
+	// order_create rows (and in the parked ones of an erased account), then deletes the sent and
+	// skipped rows of the other kinds created or sent before the cutoff. It returns the deleted count.
+	PurgeFinished(ctx context.Context, before time.Time) (int64, error)
 }

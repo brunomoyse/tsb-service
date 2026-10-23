@@ -280,8 +280,11 @@ func TestCustomerRowsFollowTheSyncCustomersToggle(t *testing.T) {
 	require.NoError(t, err)
 	items, err := outbox.Claim(ctx, now, time.Minute, 5, domain.OutboxCustomer, domain.OutboxCustomerAnonymise)
 	require.NoError(t, err)
-	assert.Empty(t, items, "nothing leaves while the customer sync is off")
+	require.Len(t, items, 1, "only the erasure of a deleted account leaves while the customer sync is off")
+	assert.Equal(t, domain.OutboxCustomerAnonymise, items[0].Kind)
 
+	_, err = e.db.ExecContext(ctx, `UPDATE hubrise_outbox SET state = 'pending', leased_until = NULL`)
+	require.NoError(t, err)
 	_, err = e.db.ExecContext(ctx, `UPDATE hubrise_connection SET sync_customers = TRUE`)
 	require.NoError(t, err)
 	items, err = outbox.Claim(ctx, now, time.Minute, 5, domain.OutboxCustomer, domain.OutboxCustomerAnonymise)
@@ -312,4 +315,51 @@ func TestHubriseCustomersMigration(t *testing.T) {
 	_, err = p.Up(ctx)
 	require.NoError(t, err)
 	assert.True(t, tableExists(t, td, "hubrise_customers"))
+}
+
+func TestCustomerSourceListsTheDeletedAccountsNotErased(t *testing.T) {
+	e := newEnv(t)
+	src := infrastructure.NewCustomerSource(e.db)
+	links := infrastructure.NewCustomerLinkRepository(e.db)
+	outbox := infrastructure.NewOutboxRepository(e.db)
+	ctx := t.Context()
+	now := time.Now().Truncate(time.Microsecond)
+	user := func(email string, deleted bool) uuid.UUID {
+		id := insertUser(t, e, email)
+		_, _, err := links.Begin(ctx, id)
+		require.NoError(t, err)
+		if deleted {
+			_, err = e.db.ExecContext(ctx, `UPDATE users SET deletion_requested_at = $2 WHERE id = $1`, id, now)
+			require.NoError(t, err)
+		}
+		return id
+	}
+
+	alive := user("alive@example.com", false)
+	missed := user("missed@example.com", true)
+	queued := user("queued@example.com", true)
+	erased := user("erased@example.com", true)
+	parked := user("parked@example.com", true)
+	skipped := user("skipped@example.com", true)
+	_ = alive
+	_, _, err := outbox.Enqueue(ctx, domain.NewOutboxItem(domain.OutboxCustomerAnonymise, nil, domain.CustomerDedupeKey(queued), nil, now))
+	require.NoError(t, err)
+	require.NoError(t, links.MarkAnonymised(ctx, erased, now))
+	parkedRow, _, err := outbox.Enqueue(ctx, domain.NewOutboxItem(domain.OutboxCustomerAnonymise, nil, domain.CustomerDedupeKey(parked), nil, now))
+	require.NoError(t, err)
+	_, err = e.db.ExecContext(ctx, `UPDATE hubrise_outbox SET state = 'parked' WHERE id = $1`, parkedRow)
+	require.NoError(t, err)
+	// A row that was skipped did not erase anything: the account is listed again.
+	skippedRow, _, err := outbox.Enqueue(ctx, domain.NewOutboxItem(domain.OutboxCustomerAnonymise, nil, domain.CustomerDedupeKey(skipped), nil, now))
+	require.NoError(t, err)
+	_, err = e.db.ExecContext(ctx, `UPDATE hubrise_outbox SET state = 'skipped' WHERE id = $1`, skippedRow)
+	require.NoError(t, err)
+
+	got, err := src.DeletedNotErased(ctx, 10)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []uuid.UUID{missed, skipped}, got)
+
+	got, err = src.DeletedNotErased(ctx, 1)
+	require.NoError(t, err)
+	assert.Len(t, got, 1)
 }

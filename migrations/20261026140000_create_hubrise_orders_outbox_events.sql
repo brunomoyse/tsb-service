@@ -2,6 +2,10 @@
 -- HubRise integration, part 3: order links, the durable outbox, the inbound event store and the
 -- foreign-order cache. New tables only. See docs/hubrise/PLAN.md sections 4, 6 and 7.
 
+-- The foreign keys below take SHARE ROW EXCLUSIVE on orders, which conflicts with every
+-- writer of that table. lock_timeout bounds the wait: a long transaction there makes this
+-- migration fail fast (the deploy is simply re-run) instead of queueing every writer behind it.
+SET LOCAL lock_timeout = '5s';
 -- One row per order known to the integration. Also the idempotency anchor of order_create:
 -- enqueueing is INSERT ... ON CONFLICT (order_id) DO NOTHING, and the outbox row is written in
 -- the same transaction only when the insert happened.
@@ -15,6 +19,9 @@ CREATE TABLE hubrise_orders (
     last_remote_event_at  TIMESTAMPTZ,
     -- Set when we send a status PATCH (HubRise does not echo our own changes back to us).
     last_local_patch_at   TIMESTAMPTZ,
+    -- When the reconciler last read the order from HubRise, by OUR clock. The refresh reads the order
+    -- read longest ago first; unlike last_remote_event_at it never takes part in the stale-event guard.
+    last_remote_read_at   TIMESTAMPTZ,
     -- The confirmed_time (estimated ready time) last seen at HubRise: it is applied to the local
     -- order only when HubRise changes it, so a ready time edited locally afterwards is kept.
     last_remote_confirmed_time TIMESTAMPTZ,
@@ -84,6 +91,7 @@ CREATE TABLE hubrise_foreign_orders (
 CREATE INDEX hubrise_foreign_orders_seen_at_idx ON hubrise_foreign_orders (seen_at);
 
 -- +goose Down
+SET LOCAL lock_timeout = '5s';
 DROP TABLE hubrise_foreign_orders;
 DROP TABLE hubrise_events;
 DROP TABLE hubrise_outbox;
