@@ -67,6 +67,10 @@ type OrderLinkRepository interface {
 	// FlagAttention flags the order for staff unless it is already flagged (the first problem
 	// stays visible).
 	FlagAttention(ctx context.Context, orderID uuid.UUID, code string) error
+	// MarkNotAccepted records that staff were told the order is still new at HubRise, so the alert
+	// is sent once, and flags it NOT_ACCEPTED unless it already carries a flag: a more specific
+	// diagnosis (UNLINKED_ITEM, TOTAL_MISMATCH) is kept.
+	MarkNotAccepted(ctx context.Context, orderID uuid.UUID, at time.Time) error
 	// ClearAttention removes the flag when it is one of codes.
 	ClearAttention(ctx context.Context, orderID uuid.UUID, codes ...string) error
 	// StampRemoteRead records that the order was read from HubRise at the time, without touching

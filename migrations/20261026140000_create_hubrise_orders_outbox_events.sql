@@ -17,6 +17,8 @@ CREATE TABLE hubrise_orders (
     last_local_patch_at   TIMESTAMPTZ,
     remote_total          NUMERIC(10, 2),
     needs_attention       TEXT,
+    -- Set once staff were told that HubRise still had the order as new (the alert is sent once).
+    stuck_alerted_at      TIMESTAMPTZ,
     created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );

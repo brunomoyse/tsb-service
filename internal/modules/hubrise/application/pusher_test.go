@@ -145,32 +145,33 @@ func TestStatusChangesAreIgnoredWhenTheyMustNotBePushed(t *testing.T) {
 	// The status toggle off.
 	_, err := e.mod.Connections.UpdateSettings(t.Context(), domain.SettingsPatch{SyncStatus: ptr(false)})
 	require.NoError(t, err)
-	e.push.Pusher.Invalidate()
 	require.NoError(t, e.mod.Orders.SetPushState(t.Context(), id, domain.PushSent))
 	require.NoError(t, e.push.Pusher.OrderStatusChanged(t.Context(), id, "CONFIRMED", uuid.New()))
 	assert.Empty(t, e.outboxRows(id, domain.OutboxOrderStatus))
 }
 
-func TestTheConnectionIsCachedForFifteenSecondsUntilInvalidated(t *testing.T) {
+func TestASettingsChangeIsSeenByTheHooksAtOnce(t *testing.T) {
 	e := newEnv(t)
 	first := e.order(orderSpec{})
 	e.ready(first)
 	assert.Len(t, e.outboxRows(first, domain.OutboxOrderCreate), 1)
 
-	// Switching the integration off is seen after the cache expires, or at once when invalidated.
+	// No row is queued after the integration was switched off, not even within a cache window.
 	_, err := e.mod.Connections.UpdateSettings(t.Context(), domain.SettingsPatch{Enabled: ptr(false)})
 	require.NoError(t, err)
 	second := e.order(orderSpec{})
 	e.ready(second)
-	assert.Len(t, e.outboxRows(second, domain.OutboxOrderCreate), 1, "the cached row still says enabled")
-	e.clock.Advance(16 * time.Second)
+	assert.Empty(t, e.outboxRows(second, domain.OutboxOrderCreate))
+	assert.Zero(t, e.count(`SELECT count(*) FROM hubrise_orders WHERE order_id = '`+second.String()+`'`))
+
+	_, err = e.mod.Connections.UpdateSettings(t.Context(), domain.SettingsPatch{Enabled: ptr(true), PushOrders: ptr(false)})
+	require.NoError(t, err)
 	third := e.order(orderSpec{})
 	e.ready(third)
-	assert.Empty(t, e.outboxRows(third, domain.OutboxOrderCreate), "after the TTL the switch is seen")
+	assert.Empty(t, e.outboxRows(third, domain.OutboxOrderCreate), "the push_orders toggle bites at once too")
 
-	_, err = e.mod.Connections.UpdateSettings(t.Context(), domain.SettingsPatch{Enabled: ptr(true)})
+	_, err = e.mod.Connections.UpdateSettings(t.Context(), domain.SettingsPatch{PushOrders: ptr(true)})
 	require.NoError(t, err)
-	e.push.Pusher.Invalidate()
 	fourth := e.order(orderSpec{})
 	e.ready(fourth)
 	assert.Len(t, e.outboxRows(fourth, domain.OutboxOrderCreate), 1)

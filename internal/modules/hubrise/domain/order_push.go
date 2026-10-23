@@ -263,7 +263,8 @@ type OrderSource interface {
 	StatusMismatches(ctx context.Context, pairs []StatusPair, limit int) ([]OpenLink, error)
 	// RefreshCandidates lists open pushed orders, the ones read from HubRise longest ago first.
 	RefreshCandidates(ctx context.Context, limit int) ([]OpenLink, error)
-	// StuckNew lists open pushed orders still "new" at HubRise since before the cutoff that are
-	// not flagged yet.
+	// StuckNew lists open pushed orders still "new" at HubRise since before the cutoff that staff
+	// were not told about yet (see OrderLinkRepository.MarkNotAccepted) and that carry no flag
+	// other than a lesser one (UNLINKED_ITEM, TOTAL_MISMATCH).
 	StuckNew(ctx context.Context, pushedBefore time.Time, limit int) ([]OpenLink, error)
 }

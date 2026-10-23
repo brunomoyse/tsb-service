@@ -1,6 +1,8 @@
 package application_test
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"sync"
@@ -425,4 +427,119 @@ func mustDecimal(t *testing.T, m pkghubrise.Money) interface{ StringFixed(int32)
 	d, err := m.Decimal()
 	require.NoError(t, err)
 	return d
+}
+
+// leaseSpy wraps the outbox: it records what Extend answered, can make it fail, and runs a hook
+// after a row was completed, which is how the tests let time pass in the middle of a batch.
+type leaseSpy struct {
+	domain.OutboxRepository
+	extended  []bool
+	extendErr error
+	afterSent func()
+}
+
+func (s *leaseSpy) Extend(ctx context.Context, id int64, now, until time.Time) (bool, error) {
+	if s.extendErr != nil {
+		return false, s.extendErr
+	}
+	ok, err := s.OutboxRepository.Extend(ctx, id, now, until)
+	s.extended = append(s.extended, ok)
+	return ok, err
+}
+
+func (s *leaseSpy) MarkSent(ctx context.Context, id int64, now time.Time) (bool, error) {
+	ok, err := s.OutboxRepository.MarkSent(ctx, id, now)
+	if s.afterSent != nil {
+		s.afterSent()
+	}
+	return ok, err
+}
+
+func (e *env) workerOver(outbox domain.OutboxRepository, cfg application.WorkerConfig) *application.OutboxWorker {
+	return application.NewOutboxWorker(application.WorkerDeps{
+		Connections: e.mod.Connections, Outbox: outbox, Orders: e.mod.Orders, Links: e.mod.CatalogLinks,
+		Source: e.mod.Source, Clients: e.opts.Clients, Clock: e.clock, Config: cfg,
+	})
+}
+
+// twoQueuedOrders queues two orders that one claim leases together.
+func twoQueuedOrders(e *env) (first, second uuid.UUID) {
+	e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
+	return e.queued(orderSpec{}), e.queued(orderSpec{})
+}
+
+func TestTheLeaseIsRenewedBeforeEachRowOfABatch(t *testing.T) {
+	e := newEnv(t)
+	first, second := twoQueuedOrders(e)
+	spy := &leaseSpy{OutboxRepository: e.mod.Outbox}
+	spy.afterSent = func() { e.clock.Advance(4 * time.Minute) } // the first row was slow, the lease is 5 minutes
+	n, err := e.workerOver(spy, application.WorkerConfig{}).DrainOnce(t.Context())
+	require.NoError(t, err)
+
+	assert.Equal(t, 2, n)
+	assert.Equal(t, []bool{true}, spy.extended, "the second row got a fresh lease, the first needs none")
+	assert.Len(t, e.posts(), 2)
+	for _, id := range []uuid.UUID{first, second} {
+		assert.Equal(t, domain.OutboxSent, e.state(id, domain.OutboxOrderCreate))
+	}
+}
+
+func TestARowWhoseLeaseRanOutInTheBatchIsLeftToTheNextClaim(t *testing.T) {
+	e := newEnv(t)
+	first, second := twoQueuedOrders(e)
+	spy := &leaseSpy{OutboxRepository: e.mod.Outbox}
+	spy.afterSent = func() { e.clock.Advance(6 * time.Minute) } // longer than the lease: another replica may hold it
+	_, err := e.workerOver(spy, application.WorkerConfig{}).DrainOnce(t.Context())
+	require.NoError(t, err)
+
+	assert.Equal(t, []bool{false}, spy.extended)
+	assert.Len(t, e.posts(), 1, "the late row is not sent from a stale claim")
+	assert.Equal(t, domain.OutboxSent, e.state(first, domain.OutboxOrderCreate))
+	assert.Equal(t, domain.OutboxSending, e.state(second, domain.OutboxOrderCreate))
+
+	// Whoever claims it next looks the order up first (attempts is 2) and creates it once.
+	e.drainAll()
+	assert.Len(t, e.posts(), 2)
+	assert.Equal(t, domain.OutboxSent, e.state(second, domain.OutboxOrderCreate))
+	assert.Equal(t, 2, e.outboxRows(second, domain.OutboxOrderCreate)[0].Attempts)
+}
+
+func TestARowWhoseLeaseCannotBeRenewedIsNotSent(t *testing.T) {
+	e := newEnv(t)
+	_, second := twoQueuedOrders(e)
+	spy := &leaseSpy{OutboxRepository: e.mod.Outbox, extendErr: errors.New("store down")}
+	_, err := e.workerOver(spy, application.WorkerConfig{}).DrainOnce(t.Context())
+	require.NoError(t, err)
+
+	assert.Len(t, e.posts(), 1)
+	assert.Equal(t, domain.OutboxSending, e.state(second, domain.OutboxOrderCreate), "it stays leased until the lease runs out")
+	e.clock.Advance(6 * time.Minute)
+	e.drainAll()
+	assert.Len(t, e.posts(), 2)
+}
+
+func TestTheLeaseOutlastsTheCallsOfOneRow(t *testing.T) {
+	for name, tc := range map[string]struct {
+		cfg  application.WorkerConfig
+		want time.Duration
+	}{
+		"default":                {application.WorkerConfig{}, 5 * time.Minute},
+		"too short for the call": {application.WorkerConfig{Lease: time.Minute}, 4 * time.Minute},
+		"short calls":            {application.WorkerConfig{Lease: time.Second, CallTimeout: 10 * time.Second}, 40 * time.Second},
+		"generous":               {application.WorkerConfig{Lease: 10 * time.Minute}, 10 * time.Minute},
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := newEnv(t)
+			id := e.queued(orderSpec{})
+			// The row stays claimed when it cannot be given back, which exposes its lease.
+			outbox := faultOutbox{e.mod.Outbox, newFaults("Outbox.Release")}
+			e.srv.AddFault(hubrisetest.Fault{Method: http.MethodPost, Path: e.ordersPath(), Status: 503, Times: 1})
+			_, err := e.workerOver(outbox, tc.cfg).DrainOnce(t.Context())
+			require.NoError(t, err)
+
+			row := e.outboxRows(id, domain.OutboxOrderCreate)[0]
+			require.NotNil(t, row.LeasedUntil)
+			assert.WithinDuration(t, e.clock.Now().Add(tc.want), *row.LeasedUntil, time.Second)
+		})
+	}
 }

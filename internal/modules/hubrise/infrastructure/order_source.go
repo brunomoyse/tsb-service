@@ -272,6 +272,7 @@ func (s *orderSource) StuckNew(ctx context.Context, pushedBefore time.Time, limi
 		JOIN orders o ON o.id = ho.order_id
 		WHERE ho.push_state = 'sent' AND ho.hubrise_order_id IS NOT NULL
 		  AND ho.last_remote_status = 'new' AND ho.pushed_at < $1
+		  AND ho.stuck_alerted_at IS NULL
 		  AND (ho.needs_attention IS NULL OR ho.needs_attention IN ('UNLINKED_ITEM', 'TOTAL_MISMATCH'))
 		  AND o.order_status NOT IN ('FAILED', 'CANCELLED', 'DELIVERED', 'PICKED_UP')
 		ORDER BY ho.pushed_at, ho.order_id

@@ -469,7 +469,6 @@ func TestToggleOffOrderToggleOnPushesNoHistory(t *testing.T) {
 	e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
 	_, err := e.mod.Connections.UpdateSettings(t.Context(), domain.SettingsPatch{PushOrders: ptr(false)})
 	require.NoError(t, err)
-	e.push.Pusher.Invalidate()
 
 	old := e.order(orderSpec{createdAgo: 5 * time.Hour})
 	recent := e.order(orderSpec{createdAgo: 20 * time.Minute})
@@ -482,7 +481,6 @@ func TestToggleOffOrderToggleOnPushesNoHistory(t *testing.T) {
 	now := e.clock.Now()
 	_, err = e.mod.Connections.UpdateSettings(t.Context(), domain.SettingsPatch{PushOrders: ptr(true), PushOrdersSince: &now})
 	require.NoError(t, err)
-	e.push.Pusher.Invalidate()
 	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
 	e.drainAll()
 

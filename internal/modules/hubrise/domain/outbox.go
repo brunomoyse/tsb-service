@@ -80,6 +80,10 @@ type OutboxRepository interface {
 	// feature toggle on. When kinds is not empty only rows of those kinds are claimed (a worker
 	// that handles some kinds must never lease the others).
 	Claim(ctx context.Context, now time.Time, lease time.Duration, limit int, kinds ...OutboxKind) ([]OutboxItem, error)
+	// Extend pushes the lease of a claimed row to until, as long as the row is still sending and its
+	// lease has not run out at now. It returns false when the row is no longer ours (another
+	// replica may have reclaimed it): the caller must then leave it alone.
+	Extend(ctx context.Context, id int64, now, until time.Time) (bool, error)
 	// MarkSent completes a claimed row; false when it was no longer sending.
 	MarkSent(ctx context.Context, id int64, now time.Time) (bool, error)
 	// MarkParked parks a claimed row with the reason; false when it was no longer sending.

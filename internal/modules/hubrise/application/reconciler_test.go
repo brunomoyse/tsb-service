@@ -313,7 +313,7 @@ func TestReconcilerFlagsOrdersStuckInNew(t *testing.T) {
 	open = true
 	require.NoError(t, e.push.Reconciler.RunOnce(t.Context()))
 	assert.Equal(t, domain.AttentionNotAccepted, *e.link(stuck).NeedsAttention)
-	assert.Equal(t, domain.AttentionNotAccepted, *e.link(unlinked).NeedsAttention, "it outranks the lesser flags")
+	assert.Equal(t, domain.AttentionUnlinkedItem, *e.link(unlinked).NeedsAttention, "the more specific diagnosis is kept")
 	require.Len(t, alerts.subjects, 2)
 	assert.Contains(t, alerts.subjects[0], "not accepted")
 

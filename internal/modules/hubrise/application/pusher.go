@@ -24,7 +24,7 @@ type OrderPusher struct {
 	outbox domain.OutboxRepository
 	source domain.OrderSource
 	clock  domain.Clock
-	gate   *gate
+	conns  domain.ConnectionRepository
 	wake   func()
 }
 
@@ -41,7 +41,7 @@ type PusherDeps struct {
 func NewOrderPusher(d PusherDeps) *OrderPusher {
 	return &OrderPusher{
 		orders: d.Orders, outbox: d.Outbox, source: d.Source, clock: d.Clock,
-		gate: newGate(d.Connections, d.Clock), wake: func() {},
+		conns: d.Connections, wake: func() {},
 	}
 }
 
@@ -54,15 +54,24 @@ func (p *OrderPusher) SetWake(wake func()) {
 	p.wake = wake
 }
 
-// Invalidate forgets the cached connection row. Call it after the settings changed.
-func (p *OrderPusher) Invalidate() { p.gate.Invalidate() }
+// connection returns the connection row, or nil when the installation never connected. It reads the
+// database on every call, on purpose: a cached row would let the hooks queue rows for a while after
+// the integration was switched off (on this replica or, worse, on another one), and the order hooks
+// are rare enough for one primary key read to cost nothing.
+func (p *OrderPusher) connection(ctx context.Context) (*domain.Connection, error) {
+	conn, err := p.conns.Get(ctx)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil, nil
+	}
+	return conn, err
+}
 
 // OrderReady queues the push of an order that became actionable: a cash order that was placed or an
 // online order whose payment was confirmed. It is idempotent: a second call for the same order (a
 // redelivered Mollie webhook) queues nothing. Nothing happens unless the integration is connected,
 // enabled and pushing orders.
 func (p *OrderPusher) OrderReady(ctx context.Context, orderID uuid.UUID) error {
-	conn, err := p.gate.Connection(ctx)
+	conn, err := p.connection(ctx)
 	if err != nil {
 		return fmt.Errorf("hubrise: read connection: %w", err)
 	}
@@ -108,7 +117,7 @@ func (p *OrderPusher) enqueueCreate(ctx context.Context, orderID uuid.UUID) (boo
 // PATCHes in order. historyID is the id of the status history row (uuid.Nil when it could not be
 // written), which makes the dedupe key of the row unique per transition.
 func (p *OrderPusher) OrderStatusChanged(ctx context.Context, orderID uuid.UUID, newStatus string, historyID uuid.UUID) error {
-	conn, err := p.gate.Connection(ctx)
+	conn, err := p.connection(ctx)
 	if err != nil {
 		return fmt.Errorf("hubrise: read connection: %w", err)
 	}

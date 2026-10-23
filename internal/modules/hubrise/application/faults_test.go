@@ -155,6 +155,13 @@ func (l faultLinks) SetNeedsAttention(ctx context.Context, id uuid.UUID, code st
 	return l.OrderLinkRepository.SetNeedsAttention(ctx, id, code)
 }
 
+func (l faultLinks) MarkNotAccepted(ctx context.Context, id uuid.UUID, at time.Time) error {
+	if err := l.f.hit("Orders.MarkNotAccepted"); err != nil {
+		return err
+	}
+	return l.OrderLinkRepository.MarkNotAccepted(ctx, id, at)
+}
+
 func (l faultLinks) FlagAttention(ctx context.Context, id uuid.UUID, code string) error {
 	if err := l.f.hit("Orders.FlagAttention"); err != nil {
 		return err
@@ -314,7 +321,7 @@ func TestWorkerSurvivesBookkeepingFailures(t *testing.T) {
 		assert.Equal(t, domain.PushSent, e.link(id).PushState, "the link knows the order was sent")
 
 		// The lease runs out: the next claim adopts the order instead of posting it again.
-		e.clock.Advance(3 * time.Minute)
+		e.clock.Advance(6 * time.Minute)
 		e.drainAll()
 		assert.Len(t, e.posts(), 1)
 		assert.Equal(t, domain.OutboxSent, e.state(id, domain.OutboxOrderCreate))
@@ -325,7 +332,7 @@ func TestWorkerSurvivesBookkeepingFailures(t *testing.T) {
 		id := e.queued(orderSpec{})
 		e.drainWith(e.faultyWorker(newFaults("Orders.MarkSent")))
 		assert.Equal(t, domain.OutboxSending, e.state(id, domain.OutboxOrderCreate))
-		e.clock.Advance(3 * time.Minute)
+		e.clock.Advance(6 * time.Minute)
 		e.drainAll()
 		assert.Len(t, e.posts(), 1, "the lost answer is found through private_ref")
 		assert.Equal(t, domain.PushSent, e.link(id).PushState)
@@ -597,7 +604,7 @@ func TestReconcilerSurvivesStoreFailures(t *testing.T) {
 		e.linkProduct(e.fx.SalmonSushi.ID, "SUSHI-SALMON")
 		e.sentOrder(orderSpec{})
 		e.clock.Advance(6 * time.Minute)
-		r := e.faultyReconciler(newFaults("Orders.SetNeedsAttention"), nil)
+		r := e.faultyReconciler(newFaults("Orders.MarkNotAccepted"), nil)
 		require.Error(t, r.RunOnce(t.Context()))
 	})
 	t.Run("a stuck-order query that fails", func(t *testing.T) {

@@ -72,6 +72,7 @@ func TestRepositoriesReportAStoreThatIsDown(t *testing.T) {
 		"outbox get":     func() error { _, err := outbox.Get(ctx, 1); return err },
 		"outbox list":    func() error { _, err := outbox.List(ctx, nil, 1); return err },
 		"outbox counts":  func() error { _, err := outbox.Counts(ctx); return err },
+		"outbox extend":  func() error { _, err := outbox.Extend(ctx, 1, now, now); return err },
 		"outbox retry":   func() error { _, err := outbox.RetryParked(ctx, 1, now); return err },
 		"outbox retry*":  func() error { _, err := outbox.RetryAllParked(ctx, now); return err },
 
@@ -82,6 +83,7 @@ func TestRepositoriesReportAStoreThatIsDown(t *testing.T) {
 		"order total":     func() error { return orders.SetRemoteTotal(ctx, id, decimal.Zero) },
 		"order attention": func() error { _, err := orders.CountNeedsAttention(ctx); return err },
 		"order set flag":  func() error { return orders.SetNeedsAttention(ctx, id, "X") },
+		"order not accpt": func() error { return orders.MarkNotAccepted(ctx, id, now) },
 		"order flag":      func() error { return orders.FlagAttention(ctx, id, "X") },
 		"order unflag":    func() error { return orders.ClearAttention(ctx, id, "X") },
 		"order stamp":     func() error { return orders.StampRemoteRead(ctx, id, now) },

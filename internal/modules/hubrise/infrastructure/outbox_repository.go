@@ -105,6 +105,12 @@ func (r *outboxRepository) Claim(ctx context.Context, now time.Time, lease time.
 	return items, nil
 }
 
+func (r *outboxRepository) Extend(ctx context.Context, id int64, now, until time.Time) (bool, error) {
+	return r.affected(ctx, "extend outbox lease", `
+		UPDATE hubrise_outbox SET leased_until = $3
+		WHERE id = $1 AND state = 'sending' AND leased_until >= $2`, id, now, until)
+}
+
 func (r *outboxRepository) MarkSent(ctx context.Context, id int64, now time.Time) (bool, error) {
 	return r.affected(ctx, "mark outbox sent", `
 		UPDATE hubrise_outbox SET state = 'sent', sent_at = $2, leased_until = NULL, last_error = NULL

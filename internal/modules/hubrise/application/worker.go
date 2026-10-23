@@ -20,7 +20,11 @@ import (
 type WorkerConfig struct {
 	// BatchSize is how many rows one claim leases (5).
 	BatchSize int
-	// Lease is how long a claimed row stays ours (2 minutes).
+	// Lease is how long a claimed row stays ours (5 minutes). The worker renews it before each row of
+	// a batch, so it only has to outlast the calls of one row: a row makes at most three HubRise
+	// calls (a 404 on a status PATCH, the private_ref lookup, the repeated PATCH), each bounded by
+	// CallTimeout. A smaller value is raised to four times CallTimeout, or another replica could
+	// reclaim a row that is still being sent and POST it a second time.
 	Lease time.Duration
 	// Tick is the poll interval; the wake-up channel makes a new row go out sooner (5 seconds).
 	Tick time.Duration
@@ -42,9 +46,10 @@ func (c WorkerConfig) withDefaults() WorkerConfig {
 	if c.BatchSize <= 0 {
 		c.BatchSize = 5
 	}
-	def(&c.Lease, 2*time.Minute)
+	def(&c.Lease, 5*time.Minute)
 	def(&c.Tick, 5*time.Second)
 	def(&c.CallTimeout, time.Minute)
+	c.Lease = max(c.Lease, 4*c.CallTimeout)
 	def(&c.BackoffBase, 30*time.Second)
 	def(&c.BackoffMax, 30*time.Minute)
 	def(&c.CreateMaxAge, 48*time.Hour)
@@ -153,14 +158,34 @@ func (w *OutboxWorker) DrainOnce(ctx context.Context) (int, error) {
 		}
 		return len(items), nil
 	}
-	for _, it := range items {
+	for i, it := range items {
 		if b.paused || ctx.Err() != nil {
 			w.release(ctx, it, w.d.Clock.Now(), "", true)
+			continue
+		}
+		if i > 0 && !w.renew(ctx, it) {
 			continue
 		}
 		w.process(ctx, b, it)
 	}
 	return len(items), nil
+}
+
+// renew gives a row of the batch a full lease again just before it is processed, so the time spent
+// on the rows before it never eats into it. It returns false when the row must not be processed: its
+// lease had already run out (another replica may hold it by now, and a send from here would race the
+// idempotency lookup that its claim runs). The row is then left to whoever claims it next.
+func (w *OutboxWorker) renew(ctx context.Context, item domain.OutboxItem) bool {
+	now := w.d.Clock.Now()
+	ok, err := w.d.Outbox.Extend(context.WithoutCancel(ctx), item.ID, now, now.Add(w.cfg.Lease))
+	if err != nil {
+		logging.FromContext(ctx).Error("hubrise: cannot renew an outbox lease", zap.Int64("outbox_id", item.ID), zap.Error(err))
+		return false // the lease runs out and the row is claimed again
+	}
+	if !ok {
+		logging.FromContext(ctx).Warn("hubrise: outbox lease lost before the row was processed", zap.Int64("outbox_id", item.ID))
+	}
+	return ok
 }
 
 func (w *OutboxWorker) process(ctx context.Context, b *batch, item domain.OutboxItem) {

@@ -284,7 +284,7 @@ func (r *Reconciler) flagStuck(ctx context.Context) error {
 	}
 	var errs []error
 	for _, l := range stuck {
-		if err := r.d.Orders.SetNeedsAttention(ctx, l.OrderID, domain.AttentionNotAccepted); err != nil {
+		if err := r.d.Orders.MarkNotAccepted(ctx, l.OrderID, r.d.Clock.Now()); err != nil {
 			errs = append(errs, err)
 			continue
 		}

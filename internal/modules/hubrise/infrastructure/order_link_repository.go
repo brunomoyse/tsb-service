@@ -118,6 +118,12 @@ func (r *orderLinkRepository) FlagAttention(ctx context.Context, orderID uuid.UU
 		`UPDATE hubrise_orders SET needs_attention = $2, updated_at = now() WHERE order_id = $1 AND needs_attention IS NULL`, orderID, code)
 }
 
+func (r *orderLinkRepository) MarkNotAccepted(ctx context.Context, orderID uuid.UUID, at time.Time) error {
+	return r.mustChange(ctx, "mark not accepted", `
+		UPDATE hubrise_orders SET needs_attention = COALESCE(needs_attention, $2), stuck_alerted_at = $3, updated_at = now()
+		WHERE order_id = $1`, orderID, domain.AttentionNotAccepted, at)
+}
+
 func (r *orderLinkRepository) ClearAttention(ctx context.Context, orderID uuid.UUID, codes ...string) error {
 	return r.exec(ctx, "clear attention",
 		`UPDATE hubrise_orders SET needs_attention = NULL, updated_at = now() WHERE order_id = $1 AND needs_attention = ANY($2)`,

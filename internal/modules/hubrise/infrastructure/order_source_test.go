@@ -270,6 +270,10 @@ func TestSourceStuckNew(t *testing.T) {
 		UPDATE hubrise_orders SET needs_attention = CASE order_id WHEN $1 THEN 'NOT_ACCEPTED' ELSE 'UNLINKED_ITEM' END
 		WHERE order_id IN ($1, $2)`, flagged, lesser)
 	require.NoError(t, err)
+	alerted := e.sourceOrder(t, sourceOrder{})
+	e.sentLink(t, alerted, "new", 10*time.Minute)
+	_, err = e.db.ExecContext(t.Context(), `UPDATE hubrise_orders SET stuck_alerted_at = now() WHERE order_id = $1`, alerted)
+	require.NoError(t, err)
 	finished := e.sourceOrder(t, sourceOrder{status: "DELIVERED"})
 	e.sentLink(t, finished, "new", 10*time.Minute)
 
@@ -279,7 +283,7 @@ func TestSourceStuckNew(t *testing.T) {
 	for _, l := range got {
 		orders = append(orders, l.OrderID)
 	}
-	assert.Equal(t, []uuid.UUID{lesser, stuck}, orders, "oldest first; a lesser flag does not hide the order, an alert flag does")
+	assert.Equal(t, []uuid.UUID{lesser, stuck}, orders, "oldest first; a lesser flag does not hide the order, an alert flag or an alert already sent does")
 	assert.Equal(t, "UNLINKED_ITEM", got[0].NeedsAttention)
 
 	got, err = src.StuckNew(t.Context(), time.Now().Add(-5*time.Minute), 1)

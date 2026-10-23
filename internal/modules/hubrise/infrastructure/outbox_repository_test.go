@@ -299,14 +299,27 @@ func TestOutboxTransitions(t *testing.T) {
 	ok, _ = repo.Release(ctx, id, now, "x", false)
 	assert.False(t, ok)
 
+	// Extend renews the lease of a claimed row while it is still ours.
+	ok, _ = repo.Extend(ctx, id, now, now.Add(time.Hour))
+	assert.False(t, ok, "a row nobody claimed has no lease to renew")
+
 	items, _ := repo.Claim(ctx, now, time.Minute, 10)
 	require.Len(t, items, 1)
-
-	// Connection-level refusal: back to pending with the attempt reverted.
-	ok, err := repo.Release(ctx, id, now.Add(time.Minute), "401 revoked", true)
+	ok, err := repo.Extend(ctx, id, now.Add(30*time.Second), now.Add(time.Hour))
 	require.NoError(t, err)
 	require.True(t, ok)
 	got, _ := repo.Get(ctx, id)
+	assert.WithinDuration(t, now.Add(time.Hour), *got.LeasedUntil, time.Millisecond)
+	ok, _ = repo.Extend(ctx, id, now.Add(2*time.Hour), now.Add(3*time.Hour))
+	assert.False(t, ok, "a lease that ran out is not renewed: another replica may hold the row")
+	got, _ = repo.Get(ctx, id)
+	assert.WithinDuration(t, now.Add(time.Hour), *got.LeasedUntil, time.Millisecond)
+
+	// Connection-level refusal: back to pending with the attempt reverted.
+	ok, err = repo.Release(ctx, id, now.Add(time.Minute), "401 revoked", true)
+	require.NoError(t, err)
+	require.True(t, ok)
+	got, _ = repo.Get(ctx, id)
 	assert.Equal(t, domain.OutboxPending, got.State)
 	assert.Zero(t, got.Attempts)
 	assert.Equal(t, "401 revoked", *got.LastError)
