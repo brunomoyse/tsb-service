@@ -94,8 +94,8 @@ func TestConnectionState(t *testing.T) {
 	if err != nil || tok.Reveal() != "tok" {
 		t.Errorf("AccessToken = %v, %v", tok, err)
 	}
-	if _, err := c.AccessToken(fakeCodec{err: errors.New("boom")}); err == nil {
-		t.Error("a codec failure must surface")
+	if _, err := c.AccessToken(fakeCodec{err: errors.New("boom")}); !errors.Is(err, domain.ErrTokenUnreadable) {
+		t.Errorf("a codec failure must surface as ErrTokenUnreadable, got %v", err)
 	}
 
 	c.Enabled = false

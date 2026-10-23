@@ -120,7 +120,7 @@ type Push struct {
 func (m *Module) NewPush(o PushOptions) *Push {
 	clients := o.Clients
 	if clients == nil {
-		clients = application.NewPooledClients(m.Codec, m.Config.APIBaseURL, nil, nil)
+		clients = application.WithAuthRecording(application.NewPooledClients(m.Codec, m.Config.APIBaseURL, nil, nil), m.Connections, m.Clock)
 	}
 	pusher := application.NewOrderPusher(application.PusherDeps{
 		Connections: m.Connections, Orders: m.Orders, Outbox: m.Outbox, Source: m.Source, Clock: m.Clock,

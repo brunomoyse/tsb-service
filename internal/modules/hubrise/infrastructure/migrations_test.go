@@ -21,17 +21,17 @@ const (
 	// HubRise task never meets a "missing" lower version.
 	lastPreHubriseVersion int64 = 20261018120000
 
-	m1Version int64 = 20261026120000
-	m2Version int64 = 20261026130000
-	m3Version int64 = 20261026140000
+	m1Version int64 = 20261024120000
+	m2Version int64 = 20261024130000
+	m3Version int64 = 20261024140000
 	// m4Version adds the source column to the translation tables.
-	m4Version int64 = 20261026150000
+	m4Version int64 = 20261024150000
 	// m5Version adds product_choices.is_available (inventory can sell an option out).
-	m5Version int64 = 20261026160000
+	m5Version int64 = 20261024160000
 	// m6Version adds orders.channel, the one change to an existing table.
-	m6Version int64 = 20261026170000
+	m6Version int64 = 20261024170000
 	// m7Version creates hubrise_customers, the link to the customer list.
-	m7Version int64 = 20261026180000
+	m7Version int64 = 20261024180000
 )
 
 var hubriseTables = []string{

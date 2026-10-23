@@ -179,6 +179,8 @@ func TestCompleteConnectionStoresTheSealedTokenAndRegistersTheCallback(t *testin
 	assert.Equal(t, hubrisetest.Token, r.tokenOf(c), "the stored token opens to the one HubRise issued")
 	assert.NotContains(t, string(c.AccessTokenEnc), hubrisetest.Token, "and is not stored in the clear")
 	assert.False(t, c.Enabled, "connecting does not switch anything on")
+	assert.False(t, c.PushOrders || c.SyncStatus || c.SyncInventory || c.SyncCatalog || c.SyncCustomers,
+		"and every feature starts off, to be turned on one by one")
 	assert.Equal(t, hubrisetest.AccountID, *c.AccountID)
 	assert.Equal(t, hubrisetest.AccountName, *c.AccountName)
 	assert.Equal(t, hubrisetest.LocationID, *c.LocationID)
@@ -599,6 +601,15 @@ func TestPushingBecomingEffectiveStampsPushOrdersSince(t *testing.T) {
 		c, err := r.admin.UpdateSettings(t.Context(), domain.SettingsPatch{Enabled: &yes})
 		require.NoError(t, err)
 		assert.WithinDuration(t, r.clock.Now(), *c.PushOrdersSince, time.Second)
+	})
+	t.Run("enabling with every feature off (a new connection) stamps nothing, the push switch does", func(t *testing.T) {
+		r := newAdminRig(t, withSeed(hubtest.WithEnabled(false), hubtest.WithFeatures(false, false, false, false, false), hubtest.WithPushOrdersSince(longAgo)))
+		c, err := r.admin.UpdateSettings(t.Context(), domain.SettingsPatch{Enabled: &yes})
+		require.NoError(t, err)
+		assert.WithinDuration(t, longAgo, *c.PushOrdersSince, time.Second, "nothing is pushed yet")
+		c, err = r.admin.UpdateSettings(t.Context(), domain.SettingsPatch{PushOrders: &yes})
+		require.NoError(t, err)
+		assert.WithinDuration(t, r.clock.Now(), *c.PushOrdersSince, time.Second, "only the orders from now on")
 	})
 	t.Run("push_orders on again", func(t *testing.T) {
 		r := newAdminRig(t, withSeed(hubtest.WithFeatures(false, true, true, false, true), hubtest.WithPushOrdersSince(longAgo)))

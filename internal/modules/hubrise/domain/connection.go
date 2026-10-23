@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -82,13 +83,15 @@ func (c *Connection) Active() bool {
 }
 
 // AccessToken opens the stored token. It is meant to be called only when building the API client.
+// A token that cannot be opened is reported as ErrTokenUnreadable; the codec's own error is
+// attached, and never carries the token.
 func (c *Connection) AccessToken(codec TokenCodec) (Redacted, error) {
 	if !c.Connected() {
 		return "", ErrNotConnected
 	}
 	plain, err := codec.Decrypt(c.AccessTokenEnc)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %w", ErrTokenUnreadable, err)
 	}
 	return Redacted(plain), nil
 }

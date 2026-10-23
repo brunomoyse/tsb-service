@@ -56,7 +56,7 @@ func TestConnectionRepository(t *testing.T) {
 		assert.Equal(t, []byte("sealed"), c.AccessTokenEnc)
 		assert.Equal(t, "loc", *c.LocationID)
 		assert.Equal(t, "Customers", *c.CustomerListName)
-		assert.True(t, c.PushOrders && c.SyncStatus && c.SyncInventory && c.SyncCustomers)
+		assert.False(t, c.PushOrders || c.SyncStatus || c.SyncInventory || c.SyncCustomers, "every feature starts off")
 		assert.False(t, c.SyncCatalog || c.CatalogAutoImport || c.AutoRefundOnCancel || c.ImportImages)
 		assert.Equal(t, "fr", c.CatalogLanguage)
 		assert.WithinDuration(t, since, *c.PushOrdersSince, time.Millisecond)

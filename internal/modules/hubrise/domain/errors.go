@@ -11,6 +11,9 @@ var (
 	ErrNotFound = errors.New("hubrise: not found")
 	// ErrNotConnected means there is no connection row, or it holds no access token.
 	ErrNotConnected = errors.New("hubrise: not connected")
+	// ErrTokenUnreadable means the stored access token cannot be decrypted (HUBRISE_TOKEN_KEY changed
+	// or lost, or the stored bytes are damaged). Only reconnecting to HubRise helps.
+	ErrTokenUnreadable = errors.New("hubrise: the stored access token cannot be decrypted")
 	// ErrInvalidLink means a catalog link does not name exactly the local row of its entity type.
 	ErrInvalidLink = errors.New("hubrise: invalid catalog link")
 

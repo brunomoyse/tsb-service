@@ -20,12 +20,12 @@ CREATE TABLE hubrise_connection (
     customer_list_id            TEXT,
     customer_list_name          TEXT,
     scope                       TEXT,
-    -- Feature toggles.
-    push_orders                 BOOLEAN NOT NULL DEFAULT TRUE,
-    sync_status                 BOOLEAN NOT NULL DEFAULT TRUE,
-    sync_inventory              BOOLEAN NOT NULL DEFAULT TRUE,
+    -- Feature toggles: all start OFF, so a new connection does nothing until each one is turned on.
+    push_orders                 BOOLEAN NOT NULL DEFAULT FALSE,
+    sync_status                 BOOLEAN NOT NULL DEFAULT FALSE,
+    sync_inventory              BOOLEAN NOT NULL DEFAULT FALSE,
     sync_catalog                BOOLEAN NOT NULL DEFAULT FALSE,
-    sync_customers              BOOLEAN NOT NULL DEFAULT TRUE,
+    sync_customers              BOOLEAN NOT NULL DEFAULT FALSE,
     -- sync_catalog = HubRise owns the managed fields; this one only decides whether a catalog
     -- change is imported by itself or just announced (catalog_update_available_at).
     catalog_auto_import         BOOLEAN NOT NULL DEFAULT FALSE,

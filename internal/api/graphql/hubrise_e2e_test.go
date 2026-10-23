@@ -332,7 +332,18 @@ func TestHubriseRolloutFromConnectionToPauseAndResume(t *testing.T) {
 	r.publishMenu()
 
 	t.Run("the menu the shop already has is adopted without touching it", func(t *testing.T) {
-		r.settings(`enabled: true`)
+		st := r.settings(`enabled: true`)
+		assert.True(t, st.Enabled)
+		assert.False(t, st.Features.PushOrders || st.Features.SyncStatus || st.Features.SyncInventory || st.Features.SyncCatalog || st.SyncCustomers,
+			"enabling starts no feature: each one is turned on by hand")
+		// An order placed now, before the menu is linked, leaves nothing behind for HubRise.
+		early := env.newPushCustomer(t, "e2e-enabled-only", false)
+		earlyOrder := env.placeOrder(t, early, "fr")
+		env.mustUpdateOrder(t, earlyOrder.ID, map[string]any{"status": "PICKED_UP"}) // served: no open order to catch up later
+		assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM hubrise_outbox`))
+		r.quiet(100 * time.Millisecond)
+		assert.Zero(t, r.remoteRequests(http.MethodPost, "/v1/location/orders"), "no order reaches HubRise")
+		assert.Zero(t, r.remoteRequests(http.MethodPatch, "/v1/location/orders"))
 		priceBefore, _ := r.productRow(salmon)
 
 		preview := r.mustAsk(`mutation { previewHubriseCatalogSync(mode: LINK_ONLY) { changes { action key } } }`, nil)
@@ -369,6 +380,30 @@ func TestHubriseRolloutFromConnectionToPauseAndResume(t *testing.T) {
 	// The shop sells what HubRise says from here on: look the new product up for the rest.
 	var gyoza uuid.UUID
 	require.NoError(t, env.DB.DB.GetContext(t.Context(), &gyoza, `SELECT product_id FROM hubrise_catalog_links WHERE hubrise_ref = 'SKU-GYOZA'`))
+
+	t.Run("the features are turned on one by one, pushing stamping its starting point", func(t *testing.T) {
+		pushSince := func() *time.Time {
+			var since *time.Time
+			require.NoError(t, env.DB.DB.GetContext(t.Context(), &since, `SELECT push_orders_since FROM hubrise_connection`))
+			return since
+		}
+		// Connecting stamped the first value; turning the push on moves it to now, so the orders of the
+		// time it was off are never replayed as history.
+		connectedAt := pushSince()
+		require.NotNil(t, connectedAt)
+		r.quiet(5 * time.Millisecond)
+		st := r.settings(`pushOrders: true`)
+		assert.True(t, st.Features.PushOrders)
+		assert.False(t, st.Features.SyncStatus || st.Features.SyncInventory || st.SyncCustomers, "the others stay off")
+		stamped := pushSince()
+		require.NotNil(t, stamped)
+		assert.True(t, stamped.After(*connectedAt), "pushOrders becoming effective restamps push_orders_since")
+
+		assert.True(t, r.settings(`syncStatus: true`).Features.SyncStatus)
+		assert.True(t, r.settings(`syncCustomers: true`).SyncCustomers)
+		assert.True(t, r.settings(`syncInventory: true`).Features.SyncInventory)
+		assert.Equal(t, stamped.UnixMicro(), pushSince().UnixMicro(), "the other switches do not touch the stamp")
+	})
 
 	t.Run("an order is pushed with the refs of the catalog and follows the EPOS", func(t *testing.T) {
 		c := env.newPushCustomer(t, "e2e-flow", true)

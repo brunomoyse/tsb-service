@@ -66,10 +66,11 @@ inventory `update/patch`) and sends the browser to `<APP_DASHBOARD_URL>/hubrise?
 the outcome `connected`, `relink_required`, `denied`, `invalid_state`, `authorization_failed` or `error`.
 Nothing else travels in that address.
 
-Connected is **not** enabled: the connection starts paused. Every feature switch (`pushOrders`,
-`syncStatus`, `syncInventory`, `syncCustomers`) is already on, though, so `enabled` is the moment they all
-start: switch the ones that must wait off in the same call that sets `enabled` (section 2, step 4). The status shows the account, location, catalog and customer list names and
-ids to give HubRise when they review the integration.
+Connected is **not** enabled: the connection starts paused, and every feature switch (`pushOrders`,
+`syncStatus`, `syncInventory`, `syncCatalog`, `syncCustomers`) starts **off** too. Enabling the integration
+therefore sends nothing by itself; each feature is turned on, one at a time, when its step of the ladder
+(section 2) comes. The status shows the account, location, catalog and customer list names and ids to give
+HubRise when they review the integration.
 
 Disconnecting revokes the token at HubRise, deletes the callback and forgets the token. The settings and
 the links stay, so connecting again to the same location resumes where it was.
@@ -87,20 +88,20 @@ each before the next.
    catalog sync is ever enabled, otherwise a price edit on a managed product answers `HUBRISE_MANAGED` to a
    screen that does not know the code.
 3. **Set the variables, restart, connect.**
-4. **Adopt the menu you already have (`LINK_ONLY`).** An import is refused (`HUBRISE_NOT_ENABLED`) while the
-   integration is paused, and turning `enabled` on starts every feature switch that is on, so do both in one
-   call: `updateHubriseSettings(input: {enabled: true, pushOrders: false, syncStatus: false,
-   syncInventory: false, syncCustomers: false})`. Nothing leaves yet; an order placed now would carry no SKU
-   refs, which is why `pushOrders` waits for the links. `previewHubriseCatalogSync(mode: LINK_ONLY)` lists
+4. **Enable and adopt the menu you already have (`LINK_ONLY`).** An import is refused
+   (`HUBRISE_NOT_ENABLED`) while the integration is paused, so first `updateHubriseSettings(input:
+   {enabled: true})`. Every feature switch is still off, so nothing leaves: an order placed now carries no
+   SKU refs, which is why `pushOrders` waits for the links. `previewHubriseCatalogSync(mode: LINK_ONLY)` lists
    the products that match a HubRise SKU; `syncHubriseCatalog(mode: LINK_ONLY)` records the links and
    touches no product data. This gives the orders their SKU refs. A product matches by the menu code
    (`custom_fields.code` of the SKU equals `products.code`), then by its normalized name inside the
    category of the same name. Anything ambiguous is listed as a conflict and never guessed; link it by
    hand with `linkHubriseProduct`.
-5. **Turn on `pushOrders`.** Only the open orders from this moment (and the last hour,
-   for the ones in flight) are pushed. History is never replayed. Place a test order and watch it in the
-   EPOS. Then `syncStatus`, `syncCustomers` and `syncInventory`; the first time inventory sync becomes
-   effective, the products the shop already marks sold out are pushed to HubRise as the baseline.
+5. **Turn the features on one by one.** First `pushOrders`: only the open orders from this moment (and the
+   last hour, for the ones in flight) are pushed, because turning it on stamps `push_orders_since`. History is
+   never replayed. Place a test order and watch it in the EPOS. Then `syncStatus`, `syncCustomers` and
+   `syncInventory`; the first time inventory sync becomes effective, the products the shop already marks sold
+   out are pushed to HubRise as the baseline.
 6. **Preview the catalog (`DRY_RUN`), then turn on `syncCatalog`.** It is refused (`HUBRISE_PREVIEW_REQUIRED`)
    unless a dry run of the current catalog was made in the last 24 hours. Read the diff: what is created,
    updated, linked, retired, and the warnings. Then `syncHubriseCatalog(mode: FULL)`.
@@ -152,7 +153,10 @@ problem found stays on the order.
 
 Other things to look at on the HubRise page: `authErrorAt` and `lastError` (a 401 or 403 pauses the whole
 pipeline without parking anything: the token was revoked, the account is unpaid or a scope is missing;
-reconnect), the backlog (pending and parked rows, with `retryHubriseOutbox` to retry a parked chain), the
+reconnect. The same happens when the stored token cannot be decrypted because `HUBRISE_TOKEN_KEY` changed or
+was lost: the first time it is noticed `lastError` says "stored HubRise token cannot be decrypted ... reconnect
+to HubRise", the workers pause without using an attempt of any row, and connecting again clears it), the
+backlog (pending and parked rows, with `retryHubriseOutbox` to retry a parked chain), the
 relink banner and the "catalog update pending review" banner.
 
 ## 5. Conventions on the HubRise side

@@ -102,7 +102,7 @@ func Install(o Options) (*Runtime, error) {
 	clients := o.Clients
 	if clients == nil {
 		limiter := pkghubrise.NewLimiter(pkghubrise.DefaultLimits().Split(m.Config.Replicas))
-		clients = application.NewPooledClients(m.Codec, m.Config.APIBaseURL, nil, limiter)
+		clients = application.WithAuthRecording(application.NewPooledClients(m.Codec, m.Config.APIBaseURL, nil, limiter), m.Connections, m.Clock)
 	}
 
 	push := o.Push
