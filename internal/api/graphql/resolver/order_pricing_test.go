@@ -169,8 +169,8 @@ func newPricingFixture(t *testing.T) *pricingFixture {
 				odd95ID:   product(odd95ID, "12.95", true, false, true),
 			},
 			choices: map[uuid.UUID]*productDomain.ProductChoice{
-				brothA: {ID: brothA, ProductID: bowlID, ChoiceGroupID: brothGrp, PriceModifier: decimal.Zero},
-				brothB: {ID: brothB, ProductID: bowlID, ChoiceGroupID: brothGrp, PriceModifier: decimal.RequireFromString("1.50")},
+				brothA: {ID: brothA, ProductID: bowlID, ChoiceGroupID: brothGrp, PriceModifier: decimal.Zero, IsAvailable: true},
+				brothB: {ID: brothB, ProductID: bowlID, ChoiceGroupID: brothGrp, PriceModifier: decimal.RequireFromString("1.50"), IsAvailable: true},
 			},
 			groups: map[uuid.UUID][]*productDomain.ProductChoiceGroup{
 				bowlID: {{ID: brothGrp, ProductID: bowlID, MinSelections: 1, MaxSelections: 1}},
@@ -302,6 +302,27 @@ func TestPricing_LegacyChoiceIsFoldedIntoSelections(t *testing.T) {
 	if got := res.Lines[0].Selections; len(got) != 1 || got[0].GroupID != brothGrp || got[0].Quantity != 3 {
 		t.Fatalf("selections echo = %+v", got)
 	}
+}
+
+func TestPricing_AnUnavailableChoiceIsRefusedWithSelectionInvalid(t *testing.T) {
+	f := newPricingFixture(t)
+	f.catalog.choices[brothB].IsAvailable = false // sold out at HubRise
+
+	// Through the group selection and through the legacy single choice: the existing code, the
+	// product's price travels with the issue, and nothing is added to the basket.
+	legacy := brothB
+	res := f.price(pricingInput{Items: []pricingItem{
+		{ProductID: bowlID, Quantity: 1, Selections: []pricingSelection{{GroupID: brothGrp, ChoiceID: brothB, Quantity: 1}}},
+		{ProductID: bowlID, Quantity: 1, ChoiceID: &legacy},
+		{ProductID: bowlID, Quantity: 1, Selections: []pricingSelection{{GroupID: brothGrp, ChoiceID: brothA, Quantity: 1}}},
+	}})
+	wantCodes(t, res.LineIssues(0), apperr.CodeSelectionInvalid)
+	wantCodes(t, res.LineIssues(1), apperr.CodeSelectionInvalid)
+	wantCodes(t, res.LineIssues(2))
+	if got := res.LineIssues(0)[0].CurrentPrice; got == nil || !got.Equal(dec("10.00")) {
+		t.Errorf("currentPrice = %v, want 10.00", got)
+	}
+	wantMoney(t, "only the available choice is priced", res.Subtotal, "10.00")
 }
 
 // ---- line issues ---------------------------------------------------------------------------------

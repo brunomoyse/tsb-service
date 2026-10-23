@@ -463,6 +463,10 @@ func (p *orderPricer) priceLine(
 		case groupID != nil && choice.ChoiceGroupID != *groupID:
 			reject(apperr.Newf(apperr.CodeSelectionInvalid, "choice %s does not belong to group %s", choiceID, groupID))
 			return true, nil
+		case !choice.IsAvailable:
+			// Sold out (HubRise inventory). The existing code on purpose: stored app builds already show it.
+			reject(apperr.Newf(apperr.CodeSelectionInvalid, "choice %s of %s is not available", choiceID, label))
+			return true, nil
 		}
 		line.Modifiers[choice.ID] = choice.PriceModifier
 		selectionByChoice[choice.ID] += quantity

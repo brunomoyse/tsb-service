@@ -31,12 +31,15 @@ type Product struct {
 
 // ProductChoice represents a selectable option for a product.
 type ProductChoice struct {
-	ID            uuid.UUID           `db:"id" json:"id"`
-	ProductID     uuid.UUID           `db:"product_id" json:"productId"`
-	ChoiceGroupID uuid.UUID           `db:"choice_group_id" json:"choiceGroupId"`
-	PriceModifier decimal.Decimal     `db:"price_modifier" json:"priceModifier"`
-	SortOrder     int                 `db:"sort_order" json:"sortOrder"`
-	Translations  []ChoiceTranslation `json:"translations"`
+	ID            uuid.UUID       `db:"id" json:"id"`
+	ProductID     uuid.UUID       `db:"product_id" json:"productId"`
+	ChoiceGroupID uuid.UUID       `db:"choice_group_id" json:"choiceGroupId"`
+	PriceModifier decimal.Decimal `db:"price_modifier" json:"priceModifier"`
+	SortOrder     int             `db:"sort_order" json:"sortOrder"`
+	// IsAvailable is false while the choice is sold out (HubRise inventory); an order selecting an
+	// unavailable choice is refused. Always true in a restaurant without HubRise.
+	IsAvailable  bool                `db:"is_available" json:"isAvailable"`
+	Translations []ChoiceTranslation `json:"translations"`
 }
 
 type ProductChoiceGroup struct {

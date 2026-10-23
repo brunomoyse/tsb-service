@@ -541,6 +541,37 @@ func TestProductRepositoryChoices(t *testing.T) {
 		assert.Equal(t, c1.ID, got.Translations[0].ProductChoiceID)
 	})
 
+	t.Run("a choice is available by default, every read reports it, and an edit never changes it", func(t *testing.T) {
+		got, err := e.repo.FindChoiceByID(ctx, c1.ID)
+		require.NoError(t, err)
+		assert.True(t, got.IsAvailable)
+
+		// Sold out by the inventory sync, which writes the column directly.
+		_, err = e.tdb.DB.ExecContext(ctx, `UPDATE product_choices SET is_available = false WHERE id = $1`, c1.ID)
+		require.NoError(t, err)
+		byProduct, err := e.repo.FindChoicesByProductID(ctx, p1)
+		require.NoError(t, err)
+		states := map[uuid.UUID]bool{}
+		for _, c := range byProduct {
+			states[c.ID] = c.IsAvailable
+		}
+		assert.Equal(t, map[uuid.UUID]bool{c1.ID: false, c2.ID: true}, states)
+		batch, err := e.repo.BatchGetChoicesByIDs(ctx, []string{c1.ID.String()})
+		require.NoError(t, err)
+		assert.False(t, batch[c1.ID.String()][0].IsAvailable)
+
+		// A dashboard edit sends a choice whose IsAvailable is the zero value: it must not sell it
+		// out, or bring it back.
+		edit := *c1
+		edit.IsAvailable = true
+		require.NoError(t, e.repo.UpdateChoice(ctx, &edit))
+		got, err = e.repo.FindChoiceByID(ctx, c1.ID)
+		require.NoError(t, err)
+		assert.False(t, got.IsAvailable)
+		_, err = e.tdb.DB.ExecContext(ctx, `UPDATE product_choices SET is_available = true WHERE id = $1`, c1.ID)
+		require.NoError(t, err)
+	})
+
 	t.Run("CreateChoice failures roll back", func(t *testing.T) {
 		dupTr := &domain.ProductChoice{ID: uuid.New(), ProductID: p1, ChoiceGroupID: g1.ID, Translations: []domain.ChoiceTranslation{{Locale: "fr", Name: "A"}, {Locale: "fr", Name: "B"}}}
 		require.ErrorContains(t, e.repo.CreateChoice(ctx, dupTr), "insert choice translation")

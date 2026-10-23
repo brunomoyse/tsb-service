@@ -1258,7 +1258,7 @@ func (r *ProductRepository) DeleteChoiceGroup(ctx context.Context, groupID uuid.
 func (r *ProductRepository) FindChoicesByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoice, error) {
 	query := `
 		SELECT
-			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order, pc.is_available,
 			pct.locale, pct.name
 		FROM product_choices pc
 		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
@@ -1272,7 +1272,7 @@ func (r *ProductRepository) FindChoicesByProductID(ctx context.Context, productI
 func (r *ProductRepository) FindChoiceByID(ctx context.Context, choiceID uuid.UUID) (*domain.ProductChoice, error) {
 	query := `
 		SELECT
-			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order, pc.is_available,
 			pct.locale, pct.name
 		FROM product_choices pc
 		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
@@ -1296,7 +1296,7 @@ func (r *ProductRepository) BatchGetChoicesByProductIDs(ctx context.Context, pro
 
 	query := `
 		SELECT
-			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order, pc.is_available,
 			pct.locale, pct.name
 		FROM product_choices pc
 		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
@@ -1326,7 +1326,7 @@ func (r *ProductRepository) BatchGetChoicesByIDs(ctx context.Context, choiceIDs 
 
 	query := `
 		SELECT
-			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order, pc.is_available,
 			pct.locale, pct.name
 		FROM product_choices pc
 		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
@@ -1433,6 +1433,7 @@ func (r *ProductRepository) queryChoices(ctx context.Context, query string, args
 		ChoiceGroupID uuid.UUID       `db:"choice_group_id"`
 		PriceModifier decimal.Decimal `db:"price_modifier"`
 		SortOrder     int             `db:"sort_order"`
+		IsAvailable   bool            `db:"is_available"`
 		Locale        *string         `db:"locale"`
 		Name          *string         `db:"name"`
 	}
@@ -1454,6 +1455,7 @@ func (r *ProductRepository) queryChoices(ctx context.Context, query string, args
 				ChoiceGroupID: row.ChoiceGroupID,
 				PriceModifier: row.PriceModifier,
 				SortOrder:     row.SortOrder,
+				IsAvailable:   row.IsAvailable,
 				Translations:  []domain.ChoiceTranslation{},
 			}
 			choicesMap[row.ID] = choice

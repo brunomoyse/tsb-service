@@ -23,6 +23,8 @@ const (
 	m1Version int64 = 20261026120000
 	m2Version int64 = 20261026130000
 	m3Version int64 = 20261026140000
+	// m5Version adds product_choices.is_available (inventory can sell an option out).
+	m5Version int64 = 20261026160000
 	// m6Version adds orders.channel, the one change to an existing table.
 	m6Version int64 = 20261026170000
 )
@@ -142,7 +144,7 @@ func TestHubriseMigrationsApplyOneByOneWithoutMissingVersions(t *testing.T) {
 
 	// An environment that deployed task 1 only (the test server deploys on every push), then later
 	// tasks: each step must apply cleanly with out-of-order disabled.
-	for _, v := range []int64{m1Version, m2Version, m3Version, m6Version} {
+	for _, v := range []int64{m1Version, m2Version, m3Version, m5Version, m6Version} {
 		res, err := p.UpTo(ctx, v)
 		require.NoError(t, err, "UpTo %d", v)
 		require.Len(t, res, 1)
@@ -181,7 +183,8 @@ func TestMigrationVersionsAreStrictlyOrdered(t *testing.T) {
 	assert.Greater(t, m1Version, lastPreHubriseVersion)
 	assert.Less(t, m1Version, m2Version)
 	assert.Less(t, m2Version, m3Version)
-	assert.Less(t, m3Version, m6Version)
+	assert.Less(t, m3Version, m5Version)
+	assert.Less(t, m5Version, m6Version)
 
 	// The database really is at the newest version after the template migrations.
 	v, err := p.GetDBVersion(context.Background())
@@ -270,5 +273,84 @@ func TestOrdersChannelMigrationDoesNotBlockOrdersForLong(t *testing.T) {
 	_, err = p.UpTo(ctx, m6Version)
 	require.NoError(t, err)
 	_, ok = ordersChannelColumn(t, td)
+	assert.True(t, ok)
+}
+
+func choiceAvailableColumn(t *testing.T, td *testhelpers.TestDatabase) (nullable, def string, exists bool) {
+	t.Helper()
+	var rows []struct {
+		Nullable string  `db:"is_nullable"`
+		Default  *string `db:"column_default"`
+	}
+	require.NoError(t, td.DB.SelectContext(t.Context(), &rows, `
+		SELECT is_nullable, column_default FROM information_schema.columns
+		WHERE table_schema = 'public' AND table_name = 'product_choices' AND column_name = 'is_available'`))
+	if len(rows) == 0 {
+		return "", "", false
+	}
+	if rows[0].Default != nil {
+		def = *rows[0].Default
+	}
+	return rows[0].Nullable, def, true
+}
+
+// A choice that existed before the migration stays available, and Down takes the column away again.
+func TestChoiceIsAvailableMigrationUpDownAndExistingRows(t *testing.T) {
+	td := testhelpers.SetupTestDatabase(t)
+	ctx := t.Context()
+	p := newProvider(t, td)
+
+	nullable, def, ok := choiceAvailableColumn(t, td)
+	require.True(t, ok)
+	assert.Equal(t, "NO", nullable)
+	assert.Equal(t, "true", def)
+
+	_, err := p.DownTo(ctx, m3Version)
+	require.NoError(t, err)
+	_, _, ok = choiceAvailableColumn(t, td)
+	assert.False(t, ok, "Down drops the column")
+
+	fx := testhelpers.SeedTestData(t, td.DB)
+	var groupID, choiceID string
+	require.NoError(t, td.DB.GetContext(ctx, &groupID, `INSERT INTO product_choice_groups (product_id) VALUES ($1) RETURNING id`, fx.SalmonSushi.ID))
+	require.NoError(t, td.DB.GetContext(ctx, &choiceID, `
+		INSERT INTO product_choices (product_id, choice_group_id, price_modifier) VALUES ($1, $2, 0.50) RETURNING id`, fx.SalmonSushi.ID, groupID))
+
+	_, err = p.Up(ctx)
+	require.NoError(t, err)
+	var available bool
+	require.NoError(t, td.DB.GetContext(ctx, &available, `SELECT is_available FROM product_choices WHERE id = $1`, choiceID))
+	assert.True(t, available, "every existing choice stays available")
+}
+
+// product_choices is read on every order: the ALTER must give up after the lock timeout instead of
+// queueing behind a reader and blocking the readers behind itself.
+func TestChoiceIsAvailableMigrationDoesNotBlockChoicesForLong(t *testing.T) {
+	td := testhelpers.SetupTestDatabase(t)
+	ctx := t.Context()
+	p := newProvider(t, td)
+	_, err := p.DownTo(ctx, m3Version)
+	require.NoError(t, err)
+
+	blocker, err := td.DB.BeginTxx(ctx, nil)
+	require.NoError(t, err)
+	defer func() { _ = blocker.Rollback() }()
+	var n int
+	require.NoError(t, blocker.GetContext(ctx, &n, `SELECT count(*) FROM product_choices`)) // ACCESS SHARE until the end
+
+	start := time.Now()
+	_, err = p.UpTo(ctx, m5Version)
+	elapsed := time.Since(start)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "lock timeout")
+	assert.GreaterOrEqual(t, elapsed, 4*time.Second, "it waited for the lock")
+	assert.Less(t, elapsed, 15*time.Second, "and gave up")
+	_, _, ok := choiceAvailableColumn(t, td)
+	assert.False(t, ok)
+
+	require.NoError(t, blocker.Rollback())
+	_, err = p.UpTo(ctx, m5Version)
+	require.NoError(t, err)
+	_, _, ok = choiceAvailableColumn(t, td)
 	assert.True(t, ok)
 }
