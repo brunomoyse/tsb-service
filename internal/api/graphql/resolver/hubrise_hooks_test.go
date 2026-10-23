@@ -23,6 +23,8 @@ type spyHooks struct {
 	history  []uuid.UUID
 	avail    map[uuid.UUID]bool
 	guarded  [][2]*productDomain.Product
+	groups   [][2]*productDomain.ProductChoiceGroup
+	choices  [][2]*productDomain.ProductChoice
 }
 
 func (s *spyHooks) OrderReady(_ context.Context, id uuid.UUID) error {
@@ -49,6 +51,16 @@ func (s *spyHooks) ProductGuard(_ context.Context, current, updated *productDoma
 	return s.err
 }
 
+func (s *spyHooks) ChoiceGroupGuard(_ context.Context, current, updated *productDomain.ProductChoiceGroup) error {
+	s.groups = append(s.groups, [2]*productDomain.ProductChoiceGroup{current, updated})
+	return s.err
+}
+
+func (s *spyHooks) ChoiceGuard(_ context.Context, current, updated *productDomain.ProductChoice) error {
+	s.choices = append(s.choices, [2]*productDomain.ProductChoice{current, updated})
+	return s.err
+}
+
 func TestHubriseHelpersAreNoOpsWithoutHubrise(t *testing.T) {
 	r := &Resolver{} // standalone: Hubrise is nil
 	ctx := t.Context()
@@ -60,6 +72,8 @@ func TestHubriseHelpersAreNoOpsWithoutHubrise(t *testing.T) {
 		r.AvailabilityChanged(ctx, id, false)
 	})
 	assert.NoError(t, r.ProductGuard(ctx, &productDomain.Product{}, &productDomain.Product{}), "a standalone restaurant can edit everything")
+	assert.NoError(t, r.ChoiceGroupGuard(ctx, &productDomain.ProductChoiceGroup{}, nil))
+	assert.NoError(t, r.ChoiceGuard(ctx, nil, &productDomain.ProductChoice{}))
 }
 
 func TestHubriseHelpersForwardToTheHooks(t *testing.T) {
@@ -73,12 +87,17 @@ func TestHubriseHelpersForwardToTheHooks(t *testing.T) {
 	r.OrderStatusChanged(ctx, order, orderDomain.OrderStatusPreparing, history)
 	r.AvailabilityChanged(ctx, product, true)
 	require.NoError(t, r.ProductGuard(ctx, current, updated))
+	group, choice := &productDomain.ProductChoiceGroup{ID: uuid.New()}, &productDomain.ProductChoice{ID: uuid.New()}
+	require.NoError(t, r.ChoiceGroupGuard(ctx, nil, group))
+	require.NoError(t, r.ChoiceGuard(ctx, choice, nil))
 
 	assert.Equal(t, []uuid.UUID{order}, spy.ready)
 	assert.Equal(t, []orderDomain.OrderStatus{orderDomain.OrderStatusPreparing}, spy.statuses)
 	assert.Equal(t, []uuid.UUID{history}, spy.history)
 	assert.Equal(t, map[uuid.UUID]bool{product: true}, spy.avail)
 	assert.Equal(t, [][2]*productDomain.Product{{current, updated}}, spy.guarded)
+	assert.Equal(t, [][2]*productDomain.ProductChoiceGroup{{nil, group}}, spy.groups)
+	assert.Equal(t, [][2]*productDomain.ProductChoice{{choice, nil}}, spy.choices)
 }
 
 func TestHubriseHookFailuresAreLoggedNotReturned(t *testing.T) {
@@ -98,6 +117,8 @@ func TestHubriseHookFailuresAreLoggedNotReturned(t *testing.T) {
 	assert.Equal(t, 1, logs.FilterMessage("hubrise: order status hook failed").Len())
 	assert.Equal(t, 1, logs.FilterMessage("hubrise: availability hook failed").Len())
 	assert.ErrorIs(t, r.ProductGuard(ctx, &productDomain.Product{}, &productDomain.Product{}), boom, "the guard is a veto: its error is returned")
+	assert.ErrorIs(t, r.ChoiceGroupGuard(ctx, nil, &productDomain.ProductChoiceGroup{}), boom)
+	assert.ErrorIs(t, r.ChoiceGuard(ctx, nil, &productDomain.ProductChoice{}), boom)
 }
 
 func TestNoopHubriseHooks(t *testing.T) {
@@ -108,4 +129,6 @@ func TestNoopHubriseHooks(t *testing.T) {
 	assert.NoError(t, h.OrderStatusChanged(ctx, uuid.New(), orderDomain.OrderStatusPending, uuid.New()))
 	assert.NoError(t, h.AvailabilityChanged(ctx, uuid.New(), true))
 	assert.NoError(t, h.ProductGuard(ctx, nil, nil))
+	assert.NoError(t, h.ChoiceGroupGuard(ctx, nil, nil))
+	assert.NoError(t, h.ChoiceGuard(ctx, nil, nil))
 }

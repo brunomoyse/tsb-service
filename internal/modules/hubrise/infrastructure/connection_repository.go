@@ -24,7 +24,7 @@ type connectionRepository struct{ store }
 
 // NewConnectionRepository returns the repository of the single hubrise_connection row.
 func NewConnectionRepository(db *sqlx.DB) domain.ConnectionRepository {
-	return &connectionRepository{store{db}}
+	return &connectionRepository{newStore(db)}
 }
 
 func (r *connectionRepository) Get(ctx context.Context) (*domain.Connection, error) {

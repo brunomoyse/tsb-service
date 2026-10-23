@@ -20,7 +20,7 @@ type orderLinkRepository struct{ store }
 
 // NewOrderLinkRepository returns the store of order links.
 func NewOrderLinkRepository(db *sqlx.DB) domain.OrderLinkRepository {
-	return &orderLinkRepository{store{db}}
+	return &orderLinkRepository{newStore(db)}
 }
 
 // EnqueueCreate: the link insert is the idempotency gate. Only the call that inserted it writes

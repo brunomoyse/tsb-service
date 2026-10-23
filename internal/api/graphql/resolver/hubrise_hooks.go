@@ -34,6 +34,11 @@ type HubriseHooks interface {
 	AvailabilityChanged(ctx context.Context, productID uuid.UUID, available bool) error
 	// ProductGuard may refuse an edit of a product whose fields HubRise owns.
 	ProductGuard(ctx context.Context, current, updated *productDomain.Product) error
+	// ChoiceGroupGuard may refuse the creation (current is nil), the edit or the deletion (updated is
+	// nil) of a choice group of a product whose options HubRise owns.
+	ChoiceGroupGuard(ctx context.Context, current, updated *productDomain.ProductChoiceGroup) error
+	// ChoiceGuard is ChoiceGroupGuard for a choice.
+	ChoiceGuard(ctx context.Context, current, updated *productDomain.ProductChoice) error
 }
 
 // NoopHubriseHooks is the HubriseHooks that does nothing: what a deployment without HubRise behaves like.
@@ -48,6 +53,14 @@ func (NoopHubriseHooks) OrderStatusChanged(context.Context, uuid.UUID, orderDoma
 func (NoopHubriseHooks) AvailabilityChanged(context.Context, uuid.UUID, bool) error { return nil }
 
 func (NoopHubriseHooks) ProductGuard(context.Context, *productDomain.Product, *productDomain.Product) error {
+	return nil
+}
+
+func (NoopHubriseHooks) ChoiceGroupGuard(context.Context, *productDomain.ProductChoiceGroup, *productDomain.ProductChoiceGroup) error {
+	return nil
+}
+
+func (NoopHubriseHooks) ChoiceGuard(context.Context, *productDomain.ProductChoice, *productDomain.ProductChoice) error {
 	return nil
 }
 
@@ -94,4 +107,21 @@ func (r *Resolver) ProductGuard(ctx context.Context, current, updated *productDo
 		return nil
 	}
 	return r.Hubrise.ProductGuard(ctx, current, updated)
+}
+
+// ChoiceGroupGuard returns the integration's veto on a choice group change, or nil: always nil when
+// HubRise is not configured.
+func (r *Resolver) ChoiceGroupGuard(ctx context.Context, current, updated *productDomain.ProductChoiceGroup) error {
+	if r.Hubrise == nil {
+		return nil
+	}
+	return r.Hubrise.ChoiceGroupGuard(ctx, current, updated)
+}
+
+// ChoiceGuard returns the integration's veto on a choice change, with the same rules.
+func (r *Resolver) ChoiceGuard(ctx context.Context, current, updated *productDomain.ProductChoice) error {
+	if r.Hubrise == nil {
+		return nil
+	}
+	return r.Hubrise.ChoiceGuard(ctx, current, updated)
 }

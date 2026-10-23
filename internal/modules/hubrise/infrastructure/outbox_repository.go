@@ -18,7 +18,7 @@ type outboxRepository struct{ store }
 
 // NewOutboxRepository returns the durable outbox.
 func NewOutboxRepository(db *sqlx.DB) domain.OutboxRepository {
-	return &outboxRepository{store{db}}
+	return &outboxRepository{newStore(db)}
 }
 
 // Enqueue inserts the item. The ON CONFLICT clause names the partial unique index of pending

@@ -152,6 +152,8 @@ type CatalogLinkRepository interface {
 	SetRetired(ctx context.Context, id int64, at *time.Time) error
 	// SetCatalogDisabled records whether HubRise restrictions disable the entry.
 	SetCatalogDisabled(ctx context.Context, id int64, disabled bool) error
+	// SetImageMD5 records the MD5 of the image imported for the entry.
+	SetImageMD5(ctx context.Context, id int64, md5 string) error
 	// UpdateInventory records the result of an inventory sync.
 	UpdateInventory(ctx context.Context, id int64, s InventoryState) error
 	// ClearSoldOut clears the sold-out provenance of a link: the shop now owns that state.
