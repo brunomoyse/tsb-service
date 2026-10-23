@@ -180,6 +180,9 @@ type ConnectionRepository interface {
 	SetCatalogUpdateAvailable(ctx context.Context, at *time.Time) error
 	// SetInventoryBaseline stamps the end of the first-enable inventory baseline.
 	SetInventoryBaseline(ctx context.Context, at time.Time) error
+	// ResetInventoryBaseline forgets the baseline, so the next sync pushes the shop's sold-out
+	// products again (inventory sync was switched off while the shop kept toggling availability).
+	ResetInventoryBaseline(ctx context.Context) error
 	// SetRelinkRequired stamps (or with nil clears) the "re-authorized against another
 	// location" flag.
 	SetRelinkRequired(ctx context.Context, at *time.Time) error

@@ -245,3 +245,14 @@ func TestCreatePayloadRoundTrips(t *testing.T) {
 		t.Fatalf("round trip changed the payload: %+v", out)
 	}
 }
+
+func TestInvalidSettingErrorNamesTheField(t *testing.T) {
+	err := &domain.InvalidSettingError{Field: "catalogLanguage", Message: "must be one of fr, en"}
+	if got, want := err.Error(), "hubrise: invalid setting catalogLanguage: must be one of fr, en"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	var target *domain.InvalidSettingError
+	if !errors.As(fmt.Errorf("wrapped: %w", err), &target) || target.Field != "catalogLanguage" {
+		t.Fatal("the error is found through wrapping")
+	}
+}

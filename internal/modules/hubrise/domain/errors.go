@@ -32,7 +32,26 @@ var (
 	ErrRetireConfirmRequired = errors.New("hubrise: the import would retire a large part of the menu, confirm it")
 	// ErrManaged means an edit touches a field HubRise owns.
 	ErrManaged = errors.New("hubrise: this is managed by HubRise")
+	// ErrSKULinked means a SKU is already linked to another local product.
+	ErrSKULinked = errors.New("hubrise: the SKU is already linked to another product")
+	// ErrInvalidState means the OAuth state of a callback is unknown, already used, expired, or was
+	// started by somebody else. The authorization is dropped.
+	ErrInvalidState = errors.New("hubrise: the authorization state is unknown, used or expired")
+	// ErrAuthorizationFailed means HubRise refused the authorization code (spent, expired) or the
+	// client credentials, or the connection could not be set up with the token it returned.
+	ErrAuthorizationFailed = errors.New("hubrise: the authorization could not be completed")
 )
+
+// InvalidSettingError is the refusal of a settings value. It carries the setting's name and a
+// message safe to show the operator.
+type InvalidSettingError struct {
+	Field   string
+	Message string
+}
+
+func (e *InvalidSettingError) Error() string {
+	return "hubrise: invalid setting " + e.Field + ": " + e.Message
+}
 
 // ManagedError is the refusal of an edit of HubRise-owned fields. It matches ErrManaged.
 type ManagedError struct {

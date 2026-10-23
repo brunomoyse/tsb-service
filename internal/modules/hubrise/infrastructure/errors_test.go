@@ -41,6 +41,7 @@ func TestRepositoriesReportAStoreThatIsDown(t *testing.T) {
 		"conn disconnect": func() error { return conns.Disconnect(ctx) },
 		"conn settings":   func() error { _, err := conns.UpdateSettings(ctx, domain.SettingsPatch{}); return err },
 		"conn auth":       func() error { return conns.RecordAuthError(ctx, now, "x") },
+		"conn baseline":   func() error { return conns.ResetInventoryBaseline(ctx) },
 
 		"state create":  func() error { return states.Create(ctx, "s", id, now) },
 		"state consume": func() error { _, _, err := states.Consume(ctx, "s", now); return err },
@@ -63,6 +64,8 @@ func TestRepositoriesReportAStoreThatIsDown(t *testing.T) {
 		"link expired":  func() error { _, err := links.ListSoldOutExpired(ctx, now); return err },
 		"link delete":   func() error { return links.Delete(ctx, 1) },
 		"link purge":    func() error { _, err := links.DeleteAll(ctx); return err },
+		"link managed":  func() error { _, err := links.LinkedProductIDs(ctx, []uuid.UUID{id}); return err },
+		"link unlinked": func() error { _, err := links.CountUnlinkedProducts(ctx); return err },
 
 		"outbox enqueue": func() error {
 			_, _, err := outbox.Enqueue(ctx, domain.NewOutboxItem(domain.OutboxInventory, nil, "k", nil, now))

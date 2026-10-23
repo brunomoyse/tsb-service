@@ -156,6 +156,23 @@ const (
 	// CodeHubriseRetireConfirmRequired: the import would retire a large part of the menu
 	// (`retiring` of `linked` products in the extensions); repeat it with the confirmation.
 	CodeHubriseRetireConfirmRequired Code = "HUBRISE_RETIRE_CONFIRM_REQUIRED"
+	// CodeHubriseNotConfigured: HubRise is not configured on this server (no client id, secret and
+	// token key).
+	CodeHubriseNotConfigured Code = "HUBRISE_NOT_CONFIGURED"
+	// CodeHubriseNotConnected: no HubRise location is authorized yet, or it was disconnected.
+	CodeHubriseNotConnected Code = "HUBRISE_NOT_CONNECTED"
+	// CodeHubriseNotEnabled: the integration (or the feature the operation needs) is switched off.
+	CodeHubriseNotEnabled Code = "HUBRISE_NOT_ENABLED"
+	// CodeHubriseEmptyCatalog: the HubRise catalog has no product; it is never imported, so an empty
+	// or half loaded catalog cannot retire the menu.
+	CodeHubriseEmptyCatalog Code = "HUBRISE_EMPTY_CATALOG"
+	// CodeHubriseBusy: another import or inventory sync is already running; try again shortly.
+	CodeHubriseBusy Code = "HUBRISE_BUSY"
+	// CodeHubriseSKULinked: the SKU is already linked to another product.
+	CodeHubriseSKULinked Code = "HUBRISE_SKU_LINKED"
+	// CodeHubriseUpstream: HubRise refused or did not answer a call the operation needed. `kind`
+	// in the extensions says how (unauthorized, forbidden, rate_limited, server, timeout...).
+	CodeHubriseUpstream Code = "HUBRISE_UPSTREAM"
 )
 
 // expected lists the codes that are the customer's / the world's doing rather than ours: they are
@@ -207,6 +224,15 @@ var expected = map[Code]bool{
 	CodeHubriseRelinkRequired:        true,
 	CodeHubrisePreviewRequired:       true,
 	CodeHubriseRetireConfirmRequired: true,
+	CodeHubriseNotConfigured:         true,
+	CodeHubriseNotConnected:          true,
+	CodeHubriseNotEnabled:            true,
+	CodeHubriseEmptyCatalog:          true,
+	CodeHubriseBusy:                  true,
+	CodeHubriseSKULinked:             true,
+	// HubRise's side failing is not a bug of ours; the message is for the operator, and the resolver
+	// logs the cause itself.
+	CodeHubriseUpstream: true,
 }
 
 // IsExpected reports whether the code is a user-side error (warn log, no Sentry event).

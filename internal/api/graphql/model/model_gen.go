@@ -229,6 +229,124 @@ type DeliveryFeeTier struct {
 	Fee string `json:"fee"`
 }
 
+type HubriseBacklog struct {
+	Pending int `json:"pending"`
+	Parked  int `json:"parked"`
+}
+
+type HubriseCatalogChange struct {
+	Entity HubriseCatalogEntity `json:"entity"`
+	Action HubriseCatalogAction `json:"action"`
+	Key    string               `json:"key"`
+	Name   string               `json:"name"`
+	Fields []string             `json:"fields"`
+}
+
+type HubriseCatalogDiff struct {
+	CatalogHash        string                  `json:"catalogHash"`
+	Changes            []*HubriseCatalogChange `json:"changes"`
+	Warnings           []*HubriseCatalogIssue  `json:"warnings"`
+	Conflicts          []*HubriseCatalogIssue  `json:"conflicts"`
+	Unchanged          int                     `json:"unchanged"`
+	RetiringProducts   int                     `json:"retiringProducts"`
+	LinkedProducts     int                     `json:"linkedProducts"`
+	RetireNeedsConfirm bool                    `json:"retireNeedsConfirm"`
+}
+
+type HubriseCatalogIssue struct {
+	Code    string  `json:"code"`
+	Key     *string `json:"key,omitempty"`
+	Message string  `json:"message"`
+}
+
+type HubriseFeatures struct {
+	PushOrders    bool `json:"pushOrders"`
+	SyncStatus    bool `json:"syncStatus"`
+	SyncInventory bool `json:"syncInventory"`
+	SyncCatalog   bool `json:"syncCatalog"`
+}
+
+type HubriseOrderInfo struct {
+	HubriseOrderID *string    `json:"hubriseOrderId,omitempty"`
+	PushState      string     `json:"pushState"`
+	PushedAt       *time.Time `json:"pushedAt,omitempty"`
+	RemoteStatus   *string    `json:"remoteStatus,omitempty"`
+	RemoteTotal    *string    `json:"remoteTotal,omitempty"`
+	NeedsAttention *string    `json:"needsAttention,omitempty"`
+}
+
+type HubriseOutboxItem struct {
+	ID            string             `json:"id"`
+	Kind          HubriseOutboxKind  `json:"kind"`
+	OrderID       *uuid.UUID         `json:"orderId,omitempty"`
+	State         HubriseOutboxState `json:"state"`
+	Attempts      int                `json:"attempts"`
+	LastError     *string            `json:"lastError,omitempty"`
+	NextAttemptAt time.Time          `json:"nextAttemptAt"`
+	CreatedAt     time.Time          `json:"createdAt"`
+	SentAt        *time.Time         `json:"sentAt,omitempty"`
+	ParkedAt      *time.Time         `json:"parkedAt,omitempty"`
+}
+
+type HubriseSettingsInput struct {
+	Enabled             *bool   `json:"enabled,omitempty"`
+	PushOrders          *bool   `json:"pushOrders,omitempty"`
+	SyncStatus          *bool   `json:"syncStatus,omitempty"`
+	SyncInventory       *bool   `json:"syncInventory,omitempty"`
+	SyncCatalog         *bool   `json:"syncCatalog,omitempty"`
+	SyncCustomers       *bool   `json:"syncCustomers,omitempty"`
+	CatalogAutoImport   *bool   `json:"catalogAutoImport,omitempty"`
+	AutoRefundOnCancel  *bool   `json:"autoRefundOnCancel,omitempty"`
+	ImportImages        *bool   `json:"importImages,omitempty"`
+	CatalogLanguage     *string `json:"catalogLanguage,omitempty"`
+	VariantRef          *string `json:"variantRef,omitempty"`
+	ChannelName         *string `json:"channelName,omitempty"`
+	DeliveryChargeRef   *string `json:"deliveryChargeRef,omitempty"`
+	PaymentFeeChargeRef *string `json:"paymentFeeChargeRef,omitempty"`
+}
+
+type HubriseStatus struct {
+	Available              bool             `json:"available"`
+	Connected              bool             `json:"connected"`
+	Enabled                bool             `json:"enabled"`
+	AccountID              *string          `json:"accountId,omitempty"`
+	AccountName            *string          `json:"accountName,omitempty"`
+	LocationID             *string          `json:"locationId,omitempty"`
+	LocationName           *string          `json:"locationName,omitempty"`
+	CatalogID              *string          `json:"catalogId,omitempty"`
+	CatalogName            *string          `json:"catalogName,omitempty"`
+	CustomerListID         *string          `json:"customerListId,omitempty"`
+	CustomerListName       *string          `json:"customerListName,omitempty"`
+	Features               *HubriseFeatures `json:"features"`
+	SyncCustomers          bool             `json:"syncCustomers"`
+	CatalogAutoImport      bool             `json:"catalogAutoImport"`
+	CatalogUpdateAvailable bool             `json:"catalogUpdateAvailable"`
+	CatalogPendingReview   bool             `json:"catalogPendingReview"`
+	AutoRefundOnCancel     bool             `json:"autoRefundOnCancel"`
+	CatalogLanguage        string           `json:"catalogLanguage"`
+	VariantRef             *string          `json:"variantRef,omitempty"`
+	ChannelName            *string          `json:"channelName,omitempty"`
+	DeliveryChargeRef      *string          `json:"deliveryChargeRef,omitempty"`
+	PaymentFeeChargeRef    *string          `json:"paymentFeeChargeRef,omitempty"`
+	ImportImages           bool             `json:"importImages"`
+	LastCatalogSyncAt      *time.Time       `json:"lastCatalogSyncAt,omitempty"`
+	LastEventAt            *time.Time       `json:"lastEventAt,omitempty"`
+	AuthErrorAt            *time.Time       `json:"authErrorAt,omitempty"`
+	LastError              *string          `json:"lastError,omitempty"`
+	RelinkRequired         bool             `json:"relinkRequired"`
+	Backlog                *HubriseBacklog  `json:"backlog"`
+	UnlinkedProducts       int              `json:"unlinkedProducts"`
+	Attention              int              `json:"attention"`
+}
+
+type HubriseSyncResult struct {
+	Mode          HubriseSyncMode     `json:"mode"`
+	Applied       bool                `json:"applied"`
+	PendingReview bool                `json:"pendingReview"`
+	Diff          *HubriseCatalogDiff `json:"diff"`
+	FailedBatches []string            `json:"failedBatches"`
+}
+
 type Mutation struct {
 }
 
@@ -422,26 +540,28 @@ type Payment struct {
 }
 
 type Product struct {
-	Code           *string               `json:"code,omitempty"`
-	CreatedAt      time.Time             `json:"createdAt"`
-	ID             uuid.UUID             `json:"id"`
-	IsAvailable    bool                  `json:"isAvailable"`
-	IsDiscountable bool                  `json:"isDiscountable"`
-	IsHalal        bool                  `json:"isHalal"`
-	IsLunchOnly    bool                  `json:"isLunchOnly"`
-	IsSpicy        bool                  `json:"isSpicy"`
-	IsVegetarian   bool                  `json:"isVegetarian"`
-	IsVisible      bool                  `json:"isVisible"`
-	PieceCount     *int                  `json:"pieceCount,omitempty"`
-	Price          string                `json:"price"`
-	Slug           string                `json:"slug"`
-	VatCategory    string                `json:"vatCategory"`
-	Name           string                `json:"name"`
-	Description    *string               `json:"description,omitempty"`
-	Category       *ProductCategory      `json:"category"`
-	Choices        []*ProductChoice      `json:"choices"`
-	ChoiceGroups   []*ProductChoiceGroup `json:"choiceGroups"`
-	Translations   []*Translation        `json:"translations"`
+	Code                *string               `json:"code,omitempty"`
+	CreatedAt           time.Time             `json:"createdAt"`
+	ID                  uuid.UUID             `json:"id"`
+	IsAvailable         bool                  `json:"isAvailable"`
+	IsDiscountable      bool                  `json:"isDiscountable"`
+	IsHalal             bool                  `json:"isHalal"`
+	IsLunchOnly         bool                  `json:"isLunchOnly"`
+	IsSpicy             bool                  `json:"isSpicy"`
+	IsVegetarian        bool                  `json:"isVegetarian"`
+	IsVisible           bool                  `json:"isVisible"`
+	PieceCount          *int                  `json:"pieceCount,omitempty"`
+	Price               string                `json:"price"`
+	Slug                string                `json:"slug"`
+	VatCategory         string                `json:"vatCategory"`
+	Name                string                `json:"name"`
+	Description         *string               `json:"description,omitempty"`
+	Category            *ProductCategory      `json:"category"`
+	Choices             []*ProductChoice      `json:"choices"`
+	ChoiceGroups        []*ProductChoiceGroup `json:"choiceGroups"`
+	Translations        []*Translation        `json:"translations"`
+	HubriseManaged      bool                  `json:"hubriseManaged"`
+	HubriseLockedFields []string              `json:"hubriseLockedFields"`
 }
 
 type ProductCategory struct {
@@ -461,6 +581,7 @@ type ProductChoice struct {
 	SortOrder     int                  `json:"sortOrder"`
 	Name          string               `json:"name"`
 	Translations  []*ChoiceTranslation `json:"translations"`
+	IsAvailable   bool                 `json:"isAvailable"`
 }
 
 type ProductChoiceGroup struct {
@@ -790,6 +911,305 @@ func (e *CouponStatus) UnmarshalJSON(b []byte) error {
 }
 
 func (e CouponStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type HubriseCatalogAction string
+
+const (
+	HubriseCatalogActionCreate HubriseCatalogAction = "CREATE"
+	HubriseCatalogActionUpdate HubriseCatalogAction = "UPDATE"
+	HubriseCatalogActionLink   HubriseCatalogAction = "LINK"
+	HubriseCatalogActionRetire HubriseCatalogAction = "RETIRE"
+	HubriseCatalogActionRevive HubriseCatalogAction = "REVIVE"
+)
+
+var AllHubriseCatalogAction = []HubriseCatalogAction{
+	HubriseCatalogActionCreate,
+	HubriseCatalogActionUpdate,
+	HubriseCatalogActionLink,
+	HubriseCatalogActionRetire,
+	HubriseCatalogActionRevive,
+}
+
+func (e HubriseCatalogAction) IsValid() bool {
+	switch e {
+	case HubriseCatalogActionCreate, HubriseCatalogActionUpdate, HubriseCatalogActionLink, HubriseCatalogActionRetire, HubriseCatalogActionRevive:
+		return true
+	}
+	return false
+}
+
+func (e HubriseCatalogAction) String() string {
+	return string(e)
+}
+
+func (e *HubriseCatalogAction) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HubriseCatalogAction(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HubriseCatalogAction", str)
+	}
+	return nil
+}
+
+func (e HubriseCatalogAction) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *HubriseCatalogAction) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e HubriseCatalogAction) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type HubriseCatalogEntity string
+
+const (
+	HubriseCatalogEntityCategory    HubriseCatalogEntity = "CATEGORY"
+	HubriseCatalogEntityProduct     HubriseCatalogEntity = "PRODUCT"
+	HubriseCatalogEntityChoiceGroup HubriseCatalogEntity = "CHOICE_GROUP"
+	HubriseCatalogEntityChoice      HubriseCatalogEntity = "CHOICE"
+)
+
+var AllHubriseCatalogEntity = []HubriseCatalogEntity{
+	HubriseCatalogEntityCategory,
+	HubriseCatalogEntityProduct,
+	HubriseCatalogEntityChoiceGroup,
+	HubriseCatalogEntityChoice,
+}
+
+func (e HubriseCatalogEntity) IsValid() bool {
+	switch e {
+	case HubriseCatalogEntityCategory, HubriseCatalogEntityProduct, HubriseCatalogEntityChoiceGroup, HubriseCatalogEntityChoice:
+		return true
+	}
+	return false
+}
+
+func (e HubriseCatalogEntity) String() string {
+	return string(e)
+}
+
+func (e *HubriseCatalogEntity) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HubriseCatalogEntity(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HubriseCatalogEntity", str)
+	}
+	return nil
+}
+
+func (e HubriseCatalogEntity) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *HubriseCatalogEntity) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e HubriseCatalogEntity) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type HubriseOutboxKind string
+
+const (
+	HubriseOutboxKindOrderCreate       HubriseOutboxKind = "ORDER_CREATE"
+	HubriseOutboxKindOrderStatus       HubriseOutboxKind = "ORDER_STATUS"
+	HubriseOutboxKindInventory         HubriseOutboxKind = "INVENTORY"
+	HubriseOutboxKindCustomer          HubriseOutboxKind = "CUSTOMER"
+	HubriseOutboxKindCustomerAnonymise HubriseOutboxKind = "CUSTOMER_ANONYMISE"
+)
+
+var AllHubriseOutboxKind = []HubriseOutboxKind{
+	HubriseOutboxKindOrderCreate,
+	HubriseOutboxKindOrderStatus,
+	HubriseOutboxKindInventory,
+	HubriseOutboxKindCustomer,
+	HubriseOutboxKindCustomerAnonymise,
+}
+
+func (e HubriseOutboxKind) IsValid() bool {
+	switch e {
+	case HubriseOutboxKindOrderCreate, HubriseOutboxKindOrderStatus, HubriseOutboxKindInventory, HubriseOutboxKindCustomer, HubriseOutboxKindCustomerAnonymise:
+		return true
+	}
+	return false
+}
+
+func (e HubriseOutboxKind) String() string {
+	return string(e)
+}
+
+func (e *HubriseOutboxKind) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HubriseOutboxKind(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HubriseOutboxKind", str)
+	}
+	return nil
+}
+
+func (e HubriseOutboxKind) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *HubriseOutboxKind) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e HubriseOutboxKind) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type HubriseOutboxState string
+
+const (
+	HubriseOutboxStatePending HubriseOutboxState = "PENDING"
+	HubriseOutboxStateSending HubriseOutboxState = "SENDING"
+	HubriseOutboxStateSent    HubriseOutboxState = "SENT"
+	HubriseOutboxStateParked  HubriseOutboxState = "PARKED"
+	HubriseOutboxStateSkipped HubriseOutboxState = "SKIPPED"
+)
+
+var AllHubriseOutboxState = []HubriseOutboxState{
+	HubriseOutboxStatePending,
+	HubriseOutboxStateSending,
+	HubriseOutboxStateSent,
+	HubriseOutboxStateParked,
+	HubriseOutboxStateSkipped,
+}
+
+func (e HubriseOutboxState) IsValid() bool {
+	switch e {
+	case HubriseOutboxStatePending, HubriseOutboxStateSending, HubriseOutboxStateSent, HubriseOutboxStateParked, HubriseOutboxStateSkipped:
+		return true
+	}
+	return false
+}
+
+func (e HubriseOutboxState) String() string {
+	return string(e)
+}
+
+func (e *HubriseOutboxState) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HubriseOutboxState(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HubriseOutboxState", str)
+	}
+	return nil
+}
+
+func (e HubriseOutboxState) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *HubriseOutboxState) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e HubriseOutboxState) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type HubriseSyncMode string
+
+const (
+	HubriseSyncModeDryRun   HubriseSyncMode = "DRY_RUN"
+	HubriseSyncModeLinkOnly HubriseSyncMode = "LINK_ONLY"
+	HubriseSyncModeFull     HubriseSyncMode = "FULL"
+)
+
+var AllHubriseSyncMode = []HubriseSyncMode{
+	HubriseSyncModeDryRun,
+	HubriseSyncModeLinkOnly,
+	HubriseSyncModeFull,
+}
+
+func (e HubriseSyncMode) IsValid() bool {
+	switch e {
+	case HubriseSyncModeDryRun, HubriseSyncModeLinkOnly, HubriseSyncModeFull:
+		return true
+	}
+	return false
+}
+
+func (e HubriseSyncMode) String() string {
+	return string(e)
+}
+
+func (e *HubriseSyncMode) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HubriseSyncMode(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HubriseSyncMode", str)
+	}
+	return nil
+}
+
+func (e HubriseSyncMode) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *HubriseSyncMode) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e HubriseSyncMode) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

@@ -26,6 +26,7 @@ import (
 	addressApplication "tsb-service/internal/modules/address/application"
 	assistantApplication "tsb-service/internal/modules/assistant/application"
 	couponApplication "tsb-service/internal/modules/coupon/application"
+	hubriseApplication "tsb-service/internal/modules/hubrise/application"
 	notificationApplication "tsb-service/internal/modules/notification/application"
 	orderApplication "tsb-service/internal/modules/order/application"
 	paymentApplication "tsb-service/internal/modules/payment/application"
@@ -67,6 +68,9 @@ type Resolver struct {
 	// AvailabilityChanged, ProductGuard) in hubrise_hooks.go. Set after NewResolver, and only to a
 	// non-nil implementation (a nil pointer inside the interface would defeat the nil checks).
 	Hubrise HubriseHooks
+	// HubriseAdmin is the connection management behind the hubrise* GraphQL operations; nil unless
+	// HubRise is configured on this deployment (hubriseStatus then answers available = false).
+	HubriseAdmin *hubriseApplication.Admin
 }
 
 // NewResolver constructs the Resolver with required services.
@@ -212,7 +216,7 @@ func GraphQLHandler(resolver *Resolver, allowedOrigins []string, oidcVerifier *m
 
 	return func(c *gin.Context) {
 		// Hand the trusted-proxy-aware client IP to the resolvers (per-IP limits on public queries).
-		c.Request = c.Request.WithContext(utils.SetClientIP(c.Request.Context(), c.ClientIP()))
+		c.Request = c.Request.WithContext(AttachHubriseLoaders(utils.SetClientIP(c.Request.Context(), c.ClientIP()), resolver))
 		h.ServeHTTP(c.Writer, c.Request)
 	}
 }

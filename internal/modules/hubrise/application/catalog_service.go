@@ -50,6 +50,9 @@ type SyncRequest struct {
 	// Scheduled marks an import started by a worker: it counts as background traffic for the rate
 	// limiter and never carries a confirmation, so a mass retirement waits for a human.
 	Scheduled bool
+	// PlanOnly plans the mode and returns the diff without writing anything and without recording
+	// a preview: what Preview does for LINK_ONLY.
+	PlanOnly bool
 }
 
 // SyncResult is what an import did (or, for a dry run, would do).
@@ -140,7 +143,7 @@ func (s *CatalogService) Sync(ctx context.Context, req SyncRequest) (*SyncResult
 	if conn.RelinkRequiredAt != nil {
 		return nil, domain.ErrRelinkRequired
 	}
-	if req.Mode != domain.SyncDryRun && !conn.Enabled {
+	if req.Mode != domain.SyncDryRun && !req.PlanOnly && !conn.Enabled {
 		return nil, domain.ErrNotEnabled
 	}
 
@@ -168,6 +171,9 @@ func (s *CatalogService) Sync(ctx context.Context, req SyncRequest) (*SyncResult
 	diff := Plan(PlanInput{Catalog: cat, Local: snapshot, Links: NewLinkIndex(links), Mode: req.Mode})
 	res := &SyncResult{Mode: req.Mode, Diff: diff, Warnings: diff.Warnings}
 
+	if req.PlanOnly {
+		return res, nil
+	}
 	if req.Mode == domain.SyncDryRun {
 		return res, s.Connections.RecordCatalogPreview(ctx, diff.CatalogHash, s.now())
 	}
@@ -215,6 +221,17 @@ func (s *CatalogService) Sync(ctx context.Context, req SyncRequest) (*SyncResult
 		}
 	}
 	return res, nil
+}
+
+// Preview plans an import without writing anything. FULL and DRY_RUN show what a full import would
+// do and record the catalog as previewed, which is what enabling catalog sync asks for. LINK_ONLY
+// shows the links that import would record and does not count as that preview, because it says
+// nothing about the products a full import would create or retire.
+func (s *CatalogService) Preview(ctx context.Context, mode domain.SyncMode) (*SyncResult, error) {
+	if mode == domain.SyncLinkOnly {
+		return s.Sync(ctx, SyncRequest{Mode: mode, PlanOnly: true})
+	}
+	return s.Sync(ctx, SyncRequest{Mode: domain.SyncDryRun})
 }
 
 func (s *CatalogService) allLinks(ctx context.Context) ([]domain.CatalogLink, error) {
@@ -321,6 +338,17 @@ func (s *CatalogService) CheckDrift(ctx context.Context) (*DriftOutcome, error) 
 	}
 	out.Imported, out.PendingReview = res.Applied, res.PendingReview
 	return out, nil
+}
+
+// DriftChecker adapts CheckDrift to the CatalogDriftChecker port of the drift job, which only wants
+// to know whether the check ran.
+func (s *CatalogService) DriftChecker() CatalogDriftChecker { return driftChecker{s} }
+
+type driftChecker struct{ s *CatalogService }
+
+func (d driftChecker) CheckDrift(ctx context.Context) error {
+	_, err := d.s.CheckDrift(ctx)
+	return err
 }
 
 // CheckEnableSyncCatalog says whether catalog sync may be switched on: the connection must not wait
@@ -444,7 +472,7 @@ func (s *CatalogService) LinkProduct(ctx context.Context, productID uuid.UUID, s
 	ref := strings.TrimSpace(*skuRef)
 	if other, err := s.Links.FindByKey(ctx, domain.EntityProduct, ref); err == nil {
 		if other.LocalID() != productID {
-			return fmt.Errorf("hubrise: SKU %q is already linked to another product", ref)
+			return fmt.Errorf("%w: %q", domain.ErrSKULinked, ref)
 		}
 	} else if !errors.Is(err, domain.ErrNotFound) {
 		return err

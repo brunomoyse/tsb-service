@@ -353,6 +353,7 @@ func (r *mutationResolver) CreateProductChoice(ctx context.Context, input model.
 		ChoiceGroupID: group.ID,
 		PriceModifier: priceMod,
 		SortOrder:     input.SortOrder,
+		IsAvailable:   true, // a new choice is on sale; only HubRise inventory or catalog change that
 		Translations:  translations,
 	}
 
@@ -518,6 +519,20 @@ func (r *productResolver) Translations(ctx context.Context, obj *model.Product) 
 	}
 
 	return translations, nil
+}
+
+// HubriseManaged is the resolver for the hubriseManaged field.
+func (r *productResolver) HubriseManaged(ctx context.Context, obj *model.Product) (bool, error) {
+	return r.hubriseManaged(ctx, obj.ID)
+}
+
+// HubriseLockedFields is the resolver for the hubriseLockedFields field.
+func (r *productResolver) HubriseLockedFields(ctx context.Context, obj *model.Product) ([]string, error) {
+	managed, err := r.hubriseManaged(ctx, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+	return hubriseLockedFields(managed, obj), nil
 }
 
 // Products is the resolver for the products field.

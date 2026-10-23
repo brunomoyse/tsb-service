@@ -146,6 +146,11 @@ func (r *connectionRepository) SetInventoryBaseline(ctx context.Context, at time
 		`UPDATE hubrise_connection SET inventory_baseline_at = $1, updated_at = now()`, at)
 }
 
+func (r *connectionRepository) ResetInventoryBaseline(ctx context.Context) error {
+	return r.mustUpdate(ctx, "reset inventory baseline",
+		`UPDATE hubrise_connection SET inventory_baseline_at = NULL, updated_at = now()`)
+}
+
 func (r *connectionRepository) SetRelinkRequired(ctx context.Context, at *time.Time) error {
 	return r.mustUpdate(ctx, "set relink required",
 		`UPDATE hubrise_connection SET relink_required_at = $1, updated_at = now()`, at)

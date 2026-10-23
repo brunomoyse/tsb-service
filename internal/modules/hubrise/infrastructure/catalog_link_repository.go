@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/shopspring/decimal"
 
 	"tsb-service/internal/modules/hubrise/domain"
@@ -153,6 +154,33 @@ func (r *catalogLinkRepository) Delete(ctx context.Context, id int64) error {
 
 func (r *catalogLinkRepository) DeleteAll(ctx context.Context) (int64, error) {
 	return r.execN(ctx, "delete all catalog links", `DELETE FROM hubrise_catalog_links`)
+}
+
+func (r *catalogLinkRepository) LinkedProductIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
+	out := map[uuid.UUID]bool{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	var linked []uuid.UUID
+	if err := r.sel(ctx, "list linked products", &linked, `
+		SELECT product_id FROM hubrise_catalog_links
+		WHERE entity_type = 'product' AND retired_at IS NULL AND product_id = ANY($1)`, pq.Array(ids)); err != nil {
+		return nil, err
+	}
+	for _, id := range linked {
+		out[id] = true
+	}
+	return out, nil
+}
+
+func (r *catalogLinkRepository) CountUnlinkedProducts(ctx context.Context) (int, error) {
+	var n int
+	err := r.get(ctx, "count unlinked products", &n, `
+		SELECT count(*) FROM products p
+		WHERE p.is_visible AND NOT EXISTS (
+			SELECT 1 FROM hubrise_catalog_links l
+			WHERE l.entity_type = 'product' AND l.product_id = p.id AND l.retired_at IS NULL)`)
+	return n, err
 }
 
 // mustChange runs a statement that must hit one link, and returns ErrNotFound otherwise.

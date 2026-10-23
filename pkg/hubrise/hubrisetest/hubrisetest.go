@@ -133,6 +133,9 @@ type Server struct {
 	inventory []hubrise.InventoryEntry
 	images    map[string]image
 
+	// target overrides what the token endpoint says the authorization gives access to.
+	target *OAuthTarget
+
 	faults  []*Fault
 	log     []Request
 	limits  Limits

@@ -168,4 +168,10 @@ type CatalogLinkRepository interface {
 	Delete(ctx context.Context, id int64) error
 	// DeleteAll removes every link (the local rows stay) and returns how many.
 	DeleteAll(ctx context.Context) (int64, error)
+	// LinkedProductIDs returns, among ids, the products that have a live (not retired) link: the
+	// ones HubRise manages when catalog sync is on.
+	LinkedProductIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error)
+	// CountUnlinkedProducts counts the visible products that have no live link: the ones an order
+	// would carry without a SKU ref.
+	CountUnlinkedProducts(ctx context.Context) (int, error)
 }

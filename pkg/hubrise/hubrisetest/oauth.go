@@ -86,11 +86,15 @@ func (s *Server) oauthToken(w http.ResponseWriter, r *http.Request) {
 	delete(s.codes, code) // one use
 	// Authorizing the same location again with the same client gives the same token.
 	delete(s.revoked, Token)
-	writeJSON(w, http.StatusOK, hubrise.TokenResponse{
+	tok := hubrise.TokenResponse{
 		AccessToken: Token, TokenType: "Bearer",
 		AccountID: AccountID, LocationID: LocationID, CatalogID: CatalogID, CustomerListID: CustomerListID,
 		AccountName: AccountName, LocationName: LocationName, CatalogName: CatalogName, CustomerListName: CustomerList,
-	})
+	}
+	if t := s.target; t != nil {
+		tok.LocationID, tok.LocationName, tok.CatalogID, tok.CatalogName = t.LocationID, t.LocationName, t.CatalogID, t.CatalogName
+	}
+	writeJSON(w, http.StatusOK, tok)
 }
 
 func (s *Server) oauthRevoke(w http.ResponseWriter, r *http.Request) {
@@ -108,4 +112,18 @@ func (s *Server) oauthRevoke(w http.ResponseWriter, r *http.Request) {
 	}
 	s.revoked[token] = true
 	writeJSON(w, http.StatusOK, map[string]any{})
+}
+
+// OAuthTarget is the location and catalog the token endpoint reports.
+type OAuthTarget struct {
+	LocationID, LocationName string
+	CatalogID, CatalogName   string
+}
+
+// SetOAuthTarget makes the next authorizations give access to another location and catalog, as if
+// the admin had picked a different one in HubRise. nil restores the default.
+func (s *Server) SetOAuthTarget(t *OAuthTarget) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.target = t
 }

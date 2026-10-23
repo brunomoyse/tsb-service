@@ -9,8 +9,10 @@ import (
 	"go.uber.org/zap"
 
 	"tsb-service/internal/api/graphql/apperr"
+	hubriseApplication "tsb-service/internal/modules/hubrise/application"
 	hubriseDomain "tsb-service/internal/modules/hubrise/domain"
 	productDomain "tsb-service/internal/modules/product/domain"
+	pkghubrise "tsb-service/pkg/hubrise"
 	"tsb-service/pkg/logging"
 	"tsb-service/pkg/utils"
 )
@@ -110,11 +112,27 @@ func HubriseError(err error) error {
 		return apperr.New(apperr.CodeHubriseRetireConfirmRequired, confirm.Error()).
 			With("retiring", confirm.Retiring).With("linked", confirm.Linked)
 	}
+	if invalid, ok := errors.AsType[*hubriseDomain.InvalidSettingError](err); ok {
+		return apperr.New(apperr.CodeUserError, invalid.Message).With("field", invalid.Field)
+	}
+	if he, ok := errors.AsType[*pkghubrise.Error](err); ok {
+		return hubriseUpstream(he)
+	}
 	switch {
 	case errors.Is(err, hubriseDomain.ErrRelinkRequired):
 		return apperr.New(apperr.CodeHubriseRelinkRequired, err.Error())
 	case errors.Is(err, hubriseDomain.ErrPreviewRequired):
 		return apperr.New(apperr.CodeHubrisePreviewRequired, err.Error())
+	case errors.Is(err, hubriseDomain.ErrNotConnected):
+		return apperr.New(apperr.CodeHubriseNotConnected, "HubRise is not connected")
+	case errors.Is(err, hubriseDomain.ErrNotEnabled):
+		return apperr.New(apperr.CodeHubriseNotEnabled, "the HubRise integration is not enabled")
+	case errors.Is(err, hubriseDomain.ErrEmptyCatalog):
+		return apperr.New(apperr.CodeHubriseEmptyCatalog, "the HubRise catalog has no product")
+	case errors.Is(err, hubriseDomain.ErrImportInProgress), errors.Is(err, hubriseApplication.ErrInventoryBusy):
+		return apperr.New(apperr.CodeHubriseBusy, "another HubRise synchronization is running, try again in a moment")
+	case errors.Is(err, hubriseDomain.ErrSKULinked):
+		return apperr.New(apperr.CodeHubriseSKULinked, "that HubRise SKU is already linked to another product")
 	}
 	return err
 }

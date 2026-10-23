@@ -8,6 +8,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ import (
 	"tsb-service/internal/modules/hubrise/domain"
 	"tsb-service/internal/modules/hubrise/infrastructure"
 	"tsb-service/internal/modules/hubrise/infrastructure/tokencrypt"
+	"tsb-service/pkg/hubrise"
 )
 
 // Module holds the ports of the integration, wired to the admin database pool.
@@ -38,6 +40,8 @@ type Module struct {
 	// CustomerLinks and Customers link shop users to their HubRise customers and read their profiles.
 	CustomerLinks domain.CustomerLinkRepository
 	Customers     domain.CustomerSource
+	// Local reads and writes the shop's own menu for the catalog import.
+	Local domain.LocalCatalogRepository
 }
 
 // NewModule builds the module on the admin pool (the hubrise tables get no per-role grants). It
@@ -71,6 +75,7 @@ func NewModule(cfg Config, adminDB *sqlx.DB, clock domain.Clock) (*Module, error
 
 		CustomerLinks: infrastructure.NewCustomerLinkRepository(adminDB),
 		Customers:     infrastructure.NewCustomerSource(adminDB),
+		Local:         infrastructure.NewLocalCatalogRepository(adminDB),
 	}, nil
 }
 
@@ -278,4 +283,93 @@ func (i *Inventory) Run(ctx context.Context) {
 		}()
 	}
 	wg.Wait()
+}
+
+// CatalogOptions customizes NewCatalog; every field is optional.
+type CatalogOptions struct {
+	// Clients overrides the provider of the push.
+	Clients application.ClientProvider
+	// Notifier publishes productUpdated for the products an import changed (the resolver).
+	Notifier application.CatalogNotifier
+	// Images stores imported product images; without it nothing is downloaded.
+	Images application.ImageUploader
+	// Holder identifies this process in the import lease (a random one by default).
+	Holder string
+}
+
+// Catalog is the catalog side of the integration: the import service and the ownership guard that
+// refuses edits of the fields HubRise owns.
+type Catalog struct {
+	Service *application.CatalogService
+	Guard   *application.Guard
+	// Drift is the catalog service as the drift job's port (see InventoryOptions.Drift).
+	Drift application.CatalogDriftChecker
+}
+
+// NewCatalog builds the catalog import on the module's repositories.
+func (m *Module) NewCatalog(push *Push, o CatalogOptions) *Catalog {
+	clients := o.Clients
+	if clients == nil {
+		clients = push.Clients
+	}
+	svc := &application.CatalogService{
+		Connections: m.Connections, Links: m.CatalogLinks, Leases: m.Leases, Local: m.Local, Clock: m.Clock,
+		NewClient: func(conn *domain.Connection) (application.CatalogAPI, error) {
+			c, err := clients.Client(context.Background(), conn)
+			if err != nil {
+				return nil, err
+			}
+			return c, nil
+		},
+		Notifier: o.Notifier, Images: o.Images, Holder: cmp.Or(o.Holder, uuid.NewString()),
+	}
+	return &Catalog{Service: svc, Guard: &application.Guard{Connections: m.Connections, Links: m.CatalogLinks}, Drift: svc.DriftChecker()}
+}
+
+// AdminOptions customizes NewAdmin.
+type AdminOptions struct {
+	// Clients overrides the provider of the push.
+	Clients application.ClientProvider
+	// TokenClient opens a client for a freshly issued token; the default talks to Config.APIBaseURL.
+	TokenClient func(token string) (*hubrise.Client, error)
+	// OAuthHTTP is the HTTP client of the authorization server calls (tests point it at the mock).
+	OAuthHTTP *http.Client
+	// APIBaseURL is the public base URL of this API (API_BASE_URL): the callback and the OAuth
+	// redirect URLs are derived from it.
+	APIBaseURL string
+	// Inventory is the inventory service, when the sold-out sync is wired.
+	Inventory *application.InventoryService
+	// Audit records the connect and disconnect entries.
+	Audit application.AuditFunc
+}
+
+// NewAdmin builds the connection management: the OAuth connection, the settings, the disconnection
+// and the operations behind the GraphQL admin API.
+func (m *Module) NewAdmin(push *Push, catalog *Catalog, o AdminOptions) (*application.Admin, error) {
+	callback, redirect, err := application.CallbackURLFor(o.APIBaseURL)
+	if err != nil {
+		return nil, err
+	}
+	var oauthOpts []hubrise.OAuthOption
+	if o.OAuthHTTP != nil {
+		oauthOpts = append(oauthOpts, hubrise.WithOAuthHTTPClient(o.OAuthHTTP))
+	}
+	oauth, err := hubrise.NewOAuth(m.Config.OAuthBaseURL, m.Config.ClientID, string(m.Config.ClientSecret), oauthOpts...)
+	if err != nil {
+		return nil, err
+	}
+	clients := o.Clients
+	if clients == nil {
+		clients = push.Clients
+	}
+	tokenClient := o.TokenClient
+	if tokenClient == nil {
+		tokenClient = func(token string) (*hubrise.Client, error) { return hubrise.New(m.Config.APIBaseURL, token) }
+	}
+	return application.NewAdmin(application.AdminDeps{
+		Config: application.AdminConfig{RedirectURL: redirect, CallbackURL: callback},
+		OAuth:  oauth, Connections: m.Connections, OAuthStates: m.OAuthStates, Links: m.CatalogLinks, Orders: m.Orders,
+		Outbox: m.Outbox, Codec: m.Codec, Clients: clients, TokenClient: tokenClient, Catalog: catalog.Service,
+		Inventory: o.Inventory, Clock: m.Clock, Audit: o.Audit, Wake: push.Worker.Wake,
+	}), nil
 }

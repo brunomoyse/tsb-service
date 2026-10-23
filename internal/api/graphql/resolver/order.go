@@ -483,6 +483,11 @@ func (r *orderResolver) StatusHistory(ctx context.Context, obj *model.Order) ([]
 	return result, nil
 }
 
+// Hubrise is the resolver for the hubrise field.
+func (r *orderResolver) Hubrise(ctx context.Context, obj *model.Order) (*model.HubriseOrderInfo, error) {
+	return r.hubriseOrderInfo(ctx, obj.ID)
+}
+
 // DisplayCustomerName is the resolver for the displayCustomerName field.
 func (r *orderResolver) DisplayCustomerName(ctx context.Context, obj *model.Order) (string, error) {
 	customer, err := r.Customer(ctx, obj)
