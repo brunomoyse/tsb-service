@@ -15,6 +15,9 @@ CREATE TABLE hubrise_orders (
     last_remote_event_at  TIMESTAMPTZ,
     -- Set when we send a status PATCH (HubRise does not echo our own changes back to us).
     last_local_patch_at   TIMESTAMPTZ,
+    -- The confirmed_time (estimated ready time) last seen at HubRise: it is applied to the local
+    -- order only when HubRise changes it, so a ready time edited locally afterwards is kept.
+    last_remote_confirmed_time TIMESTAMPTZ,
     remote_total          NUMERIC(10, 2),
     needs_attention       TEXT,
     -- Set once staff were told that HubRise still had the order as new (the alert is sent once).

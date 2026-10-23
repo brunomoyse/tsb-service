@@ -125,6 +125,20 @@ func (o faultyOrders) HasUnsettledCreate(ctx context.Context) (bool, error) {
 	return o.OrderLinkRepository.HasUnsettledCreate(ctx)
 }
 
+func (o faultyOrders) HasQueuedStatus(ctx context.Context, id uuid.UUID) (bool, error) {
+	if err := o.f.hit("HasQueuedStatus"); err != nil {
+		return false, err
+	}
+	return o.OrderLinkRepository.HasQueuedStatus(ctx, id)
+}
+
+func (o faultyOrders) RecordRemoteConfirmedTime(ctx context.Context, id uuid.UUID, t time.Time) error {
+	if err := o.f.hit("RecordRemoteConfirmedTime"); err != nil {
+		return err
+	}
+	return o.OrderLinkRepository.RecordRemoteConfirmedTime(ctx, id, t)
+}
+
 type faultySource struct {
 	domain.OrderSource
 	f *injector
@@ -265,6 +279,7 @@ func TestTheStatusSyncReportsEveryDatabaseFailure(t *testing.T) {
 	}{
 		{"link lookup", "Get", id, pkghubrise.StatusAccepted, 0, nil},
 		{"lease", "Acquire", id, pkghubrise.StatusAccepted, 0, nil},
+		{"queued status check", "HasQueuedStatus", id, pkghubrise.StatusAccepted, 0, nil},
 		{"record remote status", "RecordRemoteStatus", id, pkghubrise.StatusAccepted, 0, nil},
 		{"clear flag", "ClearAttention", id, pkghubrise.StatusAccepted, 0, func() {
 			s.exec(`UPDATE hubrise_orders SET needs_attention = 'NOT_ACCEPTED' WHERE order_id = $1`, id)
@@ -287,6 +302,15 @@ func TestTheStatusSyncReportsEveryDatabaseFailure(t *testing.T) {
 		})
 	}
 
+	t.Run("record the remote confirmed time", func(t *testing.T) {
+		timed := s.pushed(orderSpec{})
+		o := remote(timed, pkghubrise.StatusReceived)
+		ct := s.clock.Now().Add(20 * time.Minute)
+		o.ConfirmedTime = &ct
+		b := s.withFaults(application.EventProcessorConfig{})
+		b.f.on("RecordRemoteConfirmedTime")
+		require.ErrorIs(t, b.sync.ApplyRemote(t.Context(), timed, o), errBoom)
+	})
 	t.Run("an unknown order is nothing to do", func(t *testing.T) {
 		b := s.withFaults(application.EventProcessorConfig{})
 		require.NoError(t, b.sync.ApplyRemote(t.Context(), uuid.New(), remote(id, pkghubrise.StatusAccepted)))

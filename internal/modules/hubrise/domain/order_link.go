@@ -30,11 +30,13 @@ type OrderLink struct {
 	// LastRemoteEventAt is set only from remote event or remote GET data, never from our clock.
 	LastRemoteEventAt *time.Time `db:"last_remote_event_at"`
 	// LastLocalPatchAt is set when we send a status PATCH.
-	LastLocalPatchAt *time.Time       `db:"last_local_patch_at"`
-	RemoteTotal      *decimal.Decimal `db:"remote_total"`
-	NeedsAttention   *string          `db:"needs_attention"`
-	CreatedAt        time.Time        `db:"created_at"`
-	UpdatedAt        time.Time        `db:"updated_at"`
+	LastLocalPatchAt *time.Time `db:"last_local_patch_at"`
+	// LastRemoteConfirmedTime is the confirmed_time last seen at HubRise.
+	LastRemoteConfirmedTime *time.Time       `db:"last_remote_confirmed_time"`
+	RemoteTotal             *decimal.Decimal `db:"remote_total"`
+	NeedsAttention          *string          `db:"needs_attention"`
+	CreatedAt               time.Time        `db:"created_at"`
+	UpdatedAt               time.Time        `db:"updated_at"`
 }
 
 // OrderLinkRepository stores the order links.
@@ -61,6 +63,12 @@ type OrderLinkRepository interface {
 	RecordRemoteStatus(ctx context.Context, orderID uuid.UUID, status string, eventAt *time.Time) error
 	// RecordLocalPatch stamps a status PATCH we sent and the status it carried.
 	RecordLocalPatch(ctx context.Context, orderID uuid.UUID, status string, at time.Time) error
+	// RecordRemoteConfirmedTime stores the confirmed_time last seen at HubRise (the remote value
+	// the local estimated ready time was last aligned with).
+	RecordRemoteConfirmedTime(ctx context.Context, orderID uuid.UUID, t time.Time) error
+	// HasQueuedStatus reports whether a status PATCH of the order is still queued or being sent: the
+	// local status is then ahead of HubRise, and an older remote status must not move it back.
+	HasQueuedStatus(ctx context.Context, orderID uuid.UUID) (bool, error)
 	// SetRemoteTotal stores the total HubRise computed.
 	SetRemoteTotal(ctx context.Context, orderID uuid.UUID, total decimal.Decimal) error
 	// SetNeedsAttention flags the order for staff (empty clears the flag).

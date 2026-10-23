@@ -15,7 +15,7 @@ import (
 )
 
 const orderLinkColumns = `order_id, hubrise_order_id, push_state, pushed_at, last_remote_status, last_remote_event_at,
-	last_local_patch_at, remote_total, needs_attention, created_at, updated_at`
+	last_local_patch_at, last_remote_confirmed_time, remote_total, needs_attention, created_at, updated_at`
 
 type orderLinkRepository struct{ store }
 
@@ -86,7 +86,7 @@ func (r *orderLinkRepository) SetPushState(ctx context.Context, orderID uuid.UUI
 func (r *orderLinkRepository) ResetToPending(ctx context.Context, orderID uuid.UUID) error {
 	return r.mustChange(ctx, "reset order link", `
 		UPDATE hubrise_orders SET hubrise_order_id = NULL, push_state = 'pending', pushed_at = NULL,
-			last_remote_status = NULL, updated_at = now()
+			last_remote_status = NULL, last_remote_confirmed_time = NULL, updated_at = now()
 		WHERE order_id = $1`, orderID)
 }
 
@@ -101,6 +101,18 @@ func (r *orderLinkRepository) RecordLocalPatch(ctx context.Context, orderID uuid
 	return r.mustChange(ctx, "record local patch", `
 		UPDATE hubrise_orders SET last_remote_status = $2, last_local_patch_at = $3, updated_at = now()
 		WHERE order_id = $1`, orderID, status, at)
+}
+
+func (r *orderLinkRepository) RecordRemoteConfirmedTime(ctx context.Context, orderID uuid.UUID, t time.Time) error {
+	return r.mustChange(ctx, "record remote confirmed time",
+		`UPDATE hubrise_orders SET last_remote_confirmed_time = $2, updated_at = now() WHERE order_id = $1`, orderID, t)
+}
+
+func (r *orderLinkRepository) HasQueuedStatus(ctx context.Context, orderID uuid.UUID) (bool, error) {
+	var queued bool
+	err := r.get(ctx, "check queued status", &queued, `
+		SELECT EXISTS (SELECT 1 FROM hubrise_outbox WHERE order_id = $1 AND kind = 'order_status' AND state IN ('pending', 'sending'))`, orderID)
+	return queued, err
 }
 
 func (r *orderLinkRepository) SetRemoteTotal(ctx context.Context, orderID uuid.UUID, total decimal.Decimal) error {
@@ -151,7 +163,7 @@ func (r *orderLinkRepository) Recreate(ctx context.Context, orderID uuid.UUID, p
 	}
 	res, err := tx.ExecContext(ctx, `
 		UPDATE hubrise_orders SET hubrise_order_id = NULL, push_state = 'pending', pushed_at = NULL,
-			last_remote_status = NULL, last_remote_event_at = NULL, remote_total = NULL, updated_at = now()
+			last_remote_status = NULL, last_remote_event_at = NULL, last_remote_confirmed_time = NULL, remote_total = NULL, updated_at = now()
 		WHERE order_id = $1`, orderID)
 	if err != nil {
 		return fmt.Errorf("hubrise: recreate order: %w", err)

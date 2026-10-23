@@ -37,6 +37,10 @@ type OrderTransitioner interface {
 // errOrderBusy means another process is applying a change to the same order right now.
 var errOrderBusy = errors.New("hubrise: the order is being updated elsewhere")
 
+// errStatusQueued means a status PATCH of the order is still waiting to leave: the local status is
+// ahead of HubRise, so what HubRise says now is older than the local order and must wait.
+var errStatusQueued = errors.New("hubrise: a status change of the order is waiting to be sent")
+
 // orderLeaseTTL bounds how long the per order lease of an inbound change is held. A cancel with a
 // Mollie refund is the slowest thing it covers.
 const orderLeaseTTL = 2 * time.Minute
@@ -94,7 +98,7 @@ func (s *StatusSync) ApplyRemote(ctx context.Context, orderID uuid.UUID, remote 
 		return err
 	}
 	err = s.apply(ctx, conn, link, remote, nil)
-	if errors.Is(err, errOrderBusy) {
+	if errors.Is(err, errOrderBusy) || errors.Is(err, errStatusQueued) {
 		return nil
 	}
 	return err
@@ -119,13 +123,22 @@ func (s *StatusSync) apply(ctx context.Context, conn *domain.Connection, link *d
 	return s.applyLocked(ctx, conn, link, remote, eventAt)
 }
 
-// applyLocked records what HubRise says and moves the local order accordingly. The remote status is
-// recorded first: it is a fact about HubRise whatever happens to the local order, and it keeps the
+// applyLocked records what HubRise says and moves the local order accordingly. It gives way to a
+// status PATCH of ours that is still queued (errStatusQueued): the remote state is older than the
+// local one, and the processor or the reconciler looks again once the PATCH has gone out. The
+// remote status is recorded first: it is a fact about HubRise whatever happens to the local order, and it keeps the
 // outbound side from sending an older status back over it.
 func (s *StatusSync) applyLocked(ctx context.Context, conn *domain.Connection, link *domain.OrderLink, remote *hubrise.Order, eventAt *time.Time) error {
 	orderID := link.OrderID
 	log := logging.FromContext(ctx).With(zap.String("order_id", orderID.String()))
 	status := remote.Status.Canonical()
+	queued, err := s.d.Orders.HasQueuedStatus(ctx, orderID)
+	if err != nil {
+		return err
+	}
+	if queued {
+		return errStatusQueued
+	}
 	if err := s.d.Orders.RecordRemoteStatus(ctx, orderID, string(status), nil); err != nil {
 		return err
 	}
@@ -170,7 +183,7 @@ func (s *StatusSync) applyLocked(ctx context.Context, conn *domain.Connection, l
 		}
 		change.Status = ""
 	}
-	if t := readyTimeChange(remote, state, status, change.Status); t != nil {
+	if t := readyTimeChange(link, remote, state, status, change.Status); t != nil {
 		change.EstimatedReadyTime = t
 	}
 
@@ -182,6 +195,11 @@ func (s *StatusSync) applyLocked(ctx context.Context, conn *domain.Connection, l
 			return err
 		}
 		log.Info("hubrise: remote change applied", zap.String("status", change.Status), zap.String("remote", string(status)))
+	}
+	if ct := remote.ConfirmedTime; ct != nil && !ct.IsZero() && !sameSecond(link.LastRemoteConfirmedTime, *ct) {
+		if err := s.d.Orders.RecordRemoteConfirmedTime(ctx, orderID, *ct); err != nil {
+			return err
+		}
 	}
 	if eventAt != nil {
 		return s.d.Orders.RecordRemoteStatus(ctx, orderID, string(status), eventAt)
@@ -202,14 +220,20 @@ func (s *StatusSync) cancelDecision(ctx context.Context, conn *domain.Connection
 	return "", s.d.Orders.SetNeedsAttention(ctx, orderID, domain.AttentionRemoteCancelledPaid)
 }
 
-// readyTimeChange returns the new estimated ready time when HubRise confirmed a different one for
-// an order that stays alive.
-func readyTimeChange(remote *hubrise.Order, state *domain.OrderState, status hubrise.OrderStatus, newStatus string) *time.Time {
+// sameSecond reports whether a is set and equals b to the second (HubRise times have that precision).
+func sameSecond(a *time.Time, b time.Time) bool {
+	return a != nil && a.Truncate(time.Second).Equal(b.Truncate(time.Second))
+}
+
+// readyTimeChange returns the new estimated ready time when HubRise changed the confirmed time of an
+// order that stays alive. A confirmed time already seen (the link remembers it) is not applied
+// again: the ready time may have been edited locally since, and local edits are never sent back.
+func readyTimeChange(link *domain.OrderLink, remote *hubrise.Order, state *domain.OrderState, status hubrise.OrderStatus, newStatus string) *time.Time {
 	if remote.ConfirmedTime == nil || remote.ConfirmedTime.IsZero() || status.Final() ||
 		domain.IsTerminalLocal(state.Status) || newStatus == domain.LocalCancelled {
 		return nil
 	}
-	if state.EstimatedReadyTime != nil && state.EstimatedReadyTime.Truncate(time.Second).Equal(remote.ConfirmedTime.Truncate(time.Second)) {
+	if sameSecond(link.LastRemoteConfirmedTime, *remote.ConfirmedTime) || sameSecond(state.EstimatedReadyTime, *remote.ConfirmedTime) {
 		return nil
 	}
 	t := *remote.ConfirmedTime

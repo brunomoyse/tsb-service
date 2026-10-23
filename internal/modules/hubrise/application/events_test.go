@@ -175,6 +175,79 @@ func TestARemoteConfirmedTimeUpdatesTheEstimatedReadyTime(t *testing.T) {
 	})
 }
 
+func TestALocalReadyTimeEditSurvivesLaterRemoteEvents(t *testing.T) {
+	s := newSyncEnv(t)
+	id := s.pushed(orderSpec{})
+	remoteID := s.remote(id).ID
+	patch := func(p pkghubrise.OrderPatch) {
+		t.Helper()
+		s.clock.Advance(10 * time.Second)
+		_, err := s.srv.PatchOrderAs(hubrisetest.EPOSToken, remoteID, p)
+		require.NoError(t, err)
+		s.deliver()
+		s.process()
+	}
+
+	ready := s.clock.Now().Add(25 * time.Minute).Truncate(time.Second)
+	patch(pkghubrise.OrderPatch{Status: pkghubrise.StatusAccepted, ConfirmedTime: &ready})
+	require.Len(t, s.tr.all(), 1)
+	require.NotNil(t, s.link(id).LastRemoteConfirmedTime)
+	assert.True(t, ready.Equal(*s.link(id).LastRemoteConfirmedTime))
+
+	// Staff push the ready time back in the dashboard; nothing sends that to HubRise.
+	edited := ready.Add(30 * time.Minute)
+	s.exec(`UPDATE orders SET estimated_ready_time = $2 WHERE id = $1`, id, edited)
+
+	// The EPOS moves on without touching the time: the local edit is not reset.
+	patch(pkghubrise.OrderPatch{Status: pkghubrise.StatusInPreparation})
+	calls := s.tr.all()
+	require.Len(t, calls, 2)
+	assert.Equal(t, domain.LocalPreparing, calls[1].change.Status)
+	assert.Nil(t, calls[1].change.EstimatedReadyTime, "the confirmed time did not change at HubRise")
+
+	// A new confirmed time at HubRise does win.
+	newer := edited.Add(15 * time.Minute)
+	patch(pkghubrise.OrderPatch{ConfirmedTime: &newer})
+	calls = s.tr.all()
+	require.Len(t, calls, 3)
+	require.NotNil(t, calls[2].change.EstimatedReadyTime)
+	assert.True(t, newer.Equal(*calls[2].change.EstimatedReadyTime))
+}
+
+func TestARemoteStatusWaitsForALocalStatusThatIsStillQueued(t *testing.T) {
+	s := newSyncEnv(t)
+	id := s.pushed(orderSpec{})
+	remoteID := s.remote(id).ID
+
+	// The shop prepares the order but the PATCH has not left yet (queued, or backing off).
+	s.setStatus(id, "PREPARING")
+	require.NotEmpty(t, s.outboxRows(id, domain.OutboxOrderStatus))
+
+	// A late HubRise event still carries the older status.
+	s.clock.Advance(time.Minute)
+	_, err := s.srv.PatchOrderAs(hubrisetest.EPOSToken, remoteID, pkghubrise.OrderPatch{Status: pkghubrise.StatusAccepted})
+	require.NoError(t, err)
+	s.deliver()
+	s.process()
+	assert.Empty(t, s.tr.all(), "the local order is not moved back")
+	assert.Equal(t, "PREPARING", s.localStatus(id))
+	assert.Equal(t, map[string]int{"pending": 1}, s.eventStates(), "the event waits")
+	assert.NotEqual(t, "accepted", *s.link(id).LastRemoteStatus, "and nothing is recorded from it")
+
+	// The reconciler gives way too.
+	require.NoError(t, s.sync.Status.ApplyRemote(t.Context(), id, s.remote2(remoteID)))
+	assert.Empty(t, s.tr.all())
+
+	// Once the PATCH has gone out the event is looked at again, next to our PATCH, and HubRise wins.
+	s.drainAll()
+	s.clock.Advance(time.Minute)
+	s.process()
+	assert.Equal(t, "PREPARING", s.localStatus(id))
+	assert.Empty(t, s.tr.all())
+	assert.Equal(t, map[string]int{"done": 1}, s.eventStates())
+	assert.Equal(t, "in_preparation", *s.link(id).LastRemoteStatus)
+}
+
 // ---- cancellations ----
 
 func TestARemoteCancelCancelsAnUnpaidOrder(t *testing.T) {

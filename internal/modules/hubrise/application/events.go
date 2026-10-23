@@ -325,6 +325,8 @@ func (p *EventProcessor) handle(ctx context.Context, r *run, ev domain.Event) {
 	switch {
 	case errors.Is(err, errOrderBusy):
 		p.deferTo(ctx, ev, p.d.Clock.Now().Add(5*time.Second))
+	case errors.Is(err, errStatusQueued):
+		p.deferTo(ctx, ev, p.d.Clock.Now().Add(15*time.Second)) // after the queued PATCH went out
 	case err != nil:
 		if p.retry(ctx, ev, err) && (remote.Status == hubrise.StatusCancelled || remote.Status == hubrise.StatusRejected) {
 			p.d.Sync.flagCancelFailed(ctx, link.OrderID, err) // out of attempts: staff must look at it

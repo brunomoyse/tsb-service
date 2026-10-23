@@ -99,6 +99,70 @@ func TestHasUnsettledCreate(t *testing.T) {
 	assert.False(t, busy, "the id is known")
 }
 
+func TestHasQueuedStatus(t *testing.T) {
+	e := newEnv(t)
+	links := infrastructure.NewOrderLinkRepository(e.db)
+	ctx := t.Context()
+	order := e.newOrder(t)
+	now := time.Now()
+	_, err := links.EnqueueCreate(ctx, order, nil, now)
+	require.NoError(t, err)
+
+	queued, err := links.HasQueuedStatus(ctx, order)
+	require.NoError(t, err)
+	assert.False(t, queued, "a create is not a status")
+
+	_, err = e.db.ExecContext(ctx, `INSERT INTO hubrise_outbox (kind, order_id, payload, state) VALUES ('order_status', $1, '{}', 'pending')`, order)
+	require.NoError(t, err)
+	queued, _ = links.HasQueuedStatus(ctx, order)
+	assert.True(t, queued)
+
+	_, err = e.db.ExecContext(ctx, `UPDATE hubrise_outbox SET state = 'sending' WHERE kind = 'order_status'`)
+	require.NoError(t, err)
+	queued, _ = links.HasQueuedStatus(ctx, order)
+	assert.True(t, queued, "and while it is being sent")
+
+	for _, state := range []string{"sent", "parked", "skipped"} {
+		_, err = e.db.ExecContext(ctx, `UPDATE hubrise_outbox SET state = $1 WHERE kind = 'order_status'`, state)
+		require.NoError(t, err)
+		queued, _ = links.HasQueuedStatus(ctx, order)
+		assert.False(t, queued, state)
+	}
+	queued, _ = links.HasQueuedStatus(ctx, uuid.New())
+	assert.False(t, queued, "another order")
+}
+
+func TestRecordRemoteConfirmedTime(t *testing.T) {
+	e := newEnv(t)
+	links := infrastructure.NewOrderLinkRepository(e.db)
+	ctx := t.Context()
+	order := e.newOrder(t)
+	now := time.Now()
+	_, err := links.EnqueueCreate(ctx, order, nil, now)
+	require.NoError(t, err)
+
+	got, _ := links.Get(ctx, order)
+	assert.Nil(t, got.LastRemoteConfirmedTime)
+
+	at := now.Add(20 * time.Minute)
+	require.NoError(t, links.RecordRemoteConfirmedTime(ctx, order, at))
+	got, _ = links.Get(ctx, order)
+	require.NotNil(t, got.LastRemoteConfirmedTime)
+	assert.WithinDuration(t, at, *got.LastRemoteConfirmedTime, time.Millisecond)
+
+	// A new HubRise order forgets it.
+	require.NoError(t, links.MarkSent(ctx, order, "ho-1", "new", now))
+	require.NoError(t, links.ResetToPending(ctx, order))
+	got, _ = links.Get(ctx, order)
+	assert.Nil(t, got.LastRemoteConfirmedTime)
+	require.NoError(t, links.RecordRemoteConfirmedTime(ctx, order, at))
+	require.NoError(t, links.Recreate(ctx, order, nil, now))
+	got, _ = links.Get(ctx, order)
+	assert.Nil(t, got.LastRemoteConfirmedTime)
+
+	assert.ErrorIs(t, links.RecordRemoteConfirmedTime(ctx, uuid.New(), at), domain.ErrNotFound)
+}
+
 func TestSourceStateCarriesWhatTheStatusSyncNeeds(t *testing.T) {
 	e := newEnv(t)
 	src := infrastructure.NewOrderSource(e.db)
