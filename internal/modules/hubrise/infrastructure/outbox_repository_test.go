@@ -440,3 +440,136 @@ func TestOutboxClaimTwoWorkers(t *testing.T) {
 		assert.Equal(t, 1, n, "row %d claimed %d times", id, n)
 	}
 }
+
+// rawInventory inserts an inventory row in any state, bypassing Enqueue (a parked row is outside the
+// pending unique index, so a pending twin of the same key may coexist).
+func rawInventory(t *testing.T, e *env, key string, state domain.OutboxState) int64 {
+	t.Helper()
+	var id int64
+	require.NoError(t, e.db.GetContext(t.Context(), &id, `
+		INSERT INTO hubrise_outbox (kind, dedupe_key, state, parked_at, last_error)
+		VALUES ('inventory', $1, $2, CASE WHEN $2 = 'parked' THEN now() END, CASE WHEN $2 = 'parked' THEN '422 bad' END)
+		RETURNING id`, key, string(state)))
+	return id
+}
+
+func stateOf(t *testing.T, repo domain.OutboxRepository, id int64) domain.OutboxState {
+	t.Helper()
+	got, err := repo.Get(t.Context(), id)
+	require.NoError(t, err)
+	return got.State
+}
+
+func TestOutboxRetryParkedInventorySupersession(t *testing.T) {
+	e := newEnv(t)
+	repo := infrastructure.NewOutboxRepository(e.db)
+	ctx := t.Context()
+	now := time.Now().Truncate(time.Microsecond)
+	order := e.newOrder(t)
+
+	t.Run("a parked row with a pending twin is skipped instead of colliding with the unique index", func(t *testing.T) {
+		parked := rawInventory(t, e, "inv:sku:P", domain.OutboxParked)
+		pending := rawInventory(t, e, "inv:sku:P", domain.OutboxPending)
+
+		n, err := repo.RetryParked(ctx, parked, now)
+		require.NoError(t, err)
+		assert.Zero(t, n)
+		assert.Equal(t, domain.OutboxSkipped, stateOf(t, repo, parked))
+		got, _ := repo.Get(ctx, parked)
+		assert.Equal(t, "superseded by a newer inventory row", *got.LastError)
+		assert.Equal(t, domain.OutboxPending, stateOf(t, repo, pending), "the newer state stays queued")
+	})
+
+	t.Run("retry all keeps going: one superseded row does not block the others", func(t *testing.T) {
+		parked := rawInventory(t, e, "inv:sku:Q", domain.OutboxParked)
+		pending := rawInventory(t, e, "inv:sku:Q", domain.OutboxPending)
+		lone := rawInventory(t, e, "inv:sku:R", domain.OutboxParked)
+		create := enqueue(t, repo, domain.OutboxOrderCreate, &order, "", `{}`, now)
+		_, err := e.db.ExecContext(ctx, `UPDATE hubrise_outbox SET state = 'parked', parked_at = now() WHERE id = $1`, create)
+		require.NoError(t, err)
+
+		n, err := repo.RetryAllParked(ctx, now)
+		require.NoError(t, err)
+		assert.EqualValues(t, 2, n)
+		assert.Equal(t, domain.OutboxSkipped, stateOf(t, repo, parked))
+		assert.Equal(t, domain.OutboxPending, stateOf(t, repo, pending))
+		assert.Equal(t, domain.OutboxPending, stateOf(t, repo, lone))
+		assert.Equal(t, domain.OutboxPending, stateOf(t, repo, create))
+	})
+
+	t.Run("only the newest of several parked rows of a key is retried", func(t *testing.T) {
+		old := rawInventory(t, e, "inv:sku:S", domain.OutboxParked)
+		newest := rawInventory(t, e, "inv:sku:S", domain.OutboxParked)
+
+		n, err := repo.RetryAllParked(ctx, now)
+		require.NoError(t, err)
+		assert.EqualValues(t, 1, n)
+		assert.Equal(t, domain.OutboxSkipped, stateOf(t, repo, old))
+		assert.Equal(t, domain.OutboxPending, stateOf(t, repo, newest))
+	})
+
+	t.Run("retrying an older parked row retries the newest parked row of its key", func(t *testing.T) {
+		old := rawInventory(t, e, "inv:sku:T", domain.OutboxParked)
+		newest := rawInventory(t, e, "inv:sku:T", domain.OutboxParked)
+
+		n, err := repo.RetryParked(ctx, old, now)
+		require.NoError(t, err)
+		assert.EqualValues(t, 1, n)
+		assert.Equal(t, domain.OutboxSkipped, stateOf(t, repo, old))
+		assert.Equal(t, domain.OutboxPending, stateOf(t, repo, newest))
+	})
+
+	t.Run("a newer row already sending supersedes the parked one", func(t *testing.T) {
+		parked := rawInventory(t, e, "inv:sku:U", domain.OutboxParked)
+		sending := rawInventory(t, e, "inv:sku:U", domain.OutboxSending)
+
+		n, err := repo.RetryAllParked(ctx, now)
+		require.NoError(t, err)
+		assert.Zero(t, n)
+		assert.Equal(t, domain.OutboxSkipped, stateOf(t, repo, parked))
+		assert.Equal(t, domain.OutboxSending, stateOf(t, repo, sending))
+	})
+
+	t.Run("an older sent row does not supersede", func(t *testing.T) {
+		sent := rawInventory(t, e, "inv:sku:V", domain.OutboxSent)
+		parked := rawInventory(t, e, "inv:sku:V", domain.OutboxParked)
+
+		n, err := repo.RetryParked(ctx, parked, now)
+		require.NoError(t, err)
+		assert.EqualValues(t, 1, n)
+		assert.Equal(t, domain.OutboxPending, stateOf(t, repo, parked))
+		assert.Equal(t, domain.OutboxSent, stateOf(t, repo, sent))
+	})
+}
+
+// A failure in either statement or at commit rolls the whole retry back and is reported.
+func TestOutboxRetryParkedFailuresRollBack(t *testing.T) {
+	ctx := t.Context()
+	now := time.Now().Truncate(time.Microsecond)
+
+	for name, ddl := range map[string]string{
+		"supersede": `CREATE FUNCTION f() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'boom'; END $$;
+			CREATE TRIGGER t BEFORE UPDATE ON hubrise_outbox FOR EACH ROW WHEN (NEW.state = 'skipped') EXECUTE FUNCTION f()`,
+		"retry": `CREATE FUNCTION f() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'boom'; END $$;
+			CREATE TRIGGER t BEFORE UPDATE ON hubrise_outbox FOR EACH ROW WHEN (NEW.state = 'pending') EXECUTE FUNCTION f()`,
+		"commit": `CREATE FUNCTION f() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'boom'; END $$;
+			CREATE CONSTRAINT TRIGGER t AFTER UPDATE ON hubrise_outbox DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+			WHEN (NEW.state = 'pending') EXECUTE FUNCTION f()`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := newEnv(t)
+			repo := infrastructure.NewOutboxRepository(e.db)
+			// One superseded row (for the first statement) and one plain parked row (for the second).
+			superseded := rawInventory(t, e, "inv:sku:X", domain.OutboxParked)
+			rawInventory(t, e, "inv:sku:X", domain.OutboxPending)
+			plain := rawInventory(t, e, "inv:sku:Y", domain.OutboxParked)
+			_, err := e.db.ExecContext(ctx, ddl)
+			require.NoError(t, err)
+
+			_, err = repo.RetryAllParked(ctx, now)
+			assert.Error(t, err)
+			assert.Equal(t, domain.OutboxParked, stateOf(t, repo, superseded), "rolled back")
+			assert.Equal(t, domain.OutboxParked, stateOf(t, repo, plain), "rolled back")
+		})
+	}
+}

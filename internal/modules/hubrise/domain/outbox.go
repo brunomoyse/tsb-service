@@ -94,8 +94,10 @@ type OutboxRepository interface {
 	// Counts summarizes the backlog.
 	Counts(ctx context.Context) (OutboxCounts, error)
 	// RetryParked reactivates the whole parked chain of the order of row id (all its parked rows),
-	// or, for a row without an order, that row alone. It returns how many rows were reactivated.
+	// or, for an inventory row, the parked rows of its dedupe key. Parked inventory rows replaced by a
+	// newer pending, sending or parked row of the same key are skipped instead (only the newest state
+	// of an item is worth sending). It returns how many rows were reactivated.
 	RetryParked(ctx context.Context, id int64, now time.Time) (int64, error)
-	// RetryAllParked reactivates every parked row.
+	// RetryAllParked reactivates every parked row, with the same inventory supersession rule.
 	RetryAllParked(ctx context.Context, now time.Time) (int64, error)
 }

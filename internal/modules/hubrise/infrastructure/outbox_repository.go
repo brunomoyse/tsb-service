@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"time"
 
@@ -132,17 +133,56 @@ func (r *outboxRepository) Counts(ctx context.Context) (domain.OutboxCounts, err
 	return c, err
 }
 
+// supersedeParkedInventorySQL skips the parked inventory rows inside the retry scope (the %s
+// placeholder) that a newer row of the same dedupe key replaces: a pending twin of any age (it sits
+// in the partial unique index, so re-pending the parked row would fail with 23505) or a newer
+// sending or parked twin. Only the newest state of an item is worth sending, and sending a stale
+// one after it would overwrite it on HubRise.
+const supersedeParkedInventorySQL = `
+	UPDATE hubrise_outbox o SET state = 'skipped', last_error = 'superseded by a newer inventory row'
+	WHERE o.state = 'parked' AND o.kind = 'inventory' AND %s
+	  AND EXISTS (
+	        SELECT 1 FROM hubrise_outbox t
+	        WHERE t.kind = 'inventory' AND t.dedupe_key = o.dedupe_key AND t.id <> o.id
+	          AND (t.state = 'pending' OR (t.id > o.id AND t.state IN ('sending', 'parked'))))`
+
+const retryParkedSQL = `
+	UPDATE hubrise_outbox o SET state = 'pending', next_attempt_at = $%d, parked_at = NULL, last_error = NULL
+	WHERE o.state = 'parked' AND %s`
+
+// retryParked supersedes, then reactivates, the parked rows matching scope. The two statements share
+// a transaction so a failure leaves the parked rows untouched. scopeArgs fill the scope placeholders
+// ($1...) of both statements; the retry time of the second one comes right after them.
+func (r *outboxRepository) retryParked(ctx context.Context, what, scope string, now time.Time, scopeArgs ...any) (int64, error) {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("hubrise: %s: %w", what, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(supersedeParkedInventorySQL, scope), scopeArgs...); err != nil {
+		return 0, fmt.Errorf("hubrise: %s: %w", what, err)
+	}
+	res, err := tx.ExecContext(ctx, fmt.Sprintf(retryParkedSQL, len(scopeArgs)+1, scope), append(scopeArgs, now)...)
+	if err != nil {
+		return 0, fmt.Errorf("hubrise: %s: %w", what, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("hubrise: %s: %w", what, err)
+	}
+	n, _ := res.RowsAffected() // lib/pq always reports it
+	return n, nil
+}
+
 // RetryParked keeps attempts as they are: a row parked after it may have been sent still needs the
-// idempotency lookup on its next claim.
+// idempotency lookup on its next claim. The chain is the parked rows of the row's order or, for an
+// inventory row, the parked rows of its dedupe key (of which only the newest is re-pended).
 func (r *outboxRepository) RetryParked(ctx context.Context, id int64, now time.Time) (int64, error) {
-	return r.execN(ctx, "retry parked chain", `
-		UPDATE hubrise_outbox SET state = 'pending', next_attempt_at = $2, parked_at = NULL, last_error = NULL
-		WHERE state = 'parked'
-		  AND (id = $1 OR order_id = (SELECT order_id FROM hubrise_outbox WHERE id = $1))`, id, now)
+	return r.retryParked(ctx, "retry parked chain", `
+		(o.id = $1 OR o.order_id = (SELECT order_id FROM hubrise_outbox WHERE id = $1)
+		 OR (o.kind = 'inventory' AND o.dedupe_key = (SELECT dedupe_key FROM hubrise_outbox WHERE id = $1 AND kind = 'inventory')))`,
+		now, id)
 }
 
 func (r *outboxRepository) RetryAllParked(ctx context.Context, now time.Time) (int64, error) {
-	return r.execN(ctx, "retry all parked", `
-		UPDATE hubrise_outbox SET state = 'pending', next_attempt_at = $1, parked_at = NULL, last_error = NULL
-		WHERE state = 'parked'`, now)
+	return r.retryParked(ctx, "retry all parked", `TRUE`, now)
 }
