@@ -1,0 +1,144 @@
+name: CI watch
+
+# Runs after every watched workflow finishes and:
+# - posts failures on main, release tags and Dependabot branches to Telegram,
+# - reports the outcome of every release tag build,
+# - squash-merges a Dependabot PR once all its checks are green, unless it holds
+#   a major update (those get a Telegram note and wait for a human).
+# workflow_run always uses this file from main, with the repository secrets,
+# also for runs that Dependabot started.
+
+on:
+  workflow_run:
+    workflows: [Tests, Build and Deploy, Security scan]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: ci-watch-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: Report and merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      # Optional: merging with a PAT lets the merge start the main workflow
+      # (test server deploy). GITHUB_TOKEN merges start nothing.
+      MERGE_TOKEN: ${{ secrets.PAT }}
+      MAIN_DISPATCH: ''
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      WORKFLOW: ${{ github.event.workflow_run.name }}
+      CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      EVENT: ${{ github.event.workflow_run.event }}
+      RUN_URL: ${{ github.event.workflow_run.html_url }}
+      TITLE: ${{ github.event.workflow_run.display_title }}
+    steps:
+      - name: Report and merge
+        run: |
+          set -euo pipefail
+          repo="${GH_REPO#*/}"
+
+          notify() {
+            if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+              echo "::warning::Telegram secrets missing, alert not sent: $1"
+              return 0
+            fi
+            curl -fsS -o /dev/null "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+              --data-urlencode "text=$1" \
+              --data-urlencode "disable_web_page_preview=true" \
+              || echo "::warning::Telegram alert failed: $1"
+          }
+
+          failed=false
+          case "$CONCLUSION" in
+            success) ;;
+            failure|timed_out|startup_failure|action_required) failed=true ;;
+            *) echo "Conclusion '$CONCLUSION': nothing to do."; exit 0 ;;
+          esac
+
+          # Release tags: report both outcomes, a tag build is a production release.
+          is_tag=false
+          case "$BRANCH" in v[0-9]*|ygf-v[0-9]*|android-v[0-9]*|linux-v[0-9]*) is_tag=true ;; esac
+          if $is_tag && [ "$EVENT" != "pull_request" ]; then
+            if $failed; then
+              notify "❌ $repo $BRANCH: release failed in \"$WORKFLOW\" ($CONCLUSION). $RUN_URL"
+            else
+              notify "✅ $repo $BRANCH: \"$WORKFLOW\" passed (production release). $RUN_URL"
+            fi
+            exit 0
+          fi
+
+          if [ "$BRANCH" = "main" ]; then
+            $failed && notify "❌ $repo main: \"$WORKFLOW\" $CONCLUSION ($EVENT) on \"$TITLE\". $RUN_URL"
+            exit 0
+          fi
+
+          case "$BRANCH" in dependabot/*) ;; *) exit 0 ;; esac
+
+          pr=$(gh pr list --head "$BRANCH" --state open --json number,url,title,headRefOid,labels --jq '.[0] // empty')
+          if [ -z "$pr" ]; then echo "No open PR for $BRANCH."; exit 0; fi
+          number=$(jq -r .number <<<"$pr"); url=$(jq -r .url <<<"$pr"); title=$(jq -r .title <<<"$pr")
+          if [ "$(jq -r .headRefOid <<<"$pr")" != "$HEAD_SHA" ]; then echo "PR #$number moved past $HEAD_SHA."; exit 0; fi
+
+          if $failed; then
+            notify "❌ $repo: Dependabot PR #$number failed \"$WORKFLOW\". $title $url"
+            exit 0
+          fi
+
+          # Wait for the other checks (CodeQL, a second workflow); a later
+          # watched workflow re-runs this anyway.
+          for _ in $(seq 1 40); do
+            gh pr view "$number" --json statusCheckRollup --jq '.statusCheckRollup' > checks.json
+            pending=$(jq '[.[] | select((.__typename == "CheckRun" and .status != "COMPLETED") or (.__typename == "StatusContext" and (.state == "PENDING" or .state == "EXPECTED")))] | length' checks.json)
+            [ "$pending" -eq 0 ] && break
+            echo "$pending check(s) still running."
+            sleep 30
+          done
+          if [ "$pending" -ne 0 ]; then echo "Checks still running, leaving it to the next run."; exit 0; fi
+          bad=$(jq -r '[.[] | select((.__typename == "CheckRun" and ((.conclusion // "") | IN("SUCCESS", "SKIPPED", "NEUTRAL") | not)) or (.__typename == "StatusContext" and .state != "SUCCESS")) | (.name // .context)] | join(", ")' checks.json)
+          if [ -n "$bad" ]; then
+            echo "Not green: $bad"
+            # A cancelled run is a superseded one; anything else is a real failure.
+            if jq -e '[.[] | select(.__typename == "CheckRun" and .conclusion != null and (.conclusion | IN("SUCCESS", "SKIPPED", "NEUTRAL", "CANCELLED") | not))] | length > 0' checks.json >/dev/null; then
+              notify "⚠️ $repo: Dependabot PR #$number is blocked by: $bad. $url"
+            fi
+            exit 0
+          fi
+
+          # A commit pushed by hand on the branch means a human merges it.
+          if gh pr view "$number" --json commits --jq '[.commits[].authors[].login // ""] | any(test("dependabot") | not)' | grep -q true; then
+            echo "PR #$number has commits not made by Dependabot: leaving it."
+            exit 0
+          fi
+
+          msg=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA" --jq .commit.message)
+          if ! grep -q 'updated-dependencies:' <<<"$msg" || grep -q 'update-type: version-update:semver-major' <<<"$msg"; then
+            if ! jq -e '.labels | any(.name == "needs-review")' <<<"$pr" >/dev/null; then
+              gh label create needs-review --color d93f0b --description "Major update: green CI, human merge" --force >/dev/null
+              gh pr edit "$number" --add-label needs-review >/dev/null
+              notify "🟡 $repo: Dependabot PR #$number is green but has a major update, review and merge by hand. $title $url"
+            fi
+            exit 0
+          fi
+
+          if [ -n "${MERGE_TOKEN:-}" ] && GH_TOKEN="$MERGE_TOKEN" gh pr merge "$number" --squash --match-head-commit "$HEAD_SHA"; then
+            echo "Merged #$number with the PAT."
+          elif gh pr merge "$number" --squash --match-head-commit "$HEAD_SHA"; then
+            echo "Merged #$number with GITHUB_TOKEN."
+            if [ -n "$MAIN_DISPATCH" ]; then gh workflow run "$MAIN_DISPATCH" --ref main; fi
+          else
+            notify "⚠️ $repo: green Dependabot PR #$number could not be merged (conflict?). $url"
+          fi

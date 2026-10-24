@@ -1,0 +1,115 @@
+name: Nightly dependency release
+
+# Ships the dependency and security updates merged during the day to
+# production every night. It tags the next patch version (which runs the normal
+# release pipeline) only when:
+# - main has Dependabot merges since the latest vX.Y.Z tag,
+# - every other commit since that tag only touches CI config or docs, so
+#   unreleased human work never reaches production by surprise (it gets a
+#   Telegram note instead: release it by hand with "Release (tag + deploy)"),
+# - every workflow run on the main HEAD (tests, test server deploy) passed.
+# The "CI watch" workflow reports the release result to Telegram.
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # UTC: 03:00 Brussels in winter, 04:00 in summer (+ offset per repo)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only report what would be released'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: nightly-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Tag a patch release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DRY_RUN: ${{ inputs.dry_run || 'false' }}
+      # Workflow to start on the new tag when the tag push itself cannot
+      # (pushed with GITHUB_TOKEN); empty when the PAT push starts it.
+      DEPLOY_DISPATCH: ''
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          # A tag pushed with GITHUB_TOKEN starts no workflow.
+          token: ${{ secrets.PAT }}
+
+      - name: Decide and tag
+        run: |
+          set -euo pipefail
+          repo="${GH_REPO#*/}"
+          notify() {
+            if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+              echo "::warning::Telegram secrets missing, not sent: $1"
+              return 0
+            fi
+            curl -fsS -o /dev/null "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+              --data-urlencode "text=$1" \
+              --data-urlencode "disable_web_page_preview=true" \
+              || echo "::warning::Telegram alert failed: $1"
+          }
+
+          last=$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -z "$last" ]; then echo "::error::No vX.Y.Z tag yet."; exit 1; fi
+          head=$(git rev-parse HEAD)
+
+          deps=0
+          blockers=()
+          for c in $(git rev-list "$last..HEAD"); do
+            if git log -1 --format='%ae' "$c" | grep -q 'dependabot\[bot\]'; then
+              deps=$((deps + 1))
+              continue
+            fi
+            # CI config and docs never change what runs in production.
+            if git diff-tree --no-commit-id --name-only -r "$c" | grep -qvE '^(\.github/|docs/)|\.md$'; then
+              blockers+=("$(git log -1 --format='%h %s' "$c")")
+            fi
+          done
+          echo "Since $last: $deps Dependabot merge(s), ${#blockers[@]} other change(s)."
+          if [ "$deps" -eq 0 ]; then echo "Nothing to ship."; exit 0; fi
+
+          if [ "${#blockers[@]}" -gt 0 ]; then
+            printf '  %s\n' "${blockers[@]}"
+            notify "⏸️ $repo: $deps dependency update(s) wait for production, but main also has ${#blockers[@]} unreleased change(s) since $last (e.g. ${blockers[0]}). Release by hand with \"Release (tag + deploy)\"."
+            exit 0
+          fi
+
+          gh run list --commit "$head" --limit 50 --json name,status,conclusion,event \
+            --jq '[.[] | select(.event != "schedule" and .name != "CI watch" and .name != "Nightly dependency release")]' > runs.json
+          if ! jq -e 'length > 0 and all(.status == "completed" and (.conclusion | IN("success", "skipped", "neutral")))' runs.json >/dev/null; then
+            jq -r '.[] | "  \(.name): \(.status) \(.conclusion)"' runs.json
+            notify "⏸️ $repo: $deps dependency update(s) not released, main HEAD ${head:0:7} is not fully green yet. $GITHUB_SERVER_URL/$GH_REPO/actions"
+            exit 0
+          fi
+
+          IFS=. read -r major minor patch <<<"${last#v}"
+          next="v${major}.${minor}.$((patch + 1))"
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "::notice::Dry run: would tag $next on ${head:0:7} ($deps Dependabot merge(s) since $last)."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$next" -m "Nightly dependency release $next ($deps Dependabot merge(s) since $last)"
+          git push origin "$next"
+          if [ -n "$DEPLOY_DISPATCH" ]; then gh workflow run "$DEPLOY_DISPATCH" --ref "$next"; fi
+          notify "🚀 $repo $next: nightly release of $deps dependency update(s) started. $GITHUB_SERVER_URL/$GH_REPO/actions"

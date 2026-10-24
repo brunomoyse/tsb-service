@@ -1,13 +1,23 @@
 version: 2
+# Daily checks. "CI watch" merges a green minor/patch PR (majors wait for a
+# human) and "Nightly dependency release" ships the merges to production.
+# cooldown: version updates wait until a release is 3 days old (hijacked
+# releases are usually pulled within hours); security updates are immediate.
 updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "friday"
-      time: "12:00"
+      interval: "daily"
+      time: "06:00"
       timezone: "Europe/Brussels"
+    cooldown:
+      default-days: 3
     groups:
+      # Security fixes, opened as soon as an advisory lands (no cooldown).
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
       # One weekly PR for every non-major module bump (direct and indirect),
       # so a single CI run covers them. Majors still get their own PR.
       go-minor-patch:
@@ -23,25 +33,43 @@ updates:
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "friday"
-      time: "12:00"
+      interval: "daily"
+      time: "06:00"
       timezone: "Europe/Brussels"
+    cooldown:
+      default-days: 3
     groups:
+      # Security fixes, opened as soon as an advisory lands (no cooldown).
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
       base-images:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Actions are pinned to commit SHAs; Dependabot bumps the SHA and the
   # version comment together.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "friday"
-      time: "12:00"
+      interval: "daily"
+      time: "06:00"
       timezone: "Europe/Brussels"
+    cooldown:
+      default-days: 3
     groups:
+      # Security fixes, opened as soon as an advisory lands (no cooldown).
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
       actions:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
