@@ -7,8 +7,9 @@ CREATE TABLE IF NOT EXISTS public.refresh_tokens
     id         uuid        NOT NULL DEFAULT gen_random_uuid(),
     user_id    uuid        NOT NULL,
     token_hash TEXT        NOT NULL,
-    expires_at timestamptz NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at timestamp(0) with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at timestamp(0) with time zone NOT NULL,
+    revoked_at timestamp(0) with time zone,
     CONSTRAINT refresh_tokens_pkey PRIMARY KEY (id),
     CONSTRAINT refresh_tokens_token_hash_unique UNIQUE (token_hash),
     CONSTRAINT refresh_tokens_user_id_fkey FOREIGN KEY (user_id)

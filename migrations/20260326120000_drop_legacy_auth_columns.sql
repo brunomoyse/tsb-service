@@ -16,6 +16,9 @@ ALTER TABLE users
 ALTER TABLE users
     ADD COLUMN IF NOT EXISTS password_hash TEXT,
     ADD COLUMN IF NOT EXISTS salt TEXT,
-    ADD COLUMN IF NOT EXISTS remember_token TEXT,
     ADD COLUMN IF NOT EXISTS google_id TEXT,
-    ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+    ADD COLUMN IF NOT EXISTS email_verified_at timestamp(0) with time zone;
+
+-- Dropping google_id took its partial index (20260220125800) with it.
+CREATE INDEX IF NOT EXISTS idx_users_google_id ON users (google_id) WHERE google_id IS NOT NULL;
+-- remember_token is not restored: no migration ever created it (nothing to roll back to).

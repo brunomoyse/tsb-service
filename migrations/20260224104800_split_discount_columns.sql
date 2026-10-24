@@ -22,9 +22,9 @@ ALTER TABLE orders DROP COLUMN discount_amount;
 -- +goose Down
 -- Restore the combined discount_amount column
 ALTER TABLE orders
-    ADD COLUMN discount_amount numeric(10,2) NOT NULL DEFAULT 0;
+    ADD COLUMN discount_amount numeric(10,2);
 
--- Recombine the split columns
+-- Recombine the split columns (the column was nullable before the split)
 UPDATE orders
 SET discount_amount = takeaway_discount + coupon_discount;
 
