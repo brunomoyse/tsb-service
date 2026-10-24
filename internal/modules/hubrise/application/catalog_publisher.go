@@ -405,6 +405,7 @@ func (p *CatalogPublisher) execute(ctx context.Context, holder string, seq int64
 	}
 
 	var ids []domain.LinkHubriseID
+	remoteHash := plan.RemoteCatalogHash
 	if plan.NeedsPut {
 		if err := extend(); err != nil {
 			return nil, err
@@ -414,6 +415,12 @@ func (p *CatalogPublisher) execute(ctx context.Context, holder string, seq int64
 			return p.failFromWrite(ctx, api, state, err, fail)
 		}
 		ids = linkIDsOf(put)
+		// The hash of the catalog as HubRise now holds it, not of what we sent: HubRise adds defaults
+		// of its own, and the drift check compares like with like. Unknown (no body) is empty.
+		remoteHash = ""
+		if put != nil && len(put.Data) > 0 {
+			remoteHash = RemoteCatalogHash(put.Data)
+		}
 	}
 
 	items := make([]domain.PublishedItem, 0, len(plan.Desired))
@@ -421,7 +428,7 @@ func (p *CatalogPublisher) execute(ctx context.Context, holder string, seq int64
 		items = append(items, domain.PublishedItem{EntityType: d.Entity, HubriseKey: d.Key, HubriseRef: d.Ref, ContentHash: d.Hash})
 	}
 	settled = true
-	if err := p.State.Complete(bg, holder, seq, domain.PublishResult{At: p.now(), LocalHash: plan.LocalMenuHash, RemoteHash: RemoteCatalogHash(plan.Data)}, items, ids); err != nil {
+	if err := p.State.Complete(bg, holder, seq, domain.PublishResult{At: p.now(), LocalHash: plan.LocalMenuHash, RemoteHash: remoteHash}, items, ids); err != nil {
 		return nil, err
 	}
 	p.audit(ctx, interactive, true, map[string]any{

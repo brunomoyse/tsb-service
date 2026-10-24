@@ -56,6 +56,9 @@ type EventRepository interface {
 	// CollapsePending marks done all pending events of a resource type received at or before the
 	// cutoff and returns how many (catalog events collapse into one import).
 	CollapsePending(ctx context.Context, resourceType string, receivedBefore, now time.Time) (int64, error)
+	// PendingEventTypes returns the distinct event types ("update", "delete"...) of the pending
+	// events of a resource type received at or before the cutoff.
+	PendingEventTypes(ctx context.Context, resourceType string, receivedBefore time.Time) ([]string, error)
 	// OldestPendingReceivedAt returns when the oldest pending event of the resource type arrived,
 	// or nil when none is pending.
 	OldestPendingReceivedAt(ctx context.Context, resourceType string) (*time.Time, error)

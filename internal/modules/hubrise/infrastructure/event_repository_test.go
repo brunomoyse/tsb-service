@@ -137,6 +137,22 @@ func TestEventRepository(t *testing.T) {
 		require.NotNil(t, oldest)
 		assert.WithinDuration(t, now.Add(-90*time.Second), *oldest, time.Millisecond)
 
+		types, err := repo.PendingEventTypes(ctx, "catalog", now.Add(-30*time.Second))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"update"}, types)
+		del := event("cat-del", "catalog", now.Add(-45*time.Second))
+		del.EventType = "delete"
+		_, err = repo.Insert(ctx, del)
+		require.NoError(t, err)
+		types, err = repo.PendingEventTypes(ctx, "catalog", now.Add(-30*time.Second))
+		require.NoError(t, err)
+		assert.Equal(t, []string{"delete", "update"}, types, "distinct, sorted, only up to the cutoff")
+		types, err = repo.PendingEventTypes(ctx, "catalog", now.Add(-2*time.Minute))
+		require.NoError(t, err)
+		assert.Empty(t, types)
+		_, err = e.db.ExecContext(ctx, `DELETE FROM hubrise_events WHERE id = 'cat-del'`)
+		require.NoError(t, err)
+
 		// The two events older than 30 s collapse into one import; the fresh one waits.
 		n, err := repo.CollapsePending(ctx, "catalog", now.Add(-30*time.Second), now)
 		require.NoError(t, err)

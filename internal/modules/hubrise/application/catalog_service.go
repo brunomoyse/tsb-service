@@ -40,6 +40,19 @@ type CatalogService struct {
 	Images   ImageUploader
 	// Holder identifies this instance in the import lease.
 	Holder string
+	// Publish, Published and PublishState are the catalog publisher's side, all optional: the drift
+	// check of a published catalog, and the forgetting of what was published.
+	Publish      PublishWatcher
+	PublishItems domain.PublishedItemRepository
+	PublishState domain.PublishStateRepository
+}
+
+// PublishWatcher is the catalog publisher seen by the drift check and the callback poller.
+type PublishWatcher interface {
+	// CheckRemoteDrift compares the HubRise catalog with what the last publish left there.
+	CheckRemoteDrift(ctx context.Context) error
+	// NoteExternalChange records an edit made at HubRise; deleted says the catalog was deleted.
+	NoteExternalChange(ctx context.Context, deleted bool, firstEventAt time.Time) error
 }
 
 // SyncRequest asks for an import.
@@ -144,6 +157,9 @@ func (s *CatalogService) Sync(ctx context.Context, req SyncRequest) (*SyncResult
 	if conn.RelinkRequiredAt != nil {
 		return nil, domain.ErrRelinkRequired
 	}
+	if req.Mode == domain.SyncFull && conn.CatalogDirection() == domain.DirectionPublish {
+		return nil, domain.ErrPublishMode
+	}
 	if req.Mode != domain.SyncDryRun && !req.PlanOnly && !conn.Enabled {
 		return nil, domain.ErrNotEnabled
 	}
@@ -232,6 +248,11 @@ func (s *CatalogService) Sync(ctx context.Context, req SyncRequest) (*SyncResult
 // shows the links that import would record and does not count as that preview, because it says
 // nothing about the products a full import would create or retire.
 func (s *CatalogService) Preview(ctx context.Context, mode domain.SyncMode) (*SyncResult, error) {
+	if mode == domain.SyncFull {
+		if conn, err := s.connection(ctx); err == nil && conn.CatalogDirection() == domain.DirectionPublish {
+			return nil, domain.ErrPublishMode
+		}
+	}
 	if mode == domain.SyncLinkOnly {
 		return s.Sync(ctx, SyncRequest{Mode: mode, PlanOnly: true})
 	}
@@ -316,6 +337,13 @@ func (s *CatalogService) CheckDrift(ctx context.Context) (*DriftOutcome, error) 
 	}
 	if !conn.Active() {
 		return &DriftOutcome{}, nil
+	}
+	if conn.CatalogDirection() == domain.DirectionPublish {
+		// The dashboard owns the menu: nothing is imported, and an edit made at HubRise is only a warning.
+		if s.Publish == nil {
+			return &DriftOutcome{}, nil
+		}
+		return &DriftOutcome{}, s.Publish.CheckRemoteDrift(ctx)
 	}
 	_, cat, err := s.fetch(ctx, conn, true)
 	if err != nil {
@@ -464,6 +492,9 @@ func (s *CatalogService) ForgetLinks(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	if err := s.forgetPublished(ctx); err != nil {
+		return n, err
+	}
 	if _, err := s.Connections.Get(ctx); err == nil {
 		if err := s.Connections.SetRelinkRequired(ctx, nil); err != nil {
 			return n, err
@@ -472,6 +503,27 @@ func (s *CatalogService) ForgetLinks(ctx context.Context) (int64, error) {
 		return n, err
 	}
 	return n, nil
+}
+
+// forgetPublished forgets what was published: without its links the shop no longer knows which
+// HubRise items it owns, so the next publish is a first one again (preview and confirmation).
+func (s *CatalogService) forgetPublished(ctx context.Context) error {
+	if s.PublishItems != nil {
+		if err := s.PublishItems.Clear(ctx); err != nil {
+			return err
+		}
+	}
+	if s.PublishState == nil {
+		return nil
+	}
+	conn, err := s.Connections.Get(ctx)
+	if errors.Is(err, domain.ErrNotFound) || (err == nil && conn.CatalogDirection() != domain.DirectionPublish) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return s.PublishState.Reset(ctx, s.now())
 }
 
 // LinkProduct links a local product to a SKU by hand (the explicit link adoption starts from), or,

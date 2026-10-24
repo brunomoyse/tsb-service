@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
@@ -60,8 +61,11 @@ type CatalogDriftDeps struct {
 	Events      domain.EventRepository
 	Leases      domain.LeaseRepository
 	Checker     CatalogDriftChecker
-	Clock       domain.Clock
-	Config      CatalogDriftConfig
+	// Publish, optional, takes over while the dashboard owns the menu: catalog events then only
+	// record that HubRise was edited elsewhere.
+	Publish PublishWatcher
+	Clock   domain.Clock
+	Config  CatalogDriftConfig
 }
 
 // CatalogDrift notices that the HubRise catalog changed: every 6 hours, and 30 seconds after the first
@@ -86,22 +90,23 @@ func NewCatalogDrift(d CatalogDriftDeps) *CatalogDrift {
 	return c
 }
 
-// active reports whether the integration may talk to HubRise now.
-func (c *CatalogDrift) active(ctx context.Context) (bool, error) {
+// active reports whether the integration may talk to HubRise now, and whether the dashboard owns the
+// menu.
+func (c *CatalogDrift) active(ctx context.Context) (active, publishing bool, err error) {
 	conn, err := c.d.Connections.Get(ctx)
 	if errors.Is(err, domain.ErrNotFound) {
-		return false, nil
+		return false, false, nil
 	}
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
-	return conn.Active(), nil
+	return conn.Active(), conn.CatalogDirection() == domain.DirectionPublish, nil
 }
 
 // check asks the catalog service for a drift check, as background work. The check runs whether
 // automatic import is on or not: with it off the service only records that an update is available.
 func (c *CatalogDrift) check(ctx context.Context) error {
-	ok, err := c.active(ctx)
+	ok, _, err := c.active(ctx)
 	if err != nil || !ok {
 		return err
 	}
@@ -115,7 +120,7 @@ func (c *CatalogDrift) CheckScheduled(ctx context.Context) (bool, error) { retur
 // check ran. The check is not repeated for the events it consumed if it fails: the 6 hourly check is
 // the backstop.
 func (c *CatalogDrift) CheckEvents(ctx context.Context) (bool, error) {
-	ok, err := c.active(ctx)
+	ok, publishing, err := c.active(ctx)
 	if err != nil || !ok {
 		return false, err
 	}
@@ -127,6 +132,9 @@ func (c *CatalogDrift) CheckEvents(ctx context.Context) (bool, error) {
 	if now.Sub(*oldest) < c.cfg.Debounce {
 		return false, nil
 	}
+	if publishing {
+		return c.noteExternal(ctx, *oldest, now)
+	}
 	// One statement marks the due events done and counts them: of two replicas looking at once, one
 	// gets the events and the other finds none.
 	n, err := c.d.Events.CollapsePending(ctx, domain.CatalogEventResource, now.Add(-c.cfg.Debounce), now)
@@ -135,6 +143,24 @@ func (c *CatalogDrift) CheckEvents(ctx context.Context) (bool, error) {
 	}
 	logging.FromContext(ctx).Info("hubrise: catalog changed, checking for drift", zap.Int64("events", n))
 	return true, c.check(ctx)
+}
+
+// noteExternal consumes the due catalog events of a published catalog: they cost no HubRise call,
+// they only say somebody edited the catalog (or deleted it).
+func (c *CatalogDrift) noteExternal(ctx context.Context, oldest, now time.Time) (bool, error) {
+	cutoff := now.Add(-c.cfg.Debounce)
+	types, err := c.d.Events.PendingEventTypes(ctx, domain.CatalogEventResource, cutoff)
+	if err != nil {
+		return false, err
+	}
+	n, err := c.d.Events.CollapsePending(ctx, domain.CatalogEventResource, cutoff, now)
+	if err != nil || n == 0 {
+		return false, err
+	}
+	if c.d.Publish == nil {
+		return true, nil
+	}
+	return true, c.d.Publish.NoteExternalChange(ctx, slices.Contains(types, "delete"), oldest)
 }
 
 // Run checks until ctx ends: once at start (the 6 hourly job), on its cadence, and every tick for

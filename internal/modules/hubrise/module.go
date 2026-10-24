@@ -42,6 +42,9 @@ type Module struct {
 	Customers     domain.CustomerSource
 	// Local reads and writes the shop's own menu for the catalog import.
 	Local domain.LocalCatalogRepository
+	// PublishState is the row of the catalog publisher, PublishItems what its last publish contained.
+	PublishState domain.PublishStateRepository
+	PublishItems domain.PublishedItemRepository
 }
 
 // NewModule builds the module on the admin pool (the hubrise tables get no per-role grants). It
@@ -76,6 +79,8 @@ func NewModule(cfg Config, adminDB *sqlx.DB, clock domain.Clock) (*Module, error
 		CustomerLinks: infrastructure.NewCustomerLinkRepository(adminDB),
 		Customers:     infrastructure.NewCustomerSource(adminDB),
 		Local:         infrastructure.NewLocalCatalogRepository(adminDB),
+		PublishState:  infrastructure.NewPublishStateRepository(adminDB),
+		PublishItems:  infrastructure.NewPublishedItemRepository(adminDB),
 	}, nil
 }
 
@@ -204,6 +209,9 @@ type InventoryOptions struct {
 	Notifier application.ProductNotifier
 	// Drift is the catalog service seen by the drift job; without it no drift job runs.
 	Drift application.CatalogDriftChecker
+	// Publish is the catalog publisher seen by the drift job: while the dashboard owns the menu,
+	// catalog events only record that HubRise was edited elsewhere.
+	Publish application.PublishWatcher
 	// Holder identifies this process in the lease table (a random one by default).
 	Holder string
 
@@ -251,7 +259,7 @@ func (m *Module) NewInventory(push *Push, o InventoryOptions) *Inventory {
 	}
 	if o.Drift != nil {
 		inv.Drift = application.NewCatalogDrift(application.CatalogDriftDeps{
-			Connections: m.Connections, Events: m.Events, Leases: m.Leases, Checker: o.Drift, Clock: m.Clock, Config: ccfg,
+			Connections: m.Connections, Events: m.Events, Leases: m.Leases, Checker: o.Drift, Publish: o.Publish, Clock: m.Clock, Config: ccfg,
 		})
 	}
 	return inv
@@ -295,6 +303,8 @@ type CatalogOptions struct {
 	Images application.ImageUploader
 	// Holder identifies this process in the import lease (a random one by default).
 	Holder string
+	// Audit records the catalog publishes (counts only).
+	Audit application.AuditFunc
 }
 
 // Catalog is the catalog side of the integration: the import service and the ownership guard that
@@ -304,6 +314,8 @@ type Catalog struct {
 	Guard   *application.Guard
 	// Drift is the catalog service as the drift job's port (see InventoryOptions.Drift).
 	Drift application.CatalogDriftChecker
+	// Publisher publishes the dashboard's menu to the HubRise catalog; Run drives it.
+	Publisher *application.CatalogPublisher
 }
 
 // NewCatalog builds the catalog import on the module's repositories.
@@ -322,8 +334,22 @@ func (m *Module) NewCatalog(push *Push, o CatalogOptions) *Catalog {
 			return c, nil
 		},
 		Notifier: o.Notifier, Images: o.Images, Holder: cmp.Or(o.Holder, uuid.NewString()),
+		PublishItems: m.PublishItems, PublishState: m.PublishState,
 	}
-	return &Catalog{Service: svc, Guard: &application.Guard{Connections: m.Connections, Links: m.CatalogLinks}, Drift: svc.DriftChecker()}
+	publisher := &application.CatalogPublisher{
+		Connections: m.Connections, Links: m.CatalogLinks, State: m.PublishState, Items: m.PublishItems, Local: m.Local,
+		Clock: m.Clock, Leases: m.Leases,
+		NewClient: func(conn *domain.Connection) (application.PublishAPI, error) {
+			c, err := clients.Client(context.Background(), conn)
+			if err != nil {
+				return nil, err
+			}
+			return c, nil
+		},
+		Notifier: o.Notifier, Audit: o.Audit, Holder: svc.Holder,
+	}
+	svc.Publish = publisher
+	return &Catalog{Service: svc, Guard: &application.Guard{Connections: m.Connections, Links: m.CatalogLinks}, Drift: svc.DriftChecker(), Publisher: publisher}
 }
 
 // AdminOptions customizes NewAdmin.
@@ -370,6 +396,6 @@ func (m *Module) NewAdmin(push *Push, catalog *Catalog, o AdminOptions) (*applic
 		Config: application.AdminConfig{RedirectURL: redirect, CallbackURL: callback},
 		OAuth:  oauth, Connections: m.Connections, OAuthStates: m.OAuthStates, Links: m.CatalogLinks, Orders: m.Orders,
 		Outbox: m.Outbox, Codec: m.Codec, Clients: clients, TokenClient: tokenClient, Catalog: catalog.Service,
-		Inventory: o.Inventory, Clock: m.Clock, Audit: o.Audit, Wake: push.Worker.Wake,
+		Inventory: o.Inventory, Publisher: catalog.Publisher, Clock: m.Clock, Audit: o.Audit, Wake: push.Worker.Wake,
 	}), nil
 }

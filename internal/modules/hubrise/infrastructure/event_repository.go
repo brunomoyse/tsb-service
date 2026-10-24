@@ -95,6 +95,14 @@ func (r *eventRepository) CollapsePending(ctx context.Context, resourceType stri
 		WHERE state = 'pending' AND resource_type = $1 AND received_at <= $2`, resourceType, receivedBefore, now)
 }
 
+func (r *eventRepository) PendingEventTypes(ctx context.Context, resourceType string, receivedBefore time.Time) ([]string, error) {
+	var types []string
+	err := r.sel(ctx, "pending event types", &types, `
+		SELECT DISTINCT event_type FROM hubrise_events
+		WHERE state = 'pending' AND resource_type = $1 AND received_at <= $2 ORDER BY event_type`, resourceType, receivedBefore)
+	return types, err
+}
+
 func (r *eventRepository) OldestPendingReceivedAt(ctx context.Context, resourceType string) (*time.Time, error) {
 	var at *time.Time
 	err := r.get(ctx, "oldest pending event", &at,

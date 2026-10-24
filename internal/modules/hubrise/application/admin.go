@@ -25,6 +25,7 @@ import (
 const (
 	AuditConnect    = "hubrise.connect"
 	AuditDisconnect = "hubrise.disconnect"
+	AuditDirection  = "hubrise.catalog.direction"
 )
 
 // oauthStateTTL is how long the state nonce of an authorization lives: as long as the
@@ -78,6 +79,9 @@ type AdminDeps struct {
 	// Inventory is optional: without it a change of the inventory toggle needs the next sync to
 	// push the baseline, and syncing by hand is refused.
 	Inventory *InventoryService
+	// Publisher is the catalog publisher. Optional: without it the dashboard-owned menu mode is
+	// unavailable.
+	Publisher *CatalogPublisher
 	Clock     domain.Clock
 	Audit     AuditFunc
 	// Wake, optional, asks the outbox worker to drain now (after a retry).
@@ -113,6 +117,10 @@ type Status struct {
 	UnlinkedProducts int
 	// Attention counts the orders flagged for staff.
 	Attention int
+	// Direction is who owns the menu.
+	Direction domain.CatalogDirection
+	// Publish is the state of the catalog publisher.
+	Publish *PublishStatus
 }
 
 // Status reads the state of the integration.
@@ -136,6 +144,17 @@ func (a *Admin) Status(ctx context.Context) (*Status, error) {
 		if st.UnlinkedProducts, err = a.d.Links.CountUnlinkedProducts(ctx); err != nil {
 			return nil, err
 		}
+	}
+	st.Direction = domain.DirectionNone
+	if st.Connection != nil {
+		st.Direction = st.Connection.CatalogDirection()
+	}
+	if a.d.Publisher != nil {
+		if st.Publish, err = a.d.Publisher.Status(ctx, st.Connection); err != nil {
+			return nil, err
+		}
+	} else {
+		st.Publish = &PublishStatus{}
 	}
 	return st, nil
 }
@@ -402,6 +421,12 @@ func (a *Admin) UpdateSettings(ctx context.Context, patch domain.SettingsPatch) 
 			return nil, err
 		}
 	}
+	if patch.SyncCatalog != nil && *patch.SyncCatalog && before.PublishCatalog {
+		return nil, domain.ErrDirectionConflict
+	}
+	if patch.PublishImages != nil && *patch.PublishImages && !before.HasWriteScope() {
+		return nil, domain.ErrReconnectRequired
+	}
 	if patch.SyncCatalog != nil && *patch.SyncCatalog && !before.SyncCatalog {
 		if err := a.d.Catalog.CheckEnableSyncCatalog(ctx); err != nil {
 			return nil, err
@@ -475,6 +500,92 @@ func (a *Admin) SyncCatalog(ctx context.Context, mode domain.SyncMode, confirmRe
 		return nil, &domain.InvalidSettingError{Field: "mode", Message: "unknown sync mode"}
 	}
 	return a.d.Catalog.Sync(ctx, SyncRequest{Mode: mode, ConfirmRetire: confirmRetire})
+}
+
+// ---- the dashboard-owned menu ----
+
+// SetCatalogDirection switches who owns the menu, atomically (the import flags go off for PUBLISH).
+//
+//   - To PUBLISH the installation must be connected, not waiting for a relink, and hold catalog.write
+//     (domain.ErrReconnectRequired). The publisher starts "awaiting first publish": nothing is
+//     written until the first publish is confirmed.
+//   - Leaving PUBLISH with edits that were not published needs acknowledgeLocalOverwrite
+//     (domain.ErrPublishPendingChanges): HubRise will overwrite them.
+//   - To IMPORT the existing rule applies, a dry run of the current catalog from the last day
+//     (domain.ErrPreviewRequired).
+func (a *Admin) SetCatalogDirection(ctx context.Context, to domain.CatalogDirection, acknowledgeLocalOverwrite bool) (*domain.Connection, error) {
+	if !to.Valid() {
+		return nil, &domain.InvalidSettingError{Field: "direction", Message: "unknown catalog direction"}
+	}
+	before, err := a.connected(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if to == domain.DirectionImport && before.CatalogDirection() != domain.DirectionImport {
+		// Outside the lock: it reads the HubRise catalog.
+		if err := a.d.Catalog.CheckEnableSyncCatalog(ctx); err != nil {
+			return nil, err
+		}
+	}
+	guard := func(_ context.Context, conn *domain.Connection, state *domain.PublishState) error {
+		from := conn.CatalogDirection()
+		if from == to {
+			return nil
+		}
+		if to == domain.DirectionPublish {
+			if conn.RelinkRequiredAt != nil {
+				return domain.ErrRelinkRequired
+			}
+			if !conn.HasWriteScope() {
+				return domain.ErrReconnectRequired
+			}
+		}
+		if from == domain.DirectionPublish && state.Dirty() && !acknowledgeLocalOverwrite {
+			return domain.ErrPublishPendingChanges
+		}
+		return nil
+	}
+	updated, from, err := a.d.Connections.ChangeCatalogDirection(ctx, to, a.d.Clock.Now(), guard)
+	if err != nil {
+		return nil, err
+	}
+	if from != to {
+		a.audit(ctx, AuditDirection, true, map[string]any{"from": string(from), "to": string(to), "acknowledged_overwrite": acknowledgeLocalOverwrite})
+	}
+	return updated, nil
+}
+
+// PreviewPublish plans a publish of the menu against the HubRise catalog and writes nothing.
+func (a *Admin) PreviewPublish(ctx context.Context, removeForeign bool) (*PublishPreview, error) {
+	if a.d.Publisher == nil {
+		return nil, domain.ErrNotPublishMode
+	}
+	return a.d.Publisher.Preview(ctx, removeForeign)
+}
+
+// PublishCatalog publishes the menu now (see CatalogPublisher.PublishNow).
+func (a *Admin) PublishCatalog(ctx context.Context, req PublishRequest) (*PublishOutcome, error) {
+	if a.d.Publisher == nil {
+		return nil, domain.ErrNotPublishMode
+	}
+	return a.d.Publisher.PublishNow(ctx, req)
+}
+
+// AcknowledgeExternalChange clears the "HubRise was edited elsewhere" warning.
+func (a *Admin) AcknowledgeExternalChange(ctx context.Context) error {
+	if a.d.Publisher == nil {
+		return nil
+	}
+	return a.d.Publisher.AcknowledgeExternalChange(ctx)
+}
+
+// ProductPublishInfos is the batch behind Product.hubrisePublish: the publish info of the products,
+// empty while the direction is not PUBLISH.
+func (a *Admin) ProductPublishInfos(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]ProductPublishInfo, error) {
+	if a.d.Publisher == nil {
+		return map[uuid.UUID]ProductPublishInfo{}, nil
+	}
+	return a.d.Publisher.ProductInfos(ctx, ids)
 }
 
 // ForgetLinks clears every catalog link; the products stay. It returns how many links went.
