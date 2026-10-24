@@ -1,0 +1,177 @@
+name: GraphQL contract
+
+# What the backend promises to its clients, checked before merge. See
+# docs/contract/README.md for the whole flow, the escape hatch and the user actions.
+#
+#   generated-code   gqlgen output, contract/schema.graphql and contract/mcp-tools.json
+#                    must be what the code produces (no forgotten regenerate/commit).
+#   breaking-change  the PR's schema is diffed against the one before the PR with
+#                    graphql-inspector; a breaking change fails unless the PR carries
+#                    the label `breaking-schema-change` (intentional, coordinated break).
+#   deployed-clients the operations of the public clients (pili-shop, pili-dashboard)
+#                    on main are validated against the PR's schema.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths:
+      - 'internal/api/graphql/**'
+      - 'internal/mcp/**'
+      - 'internal/contract/**'
+      - 'cmd/contract/**'
+      - 'cmd/tsb-mcp/**'
+      - 'contract/**'
+      - 'gqlgen.yml'
+      - 'go.mod'
+      - '.github/workflows/graphql-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'internal/api/graphql/**'
+      - 'internal/mcp/**'
+      - 'internal/contract/**'
+      - 'contract/**'
+      - 'gqlgen.yml'
+      - 'go.mod'
+
+concurrency:
+  group: graphql-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # graphql-inspector 6.x is the last line released more than two weeks ago that supports graphql 16.
+  INSPECTOR_VERSION: 6.0.8
+  INSPECTOR_GRAPHQL_VERSION: 16.11.0
+
+jobs:
+  generated-code:
+    name: Generated code is up to date
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The Dockerfile pins the Go patch release (bumped by Dependabot).
+      - name: Read Go version from Dockerfile
+        id: go
+        run: echo "version=$(sed -nE 's/^FROM .*golang:([0-9.]+)-alpine.*/\1/p' Dockerfile | head -n1)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ steps.go.outputs.version }}
+          cache: true
+
+      - name: Regenerate gqlgen output and fail on any difference
+        run: |
+          go run github.com/99designs/gqlgen generate
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --short
+            git diff --stat
+            echo "::error::gqlgen output is out of date with internal/api/graphql/schema/*.graphql: run 'go run github.com/99designs/gqlgen generate' and commit the result"
+            exit 1
+          fi
+
+      - name: Check the committed contract files (merged SDL and MCP tool list)
+        run: go run ./cmd/contract -check
+
+  breaking-change:
+    name: No breaking schema change
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout the merge commit and its first parent
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Install graphql-inspector (pinned)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/inspector" --no-audit --no-fund --ignore-scripts \
+            "@graphql-inspector/cli@$INSPECTOR_VERSION" "graphql@$INSPECTOR_GRAPHQL_VERSION"
+
+      - name: Diff the schema against the one before this PR
+        env:
+          ALLOW_BREAKING: ${{ contains(github.event.pull_request.labels.*.name, 'breaking-schema-change') }}
+        run: |
+          # HEAD is the merge of the PR into main: its first parent is main as it was.
+          if ! git show HEAD^1:contract/schema.graphql > "$RUNNER_TEMP/base.graphql" 2>/dev/null; then
+            echo "::notice::main has no contract/schema.graphql yet: nothing to compare with"
+            exit 0
+          fi
+          if "$RUNNER_TEMP/inspector/node_modules/.bin/graphql-inspector" diff "$RUNNER_TEMP/base.graphql" contract/schema.graphql; then
+            exit 0
+          fi
+          if [ "$ALLOW_BREAKING" = "true" ]; then
+            echo "::warning::breaking schema change accepted through the 'breaking-schema-change' label: clients must already be compatible, or be released together with this change"
+            exit 0
+          fi
+          echo "::error::breaking GraphQL schema change. If a client still uses what was removed or tightened, fix the client first. If the break is intentional and coordinated, add the label 'breaking-schema-change' to this PR (see docs/contract/README.md)."
+          exit 1
+
+  deployed-clients:
+    name: Public clients still validate (${{ matrix.repo }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repo: pili-shop
+            roots: '--root layers --root apps'
+          - repo: pili-dashboard
+            roots: '--root .'
+    env:
+      ALLOW_BREAKING: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'breaking-schema-change') }}
+    steps:
+      - name: Checkout the schema under test
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checkout ${{ matrix.repo }} (main)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: nuagemagique-dev/${{ matrix.repo }}
+          path: client
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Validate the client's operations against this schema
+        env:
+          ROOTS: ${{ matrix.roots }}
+        working-directory: client
+        run: |
+          if [ ! -f scripts/check-graphql-operations.mjs ]; then
+            echo "::warning::${{ matrix.repo }} main has no scripts/check-graphql-operations.mjs yet: client not checked"
+            exit 0
+          fi
+          tools="$RUNNER_TEMP/gql-tools"
+          mkdir -p "$tools"
+          gql=$(node -p "require('./package-lock.json').packages['node_modules/graphql'].version")
+          ts=$(node -p "require('./package-lock.json').packages['node_modules/typescript'].version")
+          npm install --prefix "$tools" --no-audit --no-fund --ignore-scripts "graphql@$gql" "typescript@$ts"
+          cp scripts/check-graphql-operations.mjs "$tools/"
+          read -ra roots <<< "$ROOTS"
+          if node "$tools/check-graphql-operations.mjs" "${roots[@]}" --schema "$GITHUB_WORKSPACE/contract/schema.graphql"; then
+            exit 0
+          fi
+          if [ "$ALLOW_BREAKING" = "true" ]; then
+            echo "::warning::${{ matrix.repo }} breaks with this schema; accepted through the 'breaking-schema-change' label"
+            exit 0
+          fi
+          echo "::error::${{ matrix.repo }} (main) sends operations this schema no longer supports. Change and release the client first, or add the label 'breaking-schema-change' for a coordinated break (see docs/contract/README.md)."
+          exit 1
