@@ -1,6 +1,8 @@
-# tsb-service
+# pili-api
 
-Backend API for Tokyo Sushi Bar.
+Backend API of Pili, the restaurant ordering platform.
+
+Repository `nuagemagique-dev/pili-api`, local folder and internal name `tsb-service` (Helm app, Kubernetes deployment). Images: `ghcr.io/nuagemagique-dev/pili-api` and `ghcr.io/nuagemagique-dev/pili-mcp`.
 
 `tsb-service` provides GraphQL and REST endpoints for ordering, catalog data, authentication, and payment/webhook processing.
 
@@ -90,3 +92,18 @@ The image is multi-stage, includes healthchecks, and ships `tsb-migrate` with SQ
 - Push to `main`: build/test path and latest deployment pipeline.
 - Tag `v*`: production image build and OVH deployment, including migration step.
 - Manual rollback: run workflow with target version and migration rollback count.
+
+## Pili repositories
+
+Every Pili repository lives in the GitHub org `nuagemagique-dev`. Local folders kept their earlier names.
+
+| Repository | Local folder | What it is |
+|---|---|---|
+| **pili-api** (this repository) | `tsb-service` | GraphQL API (Go) and the `pili-mcp` tool server |
+| pili-shop | `tsb-core` | Customer web shop, one Nuxt app per brand |
+| pili-dashboard | `tsb-dashboard` | Admin dashboard (Nuxt) |
+| pili-mobile | `tsb-mobile` | Customer iOS and Android app (Expo) |
+| pili-handheld | `moyun-handheld` | Staff handheld app for the Sunmi V3H (Kotlin) |
+| pili-pos | `moyun-pos` | SCE 2.0 cash register (Rust engine, Android and Linux) |
+| pili-agent | `tsb-agent` | Owner and staff Telegram agent |
+| pili-infra | `tsb-infra` | Helm charts, Terraform, SOPS secrets, runbooks |
