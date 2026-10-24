@@ -177,6 +177,37 @@ func SetupTestDatabase(t *testing.T) *TestDatabase {
 	return testDB
 }
 
+// SetupEmptyDatabase returns a fresh database with NO migration applied (SetupTestDatabase copies
+// the migrated template), for tests of the migrations themselves. It is dropped when the test ends.
+func SetupEmptyDatabase(t *testing.T) *TestDatabase {
+	t.Helper()
+	srv := sharedFor(t)
+	name := fmt.Sprintf("e%d_%d", os.Getpid(), srv.seq.Add(1))
+
+	_, err := srv.admin.Exec("CREATE DATABASE " + name + " TEMPLATE template0")
+	require.NoError(t, err, "Could not create the empty database")
+
+	db, err := connectWhenReady(srv.pool, srv.url(name))
+	require.NoError(t, err, "Could not connect to the empty database")
+
+	testDB := &TestDatabase{
+		DB: db, Pool: srv.pool, Resource: srv.resource,
+		Name: name, User: pgUser, Password: pgPassword, HostPort: srv.hostPort,
+	}
+	t.Cleanup(func() { testDB.Teardown(t) })
+	return testDB
+}
+
+// MigrationsDir is the repository's migrations directory.
+func MigrationsDir(t *testing.T) string {
+	t.Helper()
+	workDir, err := os.Getwd()
+	require.NoError(t, err, "Could not get working directory")
+	dir := findMigrationsDir(workDir)
+	require.NotEmpty(t, dir, "Could not find migrations directory")
+	return dir
+}
+
 // Teardown closes the connection and drops the database.
 func (td *TestDatabase) Teardown(t *testing.T) {
 	if td.DB != nil {
