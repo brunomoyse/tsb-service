@@ -178,6 +178,9 @@ type CatalogTx interface {
 type LocalCatalogRepository interface {
 	// Snapshot reads the whole menu.
 	Snapshot(ctx context.Context) (*LocalSnapshot, error)
+	// SnapshotWithLinks reads the menu and every catalog link (retired ones too) in one
+	// repeatable-read transaction: what the catalog publisher plans from.
+	SnapshotWithLinks(ctx context.Context) (*LocalSnapshot, []CatalogLink, error)
 	// InBatch runs fn in one transaction after taking the import's advisory lock
 	// (pg_advisory_xact_lock), so two instances never import at the same time. fn's error rolls the
 	// batch back.

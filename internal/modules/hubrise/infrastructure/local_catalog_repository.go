@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strconv"
 
@@ -33,7 +34,40 @@ type textRow struct {
 	Source      string    `db:"source"`
 }
 
+// selecter is what a snapshot reads through: the pool or one transaction.
+type selecter interface {
+	SelectContext(ctx context.Context, dest any, query string, args ...any) error
+}
+
 func (r *localCatalogRepository) Snapshot(ctx context.Context) (*domain.LocalSnapshot, error) {
+	return snapshotOf(ctx, r.db)
+}
+
+// SnapshotWithLinks reads the menu and every catalog link in one repeatable-read transaction, so
+// the two agree even while the dashboard keeps editing.
+func (r *localCatalogRepository) SnapshotWithLinks(ctx context.Context) (*domain.LocalSnapshot, []domain.CatalogLink, error) {
+	tx, err := r.db.BeginTxx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return nil, nil, fmt.Errorf("hubrise: begin snapshot: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	snap, err := snapshotOf(ctx, tx)
+	if err != nil {
+		return nil, nil, err
+	}
+	links := NewCatalogLinkRepositoryTx(tx)
+	var all []domain.CatalogLink
+	for _, t := range []domain.EntityType{domain.EntityCategory, domain.EntityProduct, domain.EntityChoiceGroup, domain.EntityChoice} {
+		ls, err := links.ListByType(ctx, t, true)
+		if err != nil {
+			return nil, nil, err
+		}
+		all = append(all, ls...)
+	}
+	return snap, all, nil
+}
+
+func snapshotOf(ctx context.Context, r selecter) (*domain.LocalSnapshot, error) {
 	snap := &domain.LocalSnapshot{}
 
 	var cats []struct {
@@ -41,10 +75,10 @@ func (r *localCatalogRepository) Snapshot(ctx context.Context) (*domain.LocalSna
 		Slug  string    `db:"slug"`
 		Order int       `db:"order"`
 	}
-	if err := r.db.SelectContext(ctx, &cats, `SELECT id, slug, COALESCE("order", 0) AS "order" FROM product_categories ORDER BY "order", slug`); err != nil {
+	if err := r.SelectContext(ctx, &cats, `SELECT id, slug, COALESCE("order", 0) AS "order" FROM product_categories ORDER BY "order", slug`); err != nil {
 		return nil, fmt.Errorf("hubrise: snapshot categories: %w", err)
 	}
-	catTexts, err := r.texts(ctx, `SELECT product_category_id AS owner, language, name, '' AS description, source FROM product_category_translations`)
+	catTexts, err := texts(ctx, r, `SELECT product_category_id AS owner, language, name, '' AS description, source FROM product_category_translations`)
 	if err != nil {
 		return nil, err
 	}
@@ -61,12 +95,12 @@ func (r *localCatalogRepository) Snapshot(ctx context.Context) (*domain.LocalSna
 		Visible     bool            `db:"is_visible"`
 		Available   bool            `db:"is_available"`
 	}
-	if err := r.db.SelectContext(ctx, &prods, `
+	if err := r.SelectContext(ctx, &prods, `
 		SELECT id, category_id, COALESCE(code, '') AS code, COALESCE(price, 0) AS price, vat_category, is_visible, is_available
 		FROM products ORDER BY id`); err != nil {
 		return nil, fmt.Errorf("hubrise: snapshot products: %w", err)
 	}
-	prodTexts, err := r.texts(ctx, `SELECT product_id AS owner, language, name, COALESCE(description, '') AS description, source FROM product_translations`)
+	prodTexts, err := texts(ctx, r, `SELECT product_id AS owner, language, name, COALESCE(description, '') AS description, source FROM product_translations`)
 	if err != nil {
 		return nil, err
 	}
@@ -82,10 +116,10 @@ func (r *localCatalogRepository) Snapshot(ctx context.Context) (*domain.LocalSna
 		Max       int       `db:"max_selections"`
 		Sort      int       `db:"sort_order"`
 	}
-	if err := r.db.SelectContext(ctx, &groups, `SELECT id, product_id, min_selections, max_selections, sort_order FROM product_choice_groups ORDER BY sort_order, id`); err != nil {
+	if err := r.SelectContext(ctx, &groups, `SELECT id, product_id, min_selections, max_selections, sort_order FROM product_choice_groups ORDER BY sort_order, id`); err != nil {
 		return nil, fmt.Errorf("hubrise: snapshot choice groups: %w", err)
 	}
-	groupTexts, err := r.texts(ctx, `SELECT product_choice_group_id AS owner, locale AS language, name, '' AS description, source FROM product_choice_group_translations`)
+	groupTexts, err := texts(ctx, r, `SELECT product_choice_group_id AS owner, locale AS language, name, '' AS description, source FROM product_choice_group_translations`)
 	if err != nil {
 		return nil, err
 	}
@@ -101,10 +135,10 @@ func (r *localCatalogRepository) Snapshot(ctx context.Context) (*domain.LocalSna
 		Sort          int             `db:"sort_order"`
 		Available     bool            `db:"is_available"`
 	}
-	if err := r.db.SelectContext(ctx, &choices, `SELECT id, product_id, choice_group_id, price_modifier, sort_order, is_available FROM product_choices ORDER BY sort_order, id`); err != nil {
+	if err := r.SelectContext(ctx, &choices, `SELECT id, product_id, choice_group_id, price_modifier, sort_order, is_available FROM product_choices ORDER BY sort_order, id`); err != nil {
 		return nil, fmt.Errorf("hubrise: snapshot choices: %w", err)
 	}
-	choiceTexts, err := r.texts(ctx, `SELECT product_choice_id AS owner, locale AS language, name, '' AS description, source FROM product_choice_translations`)
+	choiceTexts, err := texts(ctx, r, `SELECT product_choice_id AS owner, locale AS language, name, '' AS description, source FROM product_choice_translations`)
 	if err != nil {
 		return nil, err
 	}
@@ -116,9 +150,9 @@ func (r *localCatalogRepository) Snapshot(ctx context.Context) (*domain.LocalSna
 }
 
 // texts reads a translation table into per owner, per language rows.
-func (r *localCatalogRepository) texts(ctx context.Context, query string) (map[uuid.UUID]map[string]domain.LocalText, error) {
+func texts(ctx context.Context, r selecter, query string) (map[uuid.UUID]map[string]domain.LocalText, error) {
 	var rows []textRow
-	if err := r.db.SelectContext(ctx, &rows, query); err != nil {
+	if err := r.SelectContext(ctx, &rows, query); err != nil {
 		return nil, fmt.Errorf("hubrise: snapshot translations: %w", err)
 	}
 	out := map[uuid.UUID]map[string]domain.LocalText{}

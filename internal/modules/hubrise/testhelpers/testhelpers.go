@@ -41,6 +41,7 @@ const (
 	DefaultCustomerListID   = "cl-1"
 	DefaultCustomerListName = "Test Customers"
 	DefaultScope            = "location[orders.write,customer_list.write,catalog.read,inventory.read,inventory.write]"
+	WriteScope              = "location[orders.write,customer_list.write,catalog.read,catalog.write,inventory.read,inventory.write]"
 )
 
 type seed struct {
@@ -50,6 +51,8 @@ type seed struct {
 	pushSince                                                         *time.Time
 	locationID, catalogID                                             string
 	customerListID, customerListName                                  string
+	publish                                                           bool
+	scope                                                             string
 }
 
 // SeedOption customizes SeedConnection.
@@ -84,6 +87,18 @@ func WithCustomerList(id, name string) SeedOption {
 	return func(s *seed) { s.customerListID, s.customerListName = id, name }
 }
 
+// WithPublishCatalog seeds the dashboard-owned menu mode: publish_catalog on, catalog sync off, and
+// a scope that grants catalog.write.
+func WithPublishCatalog() SeedOption {
+	return func(s *seed) {
+		s.publish, s.syncCatalog = true, false
+		s.scope = WriteScope
+	}
+}
+
+// WithScope sets the scope string stored at the last authorization.
+func WithScope(scope string) SeedOption { return func(s *seed) { s.scope = scope } }
+
 // Seeded describes what SeedConnection wrote.
 type Seeded struct {
 	// Token is the plain access token (what the mock expects in X-Access-Token).
@@ -101,7 +116,7 @@ func SeedConnection(tb testing.TB, db sqlx.ExecerContext, opts ...SeedOption) Se
 		token: DefaultToken, enabled: true,
 		pushOrders: true, syncStatus: true, syncInventory: true, syncCatalog: false, syncCustomers: true,
 		locationID: DefaultLocationID, catalogID: DefaultCatalogID,
-		customerListID: DefaultCustomerListID, customerListName: DefaultCustomerListName,
+		customerListID: DefaultCustomerListID, customerListName: DefaultCustomerListName, scope: DefaultScope,
 	}
 	for _, o := range opts {
 		o(s)
@@ -113,8 +128,8 @@ func SeedConnection(tb testing.TB, db sqlx.ExecerContext, opts ...SeedOption) Se
 	_, err = db.ExecContext(tb.Context(), `
 		INSERT INTO hubrise_connection (id, enabled, access_token_enc, account_id, account_name, location_id,
 			location_name, catalog_id, catalog_name, customer_list_id, customer_list_name, scope,
-			push_orders, sync_status, sync_inventory, sync_catalog, sync_customers, push_orders_since)
-		VALUES (TRUE, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+			push_orders, sync_status, sync_inventory, sync_catalog, sync_customers, push_orders_since, publish_catalog)
+		VALUES (TRUE, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		ON CONFLICT (id) DO UPDATE SET
 			enabled = EXCLUDED.enabled, access_token_enc = EXCLUDED.access_token_enc,
 			account_id = EXCLUDED.account_id, account_name = EXCLUDED.account_name,
@@ -124,10 +139,11 @@ func SeedConnection(tb testing.TB, db sqlx.ExecerContext, opts ...SeedOption) Se
 			scope = EXCLUDED.scope, push_orders = EXCLUDED.push_orders, sync_status = EXCLUDED.sync_status,
 			sync_inventory = EXCLUDED.sync_inventory, sync_catalog = EXCLUDED.sync_catalog,
 			sync_customers = EXCLUDED.sync_customers, push_orders_since = EXCLUDED.push_orders_since,
+			publish_catalog = EXCLUDED.publish_catalog,
 			auth_error_at = NULL, relink_required_at = NULL, updated_at = now()`,
 		s.enabled, enc, DefaultAccountID, DefaultAccountName, s.locationID, DefaultLocationName,
-		s.catalogID, DefaultCatalogName, nullable(s.customerListID), nullable(s.customerListName), DefaultScope,
-		s.pushOrders, s.syncStatus, s.syncInventory, s.syncCatalog, s.syncCustomers, s.pushSince)
+		s.catalogID, DefaultCatalogName, nullable(s.customerListID), nullable(s.customerListName), s.scope,
+		s.pushOrders, s.syncStatus, s.syncInventory, s.syncCatalog, s.syncCustomers, s.pushSince, s.publish)
 	if err != nil {
 		tb.Fatalf("testhelpers: seed connection: %v", err)
 	}

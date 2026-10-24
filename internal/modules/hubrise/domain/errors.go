@@ -104,3 +104,22 @@ func (e *RetireConfirmError) Error() string {
 }
 
 func (e *RetireConfirmError) Is(target error) bool { return target == ErrRetireConfirmRequired }
+
+// PublishBlockedError carries the blockers behind ErrPublishBlocked. It matches it.
+type PublishBlockedError struct {
+	Blockers []Warning
+}
+
+func (e *PublishBlockedError) Error() string {
+	var parts []string
+	for i, b := range e.Blockers {
+		if i == 3 {
+			parts = append(parts, fmt.Sprintf("and %d more", len(e.Blockers)-3))
+			break
+		}
+		parts = append(parts, string(b.Code)+": "+b.Message)
+	}
+	return ErrPublishBlocked.Error() + " (" + strings.Join(parts, "; ") + ")"
+}
+
+func (e *PublishBlockedError) Is(target error) bool { return target == ErrPublishBlocked }
