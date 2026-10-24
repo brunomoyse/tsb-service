@@ -67,11 +67,17 @@ smoke_api() {
   # restarts once; require a real query on the final server.
   WAIT_CONTAINER="$id-pg" wait_for docker exec "$id-pg" psql -U postgres -d tsb -c 'select 1'
 
+  local migrate_log
   local db_env=(-e DB_HOST="$id-pg" -e DB_PORT=5432 -e DB_USERNAME=postgres -e DB_PASSWORD=smoke
     -e DB_DATABASE=tsb -e DB_SSL_MODE=disable)
 
   echo "== tsb-migrate -cmd=up"
-  docker run --rm --network "$net" "${db_env[@]}" "$image" ./tsb-migrate -cmd=up >/dev/null 2>&1
+  # Output is kept and shown on failure: a bad migration must say which one.
+  if ! migrate_log=$(docker run --rm --network "$net" "${db_env[@]}" "$image" ./tsb-migrate -cmd=up 2>&1); then
+    echo "::error::tsb-migrate -cmd=up failed on the image"
+    echo "$migrate_log" | tail -n 40
+    return 1
+  fi
   echo "== tsb-migrate -cmd=status"
   docker run --rm --network "$net" "${db_env[@]}" "$image" ./tsb-migrate -cmd=status 2>&1 | tail -n 3
 
