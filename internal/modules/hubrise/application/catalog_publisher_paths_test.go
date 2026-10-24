@@ -147,10 +147,10 @@ func TestRunKeepsTickingAndPublishesWhatIsDue(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		done := make(chan struct{})
 		go func() { p.Run(ctx); close(done) }()
-		require.Eventually(t, func() bool { return e.puts() == 2 }, 10*time.Second, 5*time.Millisecond)
+		// The PUT reaches HubRise before the run records it: wait for both.
+		require.Eventually(t, func() bool { return e.puts() == 2 && !e.publisherState().Dirty() }, 10*time.Second, 5*time.Millisecond)
 		cancel()
 		<-done
-		assert.False(t, e.publisherState().Dirty())
 	})
 }
 

@@ -90,7 +90,9 @@ func TestHubriseACatalogUpdateCallbackReachesTheDriftCheckAndTheImport(t *testin
 			"the drift check noticed the new catalog")
 		assert.Greater(t, catalogFetches(), before, "the check read the catalog")
 		assert.Equal(t, "6.50", r.priceOfLink("SKU-GYOZA"), "manual import mode: nothing is imported behind the admin's back")
-		assert.Zero(t, catalogEvents(` AND state = 'pending'`), "the event was consumed by the check")
+		// The banner is raised before the event row is settled.
+		assert.Eventually(t, func() bool { return catalogEvents(` AND state = 'pending'`) == 0 }, 20*time.Second, 20*time.Millisecond,
+			"the event was consumed by the check")
 	})
 
 	t.Run("automatic import: the callback ends in the imported change", func(t *testing.T) {
