@@ -3,8 +3,10 @@ package hubrisetest
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"net"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"tsb-service/pkg/hubrise"
 )
@@ -60,7 +62,7 @@ func (s *Server) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	target, err := url.Parse(q.Get("redirect_uri"))
-	if err != nil {
+	if err != nil || !isValidRedirect(target) {
 		writeAPIError(w, http.StatusBadRequest, "invalid redirect_uri")
 		return
 	}
@@ -71,6 +73,21 @@ func (s *Server) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 	target.RawQuery = rq.Encode()
 	http.Redirect(w, r, target.String(), http.StatusFound)
+}
+
+// isValidRedirect reports whether the mock may send the browser to u: an absolute http(s) URL on
+// a loopback address or on a reserved test name (RFC 2606 .test, RFC 6761 localhost). Those never
+// reach a real site, so the mock cannot be used as an open redirect, whatever redirect_uri it gets.
+func isValidRedirect(u *url.URL) bool {
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") || strings.HasSuffix(host, ".test") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func (s *Server) oauthToken(w http.ResponseWriter, r *http.Request) {

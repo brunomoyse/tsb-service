@@ -489,3 +489,27 @@ func TestImages(t *testing.T) {
 	srv.AddImage("legacy", "image/png", png)
 	assert.Len(t, srv.Images(), 3)
 }
+
+func TestTheMockAuthorizeEndpointOnlyRedirectsToTestHosts(t *testing.T) {
+	srv := hubrisetest.New(t)
+	o := srv.NewOAuth(t)
+	noFollow := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	authorize := func(redirectURI string) *http.Response {
+		t.Helper()
+		resp, err := noFollow.Get(o.AuthorizeURL(redirectURI, hubrise.DefaultScope, "st"))
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+		return resp
+	}
+
+	for _, ok := range []string{"https://shop.test/cb", "https://api.example.test/api/v1/hubrise/oauth/callback", "http://localhost:3000/cb", "http://127.0.0.1:8080/cb", "http://[::1]/cb"} {
+		resp := authorize(ok)
+		assert.Equal(t, http.StatusFound, resp.StatusCode, ok)
+		assert.NotEmpty(t, resp.Header.Get("Location"), ok)
+	}
+	for _, refused := range []string{"https://evil.example.com/cb", "https://shop.test.evil.com/cb", "javascript:alert(1)", "//evil.example.com/cb", "ftp://shop.test/cb", "https://10.0.0.1/cb"} {
+		resp := authorize(refused)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, refused)
+		assert.Empty(t, resp.Header.Get("Location"), refused)
+	}
+}
