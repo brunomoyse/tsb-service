@@ -65,11 +65,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Trigger deploy webhook
         run: |
           curl -X POST ${{ vars.DEPLOY_WEBHOOK_URL }} \
             -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
             --fail --max-time 300
+
+      # A webhook that answered 200 does not mean the new container came up: poll it for 4 minutes.
+      # Repository variable TEST_API_BASE_URL = API root of the test server (e.g. https://<host>/api/v1).
+      # Only /up is checked: the test database may have no menu.
+      - name: Wait for the test server to answer
+        env:
+          TEST_API: ${{ vars.TEST_API_BASE_URL }}
+          SMOKE_ATTEMPTS: '24'
+          SMOKE_DELAY: '10'
+        run: |
+          if [ -z "$TEST_API" ]; then
+            echo "::warning::Repository variable TEST_API_BASE_URL is not set: the test deploy is not verified."
+            exit 0
+          fi
+          scripts/smoke.sh up "$TEST_API"
 
 # ── Production release (tag push v*) ────────────────────────────────────────
 
@@ -109,15 +127,30 @@ jobs:
             --push \
             .
 
+  # Order of a release: the SSH steps below `git pull` tsb-infra on the VPS, whose chart runs
+  # `tsb-migrate -cmd=up` as a Helm pre-upgrade hook (templates/tsb-migrate-job.yaml). The new pods
+  # only start once the migration succeeded, and a failed one aborts the atomic upgrade. This job
+  # therefore no longer runs the migration after the upgrade, and it refuses to deploy if the
+  # checkout on the VPS has no hook (tsb-infra must be merged and pulled before the first tag
+  # built from this workflow).
+  #
+  # After each upgrade the site is smoke tested from the runner; a failed smoke test runs
+  # `helm rollback` of that release (code only: the schema stays forward, so a release's migrations
+  # must keep the previous release working, see the comment of the hook template).
   deploy_production:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     needs: build_production
     name: Deploy to Production
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 60
 
     steps:
-      - name: Deploy and migrate via SSH (Helm)
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Deploy tokyosushi (Helm, migrations as a pre-upgrade hook)
+        id: deploy_tokyosushi
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
           APP: tsb-service
@@ -134,6 +167,10 @@ jobs:
             export SOPS_AGE_KEY_FILE=/opt/tokyosushi/.config/sops/age/keys.txt
             cd /opt/tokyosushi/tsb-infra
             git pull --ff-only
+            if [ ! -f charts/tokyosushi-apps/templates/tsb-migrate-job.yaml ]; then
+              echo "::error::tsb-infra on the VPS has no tsb-migrate hook: merge it and pull it first, otherwise this release would start on an unmigrated schema."
+              exit 1
+            fi
             # tsb-mcp ships from this repo. --reuse-values ignores new chart
             # defaults, so pin it only once the release really deploys it (after a
             # one-off --reset-then-reuse-values upgrade); otherwise the --set would
@@ -141,31 +178,121 @@ jobs:
             MCP_SET=""
             if sudo kubectl get deployment tsb-mcp -n tokyosushi >/dev/null 2>&1; then MCP_SET="--set apps.tsb-mcp.image.repository=${MCP_REPO} --set apps.tsb-mcp.image.tag=${TAG}"; fi
             sops -d "secrets/${APP}.secret.enc.yaml" | sudo kubectl apply -n tokyosushi -f -
-            sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
+            if ! sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
               --namespace tokyosushi \
               --reuse-values \
               --set "apps.${APP}.image.repository=${REPO}" \
               --set "apps.${APP}.image.tag=${TAG}" \
               ${MCP_SET} \
-              --atomic --timeout 5m
-            sudo kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=up
-            # Yangguofu Malatang Liège (release ygf-apps, namespace ygf) runs the
-            # same backend image on its own DB: keep it on the same version and
-            # schema. Skipped until that release exists.
+              --atomic --timeout 5m; then
+              # The pre-upgrade hook Job is kept when it fails: show why.
+              echo "::group::tsb-migrate hook logs"
+              sudo kubectl logs -n tokyosushi job/tsb-migrate --tail=100 || true
+              echo "::endgroup::"
+              exit 1
+            fi
+
+      - name: Smoke test tokyosushi
+        id: smoke_tokyosushi
+        env:
+          API: ${{ vars.TSB_API_BASE_URL }}
+        run: scripts/smoke.sh --skip-unset api "$API"
+
+      - name: Roll back tokyosushi after a failed smoke test
+        id: rollback_tokyosushi
+        if: failure() && steps.smoke_tokyosushi.outcome == 'failure'
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ vars.OVH_HOST }}
+          username: ${{ vars.OVH_USER }}
+          key: ${{ secrets.OVH_SSH_PRIVATE_KEY }}
+          script: |
+            set -euo pipefail
+            sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml \
+              helm rollback tokyosushi-apps --namespace tokyosushi --wait --timeout 5m
+
+      # Yangguofu Malatang Liège (release ygf-apps, namespace ygf) runs the same backend image on
+      # its own DB: keep it on the same version and schema. Skipped until that release exists.
+      # Runs only when tokyosushi deployed and passed its smoke test.
+      - name: Deploy ygf (Helm, migrations as a pre-upgrade hook)
+        id: deploy_ygf
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          APP: tsb-service
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
+        with:
+          host: ${{ vars.OVH_HOST }}
+          username: ${{ vars.OVH_USER }}
+          key: ${{ secrets.OVH_SSH_PRIVATE_KEY }}
+          envs: APP,TAG,REPO
+          script: |
+            set -euo pipefail
+            export SOPS_AGE_KEY_FILE=/opt/tokyosushi/.config/sops/age/keys.txt
+            cd /opt/tokyosushi/tsb-infra
             if sudo env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm status ygf-apps -n ygf >/dev/null 2>&1; then
               sops -d "secrets/ygf-${APP}.secret.enc.yaml" | sudo kubectl apply -n ygf -f -
-              sudo flock -w 600 /var/lock/ygf-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade ygf-apps ./charts/tokyosushi-apps \
+              if ! sudo flock -w 600 /var/lock/ygf-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade ygf-apps ./charts/tokyosushi-apps \
                 --namespace ygf \
                 -f ./charts/tokyosushi-apps/values.ygf.yaml \
                 --reuse-values \
                 --set "apps.${APP}.image.repository=${REPO}" \
                 --set "apps.${APP}.image.tag=${TAG}" \
-                --atomic --timeout 5m
-              sudo kubectl exec -n ygf deployment/tsb-service -- /app/tsb-migrate -cmd=up
+                --atomic --timeout 5m; then
+                echo "::group::tsb-migrate hook logs"
+                sudo kubectl logs -n ygf job/tsb-migrate --tail=100 || true
+                echo "::endgroup::"
+                exit 1
+              fi
             fi
+
+      # Repository variable YGF_API_BASE_URL = API root of the ygf site (https://ygfliege.be/api/v1).
+      - name: Smoke test ygf
+        id: smoke_ygf
+        env:
+          API: ${{ vars.YGF_API_BASE_URL }}
+        run: scripts/smoke.sh --skip-unset api "$API"
+
+      - name: Roll back ygf after a failed smoke test
+        id: rollback_ygf
+        if: failure() && steps.smoke_ygf.outcome == 'failure'
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ vars.OVH_HOST }}
+          username: ${{ vars.OVH_USER }}
+          key: ${{ secrets.OVH_SSH_PRIVATE_KEY }}
+          script: |
+            set -euo pipefail
+            sudo flock -w 600 /var/lock/ygf-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml \
+              helm rollback ygf-apps --namespace ygf --wait --timeout 5m
+
+      - name: Alert on a failed deploy
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TEXT: >-
+            pili-api ${{ github.ref_name }}: production deploy failed.
+            tokyosushi smoke ${{ steps.smoke_tokyosushi.outcome }}, rollback ${{ steps.rollback_tokyosushi.outcome }};
+            ygf smoke ${{ steps.smoke_ygf.outcome }}, rollback ${{ steps.rollback_ygf.outcome }}.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then exit 0; fi
+          curl -fsS -o /dev/null "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${TEXT}" \
+            --data-urlencode "disable_web_page_preview=true" \
+            || echo "::warning::Telegram alert failed"
 
 # ── Rollback (manual trigger) ────────────────────────────────────────────────
 
+  # Manual only (workflow_dispatch). Order matters: the migrations are rolled back FIRST, with the
+  # image that is running now (it is the one that ships the Down sections of the migrations to
+  # undo), then the code goes back to the requested version. The chart's pre-upgrade hook then runs
+  # `up` with the OLD image, which is a no-op because the schema is already at or below its own.
+  # migrations_down = 0 keeps the schema forward (code-only rollback), which only works when the
+  # migrations of the rolled back release were additive (expand/contract). The tokyosushi and ygf
+  # databases are rolled back by the same number of migrations.
   rollback:
     if: github.event_name == 'workflow_dispatch'
     name: Rollback Production
@@ -188,14 +315,29 @@ jobs:
           envs: APP,TAG,REPO,MCP_REPO,MIGRATIONS_DOWN
           script: |
             set -euo pipefail
+            case "${MIGRATIONS_DOWN:-0}" in
+              '' | *[!0-9]*) echo "::error::migrations_down must be a whole number"; exit 1 ;;
+            esac
             cd /opt/tokyosushi/tsb-infra
             # Same tsb-mcp gate as the deploy job.
             MCP_SET=""
             if sudo kubectl get deployment tsb-mcp -n tokyosushi >/dev/null 2>&1; then MCP_SET="--set apps.tsb-mcp.image.repository=${MCP_REPO} --set apps.tsb-mcp.image.tag=${TAG}"; fi
-            # Roll back DB migrations first (using current container), before swapping image
-            for i in $(seq 1 "${MIGRATIONS_DOWN:-0}"); do
-              sudo kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=down
-            done
+            YGF=0
+            if sudo env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm status ygf-apps -n ygf >/dev/null 2>&1; then YGF=1; fi
+
+            # 1. Roll back DB migrations first, using the running (current) image.
+            sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock bash -c '
+              for i in $(seq 1 "$1"); do
+                kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=down
+              done' _ "${MIGRATIONS_DOWN:-0}"
+            if [ "$YGF" = 1 ]; then
+              sudo flock -w 600 /var/lock/ygf-apps-helm.lock bash -c '
+                for i in $(seq 1 "$1"); do
+                  kubectl exec -n ygf deployment/tsb-service -- /app/tsb-migrate -cmd=down
+                done' _ "${MIGRATIONS_DOWN:-0}"
+            fi
+
+            # 2. Then swap the code.
             sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
               --namespace tokyosushi \
               --reuse-values \
@@ -203,6 +345,15 @@ jobs:
               --set "apps.${APP}.image.tag=${TAG}" \
               ${MCP_SET} \
               --atomic --timeout 5m
+            if [ "$YGF" = 1 ]; then
+              sudo flock -w 600 /var/lock/ygf-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade ygf-apps ./charts/tokyosushi-apps \
+                --namespace ygf \
+                -f ./charts/tokyosushi-apps/values.ygf.yaml \
+                --reuse-values \
+                --set "apps.${APP}.image.repository=${REPO}" \
+                --set "apps.${APP}.image.tag=${TAG}" \
+                --atomic --timeout 5m
+            fi
 
 # ── Production smoke test (tag push v*) ─────────────────────────────────────
 
