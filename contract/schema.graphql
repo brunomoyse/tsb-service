@@ -228,12 +228,260 @@ type DeliveryFeeTier {
   """
   fee: String!
 }
+type HubriseBacklog {
+  pending: Int!
+  parked: Int!
+}
+enum HubriseCatalogAction {
+  CREATE
+  UPDATE
+  LINK
+  RETIRE
+  REVIVE
+}
+type HubriseCatalogChange {
+  entity: HubriseCatalogEntity!
+  action: HubriseCatalogAction!
+  key: String!
+  name: String!
+  fields: [String!]!
+}
+type HubriseCatalogDiff {
+  catalogHash: String!
+  changes: [HubriseCatalogChange!]!
+  warnings: [HubriseCatalogIssue!]!
+  conflicts: [HubriseCatalogIssue!]!
+  unchanged: Int!
+  retiringProducts: Int!
+  linkedProducts: Int!
+  retireNeedsConfirm: Boolean!
+}
+enum HubriseCatalogDirection {
+  NONE
+  IMPORT
+  PUBLISH
+}
+enum HubriseCatalogEntity {
+  CATEGORY
+  PRODUCT
+  CHOICE_GROUP
+  CHOICE
+}
+type HubriseCatalogIssue {
+  code: String!
+  key: String
+  message: String!
+}
+type HubriseFeatures {
+  pushOrders: Boolean!
+  syncStatus: Boolean!
+  syncInventory: Boolean!
+  syncCatalog: Boolean!
+  publishCatalog: Boolean!
+}
+type HubriseOrderInfo {
+  hubriseOrderId: String
+  pushState: String!
+  pushedAt: DateTime
+  remoteStatus: String
+  remoteTotal: String
+  needsAttention: String
+}
+type HubriseOutboxItem {
+  id: String!
+  kind: HubriseOutboxKind!
+  orderId: ID
+  state: HubriseOutboxState!
+  attempts: Int!
+  lastError: String
+  nextAttemptAt: DateTime!
+  createdAt: DateTime!
+  sentAt: DateTime
+  parkedAt: DateTime
+}
+enum HubriseOutboxKind {
+  ORDER_CREATE
+  ORDER_STATUS
+  INVENTORY
+  CUSTOMER
+  CUSTOMER_ANONYMISE
+}
+enum HubriseOutboxState {
+  PENDING
+  SENDING
+  SENT
+  PARKED
+  SKIPPED
+}
+type HubriseProductPublishInfo {
+  state: HubrisePublishState!
+  publishedAt: DateTime
+  ref: String
+}
+enum HubrisePublishAction {
+  ADD
+  UPDATE
+  REMOVE
+}
+type HubrisePublishChange {
+  entity: HubriseCatalogEntity!
+  action: HubrisePublishAction!
+  key: String!
+  ref: String!
+  name: String!
+  fields: [String!]!
+}
+type HubrisePublishCount {
+  entity: HubriseCatalogEntity!
+  added: Int!
+  updated: Int!
+  removed: Int!
+}
+enum HubrisePublishErrorCode {
+  WRITE_SCOPE_MISSING
+  ACCOUNT_CATALOG
+  CATALOG_NOT_FOUND
+  REJECTED
+  INVALID_MENU
+  UNAVAILABLE
+  AUTH
+  REMOVALS_NEED_CONFIRM
+}
+type HubrisePublishForeignItem {
+  entity: HubriseCatalogEntity!
+  ref: String!
+  name: String!
+}
+type HubrisePublishPreview {
+  planHash: String!
+  firstPublish: Boolean!
+  added: Int!
+  updated: Int!
+  removed: Int!
+  unchanged: Int!
+  foreign: Int!
+  counts: [HubrisePublishCount!]!
+  changes: [HubrisePublishChange!]!
+  truncated: Boolean!
+  foreignItems: [HubrisePublishForeignItem!]!
+  preserved: [String!]!
+  warnings: [HubriseCatalogIssue!]!
+  blockers: [HubriseCatalogIssue!]!
+  removalsNeedConfirm: Boolean!
+  generatedAt: DateTime!
+}
+type HubrisePublishResult {
+  published: Boolean!
+  queued: Boolean!
+  status: HubrisePublishStatus!
+}
+enum HubrisePublishState {
+  PUBLISHED
+  PENDING
+  NOT_PUBLISHED
+}
+type HubrisePublishStatus {
+  enabled: Boolean!
+  active: Boolean!
+  pending: Boolean!
+  pendingSince: DateTime
+  nextPublishAt: DateTime
+  publishing: Boolean!
+  lastPublishedAt: DateTime
+  firstPublishConfirmedAt: DateTime
+  awaitingFirstPublish: Boolean!
+  lastError: String
+  lastErrorCode: HubrisePublishErrorCode
+  lastErrorAt: DateTime
+  externalChangeAt: DateTime
+  needsReconnectForWrite: Boolean!
+  accountCatalogDetected: Boolean!
+  publishImages: Boolean!
+  publishedProducts: Int!
+  pendingProducts: Int!
+}
+input HubriseSettingsInput {
+  enabled: Boolean
+  pushOrders: Boolean
+  syncStatus: Boolean
+  syncInventory: Boolean
+  syncCatalog: Boolean
+  syncCustomers: Boolean
+  catalogAutoImport: Boolean
+  autoRefundOnCancel: Boolean
+  importImages: Boolean
+  publishImages: Boolean
+  catalogLanguage: String
+  variantRef: String
+  channelName: String
+  deliveryChargeRef: String
+  paymentFeeChargeRef: String
+}
+type HubriseStatus {
+  available: Boolean!
+  connected: Boolean!
+  enabled: Boolean!
+  accountId: String
+  accountName: String
+  locationId: String
+  locationName: String
+  catalogId: String
+  catalogName: String
+  customerListId: String
+  customerListName: String
+  features: HubriseFeatures!
+  syncCustomers: Boolean!
+  catalogAutoImport: Boolean!
+  catalogUpdateAvailable: Boolean!
+  catalogPendingReview: Boolean!
+  autoRefundOnCancel: Boolean!
+  catalogDirection: HubriseCatalogDirection!
+  publish: HubrisePublishStatus!
+  catalogLanguage: String!
+  variantRef: String
+  channelName: String
+  deliveryChargeRef: String
+  paymentFeeChargeRef: String
+  importImages: Boolean!
+  lastCatalogSyncAt: DateTime
+  lastEventAt: DateTime
+  authErrorAt: DateTime
+  lastError: String
+  relinkRequired: Boolean!
+  backlog: HubriseBacklog!
+  unlinkedProducts: Int!
+  attention: Int!
+}
+enum HubriseSyncMode {
+  DRY_RUN
+  LINK_ONLY
+  FULL
+}
+type HubriseSyncResult {
+  mode: HubriseSyncMode!
+  applied: Boolean!
+  pendingReview: Boolean!
+  diff: HubriseCatalogDiff!
+  failedBatches: [String!]!
+}
 scalar JSON
 type Mutation {
   startAssistantLink: AssistantLink! @admin
   removeAssistantAccount(id: String!): AssistantConnection! @admin
   createCoupon(input: CreateCouponInput!): Coupon! @staff
   updateCoupon(id: ID!, input: UpdateCouponInput!): Coupon! @admin
+  startHubriseConnection: String! @admin
+  disconnectHubrise(forgetLinks: Boolean = false): HubriseStatus! @admin
+  updateHubriseSettings(input: HubriseSettingsInput!): HubriseStatus! @admin
+  previewHubriseCatalogSync(mode: HubriseSyncMode!): HubriseCatalogDiff! @admin
+  syncHubriseCatalog(mode: HubriseSyncMode!, confirmRetire: Boolean = false): HubriseSyncResult! @admin
+  forgetHubriseLinks: Int! @admin
+  syncHubriseInventory: Int! @admin
+  linkHubriseProduct(productId: ID!, skuRef: String): Boolean! @admin
+  retryHubriseOutbox(id: String): Int! @admin
+  setHubriseCatalogDirection(direction: HubriseCatalogDirection!, acknowledgeLocalOverwrite: Boolean = false): HubriseStatus! @admin
+  publishHubriseCatalog(confirmRemovals: Boolean = false, removeForeign: Boolean = false, planHash: String): HubrisePublishResult! @admin
+  acknowledgeHubriseExternalChange: HubriseStatus! @admin
   createOrder(input: CreateOrderInput!): Order! @auth
   updateOrder(id: ID!, input: UpdateOrderInput!): Order! @staff
   registerDeviceToken(deviceToken: String!, platform: String!): Boolean! @auth
@@ -295,6 +543,7 @@ type Order {
   items: [OrderItem!]!
   isManualAddress: Boolean!
   statusHistory: [OrderStatusHistory!]! @admin
+  hubrise: HubriseOrderInfo @staff
   displayCustomerName: String!
   displayAddress: String!
 }
@@ -562,6 +811,9 @@ type Product {
   choices: [ProductChoice!]!
   choiceGroups: [ProductChoiceGroup!]!
   translations: [Translation!]!
+  hubriseManaged: Boolean! @admin
+  hubriseLockedFields: [String!]! @admin
+  hubrisePublish: HubriseProductPublishInfo @admin
 }
 type ProductCategory {
   id: ID!
@@ -579,6 +831,7 @@ type ProductChoice {
   sortOrder: Int!
   name: String!
   translations: [ChoiceTranslation!]!
+  isAvailable: Boolean!
 }
 type ProductChoiceGroup {
   id: ID!
@@ -608,6 +861,9 @@ type Query {
   validateCoupon(code: String!, orderAmount: String!): CouponValidation! @auth
   coupons: [Coupon!]! @admin
   coupon(id: ID!): Coupon! @admin
+  hubriseStatus: HubriseStatus! @admin
+  hubriseOutbox(state: HubriseOutboxState, first: Int = 50): [HubriseOutboxItem!]! @admin
+  previewHubriseCatalogPublish(removeForeign: Boolean = false): HubrisePublishPreview! @admin
   """
   Public: the basket can be priced before signing in. A coupon is only evaluated when authenticated.
   """
