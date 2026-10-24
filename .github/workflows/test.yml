@@ -52,7 +52,7 @@ jobs:
         # Fails below 98 % statement coverage (generated code, test support and cmd/ excluded).
         run: |
           go test -race -timeout 30m ./cmd/...
-          scripts/coverage-check.sh 98 -timeout 30m -skip="TestUpdateProduct"
+          scripts/coverage-check.sh 98 -timeout 30m
         env:
           JWT_SECRET: test-jwt-secret-for-ci
           MOLLIE_API_TOKEN: test_dummy_token
