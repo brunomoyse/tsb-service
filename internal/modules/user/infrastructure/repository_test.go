@@ -202,3 +202,30 @@ func TestUserRepository(t *testing.T) {
 		assert.ErrorContains(t, repo.AnonymizeForDeletion(ctx, id.String()), "delete device push tokens")
 	})
 }
+
+// Migrations run before the new pods replace the old ones: user reads must ignore a column added
+// by a later release.
+func TestUserReadsIgnoreAnAddedColumn(t *testing.T) {
+	tdb := testhelpers.SetupTestDatabase(t)
+	repo := NewUserRepository(&db.DBPool{Customer: tdb.DB, Admin: tdb.DB})
+	ctx := t.Context()
+	u := &domain.User{FirstName: "Ada", LastName: "Lovelace", Email: "added-col@example.com", ZitadelUserID: ptr("zit-added-col")}
+	id, err := repo.Save(ctx, u)
+	require.NoError(t, err)
+	var orderID uuid.UUID
+	require.NoError(t, tdb.DB.GetContext(ctx, &orderID, `
+		INSERT INTO orders (user_id, order_status, order_type, language, total_price) VALUES ($1, 'PENDING', 'PICKUP', 'fr', 10) RETURNING id`, id))
+	_, err = tdb.DB.ExecContext(ctx, `ALTER TABLE users ADD COLUMN added_by_a_later_release TEXT DEFAULT 'x'`)
+	require.NoError(t, err)
+
+	_, err = repo.FindByID(ctx, id.String())
+	require.NoError(t, err)
+	_, err = repo.FindByEmail(ctx, "added-col@example.com")
+	require.NoError(t, err)
+	_, err = repo.FindByZitadelID(ctx, "zit-added-col")
+	require.NoError(t, err)
+	byOrder, err := repo.BatchGetUsersByOrderIDs(ctx, []string{orderID.String()})
+	require.NoError(t, err)
+	require.Len(t, byOrder[orderID.String()], 1)
+	assert.Equal(t, id, byOrder[orderID.String()][0].ID)
+}

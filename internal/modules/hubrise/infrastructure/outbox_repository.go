@@ -97,7 +97,7 @@ func (r *outboxRepository) SkipOpenByDedupeKey(ctx context.Context, kind domain.
 //   - $4 lists the kinds the caller handles (NULL = all).
 const claimSQL = `
 WITH conn AS (
-	SELECT * FROM hubrise_connection
+	SELECT push_orders, sync_status, sync_inventory, sync_customers FROM hubrise_connection
 	WHERE enabled AND access_token_enc IS NOT NULL AND auth_error_at IS NULL AND relink_required_at IS NULL
 ), candidates AS (
 	SELECT o.id FROM hubrise_outbox o, conn c

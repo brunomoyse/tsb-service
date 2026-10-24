@@ -305,3 +305,22 @@ func TestPaymentRepository_WithPaymentLock(t *testing.T) {
 		close(release)
 	})
 }
+
+// Migrations run before the new pods replace the old ones: payment reads must ignore a column
+// added by a later release.
+func TestPaymentReadsIgnoreAnAddedColumn(t *testing.T) {
+	repo, newOrder, tdb := newPaymentRepoDB(t)
+	ctx := t.Context()
+	orderID := newOrder(t)
+	require.NoError(t, repo.Save(ctx, samplePayment(orderID, "tr_added_col")))
+	_, err := tdb.DB.ExecContext(ctx, `ALTER TABLE mollie_payments ADD COLUMN added_by_a_later_release TEXT DEFAULT 'x'`)
+	require.NoError(t, err)
+
+	_, err = repo.FindByExternalID(ctx, "tr_added_col")
+	require.NoError(t, err)
+	_, err = repo.FindByOrderID(ctx, orderID)
+	require.NoError(t, err)
+	byOrder, err := repo.FindByOrderIDs(ctx, []string{orderID.String()})
+	require.NoError(t, err)
+	require.Len(t, byOrder[orderID.String()], 1)
+}

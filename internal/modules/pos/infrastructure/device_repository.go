@@ -9,6 +9,9 @@ import (
 	"tsb-service/pkg/db"
 )
 
+// deviceColumns lists the columns of domain.Device (see db.Columns).
+var deviceColumns = db.Columns(domain.Device{}, "")
+
 type DeviceRepository struct {
 	pool *db.DBPool
 }
@@ -19,7 +22,7 @@ func NewDeviceRepository(pool *db.DBPool) domain.DeviceRepository {
 
 func (r *DeviceRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.Device, error) {
 	var d domain.Device
-	const q = `SELECT * FROM pos_devices WHERE id = $1`
+	q := `SELECT ` + deviceColumns + ` FROM pos_devices WHERE id = $1`
 	if err := r.pool.ForContext(ctx).GetContext(ctx, &d, q, id); err != nil {
 		return nil, err
 	}

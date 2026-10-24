@@ -53,7 +53,7 @@ type Order struct {
 	OrderStatus        OrderStatus        `db:"order_status" json:"orderStatus"`
 	OrderType          OrderType          `db:"order_type" json:"orderType"`
 	IsOnlinePayment    bool               `db:"is_online_payment" json:"isOnlinePayment"`
-	PaymentID          *uuid.UUID         `db:"payment_id" json:"paymentId,omitempty"`
+	PaymentID          *uuid.UUID         `db:"-" json:"paymentId,omitempty"` // no orders column: payments point to their order
 	TakeawayDiscount   decimal.Decimal    `db:"takeaway_discount" json:"takeawayDiscount"`
 	CouponDiscount     decimal.Decimal    `db:"coupon_discount" json:"couponDiscount"`
 	DeliveryFee        *decimal.Decimal   `db:"delivery_fee" json:"deliveryFee,omitempty"`
