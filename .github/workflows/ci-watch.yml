@@ -18,6 +18,9 @@ permissions:
   pull-requests: write
   issues: write
   actions: write
+  # Reading the PR checks needs these on private repositories.
+  checks: read
+  statuses: read
 
 concurrency:
   group: ci-watch-${{ github.event.workflow_run.head_branch }}
