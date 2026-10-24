@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -155,12 +156,14 @@ func replayClientDocuments(t *testing.T, seed ...hubtest.SeedOption) {
 }
 
 // errorSummary is what a client can tell from the errors of a response: codes, paths and messages.
+// Sorted, because sibling fields resolve concurrently and their errors come in any order.
 func errorSummary(resp graphqlResponseWithExtensions) []string {
 	var out []string
 	for _, e := range resp.Errors {
 		code, _ := e.Extensions["code"].(string)
 		out = append(out, code+"|"+strings.Join(e.Path, ".")+"|"+e.Message)
 	}
+	slices.Sort(out)
 	return out
 }
 

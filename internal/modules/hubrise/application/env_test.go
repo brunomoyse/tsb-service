@@ -86,7 +86,7 @@ func withPush(o hubrise.PushOptions) envOption { return func(c *envConfig) { c.p
 
 func newEnv(t *testing.T, options ...envOption) *env {
 	t.Helper()
-	cfg := &envConfig{startTime: time.Now()}
+	cfg := &envConfig{startTime: time.Now().Truncate(time.Second)}
 	for _, o := range options {
 		o(cfg)
 	}
