@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -177,4 +179,29 @@ func TestEachMigrationRollsBack(t *testing.T) {
 		}
 		previous = applied
 	}
+}
+
+// TestOlderImageUpIsANoop is the code rollback with the schema left forward: the previous release
+// (fewer migration files) runs `tsb-migrate -cmd=up` as the Helm pre-upgrade hook against a
+// database that already has the newer migrations. It must neither fail nor touch the schema.
+func TestOlderImageUpIsANoop(t *testing.T) {
+	db, dir, migrations := setup(t)
+	require.NoError(t, goose.Up(db, dir))
+	full := snapshot(t, db)
+	latest, err := goose.GetDBVersion(db)
+	require.NoError(t, err)
+
+	// The older image: the same files minus the last three migrations.
+	older := t.TempDir()
+	for _, m := range migrations[:len(migrations)-3] {
+		data, err := os.ReadFile(m.Source)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(older, filepath.Base(m.Source)), data, 0o600))
+	}
+
+	require.NoError(t, goose.Up(db, older), "an older image must be able to run up on a newer schema")
+	version, err := goose.GetDBVersion(db)
+	require.NoError(t, err)
+	require.Equal(t, latest, version)
+	require.Empty(t, diff(full, snapshot(t, db)))
 }
