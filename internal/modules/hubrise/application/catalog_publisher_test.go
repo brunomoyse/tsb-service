@@ -764,3 +764,60 @@ func TestMenuChangedFailureToMarkIsReturned(t *testing.T) {
 	p.State = &pubFaultyState{PublishStateRepository: e.pub.State, fail: map[string]bool{"MarkDirty": true}}
 	assert.ErrorIs(t, p.MenuChanged(t.Context()), errPubBoom)
 }
+
+// A failed write leaves the first publish unconfirmed: the admin previewed one plan, and the next
+// run (after the reconnect) may plan something else.
+func TestAFailedFirstWriteDoesNotKeepTheConfirmation(t *testing.T) {
+	e := newPubEnv(t)
+	e.product("M1", "Maki", "8.90")
+	st, err := e.faulty(hubrisetest.Fault{Method: "PUT", Status: 403, Times: 1})
+	require.ErrorIs(t, err, domain.ErrReconnectRequired)
+	assert.Nil(t, st.FirstPublishConfirmedAt)
+	assert.Zero(t, e.puts())
+
+	_, err = e.pub.PublishNow(t.Context(), application.PublishRequest{})
+	assert.ErrorIs(t, err, domain.ErrPublishConfirmRequired, "a new preview is needed")
+}
+
+// A background run on a connection that cannot publish parks with a reason instead of failing every tick.
+func TestABackgroundRunWithoutTheWriteScopeIsParked(t *testing.T) {
+	e := armed(t)
+	e.exec(`UPDATE hubrise_connection SET scope = 'location[orders.write]'`)
+	e.clock.Advance(time.Minute)
+	ran, err := e.pub.Tick(t.Context())
+	require.NoError(t, err)
+	assert.True(t, ran)
+	st := e.publisherState()
+	assert.Equal(t, domain.PublishWriteScopeMissing, st.ErrorCode())
+	assert.NotNil(t, st.BlockedAt)
+	assert.Nil(t, st.LeaseHolder)
+	ran, err = e.pub.Tick(t.Context())
+	require.NoError(t, err)
+	assert.False(t, ran, "and it stays parked")
+}
+
+// HubRise changes every id on a PUT: the ids of the SKUs a deal line uses, as a GET shows them, must not
+// travel back.
+func TestDealLinesAreSentBackByRefOnly(t *testing.T) {
+	e := newPubEnv(t)
+	e.product("M1", "Maki", "8.90")
+	require.NoError(t, e.srv.ReplaceCatalogRaw(json.RawMessage(`{"categories":[{"ref":"old","name":"Old"}],
+	  "products":[{"ref":"OLD1","category_ref":"old","name":"Old one","skus":[{"ref":"OLD1","price":"1.00 EUR"}]}],
+	  "deals":[{"ref":"d","name":"Deal","lines":[{"label":"l","pricing_effect":"fixed_price","pricing_value":"1.00 EUR","skus":[{"ref":"OLD1"}]}]}]}`)))
+	var before struct {
+		Deals []struct {
+			Lines []struct {
+				Skus []map[string]any `json:"skus"`
+			} `json:"lines"`
+		} `json:"deals"`
+	}
+	require.NoError(t, json.Unmarshal(e.srv.CatalogData(), &before))
+	require.NotEmpty(t, before.Deals[0].Lines[0].Skus[0]["id"], "a GET shows the id of a deal sku")
+
+	out := e.confirmFirst()
+	require.True(t, out.Published, "the PUT is accepted: no stale id travelled")
+	assert.Equal(t, 1, e.puts())
+	var after map[string]any
+	require.NoError(t, json.Unmarshal(e.srv.CatalogData(), &after))
+	assert.Len(t, asList(after["deals"]), 1, "the deal survives")
+}

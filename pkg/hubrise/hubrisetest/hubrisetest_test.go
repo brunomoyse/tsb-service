@@ -229,6 +229,7 @@ func TestPutCatalogValidation(t *testing.T) {
 		"deal without line":          `{"deals":[{"name":"d","lines":[]}]}`,
 		"deal line without sku":      `{"deals":[{"name":"d","lines":[{"skus":[],"pricing_effect":"unchanged"}]}]}`,
 		"deal sku without ref":       `{"deals":[{"name":"d","lines":[{"skus":[{}],"pricing_effect":"unchanged"}]}]}`,
+		"deal sku with a stale id":   `{"categories":[{"ref":"A","name":"a"}],"products":[{"category_ref":"A","name":"p","skus":[{"ref":"S","price":"1.00 EUR"}]}],"deals":[{"name":"d","lines":[{"skus":[{"id":"stale","ref":"S"}],"pricing_effect":"unchanged"}]}]}`,
 		"deal dangling sku":          `{"deals":[{"name":"d","lines":[{"skus":[{"ref":"ghost"}],"pricing_effect":"unchanged"}]}]}`,
 		"deal bad effect":            `{"categories":[{"ref":"A","name":"a"}],"products":[{"category_ref":"A","name":"p","skus":[{"ref":"S","price":"1.00 EUR"}]}],"deals":[{"name":"d","lines":[{"skus":[{"ref":"S"}],"pricing_effect":"magic"}]}]}`,
 		"discount bad effect":        `{"discounts":[{"name":"d","pricing_effect":"free"}]}`,

@@ -295,10 +295,15 @@ func TestFailingToConfirmOrCompleteIsReported(t *testing.T) {
 	p := *e.pub
 	p.State = &pubFaultyState{PublishStateRepository: e.pub.State, fail: map[string]bool{"SetFirstPublishConfirmed": true}}
 	_, err := p.PublishNow(t.Context(), application.PublishRequest{PlanHash: prev})
-	assert.ErrorIs(t, err, errPubBoom)
-	assert.Zero(t, e.puts())
-	p.State = &pubFaultyState{PublishStateRepository: e.pub.State, fail: map[string]bool{"Complete": true}}
-	_, err = p.PublishNow(t.Context(), application.PublishRequest{PlanHash: prev})
+	assert.ErrorIs(t, err, errPubBoom, "the confirmation is recorded after the write")
+	assert.Equal(t, 1, e.puts())
+
+	e2 := newPubEnv(t)
+	e2.product("M1", "Maki", "8.90")
+	prev2 := e2.firstPlan()
+	p2 := *e2.pub
+	p2.State = &pubFaultyState{PublishStateRepository: e2.pub.State, fail: map[string]bool{"Complete": true}}
+	_, err = p2.PublishNow(t.Context(), application.PublishRequest{PlanHash: prev2})
 	assert.ErrorIs(t, err, errPubBoom)
 }
 

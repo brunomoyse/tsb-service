@@ -343,10 +343,15 @@ func (p *CatalogPublisher) execute(ctx context.Context, holder string, seq int64
 	}
 
 	if err := p.ready(conn); err != nil {
-		if !interactive && errors.Is(err, domain.ErrReconnectRequired) {
-			return fail(domain.PublishFailure{Code: domain.PublishWriteScopeMissing, Message: err.Error()}, true, err)
+		if interactive {
+			return nil, err
 		}
-		return nil, err
+		// A background run must not retry a state it cannot fix every tick: park it with a reason.
+		code := domain.PublishUnavailable
+		if errors.Is(err, domain.ErrReconnectRequired) {
+			code = domain.PublishWriteScopeMissing
+		}
+		return fail(domain.PublishFailure{Code: code, Message: truncate(err.Error(), 500)}, true, err)
 	}
 	if err := extend(); err != nil {
 		return nil, err
@@ -428,13 +433,6 @@ func (p *CatalogPublisher) execute(ctx context.Context, holder string, seq int64
 	if err := p.writeLinks(ctx, plan); err != nil {
 		return fail(domain.PublishFailure{Code: domain.PublishUnavailable, Message: truncate(err.Error(), 500), RetryAt: p.retryAt(state), CountAttempt: true}, false, err)
 	}
-	if interactive && state.FirstPublishConfirmedAt == nil {
-		now := p.now()
-		if err := p.State.SetFirstPublishConfirmed(ctx, &now); err != nil {
-			return nil, err
-		}
-	}
-
 	if images != nil && len(images.pending) > 0 {
 		// The images go first: the catalog names them by id. The plan is made again with the real ids; the
 		// confirmation above covered the same items (the images never change the plan hash).
@@ -466,6 +464,15 @@ func (p *CatalogPublisher) execute(ctx context.Context, holder string, seq int64
 		remoteHash = ""
 		if put != nil && len(put.Data) > 0 {
 			remoteHash = RemoteCatalogHash(put.Data)
+		}
+	}
+
+	// The confirmation is recorded only once the plan the admin previewed went through: a failed PUT
+	// leaves the next publish needing a preview again.
+	if interactive && state.FirstPublishConfirmedAt == nil {
+		now := p.now()
+		if err := p.State.SetFirstPublishConfirmed(bg, &now); err != nil {
+			return nil, err
 		}
 	}
 

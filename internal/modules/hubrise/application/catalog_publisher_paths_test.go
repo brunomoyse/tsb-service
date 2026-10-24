@@ -114,9 +114,16 @@ func TestTheLeaseIsExtendedBeforeEveryStepThatTakesTime(t *testing.T) {
 func TestARunOnAConnectionThatLostItsCatalogIsReportedAndReleasesTheLease(t *testing.T) {
 	e := armed(t)
 	e.exec(`UPDATE hubrise_connection SET catalog_id = NULL`)
-	_, err := e.pub.Tick(t.Context())
-	assert.ErrorIs(t, err, domain.ErrNotConnected)
+	e.clock.Advance(time.Minute)
+	ran, err := e.pub.Tick(t.Context())
+	require.NoError(t, err)
+	assert.False(t, ran, "the claim skips a connection without a catalog: no error every tick")
 	assert.Nil(t, e.publisherState().LeaseHolder)
+	assert.Equal(t, 1, e.puts())
+
+	// An interactive publish is told why.
+	_, err = e.pub.PublishNow(t.Context(), application.PublishRequest{})
+	assert.ErrorIs(t, err, domain.ErrNotConnected)
 }
 
 // Run keeps ticking whatever a tick returns, publishes what is due, and stops with its context.

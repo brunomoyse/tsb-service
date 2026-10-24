@@ -152,6 +152,7 @@ const resetPublisherSQL = `
 		first_publish_confirmed_at = NULL, change_seq = change_seq + 1, dirty_since = $1, last_change_at = $1,
 		next_attempt_at = NULL, attempts = 0, blocked_at = NULL, external_change_at = NULL,
 		last_error = NULL, last_error_code = NULL, last_error_at = NULL,
+		last_published_local_hash = NULL, last_published_remote_hash = NULL,
 		lease_holder = NULL, leased_until = NULL, updated_at = $1`
 
 // clearPublisherSQL clears the dirty flag and the warnings when the direction leaves PUBLISH ($1 = now).
@@ -159,6 +160,7 @@ const clearPublisherSQL = `
 	UPDATE hubrise_catalog_publish SET
 		dirty_since = NULL, next_attempt_at = NULL, attempts = 0, blocked_at = NULL, external_change_at = NULL,
 		last_error = NULL, last_error_code = NULL, last_error_at = NULL,
+		last_published_local_hash = NULL, last_published_remote_hash = NULL,
 		lease_holder = NULL, leased_until = NULL, updated_at = $1`
 
 func (r *connectionRepository) ChangeCatalogDirection(ctx context.Context, to domain.CatalogDirection, now time.Time, guard domain.DirectionGuard) (*domain.Connection, domain.CatalogDirection, error) {
@@ -197,13 +199,21 @@ func (r *connectionRepository) ChangeCatalogDirection(ctx context.Context, to do
 			RETURNING `+connectionColumns, sync, publish); err != nil {
 			return err
 		}
+		// Entering or leaving PUBLISH: what was published describes a menu the other direction may
+		// since have changed, so the published items go with the hashes.
+		var reset string
 		switch {
 		case to == domain.DirectionPublish && before != domain.DirectionPublish:
-			return tx.exec(ctx, "reset publisher", resetPublisherSQL, now)
+			reset = resetPublisherSQL
 		case to != domain.DirectionPublish && before == domain.DirectionPublish:
-			return tx.exec(ctx, "clear publisher", clearPublisherSQL, now)
+			reset = clearPublisherSQL
+		default:
+			return nil
 		}
-		return nil
+		if err := tx.exec(ctx, "reset publisher", reset, now); err != nil {
+			return err
+		}
+		return tx.exec(ctx, "forget published items on direction change", `DELETE FROM hubrise_published_items`)
 	})
 	if err != nil {
 		return nil, "", err

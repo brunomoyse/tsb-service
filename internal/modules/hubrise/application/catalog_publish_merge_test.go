@@ -534,3 +534,24 @@ func TestRemovingForeignItemsAlsoRemovesTheirUnusedOptionLists(t *testing.T) {
 	assert.Nil(t, gone.sku("EPOS"))
 	assert.Nil(t, gone.category("foreigncat"))
 }
+
+// The ids inside a deal (lines and the SKUs they use) are dropped from the base: HubRise reads them by ref.
+func TestDealLineIdsAreStrippedFromTheBase(t *testing.T) {
+	local := &domain.LocalSnapshot{
+		Categories: []domain.LocalCategory{{ID: puid(1), Slug: "a", Order: 1, Names: ptexts("A", "")}},
+		Products:   []domain.LocalProduct{{ID: puid(10), CategoryID: puid(1), Code: "K1", Price: pdec("5.00"), VatCategory: "food", Visible: true, Texts: ptexts("K1", "")}},
+	}
+	links := []domain.CatalogLink{linkOf(domain.EntityCategory, puid(1), "a", "a"), linkOf(domain.EntityProduct, puid(10), "K1", "K1")}
+	base := `{"categories":[{"id":"c1","ref":"a","name":"A"}],
+	  "products":[{"id":"p1","ref":"K1","category_id":"c1","name":"K1","skus":[{"id":"s1","ref":"K1","price":"1.00 EUR"}]}],
+	  "deals":[{"id":"d1","ref":"d","name":"Deal","lines":[{"id":"l1","label":"l","pricing_effect":"free","skus":[{"id":"s1","ref":"K1","extra_charge":"0.50 EUR"}]}]}]}`
+	p := planWith(t, application.PublishInput{Local: local, Links: links, Settings: application.PublishSettings{Language: "fr"}, Base: json.RawMessage(base)})
+	deal := asList(p.data["deals"])[0]
+	line := asList(deal["lines"])[0]
+	sk := asList(line["skus"])[0]
+	assert.NotContains(t, deal, "id")
+	assert.NotContains(t, line, "id")
+	assert.NotContains(t, sk, "id")
+	assert.Equal(t, "K1", sk["ref"])
+	assert.Equal(t, "0.50 EUR", sk["extra_charge"])
+}

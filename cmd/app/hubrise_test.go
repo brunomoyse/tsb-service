@@ -16,6 +16,7 @@ import (
 	"tsb-service/internal/api/graphql/resolver"
 	hubtest "tsb-service/internal/modules/hubrise/testhelpers"
 	orderApplication "tsb-service/internal/modules/order/application"
+	productApplication "tsb-service/internal/modules/product/application"
 	userApplication "tsb-service/internal/modules/user/application"
 	"tsb-service/pkg/db"
 )
@@ -34,6 +35,13 @@ type userServiceSpy struct {
 }
 
 func (s *userServiceSpy) SetProfileObserver(o userApplication.ProfileObserver) { s.observer = o }
+
+type productServiceSpy struct {
+	productApplication.ProductService
+	observer productApplication.MenuObserver
+}
+
+func (s *productServiceSpy) SetMenuObserver(o productApplication.MenuObserver) { s.observer = o }
 
 // hubriseEnv sets the whole HubRise environment of a test (every variable, so nothing leaks in from
 // the machine running the tests).
@@ -111,8 +119,8 @@ func TestInitHubrise(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			hubriseEnv(t, tc.env)
 			logs := logsOf(t)
-			orders, users := &orderServiceSpy{}, &userServiceSpy{}
-			r := &resolver.Resolver{OrderService: orders, UserService: users}
+			orders, users, products := &orderServiceSpy{}, &userServiceSpy{}, &productServiceSpy{}
+			r := &resolver.Resolver{OrderService: orders, UserService: users, ProductService: products}
 			router := gin.New()
 
 			rt := initHubrise(router.Group("/api/v1"), r, &db.DBPool{Admin: &sqlx.DB{}}, nil, "https://dash.example.test/")
@@ -123,6 +131,7 @@ func TestInitHubrise(t *testing.T) {
 				assert.Nil(t, r.HubriseAdmin)
 				assert.Nil(t, orders.observer, "no status observer")
 				assert.Nil(t, users.observer, "no profile observer")
+				assert.Nil(t, products.observer, "no menu observer")
 				assert.Empty(t, router.Routes(), "no HubRise route")
 			} else {
 				require.NotNil(t, rt)
@@ -130,6 +139,7 @@ func TestInitHubrise(t *testing.T) {
 				assert.NotNil(t, r.Hubrise)
 				assert.NotNil(t, orders.observer)
 				assert.NotNil(t, users.observer)
+				assert.NotNil(t, products.observer, "menu edits reach the publisher")
 				var routes []string
 				for _, route := range router.Routes() {
 					routes = append(routes, route.Method+" "+route.Path)

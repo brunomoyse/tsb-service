@@ -66,7 +66,7 @@ func (r *publishStateRepository) MarkDirty(ctx context.Context, now time.Time) (
 // and nothing pauses the pipeline. The connection is read inside the claim, so a disable takes
 // effect on the next claim of every replica.
 const healthyConnection = `EXISTS (SELECT 1 FROM hubrise_connection c WHERE c.publish_catalog AND c.enabled
-		AND c.access_token_enc IS NOT NULL AND c.auth_error_at IS NULL AND c.relink_required_at IS NULL)`
+		AND c.access_token_enc IS NOT NULL AND COALESCE(c.catalog_id, '') <> '' AND c.auth_error_at IS NULL AND c.relink_required_at IS NULL)`
 
 func (r *publishStateRepository) Claim(ctx context.Context, holder string, now time.Time) (int64, bool, error) {
 	return r.claim(ctx, "claim catalog publish", holder, now, `

@@ -578,6 +578,30 @@ func TestChangeCatalogDirection(t *testing.T) {
 		assert.Equal(t, domain.DirectionNone, c.CatalogDirection())
 	})
 
+	t.Run("a direction change forgets what was published and its hashes", func(t *testing.T) {
+		e := newPublishEnv(t)
+		e.connect(t)
+		require.NoError(t, e.items.Replace(ctx, []domain.PublishedItem{{EntityType: domain.EntityProduct, HubriseKey: "K", HubriseRef: "K", ContentHash: "h", PublishedAt: t0}}))
+		_, err := e.db.ExecContext(ctx, `UPDATE hubrise_catalog_publish SET last_published_local_hash = 'l', last_published_remote_hash = 'r'`)
+		require.NoError(t, err)
+		_, _, err = e.conn.ChangeCatalogDirection(ctx, domain.DirectionImport, t0, nil)
+		require.NoError(t, err)
+		s, _ := e.state.Get(ctx)
+		assert.Nil(t, s.LastPublishedLocalHash)
+		assert.Nil(t, s.LastPublishedRemoteHash)
+		n, err := e.items.Count(ctx, domain.EntityProduct)
+		require.NoError(t, err)
+		assert.Zero(t, n)
+
+		// And entering PUBLISH again starts from nothing too.
+		require.NoError(t, e.items.Replace(ctx, []domain.PublishedItem{{EntityType: domain.EntityProduct, HubriseKey: "K", HubriseRef: "K", ContentHash: "h", PublishedAt: t0}}))
+		_, _, err = e.conn.ChangeCatalogDirection(ctx, domain.DirectionPublish, t0, nil)
+		require.NoError(t, err)
+		n, err = e.items.Count(ctx, domain.EntityProduct)
+		require.NoError(t, err)
+		assert.Zero(t, n)
+	})
+
 	t.Run("staying in PUBLISH does not reset the publisher", func(t *testing.T) {
 		e := newPublishEnv(t)
 		e.connect(t)

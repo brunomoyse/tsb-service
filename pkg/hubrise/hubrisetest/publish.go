@@ -491,6 +491,9 @@ func (s *Server) validateUpload(raw json.RawMessage, data obj, checkImages bool)
 			}
 			for _, sk := range lineSkus {
 				ref := text(sk, "ref")
+				if _, has := sk["id"]; has {
+					add(g+".skus", "a deal sku is referenced by ref only, ids change after every PUT")
+				}
 				if ref == "" {
 					add(g+".skus", "a deal sku needs a ref")
 				} else if !skuRefs[ref] {
@@ -677,6 +680,12 @@ func (s *Server) recreate(in obj) obj {
 			d = cloneObj(d)
 			d["id"] = s.newID()
 			if kind == "deals" {
+				// A GET shows the ids HubRise gave the SKUs a deal line uses.
+				for _, line := range objs(d, "lines") {
+					for _, sk := range objs(line, "skus") {
+						sk["id"] = s.newID()
+					}
+				}
 				if ref := text(d, "category_ref"); ref != "" {
 					d["category_id"] = catIDs[ref]
 					delete(d, "category_ref")

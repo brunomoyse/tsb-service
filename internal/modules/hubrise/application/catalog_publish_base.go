@@ -202,6 +202,13 @@ func normDeal(d jobj, catRefByID map[string]string) jobj {
 	}
 	delete(d, "category_id")
 	delete(d, "id")
+	// HubRise changes every id on a PUT and reads deal lines by SKU ref: a stale id must not travel.
+	for _, line := range jobjs(d, "lines") {
+		delete(line, "id")
+		for _, sk := range jobjs(line, "skus") {
+			delete(sk, "id")
+		}
+	}
 	foldKey(d, "images_ids", "image_ids")
 	dropNulls(d)
 	return d
