@@ -1,0 +1,453 @@
+# HubRise catalog publish: GraphQL contract (PLAN.md amendment A15).
+# Two parts. Part 1 (NEW) is what the backend adds, additive only. Part 2 (EXISTING) is copied from
+# internal/api/graphql/schema/hubrise.graphql and the HubRise fields of product.graphql and order.graphql,
+# so the dashboard worker has the whole HubRise surface in one file.
+#
+# Error codes (extensions.code) the dashboard must handle, besides the existing HUBRISE_* ones:
+#   HUBRISE_PUBLISH_MODE          a FULL catalog import was asked while the direction is PUBLISH
+#   HUBRISE_DIRECTION_CONFLICT    settings tried to set syncCatalog while the direction is PUBLISH
+#   HUBRISE_RECONNECT_REQUIRED    the stored scope lacks catalog.write: reconnect first
+#   HUBRISE_ACCOUNT_CATALOG       the catalog is account level and the token is a location token
+#   HUBRISE_NOT_PUBLISH_MODE      a publish operation was asked while the direction is not PUBLISH
+#   HUBRISE_PREVIEW_STALE         planHash no longer matches the plan: preview again
+#   HUBRISE_PUBLISH_CONFIRM_REQUIRED  first publish or removals above the threshold without confirmation
+#   HUBRISE_PUBLISH_BLOCKED       the plan has blockers (HubrisePublishPreview.blockers)
+#   HUBRISE_PUBLISH_PENDING_CHANGES  leaving PUBLISH with unpublished local edits needs acknowledgeLocalOverwrite
+#   HUBRISE_RATE_LIMITED          HubRise read limit reached; extensions.retryAfterSeconds (Int)
+#   HUBRISE_EMPTY_MENU            the local menu has no visible product, nothing is published
+# Existing ones: HUBRISE_NOT_CONFIGURED, HUBRISE_NOT_CONNECTED, HUBRISE_NOT_ENABLED, HUBRISE_RELINK_REQUIRED,
+#   HUBRISE_PREVIEW_REQUIRED, HUBRISE_RETIRE_CONFIRM_REQUIRED, HUBRISE_EMPTY_CATALOG, HUBRISE_BUSY,
+#   HUBRISE_SKU_LINKED, HUBRISE_MANAGED, HUBRISE_UPSTREAM (extensions kind, status).
+
+# ======================================================================================================
+# PART 1: NEW
+# ======================================================================================================
+
+# Who owns the menu. NONE: nobody (links only). IMPORT: HubRise owns it (the existing syncCatalog mode).
+# PUBLISH: the dashboard owns it and every edit is published to HubRise.
+enum HubriseCatalogDirection {
+    NONE
+    IMPORT
+    PUBLISH
+}
+
+enum HubrisePublishErrorCode {
+    # catalog.write was not granted: the admin must reconnect (HubriseStatus.publish.needsReconnectForWrite).
+    WRITE_SCOPE_MISSING
+    # The catalog is account level and the connection holds a location token.
+    ACCOUNT_CATALOG
+    # The catalog id of the connection no longer exists at HubRise.
+    CATALOG_NOT_FOUND
+    # HubRise answered 422: the content was refused (lastError holds the field messages). Waits for a new edit.
+    REJECTED
+    # Our own pre-flight validation found the menu unpublishable (see the preview blockers).
+    INVALID_MENU
+    # HubRise down, slow or rate limited: retried with backoff.
+    UNAVAILABLE
+    # The token itself is refused (revoked, unpaid): the whole integration is paused (authErrorAt).
+    AUTH
+}
+
+enum HubrisePublishAction {
+    ADD
+    UPDATE
+    REMOVE
+}
+
+enum HubrisePublishState {
+    # HubRise has the current version.
+    PUBLISHED
+    # Edited since the last publish (approximation from update times; the exact answer is the preview).
+    PENDING
+    # Never published.
+    NOT_PUBLISHED
+}
+
+type HubrisePublishStatus {
+    # Equals HubriseStatus.catalogDirection == PUBLISH.
+    enabled: Boolean!
+    # Publishing may run right now: direction PUBLISH, connected, enabled, no auth error, no relink,
+    # write scope present, first publish confirmed, not blocked by a rejection.
+    active: Boolean!
+    # Edits wait to be published.
+    pending: Boolean!
+    pendingSince: DateTime
+    # When the debounced publisher will run (null when nothing is pending or it cannot run).
+    nextPublishAt: DateTime
+    # A publish is running on some replica right now.
+    publishing: Boolean!
+    lastPublishedAt: DateTime
+    # Null until the admin confirmed the first publish after switching to PUBLISH.
+    firstPublishConfirmedAt: DateTime
+    awaitingFirstPublish: Boolean!
+    lastError: String
+    lastErrorCode: HubrisePublishErrorCode
+    lastErrorAt: DateTime
+    # Someone changed the HubRise catalog elsewhere (callback or drift check). It never imports; the next
+    # publish merges around it and overwrites the fields the dashboard owns.
+    externalChangeAt: DateTime
+    # The stored scope has no catalog.write (connections made before publishing existed).
+    needsReconnectForWrite: Boolean!
+    # The catalog looks account level (no location id) or a publish was refused with 401/403 for that reason.
+    accountCatalogDetected: Boolean!
+    # Products and options images are uploaded too (HubriseSettingsInput.publishImages).
+    publishImages: Boolean!
+    publishedProducts: Int!
+    pendingProducts: Int!
+}
+
+type HubrisePublishCount {
+    entity: HubriseCatalogEntity!
+    added: Int!
+    updated: Int!
+    removed: Int!
+}
+
+type HubrisePublishChange {
+    entity: HubriseCatalogEntity!
+    action: HubrisePublishAction!
+    # The HubRise key (ref, SKU ref, "sku|list", "sku|list|option").
+    key: String!
+    ref: String!
+    name: String!
+    # What changes: name, description, price, category, vatCategory, code, visibility, translations, limits,
+    # sortOrder, image...
+    fields: [String!]!
+}
+
+# An item that exists at HubRise, has no link and no local counterpart (for example a product only the EPOS
+# knows). It is kept untouched unless removeForeign is chosen.
+type HubrisePublishForeignItem {
+    entity: HubriseCatalogEntity!
+    ref: String!
+    name: String!
+}
+
+type HubrisePublishPreview {
+    # Identifies this plan. publishHubriseCatalog needs it back for a confirmation.
+    planHash: String!
+    firstPublish: Boolean!
+    added: Int!
+    updated: Int!
+    removed: Int!
+    unchanged: Int!
+    # Items only HubRise has (kept, or removed with removeForeign).
+    foreign: Int!
+    counts: [HubrisePublishCount!]!
+    # Capped at 500 entries, removals first. truncated says whether more exist.
+    changes: [HubrisePublishChange!]!
+    truncated: Boolean!
+    foreignItems: [HubrisePublishForeignItem!]!
+    # Sections of the HubRise catalog that are carried over untouched (deals, discounts, charges, variants), by name with a count.
+    preserved: [String!]!
+    warnings: [HubriseCatalogIssue!]!
+    # Problems that forbid publishing (duplicate refs, option list rules, SKU names...). Empty when publishable.
+    blockers: [HubriseCatalogIssue!]!
+    # Removing this many SKUs (linked ones deleted locally plus foreign ones when removeForeign) needs
+    # confirmRemovals: at least 5 and more than 30 % of the published ones (the import's mass-retire rule).
+    removalsNeedConfirm: Boolean!
+    generatedAt: DateTime!
+}
+
+type HubrisePublishResult {
+    # The catalog was written to HubRise by this call.
+    published: Boolean!
+    # Another replica holds the publish lease: the work was queued and runs within seconds.
+    queued: Boolean!
+    status: HubrisePublishStatus!
+}
+
+# What the dashboard shows about one product in PUBLISH mode. Null when the direction is not PUBLISH.
+type HubriseProductPublishInfo {
+    state: HubrisePublishState!
+    publishedAt: DateTime
+    # The SKU ref the product has (or will have) at HubRise.
+    ref: String
+}
+
+extend type HubriseFeatures {
+    # True while direction == PUBLISH. Mutually exclusive with syncCatalog.
+    publishCatalog: Boolean!
+}
+
+extend type HubriseStatus {
+    catalogDirection: HubriseCatalogDirection!
+    publish: HubrisePublishStatus!
+}
+
+extend input HubriseSettingsInput {
+    # Upload product images with the catalog (max 1 MB each, reuse by private_ref). Off by default.
+    publishImages: Boolean
+}
+
+extend type Product {
+    hubrisePublish: HubriseProductPublishInfo @admin
+}
+
+extend type Query {
+    # Reads nothing locally that is not already public; fetches the HubRise catalog once (10 per minute bucket).
+    # Errors: NOT_PUBLISH_MODE, NOT_CONNECTED, RATE_LIMITED, UPSTREAM, EMPTY_MENU.
+    previewHubriseCatalogPublish(removeForeign: Boolean = false): HubrisePublishPreview! @admin
+}
+
+extend type Mutation {
+    # Switches who owns the menu, atomically (syncCatalog and the auto import are turned off for PUBLISH).
+    # To PUBLISH: needs a connected install and catalog.write (RECONNECT_REQUIRED), starts "awaiting first
+    # publish": nothing is written until publishHubriseCatalog is confirmed. Leaving PUBLISH with unpublished
+    # edits needs acknowledgeLocalOverwrite (PUBLISH_PENDING_CHANGES); IMPORT also needs the existing
+    # dry-run preview (PREVIEW_REQUIRED).
+    setHubriseCatalogDirection(direction: HubriseCatalogDirection!, acknowledgeLocalOverwrite: Boolean = false): HubriseStatus! @admin
+    # Publishes now (skips the debounce). The first publish and removals above the threshold need
+    # confirmRemovals and the planHash of the preview the admin saw (PUBLISH_CONFIRM_REQUIRED, PREVIEW_STALE).
+    # removeForeign also removes the HubRise-only items. Errors: NOT_PUBLISH_MODE, NOT_ENABLED, RELINK_REQUIRED,
+    # RECONNECT_REQUIRED, ACCOUNT_CATALOG, PUBLISH_BLOCKED, EMPTY_MENU, RATE_LIMITED, UPSTREAM.
+    publishHubriseCatalog(confirmRemovals: Boolean = false, removeForeign: Boolean = false, planHash: String): HubrisePublishResult! @admin
+    # Clears the "external change detected" warning.
+    acknowledgeHubriseExternalChange: HubriseStatus! @admin
+}
+
+# Behaviour changes of existing operations in PUBLISH mode:
+#  - syncHubriseCatalog(mode: FULL) and previewHubriseCatalogSync(FULL) fail with HUBRISE_PUBLISH_MODE;
+#    LINK_ONLY and DRY_RUN keep working (adoption of existing SKUs, to give them refs before the first publish).
+#  - updateHubriseSettings(syncCatalog: true) fails with HUBRISE_DIRECTION_CONFLICT.
+#  - updateProduct and the choice mutations are never refused with HUBRISE_MANAGED (no locks in PUBLISH mode).
+#  - HubriseStatus.features.syncCatalog is false and catalogUpdateAvailable false while PUBLISH.
+
+# ======================================================================================================
+# PART 2: EXISTING (copied; do not redefine)
+# ======================================================================================================
+
+type HubriseFeatures {
+    # Push the orders (web and app) to HubRise.
+    pushOrders: Boolean!
+    # Apply the status changes made in HubRise to the orders.
+    syncStatus: Boolean!
+    # Sold-out products and options follow the HubRise inventory, and the other way round.
+    syncInventory: Boolean!
+    # HubRise is the source of truth of the menu: its price, category, VAT, code and options are locked.
+    syncCatalog: Boolean!
+}
+#
+type HubriseBacklog {
+    pending: Int!
+    # Rows HubRise refused for good; they wait for a manual retry.
+    parked: Int!
+}
+#
+type HubriseStatus {
+    # False when HubRise is not configured on this server (no client id, secret and token key);
+    # every other field is then empty.
+    available: Boolean!
+    # A HubRise location is authorized (an access token is stored).
+    connected: Boolean!
+    # The integration is switched on. A connected but disabled integration is paused: nothing leaves
+    # and nothing is imported.
+    enabled: Boolean!
+#
+    accountId: String
+    accountName: String
+    locationId: String
+    locationName: String
+    catalogId: String
+    catalogName: String
+    customerListId: String
+    customerListName: String
+#
+    features: HubriseFeatures!
+    # Keep the HubRise customer list in step with the shop's accounts.
+    syncCustomers: Boolean!
+    # Import the catalog when HubRise says it changed, instead of only showing "update available".
+    catalogAutoImport: Boolean!
+    # HubRise has a catalog the shop has not imported yet.
+    catalogUpdateAvailable: Boolean!
+    # A scheduled import stopped at the mass-retire threshold and waits for a human to confirm.
+    catalogPendingReview: Boolean!
+    # Cancelling an order in HubRise refunds a paid online order automatically. Off by default.
+    autoRefundOnCancel: Boolean!
+#
+    # fr, en, nl or zh: the language the HubRise catalog is written in.
+    catalogLanguage: String!
+    variantRef: String
+    channelName: String
+    deliveryChargeRef: String
+    paymentFeeChargeRef: String
+    importImages: Boolean!
+#
+    lastCatalogSyncAt: DateTime
+    lastEventAt: DateTime
+    # Since when HubRise refuses the token (revoked, blocked, unpaid or missing scope): the
+    # integration is paused until the connection is authorized again.
+    authErrorAt: DateTime
+    lastError: String
+    # The connection now points at another HubRise location or catalog than the existing links were
+    # made for: forget the links before enabling the integration.
+    relinkRequired: Boolean!
+#
+    backlog: HubriseBacklog!
+    # Visible products an order would send without a SKU ref.
+    unlinkedProducts: Int!
+    # Orders flagged for staff (HubRise refused or never accepted them, a paid order was cancelled
+    # there...). The flag is on Order.hubrise.
+    attention: Int!
+}
+#
+enum HubriseOutboxState {
+    PENDING
+    SENDING
+    SENT
+    PARKED
+    SKIPPED
+}
+#
+enum HubriseOutboxKind {
+    ORDER_CREATE
+    ORDER_STATUS
+    INVENTORY
+    CUSTOMER
+    CUSTOMER_ANONYMISE
+}
+#
+# One request on its way to HubRise. The content is deliberately not exposed: it holds customer data.
+type HubriseOutboxItem {
+    # A String: the global ID scalar is bound to UUID.
+    id: String!
+    kind: HubriseOutboxKind!
+    orderId: ID
+    state: HubriseOutboxState!
+    attempts: Int!
+    lastError: String
+    nextAttemptAt: DateTime!
+    createdAt: DateTime!
+    sentAt: DateTime
+    parkedAt: DateTime
+}
+#
+input HubriseSettingsInput {
+    enabled: Boolean
+    pushOrders: Boolean
+    syncStatus: Boolean
+    syncInventory: Boolean
+    # Needs a dry run of the current catalog from the last 24 hours (HUBRISE_PREVIEW_REQUIRED).
+    syncCatalog: Boolean
+    syncCustomers: Boolean
+    catalogAutoImport: Boolean
+    autoRefundOnCancel: Boolean
+    importImages: Boolean
+    catalogLanguage: String
+    # The text options: an empty string clears the option.
+    variantRef: String
+    channelName: String
+    deliveryChargeRef: String
+    paymentFeeChargeRef: String
+}
+#
+# How far an import goes.
+enum HubriseSyncMode {
+    # Computes what a full import would do and writes nothing (it counts as the preview catalog sync needs).
+    DRY_RUN
+    # Records the links between HubRise entries and existing products, so orders carry SKU and option
+    # refs, without touching any product data.
+    LINK_ONLY
+    # Adopts, creates, updates and retires.
+    FULL
+}
+#
+enum HubriseCatalogAction {
+    CREATE
+    UPDATE
+    LINK
+    RETIRE
+    REVIVE
+}
+#
+enum HubriseCatalogEntity {
+    CATEGORY
+    PRODUCT
+    CHOICE_GROUP
+    CHOICE
+}
+#
+type HubriseCatalogChange {
+    entity: HubriseCatalogEntity!
+    action: HubriseCatalogAction!
+    # The HubRise key of the entry (ref, SKU ref, "sku|list", "sku|list|option").
+    key: String!
+    name: String!
+    # What changes: price, category, vat_category, code, visibility, availability, names, limits...
+    fields: [String!]!
+}
+#
+# Something the import noticed and did not silently absorb, or a match it refused to guess.
+type HubriseCatalogIssue {
+    code: String!
+    key: String
+    message: String!
+}
+#
+type HubriseCatalogDiff {
+    catalogHash: String!
+    changes: [HubriseCatalogChange!]!
+    warnings: [HubriseCatalogIssue!]!
+    # Ambiguous matches: neither created nor linked.
+    conflicts: [HubriseCatalogIssue!]!
+    unchanged: Int!
+    # The products this import would retire, out of the linked ones.
+    retiringProducts: Int!
+    linkedProducts: Int!
+    # Retiring that many needs `confirmRetire`.
+    retireNeedsConfirm: Boolean!
+}
+#
+type HubriseSyncResult {
+    mode: HubriseSyncMode!
+    # False for a dry run and for an import waiting for confirmation.
+    applied: Boolean!
+    # A scheduled import stopped at the mass-retire threshold.
+    pendingReview: Boolean!
+    diff: HubriseCatalogDiff!
+    # The batches (a category with its products) that were rolled back.
+    failedBatches: [String!]!
+}
+#
+# What staff see about the HubRise side of an order.
+type HubriseOrderInfo {
+    hubriseOrderId: String
+    # pending, sent, parked or skipped.
+    pushState: String!
+    pushedAt: DateTime
+    # The status HubRise last reported.
+    remoteStatus: String
+    # The total HubRise computed, two decimals.
+    remoteTotal: String
+    # Why staff must look at the order (UNLINKED_ITEM, TOTAL_MISMATCH, NOT_ACCEPTED, REMOTE_CANCELLED_PAID...).
+    needsAttention: String
+}
+#
+extend type Query {
+    hubriseStatus: HubriseStatus! @admin
+    hubriseOutbox(state: HubriseOutboxState, first: Int = 50): [HubriseOutboxItem!]! @admin
+}
+#
+extend type Mutation {
+    # The HubRise URL to send the browser to. HubRise sends it back to /api/v1/hubrise/oauth/callback.
+    startHubriseConnection: String! @admin
+    # Revokes the token, deletes the callback and switches the integration off. The links stay unless forgetLinks.
+    disconnectHubrise(forgetLinks: Boolean = false): HubriseStatus! @admin
+    updateHubriseSettings(input: HubriseSettingsInput!): HubriseStatus! @admin
+    previewHubriseCatalogSync(mode: HubriseSyncMode!): HubriseCatalogDiff! @admin
+    syncHubriseCatalog(mode: HubriseSyncMode!, confirmRetire: Boolean = false): HubriseSyncResult! @admin
+    # Clears every catalog link. The products stay, as ordinary products. Returns how many links went.
+    forgetHubriseLinks: Int! @admin
+    # Reads the HubRise inventory now. Returns how many products and options changed or got a stock figure.
+    syncHubriseInventory: Int! @admin
+    # Links a product to a HubRise SKU by hand; no skuRef removes the link.
+    linkHubriseProduct(productId: ID!, skuRef: String): Boolean! @admin
+    # Retries the parked rows: those of the chain of row `id`, or all of them. Returns how many.
+    retryHubriseOutbox(id: String): Int! @admin
+}
+
+# existing, on Product (product.graphql):
+#   hubriseManaged: Boolean! @admin
+#   hubriseLockedFields: [String!]! @admin
+# existing, on Order (order.graphql):
+#   hubrise: HubriseOrderInfo @staff
