@@ -203,3 +203,74 @@ jobs:
               --set "apps.${APP}.image.tag=${TAG}" \
               ${MCP_SET} \
               --atomic --timeout 5m
+
+# ── Production smoke test (tag push v*) ─────────────────────────────────────
+
+  smoke_production:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: deploy_production
+    name: Smoke test production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: read
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+      API: ${{ vars.TSB_API_BASE_URL }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - name: Checkout tags
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # Passes when the API answers /up and lists the menu categories from the database, retried for 5 minutes.
+      - name: Check the live site
+        id: smoke
+        run: |
+          set -uo pipefail
+          if [ -z "${API:-}" ]; then echo "::error::Production URL variable missing."; exit 1; fi
+          live() {
+            curl -fsS --max-time 20 -o /dev/null "$API/up" &&
+              curl -fsS --max-time 20 -X POST "$API/graphql" \
+                -H 'content-type: application/json' \
+                -d '{"query":"{ productCategories { id } }"}' |
+              jq -e '.data.productCategories | length > 0' >/dev/null
+          }
+          for i in $(seq 1 10); do
+            if live; then echo "Smoke test passed (attempt $i)."; exit 0; fi
+            echo "Attempt $i failed, retrying in 30 s."
+            sleep 30
+          done
+          exit 1
+
+      # A release tagged by "Nightly dependency release" only carries
+      # Dependabot updates (no migration), so the previous version is a safe
+      # target. A release tagged by hand is never rolled back automatically.
+      - name: Roll back an automated release
+        if: failure() && steps.smoke.outcome == 'failure'
+        run: |
+          set -euo pipefail
+          repo="${GH_REPO#*/}"
+          notify() {
+            if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then return 0; fi
+            curl -fsS -o /dev/null "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+              --data-urlencode "text=$1" \
+              --data-urlencode "disable_web_page_preview=true" \
+              --data-urlencode "disable_notification=true" \
+              || echo "::warning::Telegram alert failed: $1"
+          }
+          subject=$(git tag -l --format='%(contents:subject)' "$TAG")
+          prev=$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | awk -v t="$TAG" 'found { print; exit } $0 == t { found = 1 }')
+          if [[ "$subject" == "Automated dependency release"* ]] && [ -n "$prev" ]; then
+            gh workflow run action.yml --ref main -f version="$prev" -f migrations_down=0
+            notify "↩️ $repo $TAG failed its production smoke test: rolling back to $prev. $GITHUB_SERVER_URL/$GH_REPO/actions"
+          else
+            notify "🔥 $repo $TAG failed its production smoke test. Not an automated release: check it, and roll back by hand (Run workflow, version $prev) if needed. $GITHUB_SERVER_URL/$GH_REPO/actions/runs/$GITHUB_RUN_ID"
+          fi
