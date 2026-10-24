@@ -1,6 +1,7 @@
 package application_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -383,4 +384,69 @@ func TestAdminWithoutAPublisherIsStandalone(t *testing.T) {
 	infos, err := a.ProductPublishInfos(t.Context(), nil)
 	require.NoError(t, err)
 	assert.Empty(t, infos)
+}
+
+// pubFaultyEvents fails the reads of the event store the publisher's drift job makes.
+type pubFaultyEvents struct {
+	domain.EventRepository
+	types, collapse bool
+}
+
+func (f pubFaultyEvents) PendingEventTypes(ctx context.Context, resource string, before time.Time) ([]string, error) {
+	if f.types {
+		return nil, errPubBoom
+	}
+	return f.EventRepository.PendingEventTypes(ctx, resource, before)
+}
+
+func (f pubFaultyEvents) CollapsePending(ctx context.Context, resource string, before, now time.Time) (int64, error) {
+	if f.collapse {
+		return 0, errPubBoom
+	}
+	return f.EventRepository.CollapsePending(ctx, resource, before, now)
+}
+
+func TestCatalogEventsOfAPublishedCatalogThatCannotBeConsumedAreReported(t *testing.T) {
+	for name, faulty := range map[string]func(domain.EventRepository) domain.EventRepository{
+		"the types": func(e domain.EventRepository) domain.EventRepository {
+			return pubFaultyEvents{EventRepository: e, types: true}
+		},
+		"the collapse": func(e domain.EventRepository) domain.EventRepository {
+			return pubFaultyEvents{EventRepository: e, collapse: true}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newPublishRig(t)
+			_, err := r.admin.SetCatalogDirection(t.Context(), domain.DirectionPublish, false)
+			require.NoError(t, err)
+			job := application.NewCatalogDrift(application.CatalogDriftDeps{
+				Connections: r.mod.Connections, Events: faulty(r.mod.Events), Leases: r.mod.Leases, Checker: r.catalog.Drift, Clock: r.clock,
+				Publish: r.catalog.Publisher,
+			})
+			r.catalogEvent("edit", "update", time.Minute)
+			_, err = job.CheckEvents(t.Context())
+			assert.ErrorIs(t, err, errPubBoom)
+		})
+	}
+}
+
+func TestTheStatusFailsWhenThePublisherCannotBeRead(t *testing.T) {
+	r := newPublishRig(t)
+	r.exec(`ALTER TABLE hubrise_catalog_publish RENAME TO hubrise_catalog_publish_away`)
+	_, err := r.admin.Status(t.Context())
+	assert.Error(t, err)
+}
+
+func TestForgettingLinksReportsWhatItCannotForget(t *testing.T) {
+	r := newPublishRig(t)
+	r.exec(`ALTER TABLE hubrise_published_items RENAME TO hubrise_published_items_away`)
+	_, err := r.admin.ForgetLinks(t.Context())
+	assert.Error(t, err)
+}
+
+func TestThePublisherCannotBuildAClientForAnUnreadableToken(t *testing.T) {
+	r := newPublishRig(t)
+	r.exec(`UPDATE hubrise_connection SET access_token_enc = decode('00', 'hex')`)
+	_, err := r.catalog.Publisher.Preview(t.Context(), false)
+	assert.Error(t, err)
 }

@@ -33,9 +33,21 @@ func TestRepositoriesReportAStoreThatIsDown(t *testing.T) {
 	events := infrastructure.NewEventRepository(db)
 	foreign := infrastructure.NewForeignOrderRepository(db)
 	customers := infrastructure.NewCustomerLinkRepository(db)
+	publish := infrastructure.NewPublishStateRepository(db)
+	published := infrastructure.NewPublishedItemRepository(db)
+	local := infrastructure.NewLocalCatalogRepository(db)
 	source := infrastructure.NewCustomerSource(db)
 
 	calls := map[string]func() error{
+		"publish get":      func() error { _, err := publish.Get(ctx); return err },
+		"publish dirty":    func() error { _, err := publish.MarkDirty(ctx, now); return err },
+		"publish complete": func() error { return publish.Complete(ctx, "h", 1, domain.PublishResult{At: now}, nil, nil) },
+		"published list":   func() error { _, err := published.List(ctx); return err },
+		"published keys":   func() error { _, err := published.ByKeys(ctx, domain.EntityProduct, []string{"k"}); return err },
+		"published count":  func() error { _, err := published.Count(ctx, domain.EntityProduct); return err },
+		"published all":    func() error { return published.Replace(ctx, nil) },
+		"snapshot":         func() error { _, _, err := local.SnapshotWithLinks(ctx); return err },
+
 		"conn get":        func() error { _, err := conns.Get(ctx); return err },
 		"conn connect":    func() error { _, err := conns.Connect(ctx, domain.ConnectParams{}); return err },
 		"conn disconnect": func() error { return conns.Disconnect(ctx) },

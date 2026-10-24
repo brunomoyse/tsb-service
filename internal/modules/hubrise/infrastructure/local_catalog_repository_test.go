@@ -390,3 +390,21 @@ func TestLocalCatalogRepositoryWriteErrorsFailTheBatch(t *testing.T) {
 		require.NoError(t, err, c.table)
 	}
 }
+
+func TestSnapshotWithLinksReportsAMissingTable(t *testing.T) {
+	e := newEnv(t)
+	repo := infrastructure.NewLocalCatalogRepository(e.db)
+	ctx := t.Context()
+	for _, table := range []string{"products", "hubrise_catalog_links"} {
+		_, err := e.db.ExecContext(ctx, `ALTER TABLE `+table+` RENAME TO `+table+`_away`)
+		require.NoError(t, err, table)
+		_, _, snapErr := repo.SnapshotWithLinks(ctx)
+		assert.Error(t, snapErr, table)
+		_, err = e.db.ExecContext(ctx, `ALTER TABLE `+table+`_away RENAME TO `+table)
+		require.NoError(t, err, table)
+	}
+	snap, links, err := repo.SnapshotWithLinks(ctx)
+	require.NoError(t, err)
+	assert.NotEmpty(t, snap.Products)
+	assert.Empty(t, links)
+}

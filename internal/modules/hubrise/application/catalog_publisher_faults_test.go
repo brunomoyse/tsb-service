@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,6 +25,10 @@ type pubFaultyState struct {
 	fail map[string]bool
 	// extendFalse makes Extend report a lost lease.
 	extendFalse bool
+	// extendFailOn makes the nth call of Extend fail (0: none).
+	extendFailOn int
+	extendCalls  atomic.Int32
+	claims       atomic.Int32
 }
 
 func (f *pubFaultyState) Get(ctx context.Context) (*domain.PublishState, error) {
@@ -34,6 +39,9 @@ func (f *pubFaultyState) Get(ctx context.Context) (*domain.PublishState, error) 
 }
 
 func (f *pubFaultyState) Extend(ctx context.Context, h string, now time.Time) (bool, error) {
+	if n := int(f.extendCalls.Add(1)); f.extendFailOn > 0 && n == f.extendFailOn {
+		return false, errPubBoom
+	}
 	if f.fail["Extend"] {
 		return false, errPubBoom
 	}
@@ -44,6 +52,7 @@ func (f *pubFaultyState) Extend(ctx context.Context, h string, now time.Time) (b
 }
 
 func (f *pubFaultyState) Claim(ctx context.Context, h string, now time.Time) (int64, bool, error) {
+	f.claims.Add(1)
 	if f.fail["Claim"] {
 		return 0, false, errPubBoom
 	}
@@ -87,7 +96,14 @@ func (f *pubFaultyState) SetFirstPublishConfirmed(ctx context.Context, at *time.
 
 type pubFaultyItems struct {
 	domain.PublishedItemRepository
-	fail bool
+	fail, count bool
+}
+
+func (f pubFaultyItems) Count(ctx context.Context, t domain.EntityType) (int, error) {
+	if f.count {
+		return 0, errPubBoom
+	}
+	return f.PublishedItemRepository.Count(ctx, t)
 }
 
 func (f pubFaultyItems) List(ctx context.Context) ([]domain.PublishedItem, error) {
@@ -174,7 +190,7 @@ func TestRepositoryFailuresAreReportedAndReleaseTheLease(t *testing.T) {
 	})
 	t.Run("published items", func(t *testing.T) {
 		p := base
-		p.Items = pubFaultyItems{base.Items, true}
+		p.Items = pubFaultyItems{PublishedItemRepository: base.Items, fail: true}
 		_, err := p.Tick(ctx)
 		assert.ErrorIs(t, err, errPubBoom)
 		_, err = p.Preview(ctx, false)

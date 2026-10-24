@@ -6,9 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"tsb-service/internal/api/graphql/model"
 	"tsb-service/internal/api/graphql/testhelpers"
 	hubDomain "tsb-service/internal/modules/hubrise/domain"
 	hubtest "tsb-service/internal/modules/hubrise/testhelpers"
@@ -473,4 +475,45 @@ func TestPreviewListsAtMostFiveHundredChanges(t *testing.T) {
 	assert.True(t, prev.Truncated)
 	assert.Len(t, prev.Changes, 500)
 	assert.Greater(t, prev.Added, 500)
+}
+
+// The field resolver also works outside a request with its DataLoader, and every failure of the
+// stores behind the publish API is an error of the request, not a crash.
+func TestPublishAPIReportsWhatItCannotRead(t *testing.T) {
+	t.Run("the product field without a loader", func(t *testing.T) {
+		r := newPublishGQLRig(t)
+		ctx := r.ctxFor(r.Fixtures.AdminUser.ID.String(), true, "en")
+		info, err := r.Resolver.Product().HubrisePublish(ctx, &model.Product{ID: r.Fixtures.SalmonSushi.ID})
+		require.NoError(t, err)
+		require.NotNil(t, info)
+		assert.Equal(t, model.HubrisePublishStateNotPublished, info.State)
+
+		unknown, err := r.Resolver.Product().HubrisePublish(ctx, &model.Product{ID: uuid.New()})
+		require.NoError(t, err)
+		assert.Nil(t, unknown, "a product the menu does not have has no state")
+	})
+
+	t.Run("without the integration the field is null", func(t *testing.T) {
+		env := setupCovEnv(t, covOptions{})
+		info, err := env.Resolver.Product().HubrisePublish(env.ctxFor(env.Fixtures.AdminUser.ID.String(), true, "en"), &model.Product{ID: env.Fixtures.SalmonSushi.ID})
+		require.NoError(t, err)
+		assert.Nil(t, info)
+	})
+
+	t.Run("the menu cannot be read", func(t *testing.T) {
+		r := newPublishGQLRig(t)
+		ctx := r.ctxFor(r.Fixtures.AdminUser.ID.String(), true, "en")
+		r.exec(`ALTER TABLE hubrise_catalog_links RENAME TO hubrise_catalog_links_away`)
+		_, err := r.Resolver.Product().HubrisePublish(ctx, &model.Product{ID: r.Fixtures.SalmonSushi.ID})
+		assert.Error(t, err, "no loader")
+		resp := r.ask(r.adminTok, fmt.Sprintf(`{ product(id: "%s") { hubrisePublish { state } } }`, r.Fixtures.SalmonSushi.ID), nil)
+		assert.NotEmpty(t, resp.Errors, "with the loader")
+	})
+
+	t.Run("the publisher row cannot be written", func(t *testing.T) {
+		r := newPublishGQLRig(t)
+		r.exec(`ALTER TABLE hubrise_catalog_publish RENAME TO hubrise_catalog_publish_away`)
+		resp := r.ask(r.adminTok, `mutation { acknowledgeHubriseExternalChange { connected } }`, nil)
+		assert.NotEmpty(t, resp.Errors)
+	})
 }

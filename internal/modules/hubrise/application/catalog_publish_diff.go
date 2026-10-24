@@ -22,7 +22,7 @@ type projection struct {
 // finish completes the plan once the catalog is assembled: problems, changes, hashes.
 func (p *pubPlanner) finish(data jobj) {
 	pl := p.plan
-	raw, _ := marshalJSON(data)
+	raw := marshalJSON(data)
 	pl.Data = raw
 	pl.Blockers = append(pl.Blockers, p.base.issues...)
 	pl.Blockers = append(pl.Blockers, p.validate(data)...)
@@ -265,9 +265,6 @@ func (p *pubPlanner) diff(base, out map[projKey]*projection) {
 				pl.Unchanged++
 			}
 		case o == nil && b != nil && removedKey(k.entity, k.key):
-			if k.entity == domain.EntityProduct && !p.removedSkus[k.key] {
-				continue
-			}
 			pl.Changes = append(pl.Changes, PublishChange{Entity: k.entity, Action: ActionPublishRemove, Key: k.key, Ref: b.ref, Name: b.name})
 		}
 	}
@@ -334,10 +331,7 @@ func (p *pubPlanner) validate(data jobj) []domain.Warning {
 		if cr := jstr(pr, "category_ref"); cr == "" || !cats[cr] {
 			add(domain.BlockDanglingRef, key, "the product "+jstr(pr, "name")+" has an unknown category "+cr)
 		}
-		ps := jobjs(pr, "skus")
-		if len(ps) == 0 {
-			add(domain.BlockEmptyProduct, key, "the product "+jstr(pr, "name")+" has no SKU")
-		}
+		ps := jobjs(pr, "skus") // a product without SKU is dropped by the merge, none reaches this point
 		if tr, ok := pr["tax_rate"].(jobj); ok {
 			n := 0
 			for _, k := range []string{"delivery", "collection", "eat_in"} {

@@ -375,6 +375,12 @@ func TestRecordErrorAndBlock(t *testing.T) {
 	assert.LessOrEqual(t, len(*s.LastError), 500)
 	assert.True(t, utf8.ValidString(*s.LastError), "cut on a rune boundary")
 
+	euros := strings.Repeat("€", 200) // 600 bytes, the 500th byte is inside a rune
+	require.NoError(t, e.state.Block(ctx, "", domain.PublishRejected, euros, later))
+	s, _ = e.state.Get(ctx)
+	assert.True(t, utf8.ValidString(*s.LastError))
+	assert.Equal(t, strings.Repeat("€", 166), *s.LastError, "166 whole runes fit in 500 bytes")
+
 	require.NoError(t, e.state.ClearError(ctx))
 	s, _ = e.state.Get(ctx)
 	assert.Nil(t, s.BlockedAt)
@@ -699,4 +705,99 @@ func TestConnectionDomainHelpers(t *testing.T) {
 	assert.False(t, domain.HasWriteScope("location[catalogs.write]"))
 	assert.True(t, domain.DirectionPublish.Valid())
 	assert.False(t, domain.CatalogDirection("x").Valid())
+}
+
+// A transaction that fails half way leaves the old state, items and ids as they were.
+func TestCompleteFailingInsideItsTransactionChangesNothing(t *testing.T) {
+	ctx := t.Context()
+	run := func(t *testing.T, table string, items []domain.PublishedItem, ids []domain.LinkHubriseID) (*publishEnv, error) {
+		e := newPublishEnv(t)
+		e.connect(t)
+		links := infrastructure.NewCatalogLinkRepository(e.db)
+		l := &domain.CatalogLink{EntityType: domain.EntityProduct, HubriseKey: "SKU-1", HubriseRef: "SKU-1", Origin: domain.OriginPublished}
+		l.SetLocalID(e.fx.SalmonSushi.ID)
+		require.NoError(t, links.Upsert(ctx, l))
+		_, err := e.state.MarkDirty(ctx, t0)
+		require.NoError(t, err)
+		seq, ok, err := e.state.Claim(ctx, "a", t0.Add(time.Minute))
+		require.NoError(t, err)
+		require.True(t, ok)
+		_, err = e.db.ExecContext(ctx, `ALTER TABLE `+table+` RENAME TO `+table+`_away`)
+		require.NoError(t, err)
+		return e, e.state.Complete(ctx, "a", seq, domain.PublishResult{At: t0}, items, ids)
+	}
+	item := []domain.PublishedItem{{EntityType: domain.EntityProduct, HubriseKey: "NEW", HubriseRef: "NEW", ContentHash: "h", PublishedAt: t0}}
+	id := []domain.LinkHubriseID{{EntityType: domain.EntityProduct, Key: "SKU-1", HubriseID: "fresh"}}
+
+	t.Run("the state row", func(t *testing.T) {
+		_, err := run(t, "hubrise_catalog_publish", item, id)
+		assert.Error(t, err)
+	})
+	t.Run("the published items", func(t *testing.T) {
+		_, err := run(t, "hubrise_published_items", item, nil)
+		assert.Error(t, err)
+	})
+	t.Run("the links", func(t *testing.T) {
+		_, err := run(t, "hubrise_catalog_links", nil, id)
+		assert.Error(t, err)
+	})
+}
+
+// A connection that changes the publisher in the same transaction undoes both when the publisher
+// cannot be written.
+func TestConnectionChangesThatTouchThePublisherFailAsOne(t *testing.T) {
+	ctx := t.Context()
+	boom := func(t *testing.T, e *publishEnv, table string) {
+		t.Helper()
+		_, err := e.db.ExecContext(ctx, `CREATE FUNCTION boom() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'boom'; END $$`)
+		require.NoError(t, err)
+		_, err = e.db.ExecContext(ctx, `CREATE TRIGGER boom BEFORE UPDATE OR DELETE ON `+table+` FOR EACH STATEMENT EXECUTE FUNCTION boom()`)
+		require.NoError(t, err)
+	}
+	connectParams := func(relink bool) domain.ConnectParams {
+		p := domain.ConnectParams{AccessTokenEnc: []byte("x"), LocationID: "l", CatalogID: "c", Scope: hubDefaultScope}
+		if relink {
+			at := t0
+			p.RelinkRequiredAt = &at
+		}
+		return p
+	}
+
+	t.Run("a relinking connection resets the publisher", func(t *testing.T) {
+		e := newPublishEnv(t)
+		boom(t, e, "hubrise_catalog_publish")
+		_, err := e.conn.Connect(ctx, connectParams(true))
+		assert.Error(t, err)
+	})
+	t.Run("a relinking connection forgets the published items", func(t *testing.T) {
+		e := newPublishEnv(t)
+		boom(t, e, "hubrise_published_items")
+		_, err := e.conn.Connect(ctx, connectParams(true))
+		assert.Error(t, err)
+	})
+	t.Run("the connection row cannot be written", func(t *testing.T) {
+		e := newPublishEnv(t)
+		_, err := e.conn.Connect(ctx, connectParams(false))
+		require.NoError(t, err)
+		boom(t, e, "hubrise_connection")
+		_, err = e.conn.Connect(ctx, connectParams(false))
+		assert.Error(t, err)
+	})
+	t.Run("the direction needs the publisher row", func(t *testing.T) {
+		e := newPublishEnv(t)
+		_, err := e.conn.Connect(ctx, connectParams(false))
+		require.NoError(t, err)
+		_, err = e.db.ExecContext(ctx, `DELETE FROM hubrise_catalog_publish`)
+		require.NoError(t, err)
+		_, _, err = e.conn.ChangeCatalogDirection(ctx, domain.DirectionPublish, t0, nil)
+		assert.Error(t, err)
+	})
+	t.Run("the direction is written or not at all", func(t *testing.T) {
+		e := newPublishEnv(t)
+		_, err := e.conn.Connect(ctx, connectParams(false))
+		require.NoError(t, err)
+		boom(t, e, "hubrise_connection")
+		_, _, err = e.conn.ChangeCatalogDirection(ctx, domain.DirectionPublish, t0, nil)
+		assert.Error(t, err)
+	})
 }

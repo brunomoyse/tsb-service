@@ -1,6 +1,8 @@
 package graphql_test
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +15,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"tsb-service/internal/api/graphql/model"
+	"tsb-service/internal/api/graphql/resolver"
 	"tsb-service/internal/api/graphql/testhelpers"
+	"tsb-service/internal/api/hubrisewire"
 	hubtest "tsb-service/internal/modules/hubrise/testhelpers"
 	"tsb-service/pkg/db"
 	pkghubrise "tsb-service/pkg/hubrise"
@@ -110,4 +115,135 @@ func TestHubriseTwoReplicasOnOneDatabaseAndOneHubRise(t *testing.T) {
 	require.Eventually(t, func() bool { return len(srv.RequestsTo(http.MethodPatch, "/v1/location/orders")) == 2 }, 20*time.Second, 20*time.Millisecond)
 	time.Sleep(300 * time.Millisecond)
 	assert.Len(t, srv.RequestsTo(http.MethodPatch, "/v1/location/orders"), 2, "one PATCH per local change")
+}
+
+// The same two replicas publish the menu of the dashboard. The state of the publisher is one row in
+// the database, so a burst of edits made on both replicas is one write, the minimum interval holds
+// across them, a replica that died with the lease is replaced, and an edit made while a write is in
+// flight is never lost.
+func TestHubriseTwoReplicasPublishTheMenuOfTheDashboard(t *testing.T) {
+	env := setupCovEnv(t, covOptions{})
+	srv := hubrisetest.New(t)
+	hubtest.SeedConnection(t, env.DB.DB, hubtest.WithToken(hubrisetest.Token),
+		hubtest.WithLocation(hubrisetest.LocationID, hubrisetest.CatalogID), hubtest.WithPublishCatalog())
+	require.NoError(t, srv.ReplaceCatalogRaw(json.RawMessage(`{}`)))
+
+	broker := pubsub.NewBroker()
+	t.Cleanup(broker.Shutdown)
+	resB := env.wire(t, &db.DBPool{Customer: env.DB.DB, Admin: env.DB.DB}, broker)
+	gin.SetMode(gin.TestMode)
+	routers := []*gin.Engine{gin.New(), gin.New()}
+	front := httptest.NewServer(routers[0])
+	t.Cleanup(front.Close)
+	_, rtA := env.installHubrise(t, env.Resolver, srv, routers[0], front.URL+"/api/v1")
+	_, rtB := env.installHubrise(t, resB, srv, routers[1], front.URL+"/api/v1")
+	r := &e2eRig{covEnv: env, t: t, srv: srv, rt: rtA, web: front, dashboard: e2eDashboard}
+	var err error
+	r.adminTok, err = testhelpers.GenerateTestAccessToken(env.Fixtures.AdminUser.ID.String(), true)
+	require.NoError(t, err)
+	runWorkers(t, rtA)
+	runWorkers(t, rtB)
+
+	admin := env.ctxFor(env.Fixtures.AdminUser.ID.String(), true, "en")
+	salmon, tuna := env.Fixtures.SalmonSushi.ID, env.Fixtures.TunaSushi.ID
+	price := func(res *resolver.Resolver, id uuid.UUID, p string) {
+		_, err := res.Mutation().UpdateProduct(admin, id, model.UpdateProductInput{Price: &p})
+		require.NoError(t, err)
+	}
+	row := func() (changeSeq int, dirty bool, holder *string, nextAfterStart float64) {
+		var s struct {
+			Seq    int     `db:"change_seq"`
+			Dirty  bool    `db:"dirty"`
+			Holder *string `db:"lease_holder"`
+			Gap    float64 `db:"gap"`
+		}
+		require.NoError(t, env.DB.DB.GetContext(t.Context(), &s, `SELECT change_seq, dirty_since IS NOT NULL AS dirty, lease_holder,
+			COALESCE(EXTRACT(EPOCH FROM next_attempt_at - last_started_at), 0)::float8 AS gap FROM hubrise_catalog_publish`))
+		return s.Seq, s.Dirty, s.Holder, s.Gap
+	}
+
+	prev := r.pubPreview()
+	require.True(t, r.pubPublish(false, prev.PlanHash).Published)
+	r.pubSettled()
+	require.Equal(t, 1, r.puts())
+
+	t.Run("a burst of edits on both replicas is one write after the debounce", func(t *testing.T) {
+		srv.ClearRequests()
+		for i, p := range []string{"13.00", "13.10", "13.20", "13.30", "13.40"} {
+			if i%2 == 0 {
+				price(env.Resolver, salmon, p)
+			} else {
+				price(resB, tuna, p)
+			}
+		}
+		seq, dirty, _, gap := row()
+		assert.GreaterOrEqual(t, seq, 5, "five edits")
+		assert.True(t, dirty)
+		assert.GreaterOrEqual(t, gap, 29.0, "30 s after the start of the last run")
+		r.quiet(300 * time.Millisecond) // both workers have had their ticks: nothing is due
+		assert.Equal(t, 1, r.puts())
+
+		r.pubDue()
+		for _, rt := range []*hubrisewire.Runtime{rtA, rtB} {
+			_, err := rt.Catalog.Publisher.Tick(t.Context())
+			require.NoError(t, err)
+		}
+		r.pubSettled()
+		assert.Equal(t, 2, r.puts(), "one write for the whole burst")
+		assert.Len(t, srv.RequestsTo(http.MethodGet, "/v1/catalogs/"), 1)
+		salmonSku, _ := skuOf(r.remoteCatalog(), "SUSHI-SALMON")
+		tunaSku, _ := skuOf(r.remoteCatalog(), "SUSHI-TUNA")
+		assert.Equal(t, "13.30 EUR", tunaSku["price"], "the last edit of the tuna, made on the other replica")
+		assert.Equal(t, "13.40 EUR", salmonSku["price"], "the last edit of the salmon")
+	})
+
+	t.Run("a replica that died with the lease is replaced once the lease expired", func(t *testing.T) {
+		price(env.Resolver, salmon, "14.00")
+		r.pubExec(`UPDATE hubrise_catalog_publish SET lease_holder = 'dead-replica', leased_until = now() + interval '60 seconds',
+			next_attempt_at = now() - interval '1 second'`)
+		for _, rt := range []*hubrisewire.Runtime{rtA, rtB} {
+			ran, err := rt.Catalog.Publisher.Tick(t.Context())
+			require.NoError(t, err)
+			assert.False(t, ran, "the lease of the other replica is respected")
+		}
+		assert.Equal(t, 2, r.puts())
+
+		r.pubExec(`UPDATE hubrise_catalog_publish SET leased_until = now() - interval '1 second'`)
+		require.Eventually(t, func() bool {
+			_, err := rtB.Catalog.Publisher.Tick(t.Context())
+			require.NoError(t, err)
+			return r.puts() == 3
+		}, 20*time.Second, 25*time.Millisecond)
+		r.pubSettled()
+		_, _, holder, _ := row()
+		assert.Nil(t, holder)
+	})
+
+	t.Run("an edit made while the write is in flight is published by the next run", func(t *testing.T) {
+		srv.AddFault(hubrisetest.Fault{Method: http.MethodPut, Path: "/v1/catalogs/", Times: 1, Delay: 600 * time.Millisecond})
+		price(env.Resolver, salmon, "15.00")
+		srv.ClearRequests()
+		r.pubDue()
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			_, err := rtA.Catalog.Publisher.Tick(context.Background())
+			assert.NoError(t, err)
+		}()
+		// The read comes after the snapshot of the menu and before the write.
+		require.Eventually(t, func() bool { return r.gets() == 1 }, 10*time.Second, 2*time.Millisecond)
+		price(resB, tuna, "15.50")
+		<-done
+		assert.Equal(t, 4, r.puts())
+		_, dirty, _, _ := row()
+		assert.True(t, dirty, "the edit of the run is not forgotten")
+		tunaSku, _ := skuOf(r.remoteCatalog(), "SUSHI-TUNA")
+		assert.NotEqual(t, "15.50 EUR", tunaSku["price"], "it was not part of that write")
+
+		r.pubRuns(5)
+		tunaSku, _ = skuOf(r.remoteCatalog(), "SUSHI-TUNA")
+		assert.Equal(t, "15.50 EUR", tunaSku["price"])
+		_, dirty, _, _ = row()
+		assert.False(t, dirty)
+	})
 }

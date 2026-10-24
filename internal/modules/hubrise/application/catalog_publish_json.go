@@ -43,15 +43,14 @@ func decodeObject(raw []byte) (jobj, error) {
 }
 
 // marshalJSON encodes v without HTML escaping (names such as "Soupe & riz" stay readable and the
-// bytes are stable). Map keys come out sorted.
-func marshalJSON(v any) ([]byte, error) {
+// bytes are stable). Map keys come out sorted. Only generic values (maps, slices, strings, numbers,
+// booleans) go in, which always encode.
+func marshalJSON(v any) []byte {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
-	if err := enc.Encode(v); err != nil {
-		return nil, err
-	}
-	return bytes.TrimRight(buf.Bytes(), "\n"), nil
+	_ = enc.Encode(v)
+	return bytes.TrimRight(buf.Bytes(), "\n")
 }
 
 // cloneJSON deep copies a generic value.
@@ -147,11 +146,10 @@ func dropNulls(o jobj) {
 }
 
 // canonicalJSON is the comparison form of a generic value: keys sorted (the encoder does that), ids
-// removed everywhere (ids may change after every PUT), the documentation's alternative spellings
-// folded. Two catalogs with the same canonical form are the same catalog.
+// removed everywhere (ids may change after every PUT). The alternative spellings of the documentation
+// are folded by parseBaseCatalog before. Two catalogs with the same canonical form are the same catalog.
 func canonicalJSON(v any) []byte {
-	b, _ := marshalJSON(canonicalize(v))
-	return b
+	return marshalJSON(canonicalize(v))
 }
 
 func canonicalize(v any) any {
@@ -159,14 +157,8 @@ func canonicalize(v any) any {
 	case jobj:
 		out := make(jobj, len(x))
 		for k, e := range x {
-			if k == "id" || strings.HasSuffix(k, "_id") || strings.HasSuffix(k, "_ids") && k != "image_ids" && k != "images_ids" {
+			if k == "id" || strings.HasSuffix(k, "_id") || strings.HasSuffix(k, "_ids") && k != "image_ids" {
 				continue
-			}
-			switch k {
-			case "options_lists":
-				k = "option_lists"
-			case "images_ids":
-				k = "image_ids"
 			}
 			out[k] = canonicalize(e)
 		}

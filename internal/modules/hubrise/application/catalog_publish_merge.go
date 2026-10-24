@@ -2,6 +2,7 @@ package application
 
 import (
 	"encoding/json"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -481,13 +482,13 @@ func (p *pubPlanner) dropUnreferenced(out *baseCatalog) {
 			usedCats[parent] = true
 		}
 	}
-	for ref := range p.removeCat {
+	for _, ref := range slices.Sorted(maps.Keys(p.removeCat)) {
 		if p.catKept(ref) {
 			continue
 		}
 		if usedCats[ref] {
 			if !p.foreignCat[ref] {
-				p.warn(domain.WarnCategoryInUse, ref, "the category "+ref+" is gone from the shop but a product still uses it, so it is kept")
+				p.warn(domain.WarnCategoryInUse, ref, "the category "+ref+" is gone from the shop but something at HubRise still uses it, so it is kept")
 			}
 			delete(p.removeCat, ref)
 		}
@@ -556,9 +557,5 @@ func (p *pubPlanner) mergeCategoryDescription(c jobj, d *dCategory) {
 		tr[lang] = name
 	}
 	payload["translations"] = tr
-	b, err := marshalJSON(payload)
-	if err != nil {
-		return
-	}
-	c["description"] = string(b)
+	c["description"] = string(marshalJSON(payload))
 }

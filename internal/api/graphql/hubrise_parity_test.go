@@ -2,6 +2,7 @@ package graphql_test
 
 import (
 	"context"
+	"net/http"
 	"sync"
 	"testing"
 	"time"
@@ -23,7 +24,7 @@ import (
 // anything the restaurant does.
 var hubriseTables = []string{
 	"hubrise_connection", "hubrise_oauth_states", "hubrise_catalog_links", "hubrise_orders",
-	"hubrise_outbox", "hubrise_events", "hubrise_foreign_orders", "hubrise_customers",
+	"hubrise_outbox", "hubrise_events", "hubrise_foreign_orders", "hubrise_customers", "hubrise_published_items",
 }
 
 // couplingSpy is the one thing the shop knows of the integration: hooks, a status observer and a
@@ -174,4 +175,55 @@ func TestAnInstalledButDisabledIntegrationDoesNothing(t *testing.T) {
 	time.Sleep(300 * time.Millisecond) // the workers have had their chances
 	assert.Empty(t, srv.Requests(), "zero HTTP calls to HubRise")
 	assert.Equal(t, before, rows(), "and zero new rows")
+}
+
+// A connection that publishes the menu but is switched off queues the edits (nothing is sent while it
+// is off), and one that neither imports nor publishes, or no connection at all, leaves the publisher
+// alone: no write to HubRise, and the standalone shop does not even read.
+func TestMenuEditsOutsideAnActivePublishConnectionSendNothing(t *testing.T) {
+	cases := []struct {
+		name   string
+		seed   []hubtest.SeedOption
+		queued bool
+		silent bool
+	}{
+		{"publishing but switched off", []hubtest.SeedOption{hubtest.WithPublishCatalog(), hubtest.WithEnabled(false)}, true, true},
+		{"enabled, no catalog direction", []hubtest.SeedOption{hubtest.WithFeatures(true, true, true, false, false)}, false, false},
+		{"not connected", nil, false, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			env := setupCovEnv(t, covOptions{})
+			srv := hubrisetest.New(t)
+			newFileService(t)
+			if tc.seed != nil {
+				hubtest.SeedConnection(t, env.DB.DB, append([]hubtest.SeedOption{hubtest.WithToken(hubrisetest.Token),
+					hubtest.WithLocation(hubrisetest.LocationID, hubrisetest.CatalogID)}, tc.seed...)...)
+			}
+			r := env.withHubriseInstalled(t, srv)
+			r.run()
+
+			r.editProduct(env.Fixtures.SalmonSushi.ID, `{ price: "13.00" }`)
+			r.createProduct("PARITY", "Parity", "4.00")
+			require.NoError(t, r.rt.Catalog.Publisher.Scan(t.Context()))
+			r.pubDue()
+			ran, err := r.rt.Catalog.Publisher.Tick(t.Context())
+			require.NoError(t, err)
+			assert.False(t, ran, "the claim needs an enabled, confirmed publishing connection")
+			time.Sleep(200 * time.Millisecond)
+
+			assert.Empty(t, srv.RequestsTo(http.MethodPut, "/v1/catalogs/"), "nothing is written to HubRise")
+			if tc.silent {
+				assert.Empty(t, srv.Requests(), "zero HTTP calls")
+			}
+			queued := countRows(t, env.TestContext, `SELECT count(*) FROM hubrise_catalog_publish WHERE dirty_since IS NOT NULL`)
+			if tc.queued {
+				assert.Equal(t, 1, queued, "the edits wait for the connection to come back")
+			} else {
+				assert.Zero(t, queued, "the publisher was not told")
+				assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM hubrise_catalog_publish WHERE change_seq <> 0`))
+			}
+			assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM hubrise_published_items`))
+		})
+	}
 }

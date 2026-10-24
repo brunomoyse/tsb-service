@@ -1,6 +1,7 @@
 package application
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -52,6 +53,8 @@ type CatalogPublisher struct {
 	Audit AuditFunc
 	// Holder identifies this instance in the lease.
 	Holder string
+	// TickInterval is how often Run looks for a due publish (5 s when zero).
+	TickInterval time.Duration
 }
 
 // PublishRequest is an interactive publish.
@@ -236,7 +239,7 @@ func (p *CatalogPublisher) Run(ctx context.Context) {
 			leases: p.Leases, clock: p.Clock, run: p.Scan}
 		go scan.loop(ctx)
 	}
-	ticker := time.NewTicker(publishTick)
+	ticker := time.NewTicker(cmp.Or(p.TickInterval, publishTick))
 	defer ticker.Stop()
 	for {
 		if _, err := p.Tick(ctx); err != nil && ctx.Err() == nil {

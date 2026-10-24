@@ -569,7 +569,7 @@ func (p *pubPlanner) buildLists() {
 // HubRise list, else the largest, else the one with the smallest SKU ref.
 func (p *pubPlanner) chooseKeeper(sigs []string, bySig map[string][]*dGroup, base jobj) string {
 	if base != nil {
-		if baseSig, ok := baseListSignature(base, p.lang); ok {
+		if baseSig, ok := baseListSignature(base); ok {
 			for _, s := range sigs {
 				if s == baseSig {
 					return s
@@ -598,8 +598,7 @@ func (p *pubPlanner) chooseKeeper(sigs []string, bySig map[string][]*dGroup, bas
 
 // baseListSignature computes the signature the shop would give the HubRise list, to tell which
 // subset of a diverged list is the one that still matches it.
-func baseListSignature(l jobj, lang string) (string, bool) {
-	_ = lang
+func baseListSignature(l jobj) (string, bool) {
 	options := jobjs(l, "options")
 	min, _ := jint(l, "min_selections")
 	max := effectiveMax(l, len(options))

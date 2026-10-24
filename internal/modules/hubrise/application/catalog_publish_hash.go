@@ -24,11 +24,7 @@ func sumHex(b []byte) string {
 }
 
 func hashValue(v any) string {
-	b, err := marshalJSON(v)
-	if err != nil { // only strings, numbers and maps of strings go in
-		panic("hubrise: hash publish value: " + err.Error())
-	}
-	return sumHex(b)
+	return sumHex(marshalJSON(v))
 }
 
 // textsView is the language to {name, description} map of a hash.
