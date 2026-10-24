@@ -80,8 +80,36 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: latest
+          # Pinned: "latest" would change the rules under a green build.
+          # Bump it by hand together with the Go version in the Dockerfile.
+          version: v2.15.0
           args: --timeout=5m
+
+  vulncheck:
+    name: Vulnerability scan
+    # Same scan as the daily "Security scan" workflow, for pull requests and
+    # branches. Not on main or release tags: a vulnerability published today
+    # must not block an unrelated release, the daily scan alerts on it instead.
+    if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read Go version from Dockerfile
+        id: go
+        run: echo "version=$(sed -nE 's/^FROM .*golang:([0-9.]+)-alpine.*/\1/p' Dockerfile | head -n1)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ steps.go.outputs.version }}
+          cache: true
+
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
   build:
     name: Build Application
