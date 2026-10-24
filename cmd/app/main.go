@@ -16,11 +16,8 @@ import (
 
 	"github.com/VictorAvelar/mollie-api-go/v4/mollie"
 	"github.com/getsentry/sentry-go"
-	sentrygin "github.com/getsentry/sentry-go/gin"
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
 	"tsb-service/internal/api/auth"
@@ -29,6 +26,7 @@ import (
 	images "tsb-service/internal/api/images"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
+	"tsb-service/internal/server"
 	"tsb-service/internal/shared/audit"
 	"tsb-service/pkg/brand"
 	"tsb-service/pkg/email/scaleway"
@@ -330,30 +328,6 @@ func main() {
 
 	orderHandler := orderInterfaces.NewOrderHandler(orderService, userService, productService)
 
-	// Gin HTTP setup
-	router := gin.New()
-	// Behind Cloudflare Tunnel: trust CF-Connecting-IP (set by Cloudflare at the
-	// edge, and client-supplied copies are stripped there) instead of the default
-	// of trusting client-supplied X-Forwarded-For. Without this, ClientIP() is
-	// spoofable and per-IP rate limits on auth/OTP endpoints can be bypassed.
-	router.TrustedPlatform = gin.PlatformCloudflare
-	// Never fall back to a client-supplied X-Forwarded-For: requests without
-	// CF-Connecting-IP use the TCP peer address.
-	if err := router.SetTrustedProxies(nil); err != nil {
-		zap.L().Error("failed to set trusted proxies", zap.Error(err))
-		os.Exit(1)
-	}
-	// Order matters: Sentry first (catches panics in every subsequent handler),
-	// then RequestID + Logger + SentryContext (propagates request_id/user_id as Sentry scope tags).
-	router.Use(sentrygin.New(sentrygin.Options{Repanic: true}))
-	router.Use(gin.Recovery())
-	router.Use(middleware.RequestIDMiddleware())
-	router.Use(middleware.ZapRequestLogger())
-	router.Use(middleware.PrometheusMetrics())
-	router.Use(middleware.SentryContext())
-	router.RedirectTrailingSlash = true
-	router.RedirectFixedPath = true
-
 	appBaseURL := os.Getenv("APP_BASE_URL")
 	appDashboardURL := os.Getenv("APP_DASHBOARD_URL")
 	if appBaseURL == "" || appDashboardURL == "" {
@@ -369,66 +343,6 @@ func main() {
 			webOrigins = append(webOrigins, origin)
 		}
 	}
-
-	// Request body size limit (1MB default). GraphQL multipart uploads and the
-	// image preview proxy apply their own limits internally, so the global cap
-	// is skipped for those. Plain GraphQL JSON POSTs keep the 1MB cap: gqlgen
-	// reads them with io.ReadAll and has no limit of its own.
-	router.Use(func(c *gin.Context) {
-		p := c.Request.URL.Path
-		multipartGraphQL := p == "/api/v1/graphql" &&
-			strings.HasPrefix(strings.ToLower(c.GetHeader("Content-Type")), "multipart/form-data")
-		if !multipartGraphQL && p != "/api/v1/images/preview" {
-			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
-		}
-		c.Next()
-	})
-
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:  append(slices.Clone(webOrigins), "capacitor://localhost", "http://localhost", "https://localhost"),
-		CustomSchemas: []string{"capacitor://"},
-		AllowMethods:  []string{"HEAD", "GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:  []string{"Origin", "Content-Type", "Authorization", "Accept-Language"},
-		ExposeHeaders: []string{
-			"Content-Length", "Authorization", "Content-Disposition",
-			"X-Original-Width", "X-Original-Height",
-			"X-Post-Rembg-Width", "X-Post-Rembg-Height",
-			"X-Post-Trim-Width", "X-Post-Trim-Height",
-			"X-Trim-Applied",
-		},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
-	router.OPTIONS("/*any", func(c *gin.Context) { c.Status(http.StatusOK) })
-
-	// Global security headers
-	router.Use(func(c *gin.Context) {
-		c.Header("X-Content-Type-Options", "nosniff")
-		c.Header("X-Frame-Options", "DENY")
-		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
-		c.Next()
-	})
-
-	// Prometheus scrape endpoint. Registered at the router level (outside
-	// /api/v1) so it isn't auth/rate-limited/CORS'd. Public ingress only
-	// forwards /api/v1/* and /auth/*, so this stays in-cluster.
-	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
-
-	// API routes
-	api := router.Group("/api/v1")
-	healthCheck := func(c *gin.Context) {
-		if err := dbPool.DB().Ping(); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy", "db": "unreachable"})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	}
-	api.HEAD("/up", healthCheck)
-	api.GET("/up", healthCheck)
-	api.Use(middleware.LanguageExtractor())
-	api.Use(middleware.DataLoaderMiddleware(
-		orderService, paymentService, productService, userService,
-	))
 
 	// Per-user rate limit on validateCoupon GraphQL query to block brute-force
 	// enumeration of coupon codes: ~5 req/min, burst 3.
@@ -476,50 +390,42 @@ func main() {
 	graphqlHandler := resolver.GraphQLHandler(rootResolver, append(slices.Clone(webOrigins), "capacitor://localhost", "https://localhost"), oidcVerifier, auditRecorder)
 	optionalAuth := oidcVerifier.OptionalAuthMiddleware()
 
-	api.POST("/graphql", optionalAuth, graphqlHandler)
-	api.GET("/graphql", optionalAuth, graphqlHandler)
+	router, stopRouter, err := server.New(server.Config{WebOrigins: webOrigins}, server.Handlers{
+		Health:       func() error { return dbPool.DB().Ping() },
+		DataLoader:   middleware.DataLoaderMiddleware(orderService, paymentService, productService, userService),
+		OptionalAuth: optionalAuth,
+		StrictAuth:   oidcVerifier.StrictAuthMiddleware(),
+		GraphQL:      graphqlHandler,
 
-	// Auth proxy endpoints (proxies to Zitadel Session API with service account PAT)
-	authLimiter := middleware.NewRateLimiter(15.0/60, 10) // 15 req/min per IP, burst of 10
-	// Passwordless email-OTP login (Zitadel Session API otpEmail challenge)
-	api.POST("/auth/session/otp/request", authLimiter.Middleware(), auth.RequestOtpHandler)
-	api.POST("/auth/session/otp/verify", authLimiter.Middleware(), auth.VerifyOtpHandler)
-	api.POST("/auth/session/otp/resend", authLimiter.Middleware(), auth.ResendOtpHandler)
-	api.POST("/auth/session/otp/complete-profile", authLimiter.Middleware(), auth.CompleteOtpProfileHandler)
-	// Store-review OTP retrieval (Google Play / App Store reviewers, no mailbox).
-	// Disabled unless REVIEW_OTP_KEY + REVIEW_OTP_LOGINS are set.
-	api.GET("/auth/review/last-otp", authLimiter.Middleware(), auth.ReviewLastOtpHandler)
-	api.POST("/auth/session/totp/verify", authLimiter.Middleware(), auth.VerifyTotpHandler)
-	api.POST("/auth/finalize", authLimiter.Middleware(), auth.FinalizeOIDCHandler)
-	api.POST("/auth/authorize-proxy", authLimiter.Middleware(), auth.AuthorizeProxyHandler)
-	api.POST("/auth/token-exchange", authLimiter.Middleware(), auth.TokenExchangeHandler)
-	api.POST("/auth/idp/start", authLimiter.Middleware(), auth.StartIdPIntentHandler)
-	api.POST("/auth/idp/session", authLimiter.Middleware(), auth.CreateIdPSessionHandler)
+		OTPRequest:         auth.RequestOtpHandler,
+		OTPVerify:          auth.VerifyOtpHandler,
+		OTPResend:          auth.ResendOtpHandler,
+		OTPCompleteProfile: auth.CompleteOtpProfileHandler,
+		ReviewLastOTP:      auth.ReviewLastOtpHandler,
+		TOTPVerify:         auth.VerifyTotpHandler,
+		Finalize:           auth.FinalizeOIDCHandler,
+		AuthorizeProxy:     auth.AuthorizeProxyHandler,
+		TokenExchange:      auth.TokenExchangeHandler,
+		IdPStart:           auth.StartIdPIntentHandler,
+		IdPSession:         auth.CreateIdPSessionHandler,
 
-	// POS (Sunmi V3H handheld) auth endpoints: HMAC-signed, no Zitadel.
-	posLimiter := middleware.NewRateLimiter(30.0/60, 10) // 30 req/min per IP
-	api.POST("/pos/auth/device-login", posLimiter.Middleware(), posHandler.DeviceLogin)
-	api.PATCH("/pos/devices/fcm-token", posLimiter.Middleware(), posHandler.UpdateFCMToken)
+		MFAStatus:      auth.MFAStatusHandler,
+		MFAStartTOTP:   auth.StartTOTPHandler,
+		MFAConfirmTOTP: auth.ConfirmTOTPHandler,
+		MFARemoveTOTP:  auth.RemoveTOTPHandler,
 
-	// Other endpoints
-	// Mollie's webhook retries are retried ~25 times over 2 days on failure,
-	// and normal traffic is 1-3 hits per payment. 60 req/min (burst 10) per
-	// source IP is well above that baseline and blocks forced-re-fetch spam
-	// from an attacker who has guessed a valid tr_* payment ID.
-	mollieLimiter := middleware.NewRateLimiter(1.0, 10) // 60 req/min per IP, burst 10
-	api.POST("/payments/webhook", mollieLimiter.Middleware(), paymentHandler.UpdatePaymentStatusHandler)
+		POSDeviceLogin:    posHandler.DeviceLogin,
+		POSUpdateFCMToken: posHandler.UpdateFCMToken,
 
-	strictAuth := oidcVerifier.StrictAuthMiddleware()
-	// Staff second factor (TOTP) self-service, admins only (checked in handlers).
-	api.GET("/auth/mfa", strictAuth, auth.MFAStatusHandler)
-	api.POST("/auth/mfa/totp", authLimiter.Middleware(), strictAuth, auth.StartTOTPHandler)
-	api.POST("/auth/mfa/totp/verify", authLimiter.Middleware(), strictAuth, auth.ConfirmTOTPHandler)
-	api.POST("/auth/mfa/totp/remove", authLimiter.Middleware(), strictAuth, auth.RemoveTOTPHandler)
-	api.POST("/images/preview", strictAuth, images.PreviewHandler)
-	api.GET("/orders/:id/invoice", strictAuth, orderHandler.DownloadInvoice)
-
-	feedbackLimiter := middleware.NewRateLimiter(2.0/60, 2) // 2 req/min per IP
-	api.POST("/feedback", feedbackLimiter.Middleware(), feedback.HandleFeedback)
+		PaymentWebhook: paymentHandler.UpdatePaymentStatusHandler,
+		ImagePreview:   images.PreviewHandler,
+		OrderInvoice:   orderHandler.DownloadInvoice,
+		Feedback:       feedback.HandleFeedback,
+	})
+	if err != nil {
+		zap.L().Error("failed to build the HTTP router", zap.Error(err))
+		os.Exit(1)
+	}
 
 	// HTTP server
 	// Use ReadHeaderTimeout instead of ReadTimeout, and omit WriteTimeout,
@@ -615,11 +521,8 @@ func main() {
 	stopSweep()
 	stopBouncePoll()
 	stopAssistantWatch()
-	authLimiter.Stop()
+	stopRouter()
 	couponValidateLimiter.Stop()
-	posLimiter.Stop()
-	mollieLimiter.Stop()
-	feedbackLimiter.Stop()
 	publicQueryLimiter.Stop()
 	broker.Shutdown()
 
