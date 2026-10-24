@@ -596,3 +596,25 @@ func TestAssistantBotProblemEmail(t *testing.T) {
 		require.Contains(t, body, "https://dash.test/assistant")
 	}
 }
+
+func TestOpsAlertEmail(t *testing.T) {
+	srv := smtptest.Start(t)
+	useSMTP(t, srv)
+	require.NoError(t, SendOpsAlertEmail("owner@tsb.test", "HubRise: order AB12CD34 not accepted", "Check the EPOS.\n<script>alert(1)</script>"))
+	m := srv.Only(t)
+
+	require.Equal(t, "HubRise: order AB12CD34 not accepted", m.Subject)
+	require.Equal(t, "owner@tsb.test", m.To)
+	require.Contains(t, m.Text, "Check the EPOS.")
+	require.Contains(t, m.HTML, "Check the EPOS.<br>")
+	require.NotContains(t, m.HTML, "<script>", "the text is escaped")
+
+	t.Run("a send that fails is reported", func(t *testing.T) {
+		srv.SetRejectAll(true)
+		require.ErrorContains(t, SendOpsAlertEmail("owner@tsb.test", "s", "b"), "failed to send email")
+	})
+	t.Run("without a configured sender", func(t *testing.T) {
+		baseReq = nil
+		require.ErrorIs(t, SendOpsAlertEmail("owner@tsb.test", "s", "b"), ErrNotInitialized)
+	})
+}

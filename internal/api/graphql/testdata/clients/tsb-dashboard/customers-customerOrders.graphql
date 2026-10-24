@@ -1,0 +1,15 @@
+query CustomerOrders($userId: ID!, $first: Int, $page: Int) {
+    customerOrders(userId: $userId, first: $first, page: $page) {
+      id
+      createdAt
+      status
+      type
+      totalPrice
+      items {
+        quantity
+        product {
+          name
+        }
+      }
+    }
+  }

@@ -1,0 +1,31 @@
+{
+  "ref": "MAR-SM",
+  "name": "Small",
+  "restrictions": {
+    "end_time": "13:30"
+  },
+  "price": "9.80 EUR",
+  "price_overrides": [
+    {
+      "variant_refs": [
+        "1"
+      ],
+      "price": "12.30 EUR"
+    }
+  ],
+  "option_list_refs": [
+    "SAUCE",
+    "PIZZA_TOPPINGS"
+  ],
+  "tags": [
+    "hidden"
+  ],
+  "barcodes": [
+    "1234567890123",
+    "1234567890124"
+  ],
+  "custom_fields": {},
+  "weight": "150 g",
+  "volume": "33 cl",
+  "nb_servings": 4
+}

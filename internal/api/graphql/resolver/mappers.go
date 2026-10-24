@@ -620,6 +620,7 @@ func ToGQLProductChoice(c *productDomain.ProductChoice, lang string) *model.Prod
 		SortOrder:     c.SortOrder,
 		Name:          c.GetTranslationFor(lang),
 		Translations:  translations,
+		IsAvailable:   c.IsAvailable,
 	}
 }
 

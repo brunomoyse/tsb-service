@@ -228,13 +228,20 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 	// Upsert translations for the provided languages.
 	// This query inserts a new translation, or if a conflict on (product_id, language) occurs,
 	// updates the name and description.
+	//
+	// The dashboard sends every language on every save, so the row only becomes a manual override
+	// (source = 'manual') when its text really changed: a price edit must not turn the names the
+	// HubRise import wrote into manual ones, which the import would then never refresh. The import
+	// stores an empty description as NULL, so NULL and '' compare equal.
 	upsertQuery := `
-		INSERT INTO product_translations (product_id, language, name, description)
+		INSERT INTO product_translations AS t (product_id, language, name, description)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (product_id, language)
 		DO UPDATE SET
 		    name = EXCLUDED.name,
-		    description = EXCLUDED.description
+		    description = EXCLUDED.description,
+		    source = CASE WHEN (t.name, COALESCE(t.description, '')) IS DISTINCT FROM (EXCLUDED.name, COALESCE(EXCLUDED.description, ''))
+		                  THEN 'manual' ELSE t.source END
 	`
 	for _, t := range product.Translations {
 		_, err = tx.ExecContext(ctx, upsertQuery,
@@ -287,7 +294,7 @@ func (r *ProductRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain
 		return nil, err
 	}
 	if len(products) == 0 {
-		return nil, errors.New("product not found")
+		return nil, domain.ErrProductNotFound
 	}
 	return products[0], nil
 }
@@ -1235,10 +1242,11 @@ func (r *ProductRepository) UpdateChoiceGroup(ctx context.Context, group *domain
 
 	for _, t := range group.Translations {
 		_, err = tx.ExecContext(ctx,
-			`INSERT INTO product_choice_group_translations (product_choice_group_id, locale, name)
+			`INSERT INTO product_choice_group_translations AS t (product_choice_group_id, locale, name)
 			 VALUES ($1, $2, $3)
 			 ON CONFLICT (product_choice_group_id, locale)
-			 DO UPDATE SET name = EXCLUDED.name`,
+			 DO UPDATE SET name = EXCLUDED.name,
+			     source = CASE WHEN t.name IS DISTINCT FROM EXCLUDED.name THEN 'manual' ELSE t.source END`,
 			group.ID, t.Locale, t.Name,
 		)
 		if err != nil {
@@ -1258,7 +1266,7 @@ func (r *ProductRepository) DeleteChoiceGroup(ctx context.Context, groupID uuid.
 func (r *ProductRepository) FindChoicesByProductID(ctx context.Context, productID uuid.UUID) ([]*domain.ProductChoice, error) {
 	query := `
 		SELECT
-			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order, pc.is_available,
 			pct.locale, pct.name
 		FROM product_choices pc
 		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
@@ -1272,7 +1280,7 @@ func (r *ProductRepository) FindChoicesByProductID(ctx context.Context, productI
 func (r *ProductRepository) FindChoiceByID(ctx context.Context, choiceID uuid.UUID) (*domain.ProductChoice, error) {
 	query := `
 		SELECT
-			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order, pc.is_available,
 			pct.locale, pct.name
 		FROM product_choices pc
 		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
@@ -1296,7 +1304,7 @@ func (r *ProductRepository) BatchGetChoicesByProductIDs(ctx context.Context, pro
 
 	query := `
 		SELECT
-			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order, pc.is_available,
 			pct.locale, pct.name
 		FROM product_choices pc
 		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
@@ -1326,7 +1334,7 @@ func (r *ProductRepository) BatchGetChoicesByIDs(ctx context.Context, choiceIDs 
 
 	query := `
 		SELECT
-			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order,
+			pc.id, pc.product_id, pc.choice_group_id, pc.price_modifier, pc.sort_order, pc.is_available,
 			pct.locale, pct.name
 		FROM product_choices pc
 		LEFT JOIN product_choice_translations pct ON pc.id = pct.product_choice_id
@@ -1399,10 +1407,11 @@ func (r *ProductRepository) UpdateChoice(ctx context.Context, choice *domain.Pro
 
 	for _, t := range choice.Translations {
 		_, err = tx.ExecContext(ctx,
-			`INSERT INTO product_choice_translations (product_choice_id, locale, name)
+			`INSERT INTO product_choice_translations AS t (product_choice_id, locale, name)
 			 VALUES ($1, $2, $3)
 			 ON CONFLICT (product_choice_id, locale)
-			 DO UPDATE SET name = EXCLUDED.name`,
+			 DO UPDATE SET name = EXCLUDED.name,
+			     source = CASE WHEN t.name IS DISTINCT FROM EXCLUDED.name THEN 'manual' ELSE t.source END`,
 			choice.ID, t.Locale, t.Name,
 		)
 		if err != nil {
@@ -1433,6 +1442,7 @@ func (r *ProductRepository) queryChoices(ctx context.Context, query string, args
 		ChoiceGroupID uuid.UUID       `db:"choice_group_id"`
 		PriceModifier decimal.Decimal `db:"price_modifier"`
 		SortOrder     int             `db:"sort_order"`
+		IsAvailable   bool            `db:"is_available"`
 		Locale        *string         `db:"locale"`
 		Name          *string         `db:"name"`
 	}
@@ -1454,6 +1464,7 @@ func (r *ProductRepository) queryChoices(ctx context.Context, query string, args
 				ChoiceGroupID: row.ChoiceGroupID,
 				PriceModifier: row.PriceModifier,
 				SortOrder:     row.SortOrder,
+				IsAvailable:   row.IsAvailable,
 				Translations:  []domain.ChoiceTranslation{},
 			}
 			choicesMap[row.ID] = choice

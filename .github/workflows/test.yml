@@ -132,7 +132,7 @@ jobs:
           cache: true
 
       - name: Build
-        run: go build -v -o tsb-service cmd/app/main.go
+        run: go build -v -o tsb-service ./cmd/app
 
       # The release and nightly workflows refuse an untested commit through
       # this script: keep its verdicts honest.

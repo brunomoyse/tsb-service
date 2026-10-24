@@ -151,7 +151,7 @@ func TestPricingServerFaults(t *testing.T) {
 		wantMoney(t, "nothing is added to the basket", res.Subtotal, "0")
 
 		negative := uuid.MustParse("00000000-0000-0000-0000-0000000000a9")
-		f.catalog.choices[negative] = &productDomain.ProductChoice{ID: negative, ProductID: bowlID, ChoiceGroupID: brothGrp, PriceModifier: decimal.RequireFromString("-3")}
+		f.catalog.choices[negative] = &productDomain.ProductChoice{ID: negative, ProductID: bowlID, ChoiceGroupID: brothGrp, PriceModifier: decimal.RequireFromString("-3"), IsAvailable: true}
 		res = f.price(pricingInput{Items: []pricingItem{bowlWith(negative)}})
 		wantCodes(t, res.Issues)
 		wantMoney(t, "the modifier counts as zero", res.Subtotal, "10.00")

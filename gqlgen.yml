@@ -167,6 +167,12 @@ models:
         resolver: true
       choiceGroups:
         resolver: true
+      hubriseManaged:
+        resolver: true
+      hubriseLockedFields:
+        resolver: true
+      hubrisePublish:
+        resolver: true
 
   OrderItemSelection:
     fields:
@@ -197,6 +203,8 @@ models:
       platformData:
         resolver: true
       statusHistory:
+        resolver: true
+      hubrise:
         resolver: true
       displayCustomerName:
         resolver: true

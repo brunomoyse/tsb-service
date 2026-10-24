@@ -30,6 +30,16 @@ type Product {
 
     # Admin only
     translations: [Translation!]!
+
+    # HubRise: true while the product is linked to a HubRise SKU and HubRise owns its price, category,
+    # VAT category, code and options (the integration is on with catalog sync). Admin only.
+    hubriseManaged: Boolean! @admin
+    # The fields of the product the dashboard must not offer for editing while it is managed (price,
+    # category, vatCategory, code, choiceGroups); empty otherwise. Admin only.
+    hubriseLockedFields: [String!]! @admin
+    # What the dashboard shows about the product in PUBLISH mode (published, edited since, never
+    # published, and the SKU ref it has at HubRise). Null when the direction is not PUBLISH. Admin only.
+    hubrisePublish: HubriseProductPublishInfo @admin
 }
 
 type ProductChoice {
@@ -40,6 +50,9 @@ type ProductChoice {
     sortOrder: Int!
     name: String!
     translations: [ChoiceTranslation!]!
+    # False while the choice is sold out or taken off sale (HubRise inventory or catalog): an order
+    # selecting it is refused with SELECTION_INVALID.
+    isAvailable: Boolean!
 }
 
 type ProductChoiceGroup {

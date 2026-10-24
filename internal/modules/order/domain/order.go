@@ -53,7 +53,7 @@ type Order struct {
 	OrderStatus        OrderStatus        `db:"order_status" json:"orderStatus"`
 	OrderType          OrderType          `db:"order_type" json:"orderType"`
 	IsOnlinePayment    bool               `db:"is_online_payment" json:"isOnlinePayment"`
-	PaymentID          *uuid.UUID         `db:"payment_id" json:"paymentId,omitempty"`
+	PaymentID          *uuid.UUID         `db:"-" json:"paymentId,omitempty"` // no orders column: payments point to their order
 	TakeawayDiscount   decimal.Decimal    `db:"takeaway_discount" json:"takeawayDiscount"`
 	CouponDiscount     decimal.Decimal    `db:"coupon_discount" json:"couponDiscount"`
 	DeliveryFee        *decimal.Decimal   `db:"delivery_fee" json:"deliveryFee,omitempty"`
@@ -84,6 +84,9 @@ type Order struct {
 	// IsTest flags orders placed by store-review accounts. TEMPORARY (revert
 	// after launch): such orders are hidden from staff and auto-cancelled.
 	IsTest bool `db:"is_test" json:"isTest"`
+	// Channel is where the order was placed from, "web" or "app". NULL (nil) on orders that
+	// predate the column, which readers treat as "web".
+	Channel *string `db:"channel" json:"channel,omitempty"`
 }
 
 type OrderStatusHistory struct {

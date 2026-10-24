@@ -1,0 +1,8 @@
+query {
+    restaurantConfig {
+      orderingEnabled
+      openingHours
+      orderingHours
+      preparationMinutes
+    }
+  }

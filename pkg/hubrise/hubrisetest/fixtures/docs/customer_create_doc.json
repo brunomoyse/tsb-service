@@ -1,0 +1,15 @@
+{
+  "private_ref": "5f0b8a0e-3d38-4c3b-9d63-2b1e7f7f2f10",
+  "email": "ada@example.com",
+  "first_name": "Ada",
+  "last_name": "Lovelace",
+  "phone": "+32470000000",
+  "address_1": "Rue du Test 12 bte 3",
+  "postal_code": "4000",
+  "city": "Liege",
+  "country": "BE",
+  "latitude": "50.6326",
+  "longitude": "5.5797",
+  "delivery_notes": "Second floor",
+  "email_marketing": true
+}

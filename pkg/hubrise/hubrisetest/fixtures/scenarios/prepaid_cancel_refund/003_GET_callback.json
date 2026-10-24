@@ -1,0 +1,19 @@
+{
+  "method": "GET",
+  "path": "/v1/callback",
+  "request": null,
+  "response": {
+    "events": {
+      "catalog": [
+        "create",
+        "update"
+      ],
+      "order": [
+        "create",
+        "update"
+      ]
+    },
+    "url": null
+  },
+  "status": 200
+}

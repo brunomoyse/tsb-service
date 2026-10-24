@@ -12,9 +12,31 @@ import (
 	couponApplication "tsb-service/internal/modules/coupon/application"
 	"tsb-service/internal/modules/order/domain"
 	"tsb-service/pkg/logging"
+	"tsb-service/pkg/utils"
 )
 
+// StatusObserver is told, once, about every order status change that goes through
+// OrderService.UpdateOrder: the dashboard and POS mutation, the Mollie payment-failed webhook and
+// anything else that moves an order with the service. It exists so an integration (HubRise) can
+// mirror the change without the order module knowing about it.
+//
+// It is called after the status, its history row and the coupon rollback are done, on the caller's
+// goroutine, so an implementation must be quick (a queue insert, never a network call). It is not
+// called for an update that leaves the status as it was, for a change whose context carries
+// utils.OriginHubrise (the observer would only echo it back) or for CancelStaleTestOrders. An error
+// is logged and never fails the update: the status already changed.
+type StatusObserver interface {
+	// OrderStatusChanged reports the new status of an order and the id of the order_status_history
+	// row that recorded it. historyID is uuid.Nil when that row could not be written (the failure
+	// is logged); an observer that needs a unique key per transition must cope with that.
+	OrderStatusChanged(ctx context.Context, orderID uuid.UUID, newStatus domain.OrderStatus, historyID uuid.UUID) error
+}
+
 type OrderService interface {
+	// SetStatusObserver installs the observer of status changes; nil (the default) removes it. It
+	// is meant to be called once at startup, before the service takes requests.
+	SetStatusObserver(observer StatusObserver)
+
 	CreateOrder(ctx context.Context, order *domain.Order, orderProducts *[]domain.OrderProductRaw) (*domain.Order, *[]domain.OrderProductRaw, error)
 	GetPaginatedOrders(ctx context.Context, page int, limit int, userID *uuid.UUID) ([]*domain.Order, error)
 	UpdateOrder(ctx context.Context, orderID uuid.UUID, newStatus *domain.OrderStatus, estimatedReadyTime *time.Time, cancellationReason *domain.OrderCancellationReason) error
@@ -48,6 +70,9 @@ type orderService struct {
 	repo          domain.OrderRepository
 	couponService couponApplication.CouponService
 
+	observerMu sync.RWMutex
+	observer   StatusObserver
+
 	popularMu    sync.Mutex
 	popularCache map[int]popularEntry
 	now          func() time.Time
@@ -67,6 +92,31 @@ func NewOrderService(repo domain.OrderRepository, couponService couponApplicatio
 	}
 }
 
+func (s *orderService) SetStatusObserver(observer StatusObserver) {
+	s.observerMu.Lock()
+	defer s.observerMu.Unlock()
+	s.observer = observer
+}
+
+// notifyStatusObserver tells the observer about a status change, unless the change came from the
+// system the observer reports to. Nothing the observer does, not even a panic, can fail the update.
+func (s *orderService) notifyStatusObserver(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus, historyID uuid.UUID) {
+	s.observerMu.RLock()
+	observer := s.observer
+	s.observerMu.RUnlock()
+	if observer == nil || utils.GetOrigin(ctx) == utils.OriginHubrise {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			logging.FromContext(ctx).Error("order status observer panicked", zap.String("order_id", orderID.String()), zap.Any("panic", r))
+		}
+	}()
+	if err := observer.OrderStatusChanged(ctx, orderID, status, historyID); err != nil {
+		logging.FromContext(ctx).Error("order status observer failed", zap.String("order_id", orderID.String()), zap.String("status", string(status)), zap.Error(err))
+	}
+}
+
 func (s *orderService) CreateOrder(ctx context.Context, o *domain.Order, op *[]domain.OrderProductRaw) (*domain.Order, *[]domain.OrderProductRaw, error) {
 	order, orderProducts, err := s.repo.Save(ctx, o, op)
 	if err != nil {
@@ -74,7 +124,7 @@ func (s *orderService) CreateOrder(ctx context.Context, o *domain.Order, op *[]d
 	}
 
 	// Record initial status in history
-	if err := s.repo.InsertStatusHistory(ctx, order.ID, order.OrderStatus); err != nil {
+	if _, err := s.repo.InsertStatusHistory(ctx, order.ID, order.OrderStatus); err != nil {
 		logging.FromContext(ctx).Error("failed to record initial status history", zap.String("order_id", order.ID.String()), zap.Error(err))
 	}
 
@@ -118,8 +168,12 @@ func (s *orderService) UpdateOrder(ctx context.Context, orderID uuid.UUID, newSt
 	}
 
 	// Record status change in history
-	if order.OrderStatus != oldStatus {
-		if err := s.repo.InsertStatusHistory(ctx, order.ID, order.OrderStatus); err != nil {
+	statusChanged := order.OrderStatus != oldStatus
+	var historyID uuid.UUID
+	if statusChanged {
+		var err error
+		if historyID, err = s.repo.InsertStatusHistory(ctx, order.ID, order.OrderStatus); err != nil {
+			historyID = uuid.Nil
 			logging.FromContext(ctx).Error("failed to record status history", zap.String("order_id", order.ID.String()), zap.String("status", string(order.OrderStatus)), zap.Error(err))
 		}
 	}
@@ -134,6 +188,9 @@ func (s *orderService) UpdateOrder(ctx context.Context, orderID uuid.UUID, newSt
 		s.rollbackCoupon(ctx, order.ID, order.UserID, order.CouponCode)
 	}
 
+	if statusChanged {
+		s.notifyStatusObserver(ctx, order.ID, order.OrderStatus, historyID)
+	}
 	return nil
 }
 
@@ -161,7 +218,7 @@ func (s *orderService) CancelStaleTestOrders(ctx context.Context, olderThan time
 		return 0, err
 	}
 	for _, ref := range refs {
-		if err := s.repo.InsertStatusHistory(ctx, ref.ID, domain.OrderStatusCanceled); err != nil {
+		if _, err := s.repo.InsertStatusHistory(ctx, ref.ID, domain.OrderStatusCanceled); err != nil {
 			logging.FromContext(ctx).Warn("failed to record auto-cancel status history",
 				zap.String("order_id", ref.ID.String()), zap.Error(err))
 		}

@@ -29,6 +29,14 @@ func TestContextHelpers(t *testing.T) {
 		assert.False(t, GetIsStaff(bg))
 		assert.False(t, GetIsAppClient(bg), "a request is from the website unless the token says app")
 		assert.True(t, GetTokenExpiry(bg).IsZero())
+		assert.Empty(t, GetOrigin(bg), "an ordinary caller has no origin")
+	})
+
+	t.Run("origin round-trips and does not leak to the parent", func(t *testing.T) {
+		ctx := WithOrigin(bg, OriginHubrise)
+		assert.Equal(t, OriginHubrise, GetOrigin(ctx))
+		assert.Empty(t, GetOrigin(bg))
+		assert.Equal(t, OriginHubrise, GetOrigin(SetLang(ctx, "nl")), "derived contexts keep it")
 	})
 
 	t.Run("values round-trip", func(t *testing.T) {

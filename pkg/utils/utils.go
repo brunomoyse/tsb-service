@@ -27,6 +27,25 @@ const ZitadelSubKey contextKey = "zitadelSub"
 const TokenExpiryKey contextKey = "tokenExpiry"
 const ClientIPKey contextKey = "clientIP"
 const IsAppClientKey contextKey = "isAppClient"
+const OriginKey contextKey = "origin"
+
+// Origin names the system a change comes from, when it is not a person using this application.
+// It travels in the context so that code reacting to a change can tell an echo from a news item.
+type Origin string
+
+// OriginHubrise marks a change applied from a HubRise event: it must not be sent back to HubRise.
+const OriginHubrise Origin = "hubrise"
+
+// WithOrigin marks ctx as carrying a change that comes from the given system.
+func WithOrigin(ctx context.Context, origin Origin) context.Context {
+	return context.WithValue(ctx, OriginKey, origin)
+}
+
+// GetOrigin returns the system the change comes from, or "" for an ordinary caller.
+func GetOrigin(ctx context.Context) Origin {
+	origin, _ := ctx.Value(OriginKey).(Origin)
+	return origin
+}
 
 // SetClientIP stores the caller's IP (as resolved by the HTTP layer's trusted-proxy logic).
 func SetClientIP(ctx context.Context, ip string) context.Context {

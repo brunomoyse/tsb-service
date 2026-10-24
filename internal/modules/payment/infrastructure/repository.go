@@ -13,6 +13,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// paymentColumns lists the columns of domain.MolliePayment (see db.Columns).
+var paymentColumns = db.Columns(domain.MolliePayment{}, "")
+
 type PaymentRepository struct {
 	pool *db.DBPool
 }
@@ -198,8 +201,8 @@ func (r *PaymentRepository) UpdateStatusByOrderID(ctx context.Context, orderID u
 }
 
 func (r *PaymentRepository) FindByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.MolliePayment, error) {
-	const query = `
-		SELECT *
+	query := `
+		SELECT ` + paymentColumns + `
 		FROM mollie_payments
 		WHERE order_id = $1
 		LIMIT 1;
@@ -215,8 +218,8 @@ func (r *PaymentRepository) FindByOrderID(ctx context.Context, orderID uuid.UUID
 }
 
 func (r *PaymentRepository) FindByExternalID(ctx context.Context, paymentID string) (*domain.MolliePayment, error) {
-	const query = `
-		SELECT *
+	query := `
+		SELECT ` + paymentColumns + `
 		FROM mollie_payments
 		WHERE mollie_payment_id = $1
 		LIMIT 1;
@@ -232,8 +235,8 @@ func (r *PaymentRepository) FindByExternalID(ctx context.Context, paymentID stri
 }
 
 func (r *PaymentRepository) FindByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]*domain.MolliePayment, error) {
-	const query = `
-		SELECT *
+	query := `
+		SELECT ` + paymentColumns + `
 		FROM mollie_payments
 		WHERE order_id = ANY($1::uuid[])
 	`

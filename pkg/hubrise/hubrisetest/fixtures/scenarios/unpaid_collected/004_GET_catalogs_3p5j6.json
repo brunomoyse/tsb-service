@@ -1,0 +1,335 @@
+{
+  "method": "GET",
+  "path": "/v1/catalogs/3p5j6",
+  "request": null,
+  "response": {
+    "account_id": "15n44",
+    "created_at": "2026-10-03T11:54:30Z",
+    "data": {
+      "categories": [
+        {
+          "description": null,
+          "id": "vde4kv",
+          "image_ids": [],
+          "name": "Makis",
+          "parent_id": null,
+          "ref": "MAKI",
+          "tags": []
+        },
+        {
+          "description": null,
+          "id": "4be7pq",
+          "image_ids": [],
+          "name": "Soupes",
+          "parent_id": null,
+          "ref": "SOUPES",
+          "tags": []
+        },
+        {
+          "description": null,
+          "id": "xxdk6p",
+          "image_ids": [],
+          "name": "Boissons",
+          "parent_id": null,
+          "ref": "BOISSONS",
+          "tags": []
+        }
+      ],
+      "charges": [
+        {
+          "id": "gymk3",
+          "name": "Livraison",
+          "price": "2.50 EUR",
+          "ref": "DELIVERY",
+          "restrictions": {},
+          "type": "delivery"
+        }
+      ],
+      "deals": [],
+      "discounts": [],
+      "option_lists": [
+        {
+          "id": "ydjjjk5",
+          "max_selections": 1,
+          "min_selections": 0,
+          "multiple_selection": false,
+          "name": "Sauce",
+          "options": [
+            {
+              "default": false,
+              "id": "kxk9529v",
+              "name": "Soja",
+              "nutrition": null,
+              "option_list_id": "ydjjjk5",
+              "price": "0.00 EUR",
+              "price_overrides": [],
+              "ref": "SAUCE-SOJA",
+              "restrictions": {},
+              "tags": [],
+              "volume": null,
+              "weight": null
+            },
+            {
+              "default": false,
+              "id": "dm74294b",
+              "name": "Soja sucrée",
+              "nutrition": null,
+              "option_list_id": "ydjjjk5",
+              "price": "0.50 EUR",
+              "price_overrides": [],
+              "ref": "SAUCE-SUCREE",
+              "restrictions": {},
+              "tags": [],
+              "volume": null,
+              "weight": null
+            }
+          ],
+          "ref": "SAUCE",
+          "tags": [],
+          "type": "multiple"
+        },
+        {
+          "id": "2j222dq",
+          "max_selections": null,
+          "min_selections": 0,
+          "multiple_selection": false,
+          "name": "Suppléments",
+          "options": [
+            {
+              "default": false,
+              "id": "62e3gn3q",
+              "name": "Avocat",
+              "nutrition": null,
+              "option_list_id": "2j222dq",
+              "price": "1.00 EUR",
+              "price_overrides": [],
+              "ref": "EXTRA-AVOCAT",
+              "restrictions": {},
+              "tags": [],
+              "volume": null,
+              "weight": null
+            },
+            {
+              "default": false,
+              "id": "vvdnymnd",
+              "name": "Cheese",
+              "nutrition": null,
+              "option_list_id": "2j222dq",
+              "price": "0.80 EUR",
+              "price_overrides": [],
+              "ref": "EXTRA-CHEESE",
+              "restrictions": {},
+              "tags": [],
+              "volume": null,
+              "weight": null
+            }
+          ],
+          "ref": "EXTRA",
+          "tags": [],
+          "type": "multiple"
+        }
+      ],
+      "products": [
+        {
+          "category_id": "vde4kv",
+          "description": null,
+          "id": "q894pxg",
+          "image_ids": [],
+          "name": "Maki saumon",
+          "nutrition": null,
+          "ref": "MAKI-SAUMON",
+          "skus": [
+            {
+              "barcodes": [],
+              "custom_fields": {},
+              "id": "55j2yqy",
+              "name": "6 pièces",
+              "nb_servings": null,
+              "option_list_ids": [
+                "ydjjjk5"
+              ],
+              "price": "5.50 EUR",
+              "price_overrides": [],
+              "product_id": "q894pxg",
+              "ref": "MAKI-SAUMON-6",
+              "restrictions": {},
+              "tags": [],
+              "volume": null,
+              "weight": null
+            },
+            {
+              "barcodes": [],
+              "custom_fields": {},
+              "id": "7ymj6g3",
+              "name": "12 pièces",
+              "nb_servings": null,
+              "option_list_ids": [
+                "ydjjjk5"
+              ],
+              "price": "10.00 EUR",
+              "price_overrides": [],
+              "product_id": "q894pxg",
+              "ref": "MAKI-SAUMON-12",
+              "restrictions": {},
+              "tags": [],
+              "volume": null,
+              "weight": null
+            }
+          ],
+          "tags": [],
+          "tax_rate": {
+            "collection": "6.0",
+            "delivery": "6.0",
+            "eat_in": "12.0"
+          }
+        },
+        {
+          "category_id": "vde4kv",
+          "description": null,
+          "id": "95x8dkp",
+          "image_ids": [],
+          "name": "California roll",
+          "nutrition": null,
+          "ref": "CALIFORNIA",
+          "skus": [
+            {
+              "barcodes": [],
+              "custom_fields": {
+                "translations": {
+                  "zh": {
+                    "name": "加州卷"
+                  }
+                }
+              },
+              "id": "y8j56yj",
+              "name": null,
+              "nb_servings": null,
+              "option_list_ids": [
+                "ydjjjk5",
+                "2j222dq"
+              ],
+              "price": "8.90 EUR",
+              "price_overrides": [],
+              "product_id": "95x8dkp",
+              "ref": "CALIFORNIA-8",
+              "restrictions": {},
+              "tags": [],
+              "volume": null,
+              "weight": null
+            }
+          ],
+          "tags": [],
+          "tax_rate": {
+            "collection": "6.0",
+            "delivery": "6.0",
+            "eat_in": "12.0"
+          }
+        },
+        {
+          "category_id": "4be7pq",
+          "description": null,
+          "id": "nn5dq24",
+          "image_ids": [],
+          "name": "Soupe miso",
+          "nutrition": null,
+          "ref": "MISO",
+          "skus": [
+            {
+              "barcodes": [],
+              "custom_fields": {},
+              "id": "2v2xyqm",
+              "name": null,
+              "nb_servings": null,
+              "option_list_ids": [],
+              "price": "3.50 EUR",
+              "price_overrides": [],
+              "product_id": "nn5dq24",
+              "ref": "MISO-1",
+              "restrictions": {},
+              "tags": [],
+              "volume": null,
+              "weight": null
+            }
+          ],
+          "tags": [],
+          "tax_rate": {
+            "collection": "6.0",
+            "delivery": "6.0",
+            "eat_in": "12.0"
+          }
+        },
+        {
+          "category_id": "xxdk6p",
+          "description": null,
+          "id": "jn3r2m6",
+          "image_ids": [],
+          "name": "Coca-Cola 33cl",
+          "nutrition": null,
+          "ref": "COCA",
+          "skus": [
+            {
+              "barcodes": [],
+              "custom_fields": {},
+              "id": "mrq9pm8",
+              "name": null,
+              "nb_servings": null,
+              "option_list_ids": [],
+              "price": "3.00 EUR",
+              "price_overrides": [],
+              "product_id": "jn3r2m6",
+              "ref": "COCA-33",
+              "restrictions": {},
+              "tags": [],
+              "volume": null,
+              "weight": null
+            }
+          ],
+          "tags": [],
+          "tax_rate": {
+            "collection": "6.0",
+            "delivery": "6.0",
+            "eat_in": "21.0"
+          }
+        },
+        {
+          "category_id": "xxdk6p",
+          "description": null,
+          "id": "gpn57db",
+          "image_ids": [],
+          "name": "Bière Asahi 33cl",
+          "nutrition": null,
+          "ref": "ASAHI",
+          "skus": [
+            {
+              "barcodes": [],
+              "custom_fields": {},
+              "id": "qdexq3n",
+              "name": null,
+              "nb_servings": null,
+              "option_list_ids": [],
+              "price": "4.50 EUR",
+              "price_overrides": [],
+              "product_id": "gpn57db",
+              "ref": "ASAHI-33",
+              "restrictions": {},
+              "tags": [],
+              "volume": null,
+              "weight": null
+            }
+          ],
+          "tags": [],
+          "tax_rate": {
+            "collection": "21.0",
+            "delivery": "21.0",
+            "eat_in": "21.0"
+          }
+        }
+      ],
+      "variants": []
+    },
+    "id": "3p5j6",
+    "location_id": "15n44-1",
+    "name": "Liège TEST"
+  },
+  "status": 200
+}

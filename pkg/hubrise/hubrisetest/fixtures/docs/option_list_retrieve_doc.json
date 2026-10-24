@@ -1,0 +1,17 @@
+{
+  "id": "e2sfj",
+  "ref": "SAU-SM",
+  "name": "Sauce",
+  "min_selections": 0,
+  "max_selections": null,
+  "multiple_selection": true,
+  "type": "multiple",
+  "options": [
+    {
+      "id": "m9d6e",
+      "name": "BBQ",
+      "ref": "BBQ",
+      "price": "0.50 EUR"
+    }
+  ]
+}

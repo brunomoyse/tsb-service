@@ -1,0 +1,7 @@
+query ValidateCoupon($code: String!, $orderAmount: String!) {
+    validateCoupon(code: $code, orderAmount: $orderAmount) {
+      valid
+      discountAmount
+      errorMessage
+    }
+  }

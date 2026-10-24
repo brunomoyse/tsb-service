@@ -1,0 +1,11 @@
+query AuthCallbackRestaurantStatus {
+    restaurantConfig {
+      orderingEnabled
+      isOrderingCurrentlyOpen
+      preparationMinutes
+      availableSlotsToday {
+        label
+        value
+      }
+    }
+  }

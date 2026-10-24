@@ -7,7 +7,8 @@
 # ./internal/... ./pkg/..., drops the files that are not hand-written production code from the
 # profile, prints the total and exits non-zero when it is below the threshold.
 #
-# Excluded: gqlgen generated code, test support code and everything under cmd/.
+# Excluded: gqlgen generated code, test support code (testhelpers, fakeupstream, the hubrisetest mock HubRise)
+# and everything under cmd/.
 # Extra arguments after the threshold are passed to `go test` (e.g. -run, -p 2).
 # Set COVERAGE_PROFILE_OUT=path to keep the filtered profile (for `go tool cover -func`/-html).
 set -euo pipefail
@@ -26,7 +27,7 @@ trap 'rm -f "$profile" "$filtered"' EXIT
 go test -race -timeout 30m -coverpkg=./internal/...,./pkg/... -coverprofile="$profile" "$@" ./internal/... ./pkg/...
 
 # Profile lines look like: tsb-service/internal/x/y.go:12.3,15.2 3 1 (first line is "mode: ...").
-exclude='^tsb-service/(internal/api/graphql/generated\.go|internal/api/graphql/model/model_gen\.go|internal/api/graphql/testhelpers/|internal/mcp/fakeupstream/|cmd/)'
+exclude='^tsb-service/(internal/api/graphql/generated\.go|internal/api/graphql/model/model_gen\.go|internal/api/graphql/testhelpers/|internal/modules/hubrise/testhelpers/|pkg/hubrise/hubrisetest/|internal/mcp/fakeupstream/|cmd/)'
 awk -v re="$exclude" 'NR == 1 || $0 !~ re' "$profile" > "$filtered"
 
 # Statement-weighted total over the filtered profile. Blocks listed several times (one per test

@@ -15,11 +15,12 @@ import (
 // histRepo records status history rows and can fail selected calls.
 type histRepo struct {
 	fakeOrderRepo
-	history    []domain.OrderStatus
-	historyErr error
-	findErr    error
-	updateErr  error
-	saveErr    error
+	history       []domain.OrderStatus
+	lastHistoryID uuid.UUID
+	historyErr    error
+	findErr       error
+	updateErr     error
+	saveErr       error
 }
 
 func (h *histRepo) Save(ctx context.Context, o *domain.Order, op *[]domain.OrderProductRaw) (*domain.Order, *[]domain.OrderProductRaw, error) {
@@ -43,9 +44,13 @@ func (h *histRepo) Update(ctx context.Context, o *domain.Order) error {
 	return h.fakeOrderRepo.Update(ctx, o)
 }
 
-func (h *histRepo) InsertStatusHistory(_ context.Context, _ uuid.UUID, s domain.OrderStatus) error {
+func (h *histRepo) InsertStatusHistory(_ context.Context, _ uuid.UUID, s domain.OrderStatus) (uuid.UUID, error) {
 	h.history = append(h.history, s)
-	return h.historyErr
+	if h.historyErr != nil {
+		return uuid.Nil, h.historyErr
+	}
+	h.lastHistoryID = uuid.New()
+	return h.lastHistoryID, nil
 }
 
 func newHistRepo(status domain.OrderStatus, code *string) *histRepo {

@@ -1,0 +1,66 @@
+query {
+    orders {
+      id
+      createdAt
+      updatedAt
+      status
+      type
+      isOnlinePayment
+      couponCode
+      discountAmount
+      deliveryFee
+      totalPrice
+      preferredReadyTime
+      estimatedReadyTime
+      addressExtra
+      orderNote
+      orderExtra
+      isManualAddress
+      displayCustomerName
+      displayAddress
+      address {
+        id
+        streetName
+        houseNumber
+        boxNumber
+        municipalityName
+        postcode
+        distance
+      }
+      customer {
+        id
+        firstName
+        lastName
+        phoneNumber
+      }
+      payment {
+        status
+      }
+      items {
+        unitPrice
+        quantity
+        totalPrice
+        product {
+          id
+          code
+          name
+          translations {
+            language
+            name
+          }
+          category {
+            id
+            name
+            translations {
+              language
+              name
+            }
+          }
+        }
+        choice {
+          id
+          name
+        }
+      }
+    }
+  }

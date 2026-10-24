@@ -391,3 +391,96 @@ func TestProductDataLoaders(t *testing.T) {
 		require.ErrorContains(t, err, "failed to fetch product choices")
 	})
 }
+
+// menuSpy records the menu edits the service reports.
+type menuSpy struct {
+	got   []menuEdit
+	err   error
+	panic bool
+}
+
+type menuEdit struct {
+	kind MenuKind
+	id   uuid.UUID
+}
+
+func (m *menuSpy) MenuChanged(_ context.Context, kind MenuKind, id uuid.UUID) error {
+	if m.panic {
+		panic("observer bug")
+	}
+	m.got = append(m.got, menuEdit{kind, id})
+	return m.err
+}
+
+func TestMenuObserverHearsEveryWriteOnce(t *testing.T) {
+	ctx := t.Context()
+	product := &domain.Product{ID: uuid.New()}
+	group := &domain.ProductChoiceGroup{ID: uuid.New()}
+	choice := &domain.ProductChoice{ID: uuid.New()}
+	groupID, choiceID := uuid.New(), uuid.New()
+
+	writes := []struct {
+		name string
+		run  func(s ProductService) error
+		want menuEdit
+	}{
+		{"UpdateProduct", func(s ProductService) error { return s.UpdateProduct(ctx, product) }, menuEdit{MenuProduct, product.ID}},
+		{"CreateChoiceGroup", func(s ProductService) error { return s.CreateChoiceGroup(ctx, group) }, menuEdit{MenuChoiceGroup, group.ID}},
+		{"UpdateChoiceGroup", func(s ProductService) error { return s.UpdateChoiceGroup(ctx, group) }, menuEdit{MenuChoiceGroup, group.ID}},
+		{"DeleteChoiceGroup", func(s ProductService) error { return s.DeleteChoiceGroup(ctx, groupID) }, menuEdit{MenuChoiceGroup, groupID}},
+		{"CreateChoice", func(s ProductService) error { return s.CreateChoice(ctx, choice) }, menuEdit{MenuChoice, choice.ID}},
+		{"UpdateChoice", func(s ProductService) error { return s.UpdateChoice(ctx, choice) }, menuEdit{MenuChoice, choice.ID}},
+		{"DeleteChoice", func(s ProductService) error { return s.DeleteChoice(ctx, choiceID) }, menuEdit{MenuChoice, choiceID}},
+	}
+	for _, w := range writes {
+		t.Run(w.name, func(t *testing.T) {
+			spy := &menuSpy{}
+			svc := NewProductService(&stubRepo{})
+			svc.SetMenuObserver(spy)
+			require.NoError(t, w.run(svc))
+			assert.Equal(t, []menuEdit{w.want}, spy.got)
+
+			t.Run("a failed write is not reported", func(t *testing.T) {
+				failed := &menuSpy{}
+				svc := NewProductService(&stubRepo{err: errors.New("db down")})
+				svc.SetMenuObserver(failed)
+				require.Error(t, w.run(svc))
+				assert.Empty(t, failed.got)
+			})
+			t.Run("an observer that fails or panics cannot fail the write", func(t *testing.T) {
+				for _, bad := range []*menuSpy{{err: errors.New("hook down")}, {panic: true}} {
+					svc := NewProductService(&stubRepo{})
+					svc.SetMenuObserver(bad)
+					assert.NoError(t, w.run(svc))
+				}
+			})
+			t.Run("no observer, or a removed one, is fine", func(t *testing.T) {
+				svc := NewProductService(&stubRepo{})
+				assert.NoError(t, w.run(svc))
+				removed := &menuSpy{}
+				svc.SetMenuObserver(removed)
+				svc.SetMenuObserver(nil)
+				assert.NoError(t, w.run(svc))
+				assert.Empty(t, removed.got)
+			})
+		})
+	}
+
+	t.Run("CreateProduct reports the new product", func(t *testing.T) {
+		spy := &menuSpy{}
+		svc := NewProductService(&stubRepo{})
+		svc.SetMenuObserver(spy)
+		got, err := svc.CreateProduct(ctx, uuid.New(), decimal.RequireFromString("5"), nil, nil, true, true, false, false, false, false, true, domain.VatCategoryFood, fr3())
+		require.NoError(t, err)
+		assert.Equal(t, []menuEdit{{MenuProduct, got.ID}}, spy.got)
+
+		_, err = svc.CreateProduct(ctx, uuid.New(), decimal.Zero, nil, nil, true, true, false, false, false, false, true, "bogus", fr3())
+		require.Error(t, err)
+		assert.Len(t, spy.got, 1, "an invalid product is not reported")
+		failing := NewProductService(&stubRepo{err: errors.New("db down")})
+		failing.SetMenuObserver(spy)
+		_, err = failing.CreateProduct(ctx, uuid.New(), decimal.Zero, nil, nil, true, true, false, false, false, false, true, domain.VatCategoryFood, fr3())
+		require.Error(t, err)
+		assert.Len(t, spy.got, 1, "a failed insert is not reported")
+	})
+}

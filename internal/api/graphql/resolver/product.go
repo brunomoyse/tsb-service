@@ -82,6 +82,9 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch product %s: %w", id, err)
 	}
+	before := *prod // what the HubRise ownership guard compares the edit with
+
+	wasAvailable := prod.IsAvailable
 
 	// 2. Apply changes from the GraphQL input.
 	if input.CategoryID != nil {
@@ -135,9 +138,20 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 		prod.Translations = toDomainTranslations(input.Translations)
 	}
 
+	// A product HubRise owns cannot have its HubRise fields edited here (a no-op without HubRise).
+	if err := r.ProductGuard(ctx, &before, prod); err != nil {
+		return nil, err
+	}
+
 	// 3. Persist the update with the single domain object.
 	if err := r.ProductService.UpdateProduct(ctx, prod); err != nil {
 		return nil, productWriteFailure("failed to update product", err)
+	}
+
+	// A sold-out toggle made by staff (dashboard or MCP, both come through this mutation) is told to
+	// HubRise. Best effort, and never for the changes HubRise itself makes.
+	if input.IsAvailable != nil && *input.IsAvailable != wasAvailable {
+		r.AvailabilityChanged(ctx, id, *input.IsAvailable)
 	}
 
 	// 4. Refetch to get latest DB state (e.g. regenerated slug).
@@ -157,6 +171,9 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 			removeBg,
 		); err != nil {
 			logging.FromContext(ctx).Error("image upload failed", zap.String("product_id", id.String()), zap.Error(err))
+		} else {
+			// The image is part of what the HubRise catalog publisher writes (no-op without HubRise).
+			r.MenuChanged(ctx, productApplication.MenuProduct, id)
 		}
 	}
 
@@ -198,6 +215,9 @@ func (r *mutationResolver) CreateProductChoiceGroup(ctx context.Context, input m
 		Translations:  translations,
 	}
 
+	if err := r.ChoiceGroupGuard(ctx, nil, group); err != nil {
+		return nil, err
+	}
 	if err := r.ProductService.CreateChoiceGroup(ctx, group); err != nil {
 		return nil, fmt.Errorf("failed to create product choice group: %w", err)
 	}
@@ -213,6 +233,7 @@ func (r *mutationResolver) UpdateProductChoiceGroup(ctx context.Context, id uuid
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch product choice group: %w", err)
 	}
+	before := *group
 
 	if input.MinSelections != nil {
 		group.MinSelections = *input.MinSelections
@@ -244,6 +265,9 @@ func (r *mutationResolver) UpdateProductChoiceGroup(ctx context.Context, id uuid
 		group.Translations = translations
 	}
 
+	if err := r.ChoiceGroupGuard(ctx, &before, group); err != nil {
+		return nil, err
+	}
 	if err := r.ProductService.UpdateChoiceGroup(ctx, group); err != nil {
 		return nil, fmt.Errorf("failed to update product choice group: %w", err)
 	}
@@ -253,6 +277,13 @@ func (r *mutationResolver) UpdateProductChoiceGroup(ctx context.Context, id uuid
 
 // DeleteProductChoiceGroup is the resolver for the deleteProductChoiceGroup field.
 func (r *mutationResolver) DeleteProductChoiceGroup(ctx context.Context, id uuid.UUID) (bool, error) {
+	if r.Hubrise != nil { // standalone: no extra read
+		if current, err := r.ProductService.GetChoiceGroupByID(ctx, id); err == nil {
+			if err := r.ChoiceGroupGuard(ctx, current, nil); err != nil {
+				return false, err
+			}
+		}
+	}
 	if err := r.ProductService.DeleteChoiceGroup(ctx, id); err != nil {
 		return false, fmt.Errorf("failed to delete product choice group: %w", err)
 	}
@@ -305,6 +336,9 @@ func (r *mutationResolver) CreateProductChoice(ctx context.Context, input model.
 					{Locale: "zh", Name: "选择"},
 				},
 			}
+			if err := r.ChoiceGroupGuard(ctx, nil, defaultGroup); err != nil {
+				return nil, err
+			}
 			if err := r.ProductService.CreateChoiceGroup(ctx, defaultGroup); err != nil {
 				return nil, fmt.Errorf("failed to create default choice group: %w", err)
 			}
@@ -322,9 +356,13 @@ func (r *mutationResolver) CreateProductChoice(ctx context.Context, input model.
 		ChoiceGroupID: group.ID,
 		PriceModifier: priceMod,
 		SortOrder:     input.SortOrder,
+		IsAvailable:   true, // a new choice is on sale; only HubRise inventory or catalog change that
 		Translations:  translations,
 	}
 
+	if err := r.ChoiceGuard(ctx, nil, choice); err != nil {
+		return nil, err
+	}
 	if err := r.ProductService.CreateChoice(ctx, choice); err != nil {
 		return nil, fmt.Errorf("failed to create product choice: %w", err)
 	}
@@ -340,6 +378,7 @@ func (r *mutationResolver) UpdateProductChoice(ctx context.Context, id uuid.UUID
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch product choice: %w", err)
 	}
+	before := *choice
 
 	if input.PriceModifier != nil {
 		clean := strings.ReplaceAll(strings.TrimSpace(*input.PriceModifier), ",", ".")
@@ -367,6 +406,9 @@ func (r *mutationResolver) UpdateProductChoice(ctx context.Context, id uuid.UUID
 		choice.Translations = translations
 	}
 
+	if err := r.ChoiceGuard(ctx, &before, choice); err != nil {
+		return nil, err
+	}
 	if err := r.ProductService.UpdateChoice(ctx, choice); err != nil {
 		return nil, fmt.Errorf("failed to update product choice: %w", err)
 	}
@@ -376,6 +418,13 @@ func (r *mutationResolver) UpdateProductChoice(ctx context.Context, id uuid.UUID
 
 // DeleteProductChoice is the resolver for the deleteProductChoice field.
 func (r *mutationResolver) DeleteProductChoice(ctx context.Context, id uuid.UUID) (bool, error) {
+	if r.Hubrise != nil { // standalone: no extra read
+		if current, err := r.ProductService.GetChoiceByID(ctx, id); err == nil {
+			if err := r.ChoiceGuard(ctx, current, nil); err != nil {
+				return false, err
+			}
+		}
+	}
 	if err := r.ProductService.DeleteChoice(ctx, id); err != nil {
 		return false, fmt.Errorf("failed to delete product choice: %w", err)
 	}
@@ -473,6 +522,25 @@ func (r *productResolver) Translations(ctx context.Context, obj *model.Product) 
 	}
 
 	return translations, nil
+}
+
+// HubriseManaged is the resolver for the hubriseManaged field.
+func (r *productResolver) HubriseManaged(ctx context.Context, obj *model.Product) (bool, error) {
+	return r.hubriseManaged(ctx, obj.ID)
+}
+
+// HubriseLockedFields is the resolver for the hubriseLockedFields field.
+func (r *productResolver) HubriseLockedFields(ctx context.Context, obj *model.Product) ([]string, error) {
+	managed, err := r.hubriseManaged(ctx, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+	return hubriseLockedFields(managed, obj), nil
+}
+
+// HubrisePublish is the resolver for the hubrisePublish field.
+func (r *productResolver) HubrisePublish(ctx context.Context, obj *model.Product) (*model.HubriseProductPublishInfo, error) {
+	return r.hubrisePublishInfo(ctx, obj.ID)
 }
 
 // Products is the resolver for the products field.

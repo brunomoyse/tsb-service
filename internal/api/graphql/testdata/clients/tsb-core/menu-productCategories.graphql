@@ -1,0 +1,36 @@
+query {
+    productCategories {
+      id
+      name
+      order
+      slug
+      products {
+        id
+        name
+        price
+        code
+        slug
+        pieceCount
+        isVisible
+        isAvailable
+        isHalal
+        isLunchOnly
+        isSpicy
+        isVegetarian
+        isDiscountable
+        choices {
+          id
+        }
+        choiceGroups {
+          id
+          name
+          minSelections
+          maxSelections
+          sortOrder
+          choices {
+            id
+          }
+        }
+      }
+    }
+  }

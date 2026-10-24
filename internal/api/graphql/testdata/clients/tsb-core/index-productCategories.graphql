@@ -1,0 +1,9 @@
+query HomeComposerPrice {
+      productCategories {
+        slug
+        products {
+          slug
+          price
+        }
+      }
+    }

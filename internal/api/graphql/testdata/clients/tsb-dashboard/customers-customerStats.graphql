@@ -1,0 +1,26 @@
+query CustomerStats($input: CustomerStatsInput) {
+    customerStats(input: $input) {
+      summary {
+        totalCustomers
+        totalRevenue
+        averageOrderValue
+        totalOrders
+      }
+      customers {
+        userId
+        firstName
+        lastName
+        email
+        phoneNumber
+        registeredAt
+        totalOrders
+        totalAmount
+        averageOrderAmount
+        firstOrderDate
+        lastOrderDate
+        preferredOrderType
+        deliveryCount
+        pickupCount
+      }
+    }
+  }

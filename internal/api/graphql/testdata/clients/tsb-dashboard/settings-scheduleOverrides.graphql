@@ -1,0 +1,14 @@
+query ScheduleOverrides($from: DateTime!, $to: DateTime!) {
+    scheduleOverrides(from: $from, to: $to) {
+      date
+      closed
+      schedule {
+        open
+        close
+        dinnerOpen
+        dinnerClose
+      }
+      note
+      updatedAt
+    }
+  }

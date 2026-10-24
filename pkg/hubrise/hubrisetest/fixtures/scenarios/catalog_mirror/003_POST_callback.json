@@ -1,0 +1,31 @@
+{
+  "method": "POST",
+  "path": "/v1/callback",
+  "request": {
+    "events": {
+      "catalog": [
+        "create",
+        "update"
+      ],
+      "order": [
+        "create",
+        "update"
+      ]
+    },
+    "url": null
+  },
+  "response": {
+    "events": {
+      "catalog": [
+        "create",
+        "update"
+      ],
+      "order": [
+        "create",
+        "update"
+      ]
+    },
+    "url": null
+  },
+  "status": 200
+}

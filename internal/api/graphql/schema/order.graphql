@@ -27,6 +27,9 @@ type Order {
 
     statusHistory: [OrderStatusHistory!]! @admin
 
+    # The HubRise side of the order (staff only); null when the order was never handed to HubRise.
+    hubrise: HubriseOrderInfo @staff
+
     # Computed helper fields for display
     displayCustomerName: String!
     displayAddress: String!

@@ -1,0 +1,35 @@
+{
+  "ref": "REG",
+  "category_ref": "PIZ",
+  "name": "Regina",
+  "tags": [
+    "pizza",
+    "vegetarian"
+  ],
+  "nutrition": {
+    "legal_name": "Pizza with tomato sauce, mozzarella and mushrooms",
+    "allergens": [
+      "gluten_wheat",
+      "milk"
+    ]
+  },
+  "tax_rate": {
+    "delivery": "20.0",
+    "collection": "5.5",
+    "eat_in": "5.5"
+  },
+  "image_ids": [
+    "clom9"
+  ],
+  "skus": [
+    {
+      "name": "Small",
+      "ref": "REG-SM",
+      "price": "10.30 EUR",
+      "option_list_refs": [
+        "SAUCE",
+        "PIZZA_TOPPINGS"
+      ]
+    }
+  ]
+}

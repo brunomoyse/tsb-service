@@ -1,6 +1,7 @@
 package interfaces
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -52,7 +53,10 @@ type dbStack struct {
 	fx       *testhelpers.TestFixtures
 }
 
-func newDBStack(t *testing.T) *dbStack {
+func newDBStack(t *testing.T) *dbStack { return newDBStackWithHook(t, nil) }
+
+// newDBStackWithHook is newDBStack with an order-ready hook (an integration) on the webhook handler.
+func newDBStackWithHook(t *testing.T, hook OrderReadyHook) *dbStack {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	tdb := testhelpers.SetupTestDatabase(t)
@@ -77,7 +81,7 @@ func newDBStack(t *testing.T) *dbStack {
 	broker := pubsub.NewBroker()
 	t.Cleanup(broker.Shutdown)
 	notifier := &countingNotifier{}
-	h := NewPaymentHandler(paySvc, broker, notifier)
+	h := NewPaymentHandler(paySvc, broker, notifier, hook)
 	router := gin.New()
 	router.POST("/webhook", h.UpdatePaymentStatusHandler)
 
@@ -372,4 +376,64 @@ func TestWebhookWithDatabase(t *testing.T) {
 		require.Equal(t, 0, g)
 		require.Equal(t, 0, u)
 	})
+}
+
+// statusLog is an order status observer that remembers what it was told.
+type statusLog struct {
+	mu    sync.Mutex
+	calls []statusCall
+}
+
+type statusCall struct {
+	orderID   uuid.UUID
+	status    orderDomain.OrderStatus
+	historyID uuid.UUID
+}
+
+func (l *statusLog) OrderStatusChanged(_ context.Context, orderID uuid.UUID, status orderDomain.OrderStatus, historyID uuid.UUID) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.calls = append(l.calls, statusCall{orderID, status, historyID})
+	return nil
+}
+
+func (l *statusLog) seen() []statusCall {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]statusCall(nil), l.calls...)
+}
+
+// The payment-failed webhook cancels the order through OrderService.UpdateOrder, so the status
+// observer hears about it, once, however many times Mollie redelivers; a paid webhook moves no
+// status and tells it nothing.
+func TestWebhookCancellationReachesTheStatusObserver(t *testing.T) {
+	s := newDBStack(t)
+	log := &statusLog{}
+	s.orders.SetStatusObserver(log)
+	salmon := s.fx.SalmonSushi.ID
+
+	paid, _ := s.newOnlineOrder(salmon, "tr_obs_paid", false)
+	s.mollie.set("paid")
+	require.Equal(t, http.StatusOK, s.deliver("tr_obs_paid").Code)
+	require.Empty(t, log.seen(), "a paid webhook changes no order status")
+	require.Equal(t, "PENDING", s.orderStatus(paid.ID))
+
+	for _, status := range []string{"expired", "failed", "canceled"} {
+		order, _ := s.newOnlineOrder(salmon, "tr_obs_"+status, false)
+		s.mollie.set(status)
+		before := len(log.seen())
+
+		for range 3 {
+			require.Equal(t, http.StatusOK, s.deliver("tr_obs_"+status).Code)
+		}
+
+		calls := log.seen()[before:]
+		require.Len(t, calls, 1, status)
+		require.Equal(t, order.ID, calls[0].orderID)
+		require.Equal(t, orderDomain.OrderStatusCanceled, calls[0].status)
+		var historyStatus string
+		require.NoError(t, s.sql.Get(&historyStatus, `SELECT status FROM order_status_history WHERE id = $1 AND order_id = $2`, calls[0].historyID, order.ID),
+			"the observer gets the id of the history row of the cancellation")
+		require.Equal(t, "CANCELLED", historyStatus)
+	}
 }

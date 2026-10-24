@@ -33,6 +33,7 @@ require (
 	github.com/vektah/gqlparser/v2 v2.5.64
 	github.com/zitadel/zitadel-go/v3 v3.30.0
 	go.uber.org/zap v1.28.0
+	golang.org/x/image v0.46.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/text v0.43.0
 	golang.org/x/time v0.16.0

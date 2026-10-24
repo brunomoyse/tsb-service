@@ -23,6 +23,7 @@ import (
 	"tsb-service/internal/api/auth"
 	"tsb-service/internal/api/feedback"
 	"tsb-service/internal/api/graphql/resolver"
+	"tsb-service/internal/api/hubrisewire"
 	images "tsb-service/internal/api/images"
 	productApplication "tsb-service/internal/modules/product/application"
 	productInfrastructure "tsb-service/internal/modules/product/infrastructure"
@@ -381,7 +382,7 @@ func main() {
 
 	// Payment webhook depends on the resolver to fan out the new-order push
 	// notification once the Mollie payment transitions to paid.
-	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, broker, rootResolver)
+	paymentHandler := paymentInterfaces.NewPaymentHandler(paymentService, broker, rootResolver, rootResolver)
 	auditRecorder := audit.NewRecorder(dbPool.Admin)
 	auth.SetAuditFunc(func(c *gin.Context, action string, success bool) {
 		ctx := utils.SetClientIP(c.Request.Context(), c.ClientIP())
@@ -390,7 +391,15 @@ func main() {
 	graphqlHandler := resolver.GraphQLHandler(rootResolver, append(slices.Clone(webOrigins), "capacitor://localhost", "https://localhost"), oidcVerifier, auditRecorder)
 	optionalAuth := oidcVerifier.OptionalAuthMiddleware()
 
-	router, stopRouter, err := server.New(server.Config{WebOrigins: webOrigins}, server.Handlers{
+	// HubRise (EPOS integration): installed only when HUBRISE_CLIENT_ID, HUBRISE_CLIENT_SECRET and
+	// HUBRISE_TOKEN_KEY are set. It plugs into the resolver, the order and user services and the
+	// payment webhook through their hooks, and adds its two public endpoints. Standalone otherwise.
+	var hubriseRuntime *hubrisewire.Runtime
+	mountHubrise := func(api *gin.RouterGroup) {
+		hubriseRuntime = initHubrise(api, rootResolver, dbPool, auditRecorder, appDashboardURL)
+	}
+
+	router, stopRouter, err := server.New(server.Config{WebOrigins: webOrigins, Mount: mountHubrise}, server.Handlers{
 		Health:       func() error { return dbPool.DB().Ping() },
 		DataLoader:   middleware.DataLoaderMiddleware(orderService, paymentService, productService, userService),
 		OptionalAuth: optionalAuth,
@@ -513,6 +522,20 @@ func main() {
 		}
 	}()
 
+	// HubRise workers (outbox drain, reconciler, callback processing and poller, inventory sync,
+	// catalog drift check). Each replica runs the set; the singleton jobs are guarded by a lease in
+	// the database. They stop with the context on shutdown.
+	hubriseCtx, stopHubrise := context.WithCancel(context.Background())
+	hubriseDone := make(chan struct{})
+	if hubriseRuntime != nil {
+		go func() {
+			defer close(hubriseDone)
+			hubriseRuntime.Run(hubriseCtx)
+		}()
+	} else {
+		close(hubriseDone)
+	}
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
@@ -522,6 +545,7 @@ func main() {
 	stopBouncePoll()
 	stopAssistantWatch()
 	stopRouter()
+	stopHubrise()
 	couponValidateLimiter.Stop()
 	publicQueryLimiter.Stop()
 	broker.Shutdown()
@@ -531,6 +555,14 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		zap.L().Error("server forced to shutdown", zap.Error(err))
 		os.Exit(1)
+	}
+	select {
+	case <-hubriseDone:
+	case <-ctx.Done():
+		zap.L().Warn("hubrise workers did not stop in time")
+	}
+	if hubriseRuntime != nil {
+		hubriseRuntime.Stop()
 	}
 	zap.L().Info("server exited gracefully")
 }

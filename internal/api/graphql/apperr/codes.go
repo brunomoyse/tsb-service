@@ -142,6 +142,66 @@ const (
 	CodeAssistantLimitReached Code = "ASSISTANT_LIMIT_REACHED"
 )
 
+// HubRise integration (dashboard). The shop's customers never see these.
+const (
+	// CodeHubriseManaged: the edit touches a field HubRise owns on a linked product (price,
+	// category, VAT category, code, choice groups and choices). `fields` in the extensions names them.
+	CodeHubriseManaged Code = "HUBRISE_MANAGED"
+	// CodeHubriseRelinkRequired: the connection now points at another HubRise location or catalog
+	// than the existing links were made for; forget the links before enabling the integration.
+	CodeHubriseRelinkRequired Code = "HUBRISE_RELINK_REQUIRED"
+	// CodeHubrisePreviewRequired: catalog sync can only be enabled after a successful dry run of the
+	// current catalog, less than a day old.
+	CodeHubrisePreviewRequired Code = "HUBRISE_PREVIEW_REQUIRED"
+	// CodeHubriseRetireConfirmRequired: the import would retire a large part of the menu
+	// (`retiring` of `linked` products in the extensions); repeat it with the confirmation.
+	CodeHubriseRetireConfirmRequired Code = "HUBRISE_RETIRE_CONFIRM_REQUIRED"
+	// CodeHubriseNotConfigured: HubRise is not configured on this server (no client id, secret and
+	// token key).
+	CodeHubriseNotConfigured Code = "HUBRISE_NOT_CONFIGURED"
+	// CodeHubriseNotConnected: no HubRise location is authorized yet, or it was disconnected.
+	CodeHubriseNotConnected Code = "HUBRISE_NOT_CONNECTED"
+	// CodeHubriseNotEnabled: the integration (or the feature the operation needs) is switched off.
+	CodeHubriseNotEnabled Code = "HUBRISE_NOT_ENABLED"
+	// CodeHubriseEmptyCatalog: the HubRise catalog has no product; it is never imported, so an empty
+	// or half loaded catalog cannot retire the menu.
+	CodeHubriseEmptyCatalog Code = "HUBRISE_EMPTY_CATALOG"
+	// CodeHubriseBusy: another import or inventory sync is already running; try again shortly.
+	CodeHubriseBusy Code = "HUBRISE_BUSY"
+	// CodeHubriseSKULinked: the SKU is already linked to another product.
+	CodeHubriseSKULinked Code = "HUBRISE_SKU_LINKED"
+	// CodeHubriseUpstream: HubRise refused or did not answer a call the operation needed. `kind`
+	// in the extensions says how (unauthorized, forbidden, rate_limited, server, timeout...).
+	CodeHubriseUpstream Code = "HUBRISE_UPSTREAM"
+
+	// The dashboard-owned menu (catalog publishing).
+
+	// CodeHubrisePublishMode: a full catalog import was asked while the dashboard owns the menu.
+	CodeHubrisePublishMode Code = "HUBRISE_PUBLISH_MODE"
+	// CodeHubriseDirectionConflict: catalog sync was asked while the dashboard owns the menu.
+	CodeHubriseDirectionConflict Code = "HUBRISE_DIRECTION_CONFLICT"
+	// CodeHubriseReconnectRequired: the stored authorization has no catalog.write; reconnect HubRise.
+	CodeHubriseReconnectRequired Code = "HUBRISE_RECONNECT_REQUIRED"
+	// CodeHubriseAccountCatalog: the catalog belongs to the HubRise account and the connection holds
+	// a location token.
+	CodeHubriseAccountCatalog Code = "HUBRISE_ACCOUNT_CATALOG"
+	// CodeHubriseNotPublishMode: a publish operation was asked while the dashboard does not own the menu.
+	CodeHubriseNotPublishMode Code = "HUBRISE_NOT_PUBLISH_MODE"
+	// CodeHubrisePreviewStale: the plan the admin confirmed is not the current plan; preview again.
+	CodeHubrisePreviewStale Code = "HUBRISE_PREVIEW_STALE"
+	// CodeHubrisePublishConfirmRequired: the first publish, or one that removes a large part of the
+	// HubRise menu, was asked without the confirmation.
+	CodeHubrisePublishConfirmRequired Code = "HUBRISE_PUBLISH_CONFIRM_REQUIRED"
+	// CodeHubrisePublishBlocked: the plan has blockers; `blockers` in the extensions lists their codes.
+	CodeHubrisePublishBlocked Code = "HUBRISE_PUBLISH_BLOCKED"
+	// CodeHubrisePublishPendingChanges: leaving PUBLISH would abandon unpublished edits.
+	CodeHubrisePublishPendingChanges Code = "HUBRISE_PUBLISH_PENDING_CHANGES"
+	// CodeHubriseRateLimited: HubRise's read limit is reached; `retryAfterSeconds` in the extensions.
+	CodeHubriseRateLimited Code = "HUBRISE_RATE_LIMITED"
+	// CodeHubriseEmptyMenu: the local menu has no product, nothing is published.
+	CodeHubriseEmptyMenu Code = "HUBRISE_EMPTY_MENU"
+)
+
 // expected lists the codes that are the customer's / the world's doing rather than ours: they are
 // logged as warnings and never sent to Sentry. Everything else is a server fault.
 var expected = map[Code]bool{
@@ -186,6 +246,32 @@ var expected = map[Code]bool{
 	CodePaymentSettlementFailed: true,
 	// Staff must act (refund by hand); the resolver logs the cause at error level itself.
 	CodePaymentNotRefundable: true,
+	// The operator's doing: an edit of a managed field, a step done out of order.
+	CodeHubriseManaged:               true,
+	CodeHubriseRelinkRequired:        true,
+	CodeHubrisePreviewRequired:       true,
+	CodeHubriseRetireConfirmRequired: true,
+	CodeHubriseNotConfigured:         true,
+	CodeHubriseNotConnected:          true,
+	CodeHubriseNotEnabled:            true,
+	CodeHubriseEmptyCatalog:          true,
+	CodeHubriseBusy:                  true,
+	CodeHubriseSKULinked:             true,
+	// The dashboard-owned menu: steps done out of order, or limits HubRise imposes.
+	CodeHubrisePublishMode:            true,
+	CodeHubriseDirectionConflict:      true,
+	CodeHubriseReconnectRequired:      true,
+	CodeHubriseAccountCatalog:         true,
+	CodeHubriseNotPublishMode:         true,
+	CodeHubrisePreviewStale:           true,
+	CodeHubrisePublishConfirmRequired: true,
+	CodeHubrisePublishBlocked:         true,
+	CodeHubrisePublishPendingChanges:  true,
+	CodeHubriseRateLimited:            true,
+	CodeHubriseEmptyMenu:              true,
+	// HubRise's side failing is not a bug of ours; the message is for the operator, and the resolver
+	// logs the cause itself.
+	CodeHubriseUpstream: true,
 }
 
 // IsExpected reports whether the code is a user-side error (warn log, no Sentry event).
