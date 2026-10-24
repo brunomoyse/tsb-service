@@ -19,6 +19,12 @@ func normalizeEmail(raw string) string {
 	return strings.ToLower(strings.TrimSpace(raw))
 }
 
+// Column lists of domain.User, plain and prefixed with the "u" alias (see db.Columns).
+var (
+	userColumns  = db.Columns(domain.User{}, "")
+	userColumnsU = db.Columns(domain.User{}, "u")
+)
+
 type UserRepository struct {
 	pool *db.DBPool
 }
@@ -49,7 +55,7 @@ func (r *UserRepository) Save(ctx context.Context, user *domain.User) (uuid.UUID
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	var u domain.User
 	query := `
-		SELECT *
+		SELECT ` + userColumns + `
 		FROM users
 		WHERE email = $1;
 	`
@@ -62,7 +68,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
 	var u domain.User
 	query := `
-		SELECT *
+		SELECT ` + userColumns + `
 		FROM users
 		WHERE id = $1;
 	`
@@ -75,7 +81,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User,
 func (r *UserRepository) FindByZitadelID(ctx context.Context, zitadelID string) (*domain.User, error) {
 	var u domain.User
 	query := `
-		SELECT *
+		SELECT ` + userColumns + `
 		FROM users
 		WHERE zitadel_user_id = $1;
 	`
@@ -146,10 +152,10 @@ func (r *UserRepository) BatchGetUsersByOrderIDs(ctx context.Context, orderIDs [
 		return map[string][]*domain.User{}, nil
 	}
 
-	const query = `
+	query := `
     SELECT
       o.id   AS order_id,
-      u.*
+      ` + userColumnsU + `
     FROM users AS u
     JOIN orders AS o ON o.user_id = u.id
     WHERE o.id = ANY($1)
