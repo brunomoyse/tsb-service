@@ -34,6 +34,9 @@ const (
 	OriginImport  LinkOrigin = "import"  // created by the importer together with the local row
 	OriginAdopted LinkOrigin = "adopted" // matched to a row that existed before the integration
 	OriginManual  LinkOrigin = "manual"  // set by hand in the dashboard
+	// OriginPublished is a link the catalog publisher created for a new local item, with a ref the
+	// shop generated.
+	OriginPublished LinkOrigin = "published"
 )
 
 // CatalogLink ties one HubRise catalog entry to one local row. Exactly the id matching EntityType
@@ -118,7 +121,7 @@ func (l *CatalogLink) Validate() error {
 		return ErrInvalidLink
 	}
 	switch l.Origin {
-	case OriginImport, OriginAdopted, OriginManual:
+	case OriginImport, OriginAdopted, OriginManual, OriginPublished:
 		return nil
 	}
 	return ErrInvalidLink
@@ -164,6 +167,11 @@ type CatalogLinkRepository interface {
 	ListSoldOutExpired(ctx context.Context, now time.Time) ([]CatalogLink, error)
 	// ClearSoldOut clears the sold-out provenance of a link: the shop now owns that state.
 	ClearSoldOut(ctx context.Context, id int64) error
+	// Rekey changes the key and ref of a link (the shared option list split of the publisher).
+	Rekey(ctx context.Context, id int64, key, ref string) error
+	// SetHubriseID refreshes the cached HubRise id of the link of the entry (ids change on every PUT
+	// of the catalog). A key without a link is ignored.
+	SetHubriseID(ctx context.Context, t EntityType, key, hubriseID string) error
 	// Delete removes one link (the local row stays).
 	Delete(ctx context.Context, id int64) error
 	// DeleteAll removes every link (the local rows stay) and returns how many.

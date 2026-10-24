@@ -32,11 +32,26 @@ const (
 	m6Version int64 = 20261024170000
 	// m7Version creates hubrise_customers, the link to the customer list.
 	m7Version int64 = 20261024180000
+	// m8Version adds the dashboard-owned menu: publish columns, the publisher row, the published items.
+	m8Version int64 = 20261024190000
 )
 
 var hubriseTables = []string{
 	"hubrise_connection", "hubrise_oauth_states", "hubrise_job_leases", "hubrise_catalog_links",
 	"hubrise_orders", "hubrise_outbox", "hubrise_events", "hubrise_foreign_orders", "hubrise_customers",
+	"hubrise_catalog_publish", "hubrise_published_items",
+}
+
+// startsEmpty are the HubRise tables that hold no row right after the migrations (the publisher's
+// singleton row is the one exception: the migration inserts it).
+func startsEmpty() []string {
+	var out []string
+	for _, t := range hubriseTables {
+		if t != "hubrise_catalog_publish" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func newProvider(t *testing.T, td *testhelpers.TestDatabase) *goose.Provider {
@@ -132,7 +147,7 @@ func TestHubriseMigrationsLeaveExistingDataAlone(t *testing.T) {
 	require.NoError(t, td.DB.GetContext(ctx, &status, `SELECT order_status FROM orders WHERE id = $1`, orderID))
 	assert.Equal(t, "CONFIRMED", status)
 
-	for _, table := range hubriseTables {
+	for _, table := range startsEmpty() {
 		var n int
 		require.NoError(t, td.DB.GetContext(ctx, &n, `SELECT count(*) FROM `+table))
 		assert.Zero(t, n, "%s starts empty: no backfill", table)
@@ -149,7 +164,7 @@ func TestHubriseMigrationsApplyOneByOneWithoutMissingVersions(t *testing.T) {
 
 	// An environment that deployed task 1 only (the test server deploys on every push), then later
 	// tasks: each step must apply cleanly with out-of-order disabled.
-	for _, v := range []int64{m1Version, m2Version, m3Version, m4Version, m5Version, m6Version, m7Version} {
+	for _, v := range []int64{m1Version, m2Version, m3Version, m4Version, m5Version, m6Version, m7Version, m8Version} {
 		res, err := p.UpTo(ctx, v)
 		require.NoError(t, err, "UpTo %d", v)
 		require.Len(t, res, 1)
@@ -158,7 +173,7 @@ func TestHubriseMigrationsApplyOneByOneWithoutMissingVersions(t *testing.T) {
 	res, err := p.Up(ctx)
 	require.NoError(t, err, "the later HubRise migrations apply after the earlier ones")
 	for _, r := range res {
-		assert.Greater(t, r.Source.Version, m7Version)
+		assert.Greater(t, r.Source.Version, m8Version)
 	}
 	pending, err := p.HasPending(ctx)
 	require.NoError(t, err)
@@ -192,6 +207,7 @@ func TestMigrationVersionsAreStrictlyOrdered(t *testing.T) {
 	assert.Less(t, m4Version, m5Version)
 	assert.Less(t, m5Version, m6Version)
 	assert.Less(t, m6Version, m7Version)
+	assert.Less(t, m7Version, m8Version)
 
 	// The database really is at the newest version after the template migrations.
 	v, err := p.GetDBVersion(context.Background())
@@ -468,6 +484,7 @@ func TestMigrationsWithForeignKeysFailFastWhenTheReferencedTableIsBusy(t *testin
 		{"catalog links", m2Version, m1Version, "products", "hubrise_catalog_links"},
 		{"orders and outbox", m3Version, m2Version, "orders", "hubrise_orders"},
 		{"customers", m7Version, m6Version, "users", "hubrise_customers"},
+		{"catalog publish", m8Version, m7Version, "hubrise_connection", "hubrise_catalog_publish"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			td := testhelpers.SetupTestDatabase(t)
@@ -498,4 +515,150 @@ func TestMigrationsWithForeignKeysFailFastWhenTheReferencedTableIsBusy(t *testin
 			assert.True(t, tableExists(t, td, tc.created))
 		})
 	}
+}
+
+func connectionColumnExists(t *testing.T, td *testhelpers.TestDatabase, column string) (nullable, def string, ok bool) {
+	t.Helper()
+	var rows []struct {
+		Nullable string  `db:"is_nullable"`
+		Default  *string `db:"column_default"`
+	}
+	require.NoError(t, td.DB.SelectContext(t.Context(), &rows, `
+		SELECT is_nullable, column_default FROM information_schema.columns
+		WHERE table_schema = 'public' AND table_name = 'hubrise_connection' AND column_name = $1`, column))
+	if len(rows) == 0 {
+		return "", "", false
+	}
+	if rows[0].Default != nil {
+		def = *rows[0].Default
+	}
+	return rows[0].Nullable, def, true
+}
+
+func originCheckDefs(t *testing.T, td *testhelpers.TestDatabase) []string {
+	t.Helper()
+	var defs []string
+	require.NoError(t, td.DB.SelectContext(t.Context(), &defs, `
+		SELECT pg_get_constraintdef(oid) FROM pg_constraint
+		WHERE conrelid = 'hubrise_catalog_links'::regclass AND contype = 'c'
+		  AND pg_get_constraintdef(oid) LIKE '%origin%' AND pg_get_constraintdef(oid) NOT LIKE '%entity_type%'`))
+	return defs
+}
+
+// The publish migration is additive: two defaulted columns, two new tables, a widened CHECK. Down puts
+// the strict CHECK back after rewriting the new origin, and Up again works on the same database.
+func TestCatalogPublishMigrationUpDownUp(t *testing.T) {
+	td := testhelpers.SetupTestDatabase(t)
+	ctx := t.Context()
+	p := newProvider(t, td)
+
+	for _, col := range []string{"publish_catalog", "publish_images"} {
+		nullable, def, ok := connectionColumnExists(t, td, col)
+		require.True(t, ok, col)
+		assert.Equal(t, "NO", nullable)
+		assert.Equal(t, "false", def, "off by default")
+	}
+	var rows int
+	require.NoError(t, td.DB.GetContext(ctx, &rows, `SELECT count(*) FROM hubrise_catalog_publish`))
+	assert.Equal(t, 1, rows, "the publisher row exists after Up")
+	defs := originCheckDefs(t, td)
+	require.Len(t, defs, 1)
+	assert.Contains(t, defs[0], "published")
+
+	fx := testhelpers.SeedTestData(t, td.DB)
+	_, err := td.DB.ExecContext(ctx, `INSERT INTO hubrise_catalog_links (entity_type, product_id, hubrise_key, hubrise_ref, origin)
+		VALUES ('product', $1, 'SKU-P', 'SKU-P', 'published')`, fx.SalmonSushi.ID)
+	require.NoError(t, err, "the widened CHECK accepts published")
+	_, err = td.DB.ExecContext(ctx, `INSERT INTO hubrise_catalog_links (entity_type, product_id, hubrise_key, hubrise_ref, origin)
+		VALUES ('product', $1, 'SKU-G', 'SKU-G', 'garbage')`, fx.TunaSushi.ID)
+	require.Error(t, err, "and still rejects anything else")
+
+	for round := 1; round <= 2; round++ {
+		_, err := p.DownTo(ctx, m7Version)
+		require.NoError(t, err, "round %d: Down", round)
+		for _, col := range []string{"publish_catalog", "publish_images"} {
+			_, _, ok := connectionColumnExists(t, td, col)
+			assert.False(t, ok, "round %d: %s dropped", round, col)
+		}
+		assert.False(t, tableExists(t, td, "hubrise_catalog_publish"))
+		assert.False(t, tableExists(t, td, "hubrise_published_items"))
+		defs := originCheckDefs(t, td)
+		require.Len(t, defs, 1, "round %d", round)
+		assert.NotContains(t, defs[0], "published")
+		if round == 1 {
+			var origin string
+			require.NoError(t, td.DB.GetContext(ctx, &origin, `SELECT origin FROM hubrise_catalog_links WHERE hubrise_key = 'SKU-P'`))
+			assert.Equal(t, "manual", origin, "Down rewrites published links before restoring the strict CHECK")
+		}
+		_, err = p.Up(ctx)
+		require.NoError(t, err, "round %d: Up", round)
+		assert.True(t, tableExists(t, td, "hubrise_catalog_publish"))
+	}
+}
+
+// The previous release's queries (the explicit column lists of the connection and the links) keep working on
+// the new schema, and its writes stay valid.
+func TestCatalogPublishMigrationKeepsThePreviousReleaseWorking(t *testing.T) {
+	td := testhelpers.SetupTestDatabase(t)
+	ctx := t.Context()
+	fx := testhelpers.SeedTestData(t, td.DB)
+
+	oldConnectionColumns := `enabled, access_token_enc, account_id, account_name, location_id, location_name,
+		catalog_id, catalog_name, customer_list_id, customer_list_name, scope,
+		push_orders, sync_status, sync_inventory, sync_catalog, sync_customers, catalog_auto_import,
+		auto_refund_on_cancel, import_images, catalog_language, variant_ref, channel_name,
+		delivery_charge_ref, payment_fee_charge_ref, catalog_hash, catalog_preview_hash, catalog_preview_at,
+		catalog_update_available_at, push_orders_since, inventory_baseline_at, relink_required_at,
+		last_catalog_sync_at, last_event_at, auth_error_at, last_error, callback_registered_at,
+		created_at, updated_at`
+	// The old INSERT names no new column, so the defaults apply.
+	_, err := td.DB.ExecContext(ctx, `INSERT INTO hubrise_connection (id, access_token_enc, location_id) VALUES (TRUE, '\x01', 'l')`)
+	require.NoError(t, err)
+	var n int
+	require.NoError(t, td.DB.GetContext(ctx, &n, `SELECT count(*) FROM (SELECT `+oldConnectionColumns+` FROM hubrise_connection) q`))
+	assert.Equal(t, 1, n)
+	var publish bool
+	require.NoError(t, td.DB.GetContext(ctx, &publish, `SELECT publish_catalog FROM hubrise_connection`))
+	assert.False(t, publish)
+
+	for _, origin := range []string{"import", "adopted", "manual"} {
+		_, err = td.DB.ExecContext(ctx, `INSERT INTO hubrise_catalog_links (entity_type, product_id, hubrise_key, hubrise_ref, origin)
+			VALUES ('product', $1, $2, $2, $3)`, fx.SalmonSushi.ID, "K-"+origin, origin)
+		require.NoError(t, err, "the previous release writes %s links", origin)
+		_, err = td.DB.ExecContext(ctx, `DELETE FROM hubrise_catalog_links`)
+		require.NoError(t, err)
+	}
+}
+
+// hubrise_connection is read on every order push: the ALTER must give up after the lock timeout
+// instead of queueing behind a reader.
+func TestCatalogPublishMigrationDoesNotBlockTheConnectionForLong(t *testing.T) {
+	td := testhelpers.SetupTestDatabase(t)
+	ctx := t.Context()
+	p := newProvider(t, td)
+	_, err := p.DownTo(ctx, m7Version)
+	require.NoError(t, err)
+
+	blocker, err := td.DB.BeginTxx(ctx, nil)
+	require.NoError(t, err)
+	defer func() { _ = blocker.Rollback() }()
+	var n int
+	require.NoError(t, blocker.GetContext(ctx, &n, `SELECT count(*) FROM hubrise_connection`)) // ACCESS SHARE until the end
+
+	start := time.Now()
+	_, err = p.UpTo(ctx, m8Version)
+	elapsed := time.Since(start)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "lock timeout")
+	assert.GreaterOrEqual(t, elapsed, 4*time.Second)
+	assert.Less(t, elapsed, 15*time.Second)
+	_, _, ok := connectionColumnExists(t, td, "publish_catalog")
+	assert.False(t, ok, "the failed migration changed nothing")
+	assert.False(t, tableExists(t, td, "hubrise_catalog_publish"))
+
+	require.NoError(t, blocker.Rollback())
+	_, err = p.UpTo(ctx, m8Version)
+	require.NoError(t, err)
+	_, _, ok = connectionColumnExists(t, td, "publish_catalog")
+	assert.True(t, ok)
 }

@@ -43,6 +43,32 @@ var (
 	// ErrAuthorizationFailed means HubRise refused the authorization code (spent, expired) or the
 	// client credentials, or the connection could not be set up with the token it returned.
 	ErrAuthorizationFailed = errors.New("hubrise: the authorization could not be completed")
+
+	// ErrDirectionConflict means syncCatalog was asked while the catalog direction is PUBLISH (or
+	// the other way round): the two directions are mutually exclusive.
+	ErrDirectionConflict = errors.New("hubrise: the catalog direction is PUBLISH, switch it before turning catalog sync on")
+	// ErrPublishMode means a FULL catalog import was asked while the direction is PUBLISH.
+	ErrPublishMode = errors.New("hubrise: the dashboard owns the menu (PUBLISH), a full import is not available")
+	// ErrNotPublishMode means a publish operation was asked while the direction is not PUBLISH.
+	ErrNotPublishMode = errors.New("hubrise: the catalog direction is not PUBLISH")
+	// ErrReconnectRequired means the stored scope lacks catalog.write: reconnect first.
+	ErrReconnectRequired = errors.New("hubrise: the connection has no catalog.write scope, reconnect HubRise first")
+	// ErrAccountCatalog means the catalog belongs to the HubRise account and the connection holds a
+	// location token, which cannot modify it.
+	ErrAccountCatalog = errors.New("hubrise: the catalog belongs to the HubRise account, connect with an account token or use a location catalog")
+	// ErrPreviewStale means the plan the admin confirmed is no longer the plan: preview again.
+	ErrPreviewStale = errors.New("hubrise: the menu or the HubRise catalog changed since the preview, preview again")
+	// ErrPublishConfirmRequired means the first publish, or a publish that removes a large part of the
+	// HubRise catalog, was asked without the confirmation.
+	ErrPublishConfirmRequired = errors.New("hubrise: this publish needs an explicit confirmation of the preview")
+	// ErrPublishBlocked means the menu cannot be published as it is (the blockers of the preview).
+	ErrPublishBlocked = errors.New("hubrise: the menu cannot be published, fix the blockers of the preview")
+	// ErrPublishPendingChanges means leaving PUBLISH would abandon unpublished edits.
+	ErrPublishPendingChanges = errors.New("hubrise: unpublished menu edits exist, publish them or acknowledge that HubRise will overwrite them")
+	// ErrEmptyMenu means the local menu has no product: publishing it would wipe the EPOS menu.
+	ErrEmptyMenu = errors.New("hubrise: the local menu has no product, nothing is published")
+	// ErrPublishBusy means another publish holds the lease and the request could not wait for it.
+	ErrPublishBusy = errors.New("hubrise: a catalog publish is already running")
 )
 
 // InvalidSettingError is the refusal of a settings value. It carries the setting's name and a

@@ -14,7 +14,7 @@ import (
 const connectionColumns = `enabled, access_token_enc, account_id, account_name, location_id, location_name,
 	catalog_id, catalog_name, customer_list_id, customer_list_name, scope,
 	push_orders, sync_status, sync_inventory, sync_catalog, sync_customers, catalog_auto_import,
-	auto_refund_on_cancel, import_images, catalog_language, variant_ref, channel_name,
+	auto_refund_on_cancel, import_images, publish_catalog, publish_images, catalog_language, variant_ref, channel_name,
 	delivery_charge_ref, payment_fee_charge_ref, catalog_hash, catalog_preview_hash, catalog_preview_at,
 	catalog_update_available_at, push_orders_since, inventory_baseline_at, relink_required_at,
 	last_catalog_sync_at, last_event_at, auth_error_at, last_error, callback_registered_at,
@@ -41,7 +41,8 @@ func (r *connectionRepository) Connect(ctx context.Context, p domain.ConnectPara
 		since = p.PushOrdersSince
 	}
 	var c domain.Connection
-	err := r.get(ctx, "connect", &c, `
+	err := r.inTx(ctx, "connect", func(tx store) error {
+		if err := tx.get(ctx, "connect", &c, `
 		INSERT INTO hubrise_connection (id, access_token_enc, account_id, account_name, location_id, location_name,
 			catalog_id, catalog_name, customer_list_id, customer_list_name, scope, push_orders_since, relink_required_at)
 		VALUES (TRUE, $1, NULLIF($2, ''), NULLIF($3, ''), NULLIF($4, ''), NULLIF($5, ''),
@@ -60,8 +61,25 @@ func (r *connectionRepository) Connect(ctx context.Context, p domain.ConnectPara
 			relink_required_at = COALESCE($12::timestamptz, hubrise_connection.relink_required_at),
 			auth_error_at = NULL, last_error = NULL, updated_at = now()
 		RETURNING `+connectionColumns,
-		p.AccessTokenEnc, p.AccountID, p.AccountName, p.LocationID, p.LocationName,
-		p.CatalogID, p.CatalogName, p.CustomerListID, p.CustomerListName, p.Scope, since, p.RelinkRequiredAt)
+			p.AccessTokenEnc, p.AccountID, p.AccountName, p.LocationID, p.LocationName,
+			p.CatalogID, p.CatalogName, p.CustomerListID, p.CustomerListName, p.Scope, since, p.RelinkRequiredAt); err != nil {
+			return err
+		}
+		// The publisher follows the connection (amendment A15): a reconnect clears the errors that a new
+		// authorization can fix (a missing scope, a revoked token, a deleted catalog, an account catalog),
+		// and a connection to another location or catalog starts over with a fresh first publish
+		// confirmation and forgets what was published to the old catalog.
+		if p.RelinkRequiredAt != nil {
+			if err := tx.exec(ctx, "reset publisher on relink", resetPublisherSQL, time.Now()); err != nil {
+				return err
+			}
+			return tx.exec(ctx, "forget published items on relink", `DELETE FROM hubrise_published_items`)
+		}
+		return tx.exec(ctx, "clear publisher errors on reconnect", `
+			UPDATE hubrise_catalog_publish SET blocked_at = NULL, last_error = NULL, last_error_code = NULL, last_error_at = NULL,
+				attempts = 0, updated_at = now()
+			WHERE last_error_code IN ('WRITE_SCOPE_MISSING', 'AUTH', 'CATALOG_NOT_FOUND', 'ACCOUNT_CATALOG')`)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +94,27 @@ func (r *connectionRepository) Disconnect(ctx context.Context) error {
 
 func (r *connectionRepository) UpdateSettings(ctx context.Context, p domain.SettingsPatch) (*domain.Connection, error) {
 	var c domain.Connection
-	err := r.get(ctx, "update settings", &c, `
+	err := r.inTx(ctx, "update settings", func(tx store) error {
+		// The row is locked first: the two catalog directions are mutually exclusive, and the check and
+		// the update must not be overtaken by a concurrent change of the other one.
+		var cur struct {
+			Sync    bool `db:"sync_catalog"`
+			Publish bool `db:"publish_catalog"`
+		}
+		if err := tx.get(ctx, "lock connection", &cur, `SELECT sync_catalog, publish_catalog FROM hubrise_connection FOR UPDATE`); err != nil {
+			return err
+		}
+		sync, publish := cur.Sync, cur.Publish
+		if p.SyncCatalog != nil {
+			sync = *p.SyncCatalog
+		}
+		if p.PublishCatalog != nil {
+			publish = *p.PublishCatalog
+		}
+		if sync && publish {
+			return domain.ErrDirectionConflict
+		}
+		return tx.get(ctx, "update settings", &c, `
 		UPDATE hubrise_connection SET
 			enabled = COALESCE($1, enabled),
 			push_orders = COALESCE($2, push_orders),
@@ -93,15 +131,84 @@ func (r *connectionRepository) UpdateSettings(ctx context.Context, p domain.Sett
 			delivery_charge_ref = CASE WHEN $13::text IS NULL THEN delivery_charge_ref ELSE NULLIF($13::text, '') END,
 			payment_fee_charge_ref = CASE WHEN $14::text IS NULL THEN payment_fee_charge_ref ELSE NULLIF($14::text, '') END,
 			push_orders_since = COALESCE($15, push_orders_since),
+			publish_images = COALESCE($16, publish_images),
+			publish_catalog = COALESCE($17, publish_catalog),
 			updated_at = now()
 		RETURNING `+connectionColumns,
-		p.Enabled, p.PushOrders, p.SyncStatus, p.SyncInventory, p.SyncCatalog, p.SyncCustomers,
-		p.CatalogAutoImport, p.AutoRefundOnCancel, p.ImportImages, p.CatalogLanguage,
-		p.VariantRef, p.ChannelName, p.DeliveryChargeRef, p.PaymentFeeChargeRef, p.PushOrdersSince)
+			p.Enabled, p.PushOrders, p.SyncStatus, p.SyncInventory, p.SyncCatalog, p.SyncCustomers,
+			p.CatalogAutoImport, p.AutoRefundOnCancel, p.ImportImages, p.CatalogLanguage,
+			p.VariantRef, p.ChannelName, p.DeliveryChargeRef, p.PaymentFeeChargeRef, p.PushOrdersSince,
+			p.PublishImages, p.PublishCatalog)
+	})
 	if err != nil {
 		return nil, err
 	}
 	return &c, nil
+}
+
+// resetPublisherSQL returns the publisher to "awaiting first publish" at $1.
+const resetPublisherSQL = `
+	UPDATE hubrise_catalog_publish SET
+		first_publish_confirmed_at = NULL, change_seq = change_seq + 1, dirty_since = $1, last_change_at = $1,
+		next_attempt_at = NULL, attempts = 0, blocked_at = NULL, external_change_at = NULL,
+		last_error = NULL, last_error_code = NULL, last_error_at = NULL,
+		lease_holder = NULL, leased_until = NULL, updated_at = $1`
+
+// clearPublisherSQL clears the dirty flag and the warnings when the direction leaves PUBLISH ($1 = now).
+const clearPublisherSQL = `
+	UPDATE hubrise_catalog_publish SET
+		dirty_since = NULL, next_attempt_at = NULL, attempts = 0, blocked_at = NULL, external_change_at = NULL,
+		last_error = NULL, last_error_code = NULL, last_error_at = NULL,
+		lease_holder = NULL, leased_until = NULL, updated_at = $1`
+
+func (r *connectionRepository) ChangeCatalogDirection(ctx context.Context, to domain.CatalogDirection, now time.Time, guard domain.DirectionGuard) (*domain.Connection, domain.CatalogDirection, error) {
+	if !to.Valid() {
+		return nil, "", &domain.InvalidSettingError{Field: "catalogDirection", Message: "unknown direction"}
+	}
+	var out domain.Connection
+	var before domain.CatalogDirection
+	err := r.inTx(ctx, "change catalog direction", func(tx store) error {
+		var cur domain.Connection
+		if err := tx.get(ctx, "lock connection", &cur, `SELECT `+connectionColumns+` FROM hubrise_connection FOR UPDATE`); err != nil {
+			return err
+		}
+		var state domain.PublishState
+		if err := tx.get(ctx, "lock publisher", &state, `SELECT `+publishStateColumns+` FROM hubrise_catalog_publish FOR UPDATE`); err != nil {
+			return err
+		}
+		before = cur.CatalogDirection()
+		if guard != nil {
+			if err := guard(ctx, &cur, &state); err != nil {
+				return err
+			}
+		}
+		sync, publish, auto := false, false, "catalog_auto_import"
+		switch to {
+		case domain.DirectionImport:
+			sync = true
+		case domain.DirectionPublish:
+			publish, auto = true, "FALSE"
+		}
+		if err := tx.get(ctx, "change catalog direction", &out, `
+			UPDATE hubrise_connection SET sync_catalog = $1, publish_catalog = $2,
+				catalog_auto_import = `+auto+`,
+				catalog_update_available_at = CASE WHEN $2 THEN NULL ELSE catalog_update_available_at END,
+				updated_at = now()
+			RETURNING `+connectionColumns, sync, publish); err != nil {
+			return err
+		}
+		switch {
+		case to == domain.DirectionPublish && before != domain.DirectionPublish:
+			return tx.exec(ctx, "reset publisher", resetPublisherSQL, now)
+		case to != domain.DirectionPublish && before == domain.DirectionPublish:
+			return tx.exec(ctx, "clear publisher", clearPublisherSQL, now)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	return &out, before, nil
 }
 
 func (r *connectionRepository) RecordAuthError(ctx context.Context, at time.Time, message string) error {

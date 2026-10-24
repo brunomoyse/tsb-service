@@ -148,6 +148,20 @@ func (r *catalogLinkRepository) ClearSoldOut(ctx context.Context, id int64) erro
 		`UPDATE hubrise_catalog_links SET inventory_sold_out = FALSE, sold_out_until = NULL, updated_at = now() WHERE id = $1`, id)
 }
 
+func (r *catalogLinkRepository) Rekey(ctx context.Context, id int64, key, ref string) error {
+	if key == "" || ref == "" {
+		return domain.ErrInvalidLink
+	}
+	return r.mustChange(ctx, "rekey catalog link",
+		`UPDATE hubrise_catalog_links SET hubrise_key = $2, hubrise_ref = $3, updated_at = now() WHERE id = $1`, id, key, ref)
+}
+
+func (r *catalogLinkRepository) SetHubriseID(ctx context.Context, t domain.EntityType, key, hubriseID string) error {
+	return r.exec(ctx, "set catalog link hubrise id", `
+		UPDATE hubrise_catalog_links SET hubrise_id = NULLIF($3, ''), updated_at = now()
+		WHERE entity_type = $1 AND hubrise_key = $2 AND hubrise_id IS DISTINCT FROM NULLIF($3, '')`, t, key, hubriseID)
+}
+
 func (r *catalogLinkRepository) Delete(ctx context.Context, id int64) error {
 	return r.mustChange(ctx, "delete catalog link", `DELETE FROM hubrise_catalog_links WHERE id = $1`, id)
 }

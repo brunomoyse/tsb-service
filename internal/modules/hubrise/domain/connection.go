@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,6 +50,11 @@ type Connection struct {
 	CatalogAutoImport  bool `db:"catalog_auto_import"`
 	AutoRefundOnCancel bool `db:"auto_refund_on_cancel"`
 	ImportImages       bool `db:"import_images"`
+	// PublishCatalog is the catalog direction PUBLISH: the dashboard owns the menu and every edit is
+	// published to HubRise. It is never true together with SyncCatalog.
+	PublishCatalog bool `db:"publish_catalog"`
+	// PublishImages uploads the product images with the published catalog.
+	PublishImages bool `db:"publish_images"`
 
 	CatalogLanguage     string  `db:"catalog_language"`
 	VariantRef          *string `db:"variant_ref"`
@@ -71,6 +77,66 @@ type Connection struct {
 
 	CreatedAt time.Time `db:"created_at"`
 	UpdatedAt time.Time `db:"updated_at"`
+}
+
+// CatalogDirection says who owns the menu.
+type CatalogDirection string
+
+const (
+	// DirectionNone: nobody does; links only.
+	DirectionNone CatalogDirection = "NONE"
+	// DirectionImport: HubRise owns the menu (sync_catalog).
+	DirectionImport CatalogDirection = "IMPORT"
+	// DirectionPublish: the dashboard owns the menu (publish_catalog).
+	DirectionPublish CatalogDirection = "PUBLISH"
+)
+
+// Valid reports whether d is one of the three directions.
+func (d CatalogDirection) Valid() bool {
+	return d == DirectionNone || d == DirectionImport || d == DirectionPublish
+}
+
+// CatalogDirection derives the direction from the two switches. Both set is impossible (one UPDATE
+// keeps them apart); if it ever happened PUBLISH wins, which writes nothing the shop did not
+// decide.
+func (c *Connection) CatalogDirection() CatalogDirection {
+	switch {
+	case c == nil:
+		return DirectionNone
+	case c.PublishCatalog:
+		return DirectionPublish
+	case c.SyncCatalog:
+		return DirectionImport
+	}
+	return DirectionNone
+}
+
+// HasWriteScope reports whether the scope stored at the last authorization grants catalog.write
+// (inside location[...] or account[...], or through the catalog.* wildcard). Connections made
+// before the dashboard-owned menu existed do not have it and must reconnect before they can
+// publish.
+func (c *Connection) HasWriteScope() bool {
+	return c != nil && c.Scope != nil && HasWriteScope(*c.Scope)
+}
+
+// catalogWildcard is the scope entry that grants every catalog permission.
+const catalogWildcard = "catalog." + "*"
+
+// HasWriteScope reports whether a scope string grants catalog.write.
+func HasWriteScope(scope string) bool {
+	inner := scope
+	if open := strings.Index(scope, "["); open >= 0 {
+		inner = scope[open+1:]
+		if end := strings.LastIndex(inner, "]"); end >= 0 {
+			inner = inner[:end]
+		}
+	}
+	for _, p := range strings.FieldsFunc(inner, func(r rune) bool { return r == ',' || r == ' ' }) {
+		if p == "catalog.write" || p == catalogWildcard {
+			return true
+		}
+	}
+	return false
 }
 
 // Connected reports whether an access token is stored.
@@ -146,6 +212,11 @@ type SettingsPatch struct {
 	CatalogAutoImport  *bool
 	AutoRefundOnCancel *bool
 	ImportImages       *bool
+	// PublishImages uploads product images with the published catalog. PublishCatalog is the
+	// catalog direction, changed through ConnectionRepository.ChangeCatalogDirection only; UpdateSettings
+	// refuses to turn SyncCatalog and PublishCatalog on together.
+	PublishImages  *bool
+	PublishCatalog *bool
 
 	CatalogLanguage     *string
 	VariantRef          *string
@@ -168,8 +239,17 @@ type ConnectionRepository interface {
 	// Disconnect removes the token and switches the integration off; the row, its settings and
 	// ids stay. It returns ErrNotFound when there is no row.
 	Disconnect(ctx context.Context) error
-	// UpdateSettings applies the patch and returns the new row (ErrNotFound without a row).
+	// UpdateSettings applies the patch and returns the new row (ErrNotFound without a row). It reads
+	// the row FOR UPDATE and returns ErrDirectionConflict instead of leaving sync_catalog and
+	// publish_catalog both on.
 	UpdateSettings(ctx context.Context, p SettingsPatch) (*Connection, error)
+	// ChangeCatalogDirection switches the catalog direction atomically: it locks the connection and
+	// the publisher row, calls guard with both (an error from it rolls everything back), and then
+	// sets sync_catalog, catalog_auto_import, publish_catalog and the publisher row in one
+	// transaction. Moving to PUBLISH clears the import flags and resets the publisher to "awaiting
+	// first publish"; leaving it clears the publisher's dirty flag and warnings. It returns the new
+	// row and the direction it had before.
+	ChangeCatalogDirection(ctx context.Context, to CatalogDirection, now time.Time, guard DirectionGuard) (*Connection, CatalogDirection, error)
 
 	// RecordAuthError pauses the pipeline: auth_error_at and last_error.
 	RecordAuthError(ctx context.Context, at time.Time, message string) error
@@ -214,3 +294,7 @@ type LeaseRepository interface {
 	// Release gives the lease back if holder still owns it.
 	Release(ctx context.Context, name, holder string) error
 }
+
+// DirectionGuard runs inside ChangeCatalogDirection with the connection and the publisher row
+// locked, so a check made there cannot be overtaken by a concurrent change.
+type DirectionGuard func(ctx context.Context, conn *Connection, state *PublishState) error

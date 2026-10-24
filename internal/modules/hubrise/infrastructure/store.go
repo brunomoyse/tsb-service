@@ -74,3 +74,23 @@ func (s store) affected(ctx context.Context, what, query string, args ...any) (b
 
 // isNoRows reports whether err is "no rows in result set".
 func isNoRows(err error) bool { return errors.Is(err, sql.ErrNoRows) }
+
+// inTx runs fn on a store bound to one transaction and commits it, or rolls everything back when fn
+// fails. On a store that is already bound to a transaction fn simply runs in it.
+func (s store) inTx(ctx context.Context, what string, fn func(tx store) error) error {
+	if s.db == nil {
+		return fn(s)
+	}
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("hubrise: %s: %w", what, err)
+	}
+	defer func() { _ = tx.Rollback() }() // a no-op once committed
+	if err := fn(newTxStore(tx)); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("hubrise: %s: commit: %w", what, err)
+	}
+	return nil
+}
