@@ -1,20 +1,31 @@
 name: Nightly dependency release
 
-# Ships the dependency and security updates merged during the day to
-# production every night. It tags the next patch version (which runs the normal
-# release pipeline) only when:
-# - main has Dependabot merges since the latest vX.Y.Z tag,
-# - every other commit since that tag only touches CI config or docs, so
-#   unreleased human work never reaches production by surprise (it gets a
-#   Telegram note instead: release it by hand with "Release (tag + deploy)"),
+# Ships Dependabot merges to production, at 04:00 Brussels time:
+# - every night when a security fix is waiting: a Dependabot security update
+#   (its "security" group) or a base image bump (a Dockerfile change: OS and
+#   language runtime fixes that Dependabot never flags as security);
+# - on Tuesdays for everything else Dependabot merged during the week.
+# It tags the next patch version (which runs the normal release pipeline, and
+# its production smoke test) only when:
+# - every non-Dependabot commit since the latest vX.Y.Z tag only touches CI
+#   config or docs, so unreleased human work never reaches production by
+#   surprise (a Telegram note says to release it by hand instead),
 # - every workflow run on the main HEAD (tests, test server deploy) passed.
 # The "CI watch" workflow reports the release result to Telegram.
 
 on:
   schedule:
-    - cron: '0 2 * * *' # UTC: 03:00 Brussels in winter, 04:00 in summer (+ offset per repo)
+    # GitHub cron is UTC: one entry for summer time (UTC+2), one for winter
+    # time (UTC+1); the run whose entry does not match today's offset stops.
+    - cron: '0 2 * * *'
+    - cron: '0 3 * * *'
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'security: only if a security fix waits; weekly: every Dependabot merge'
+        type: choice
+        options: [security, weekly]
+        default: security
       dry_run:
         description: 'Only report what would be released'
         type: boolean
@@ -36,6 +47,11 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
+      EVENT: ${{ github.event_name }}
+      SCHEDULE: ${{ github.event.schedule }}
+      CRON_SUMMER: '0 2 * * *'
+      CRON_WINTER: '0 3 * * *'
+      MODE: ${{ inputs.mode || '' }}
       DRY_RUN: ${{ inputs.dry_run || 'false' }}
       # Workflow to start on the new tag when the tag push itself cannot
       # (pushed with GITHUB_TOKEN); empty when the PAT push starts it.
@@ -43,7 +59,22 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
+      - name: Daylight saving slot
+        id: slot
+        run: |
+          set -euo pipefail
+          run=true
+          if [ "$EVENT" = "schedule" ]; then
+            if [ "$(TZ=Europe/Brussels date +%z)" = "+0200" ]; then want="$CRON_SUMMER"; else want="$CRON_WINTER"; fi
+            if [ "$SCHEDULE" != "$want" ]; then
+              echo "Cron '$SCHEDULE' is the other daylight saving slot, nothing to do."
+              run=false
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
       - name: Checkout main
+        if: steps.slot.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
@@ -52,6 +83,7 @@ jobs:
           token: ${{ secrets.PAT }}
 
       - name: Decide and tag
+        if: steps.slot.outputs.run == 'true'
         run: |
           set -euo pipefail
           repo="${GH_REPO#*/}"
@@ -68,28 +100,46 @@ jobs:
               || echo "::warning::Telegram alert failed: $1"
           }
 
+          # Tuesday (Brussels) ships every Dependabot merge, other nights only
+          # security fixes.
+          if [ -z "$MODE" ]; then
+            if [ "$(TZ=Europe/Brussels date +%u)" = "2" ]; then MODE=weekly; else MODE=security; fi
+          fi
+
           last=$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
           if [ -z "$last" ]; then echo "::error::No vX.Y.Z tag yet."; exit 1; fi
           head=$(git rev-parse HEAD)
 
           deps=0
+          security=0
           blockers=()
           for c in $(git rev-list "$last..HEAD"); do
+            files=$(git diff-tree --no-commit-id --name-only -r "$c")
             if git log -1 --format='%ae' "$c" | grep -q 'dependabot\[bot\]'; then
               deps=$((deps + 1))
+              if git log -1 --format='%B' "$c" | grep -qiE 'dependency-group: security|the security group' \
+                || grep -qE '(^|/)Dockerfile[^/]*$' <<<"$files"; then
+                security=$((security + 1))
+              fi
               continue
             fi
             # CI config and docs never change what runs in production.
-            if git diff-tree --no-commit-id --name-only -r "$c" | grep -qvE '^(\.github/|docs/)|\.md$'; then
+            if grep -qvE '^(\.github/|docs/)|\.md$' <<<"$files"; then
               blockers+=("$(git log -1 --format='%h %s' "$c")")
             fi
           done
-          echo "Since $last: $deps Dependabot merge(s), ${#blockers[@]} other change(s)."
+          echo "Mode $MODE. Since $last: $deps Dependabot merge(s) ($security security), ${#blockers[@]} other change(s)."
           if [ "$deps" -eq 0 ]; then echo "Nothing to ship."; exit 0; fi
+          if [ "$MODE" = "security" ] && [ "$security" -eq 0 ]; then
+            echo "No security fix waiting, the routine updates ship on Tuesday."
+            exit 0
+          fi
+          if [ "$MODE" = "security" ]; then kind="security"; else kind="weekly"; fi
 
           if [ "${#blockers[@]}" -gt 0 ]; then
             printf '  %s\n' "${blockers[@]}"
-            notify "⏸️ $repo: $deps dependency update(s) wait for production, but main also has ${#blockers[@]} unreleased change(s) since $last (e.g. ${blockers[0]}). Release by hand with \"Release (tag + deploy)\"."
+            if [ "$kind" = "security" ]; then what="$security security fix(es)"; else what="$deps dependency update(s)"; fi
+            notify "⏸️ $repo: $what wait for production, but main also has ${#blockers[@]} unreleased change(s) since $last (e.g. ${blockers[0]}). Release by hand with \"Release (tag + deploy)\"."
             exit 0
           fi
 
@@ -97,20 +147,23 @@ jobs:
             --jq '[.[] | select(.event != "schedule" and .name != "CI watch" and .name != "Nightly dependency release")]' > runs.json
           if ! jq -e 'length > 0 and all(.status == "completed" and (.conclusion | IN("success", "skipped", "neutral")))' runs.json >/dev/null; then
             jq -r '.[] | "  \(.name): \(.status) \(.conclusion)"' runs.json
-            notify "⏸️ $repo: $deps dependency update(s) not released, main HEAD ${head:0:7} is not fully green yet. $GITHUB_SERVER_URL/$GH_REPO/actions"
+            notify "⏸️ $repo: $deps dependency update(s) ($kind release) not shipped, main HEAD ${head:0:7} is not fully green yet. $GITHUB_SERVER_URL/$GH_REPO/actions"
             exit 0
           fi
 
           IFS=. read -r major minor patch <<<"${last#v}"
           next="v${major}.${minor}.$((patch + 1))"
           if [ "$DRY_RUN" = "true" ]; then
-            echo "::notice::Dry run: would tag $next on ${head:0:7} ($deps Dependabot merge(s) since $last)."
+            echo "::notice::Dry run: would tag $next ($kind) on ${head:0:7}: $deps Dependabot merge(s), $security security, since $last."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$next" -m "Nightly dependency release $next ($deps Dependabot merge(s) since $last)"
+          # The production smoke test rolls back a release whose message starts
+          # with "Automated dependency release" when the live site fails it.
+          git tag -a "$next" -m "Automated dependency release $next ($kind): $deps Dependabot merge(s), $security security, since $last"
           git push origin "$next"
           if [ -n "$DEPLOY_DISPATCH" ]; then gh workflow run "$DEPLOY_DISPATCH" --ref "$next"; fi
-          notify "🚀 $repo $next: nightly release of $deps dependency update(s) started. $GITHUB_SERVER_URL/$GH_REPO/actions"
+          if [ "$kind" = "security" ]; then icon="🛡️"; else icon="🚀"; fi
+          notify "$icon $repo $next: $kind release of $deps dependency update(s) ($security security) started. $GITHUB_SERVER_URL/$GH_REPO/actions"
