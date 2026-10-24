@@ -106,6 +106,10 @@ func RemoteCatalogHash(raw []byte) string {
 func planHashOf(changes []PublishChange, foreign []ForeignItem) string {
 	var lines []string
 	for _, c := range changes {
+		// The images are uploaded after the confirmation and may fail: they never stale a preview.
+		if c.Action == ActionPublishUpdate && slices.Equal(c.Fields, []string{FieldPubImage}) {
+			continue
+		}
 		prefix := map[PublishAction]string{ActionPublishAdd: "A", ActionPublishUpdate: "U", ActionPublishRemove: "R"}[c.Action]
 		lines = append(lines, fmt.Sprintf("%s:%s:%s", prefix, c.Entity, c.Key))
 	}

@@ -100,6 +100,21 @@ func priceText(o jobj) string {
 	return d.StringFixed(2)
 }
 
+// ownedImages is the image ids of a HubRise product that are the shop's (empty when images are off).
+func (p *pubPlanner) ownedImages(product jobj) string {
+	if p.in.Images == nil {
+		return ""
+	}
+	var owned []string
+	for _, id := range jstrs(product, "image_ids") {
+		if _, ok := p.in.Images.Owned[id]; ok {
+			owned = append(owned, id)
+		}
+	}
+	slices.Sort(owned)
+	return strings.Join(owned, ",")
+}
+
 // project reads the shop-owned view of a catalog.
 func (p *pubPlanner) project(data jobj) map[projKey]*projection {
 	out := map[projKey]*projection{}
@@ -143,7 +158,7 @@ func (p *pubPlanner) project(data jobj) map[projKey]*projection {
 			put(domain.EntityProduct, ref, ref, skuFullName(pr, s), map[string]string{
 				FieldPubName: skuFullName(pr, s), FieldPubDescription: desc, FieldPubPrice: p.effectivePrice(s),
 				FieldPubCategory: jstr(pr, "category_ref"), FieldPubVat: vatOf(pr, s), FieldPubCode: strings.TrimSpace(jstr(cf, "code")),
-				FieldPubVisibility: vis, FieldPubTranslations: trText,
+				FieldPubVisibility: vis, FieldPubTranslations: trText, FieldPubImage: p.ownedImages(pr),
 			})
 			for _, lref := range jstrs(s, "option_list_refs") {
 				l := lists[lref]

@@ -30,6 +30,8 @@ type PublishAPI interface {
 	GetCatalogRaw(ctx context.Context, id string) (*hubrise.RawCatalog, error)
 	ReplaceCatalog(ctx context.Context, id string, data json.RawMessage) (*hubrise.RawCatalog, error)
 	GetLocation(ctx context.Context) (*hubrise.Location, error)
+	ListImages(ctx context.Context, catalogID, privateRef string) ([]hubrise.Image, error)
+	UploadImage(ctx context.Context, catalogID, privateRef, contentType string, data []byte) (*hubrise.Image, error)
 }
 
 // CatalogPublisher publishes the local menu to the HubRise catalog (amendment A15). The dashboard
@@ -55,6 +57,12 @@ type CatalogPublisher struct {
 	Holder string
 	// TickInterval is how often Run looks for a due publish (5 s when zero).
 	TickInterval time.Duration
+	// ImageSource reads the product images for publish_images. Optional: without it the images are
+	// left as they are and every run says so.
+	ImageSource ProductImageSource
+	// ImageStamps remembers the versions of the product images already read, to skip the transfer of
+	// an unchanged one. Optional (NewImageStamps).
+	ImageStamps *ImageStamps
 }
 
 // PublishRequest is an interactive publish.
@@ -176,10 +184,22 @@ func (p *CatalogPublisher) Preview(ctx context.Context, removeForeign bool) (*Pu
 	if raw.LocationID == "" && raw.AccountID != "" {
 		return nil, domain.ErrAccountCatalog
 	}
-	plan, err := PlanPublish(PublishInput{Local: snap, Links: links, Published: published, Settings: settingsOf(conn),
-		Base: raw.Data, RemoveForeign: removeForeign})
+	settings := settingsOf(conn)
+	in := PublishInput{Local: snap, Links: links, Published: published, Settings: settings, Base: raw.Data, RemoveForeign: removeForeign}
+	var images *imageSet
+	if settings.Images {
+		// Read only: the images are uploaded by the publish, after the confirmation.
+		if images, err = p.gatherImages(ctx, api, *conn.CatalogID, snap); err != nil {
+			return nil, err
+		}
+		in.Images = &images.images
+	}
+	plan, err := PlanPublish(in)
 	if err != nil {
 		return nil, err
+	}
+	if images != nil {
+		plan.Warnings = append(plan.Warnings, images.warnings...)
 	}
 	return &PublishPreview{Plan: plan, FirstPublish: state.FirstPublishConfirmedAt == nil, GeneratedAt: p.now()}, nil
 }
@@ -346,7 +366,8 @@ func (p *CatalogPublisher) execute(ctx context.Context, holder string, seq int64
 	}
 	settings := settingsOf(conn)
 	localHash := LocalMenuHash(snap, settings)
-	if !interactive && state.LastPublishedLocalHash != nil && *state.LastPublishedLocalHash == localHash {
+	// With images the menu hash is not the whole story (the pictures live in the bucket): every run reads.
+	if !interactive && !settings.Images && state.LastPublishedLocalHash != nil && *state.LastPublishedLocalHash == localHash {
 		// The edits that woke us (an availability toggle, a no-op save) change nothing HubRise
 		// holds: no read, no write, the 10 a minute bucket stays free.
 		remote := ""
@@ -375,6 +396,13 @@ func (p *CatalogPublisher) execute(ctx context.Context, holder string, seq int64
 	in := PublishInput{Local: snap, Links: links, Published: published, Settings: settings, Base: raw.Data}
 	if interactive {
 		in.RemoveForeign = req.RemoveForeign
+	}
+	var images *imageSet
+	if settings.Images {
+		if images, err = p.gatherImages(ctx, api, *conn.CatalogID, snap); err != nil {
+			return p.failFromRead(ctx, state, err, fail)
+		}
+		in.Images = &images.images
 	}
 	plan, err := PlanPublish(in)
 	if errors.Is(err, domain.ErrEmptyMenu) {
@@ -407,6 +435,21 @@ func (p *CatalogPublisher) execute(ctx context.Context, holder string, seq int64
 		}
 	}
 
+	if images != nil && len(images.pending) > 0 {
+		// The images go first: the catalog names them by id. The plan is made again with the real ids; the
+		// confirmation above covered the same items (the images never change the plan hash).
+		if err := extend(); err != nil {
+			return nil, err
+		}
+		p.uploadImages(ctx, api, *conn.CatalogID, images)
+		if plan, err = PlanPublish(in); err != nil {
+			return nil, err
+		}
+	}
+	if images != nil {
+		plan.Warnings = append(plan.Warnings, images.warnings...)
+	}
+
 	var ids []domain.LinkHubriseID
 	remoteHash := plan.RemoteCatalogHash
 	if plan.NeedsPut {
@@ -435,10 +478,20 @@ func (p *CatalogPublisher) execute(ctx context.Context, holder string, seq int64
 	if err := p.State.Complete(bg, holder, seq, domain.PublishResult{At: p.now(), LocalHash: plan.LocalMenuHash, RemoteHash: remoteHash}, items, ids); err != nil {
 		return nil, err
 	}
-	p.audit(ctx, interactive, true, map[string]any{
+	details := map[string]any{
 		"added": plan.Count(ActionPublishAdd), "updated": plan.Count(ActionPublishUpdate), "removed": plan.Count(ActionPublishRemove),
 		"wrote": plan.NeedsPut,
-	})
+	}
+	if images != nil {
+		details["imageWarnings"] = len(images.warnings)
+		if images.more {
+			// Uploads are left: the next run (30 seconds at the earliest) does them.
+			if _, err := p.State.MarkDirty(bg, p.now()); err != nil {
+				logging.FromContext(ctx).Warn("hubrise: cannot schedule the remaining image uploads", zap.Error(err))
+			}
+		}
+	}
+	p.audit(ctx, interactive, true, details)
 	p.notify(ctx, plan)
 	return &PublishOutcome{Published: true, Plan: plan}, nil
 }

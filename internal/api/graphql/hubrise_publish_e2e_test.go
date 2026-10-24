@@ -1,8 +1,11 @@
 package graphql_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/png"
 	"net/http"
 	"sync"
 	"testing"
@@ -14,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"tsb-service/internal/api/hubrisewire"
+	"tsb-service/internal/modules/hubrise/application"
 	hubtest "tsb-service/internal/modules/hubrise/testhelpers"
 	"tsb-service/pkg/db"
 	"tsb-service/pkg/hubrise/hubrisetest"
@@ -497,4 +501,56 @@ func TestHubriseStandaloneMenuEditsMakeNoCall(t *testing.T) {
 	assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM hubrise_catalog_publish WHERE dirty_since IS NOT NULL`))
 	assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM hubrise_published_items`))
 	assert.Zero(t, countRows(t, env.TestContext, `SELECT count(*) FROM hubrise_catalog_links`))
+}
+
+// shopImages is the product bucket of the scenario: the salmon sushi has a picture, nothing else has.
+type shopImages struct{ product uuid.UUID }
+
+func (s shopImages) ProductImage(_ context.Context, id uuid.UUID, _ string) (*application.SourceImage, error) {
+	if id != s.product {
+		return nil, nil
+	}
+	img := image.NewGray(image.Rect(0, 0, 8, 8))
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, img)
+	return &application.SourceImage{Data: buf.Bytes(), Version: `"v1"`}, nil
+}
+
+func TestHubriseThePublishedMenuCarriesTheProductImages(t *testing.T) {
+	env := setupCovEnv(t, covOptions{})
+	srv := hubrisetest.New(t)
+	srv.SetLimits(hubrisetest.Limits{PerMinute: 500, PerHour: 2500, PerDay: 10000, HeavyPerMinute: 1000})
+	newFileService(t)
+	salmon := env.Fixtures.SalmonSushi.ID
+	r := env.withHubriseInstalled(t, srv, func(o *hubrisewire.Options) {
+		o.Catalog.ProductImages = shopImages{product: salmon}
+	})
+	r.run()
+	require.NoError(t, srv.ReplaceCatalogRaw(json.RawMessage(`{}`)))
+	require.NotContains(t, r.connect().RawQuery, "error")
+	require.True(t, r.settings(`enabled: true`).Enabled)
+	r.settings(`publishImages: true`)
+	r.pubDirection("PUBLISH")
+
+	prev := r.pubPreview()
+	assert.Empty(t, srv.Images(), "a preview uploads nothing")
+	out := r.pubPublish(false, prev.PlanHash)
+	require.True(t, out.Published)
+	r.pubSettled()
+
+	imgs := srv.Images()
+	require.Len(t, imgs, 1, "one picture for the one product that has one")
+	assert.Equal(t, "tsb-product-"+salmon.String()+"-"+imgs[0].MD5[:12], imgs[0].PrivateRef)
+	sku, product := skuOf(r.remoteCatalog(), "SUSHI-SALMON")
+	require.NotNil(t, sku)
+	assert.Equal(t, []any{imgs[0].ID}, product["image_ids"])
+	_, other := skuOf(r.remoteCatalog(), "SUSHI-TUNA")
+	if other != nil {
+		assert.Empty(t, other["image_ids"])
+	}
+
+	// A later edit does not upload the picture again.
+	r.editProduct(salmon, `{ price: "14.00" }`)
+	r.pubRuns(2)
+	assert.Len(t, srv.Images(), 1)
 }

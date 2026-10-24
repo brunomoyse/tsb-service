@@ -807,3 +807,11 @@ func (s *Server) ImageBytes(id string) ([]byte, bool) {
 	img, ok := s.images[id]
 	return bytes.Clone(img.data), ok
 }
+
+// PurgeImages forgets every image, as HubRise does with the images no product carries any more.
+func (s *Server) PurgeImages() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.images = map[string]image{}
+	s.imageSeq = nil
+}

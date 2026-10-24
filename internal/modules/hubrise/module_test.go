@@ -1,6 +1,7 @@
 package hubrise_test
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 	"tsb-service/internal/api/graphql/testhelpers"
 	"tsb-service/internal/modules/hubrise"
+	"tsb-service/internal/modules/hubrise/application"
 	"tsb-service/internal/modules/hubrise/domain"
 	"tsb-service/internal/modules/hubrise/infrastructure"
 	hubtest "tsb-service/internal/modules/hubrise/testhelpers"
@@ -108,4 +110,32 @@ func TestNewPushBuildsTheOrderPushOnTheModuleStores(t *testing.T) {
 	n, err := push.Worker.DrainOnce(t.Context())
 	require.NoError(t, err)
 	assert.Zero(t, n)
+}
+
+type noImages struct{}
+
+func (noImages) ProductImage(context.Context, uuid.UUID, string) (*application.SourceImage, error) {
+	return nil, nil
+}
+
+func TestTheCatalogPublisherReadsTheImagesFromTheConfiguredBucket(t *testing.T) {
+	td := testhelpers.SetupTestDatabase(t)
+	cfg, err := hubrise.LoadConfig(env(validEnv()))
+	require.NoError(t, err)
+	clients := application.NewPooledClients(nil, "http://hubrise.invalid/v1", nil, nil)
+
+	m, err := hubrise.NewModule(cfg, td.DB, nil)
+	require.NoError(t, err)
+	assert.Nil(t, m.NewCatalog(nil, hubrise.CatalogOptions{Clients: clients}).Publisher.ImageSource, "no bucket, no images")
+
+	cfg.ImageBaseURL = "https://bucket.example/shop"
+	m, err = hubrise.NewModule(cfg, td.DB, nil)
+	require.NoError(t, err)
+	pub := m.NewCatalog(nil, hubrise.CatalogOptions{Clients: clients}).Publisher
+	assert.Equal(t, application.HTTPProductImages{BaseURL: "https://bucket.example/shop"}, pub.ImageSource)
+	assert.NotNil(t, pub.ImageStamps)
+
+	own := noImages{}
+	pub = m.NewCatalog(nil, hubrise.CatalogOptions{Clients: clients, ProductImages: own}).Publisher
+	assert.Equal(t, own, pub.ImageSource, "the caller's source wins")
 }

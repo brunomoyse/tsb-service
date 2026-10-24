@@ -47,9 +47,9 @@ type PublishInput struct {
 	Base json.RawMessage
 	// RemoveForeign also removes the items only HubRise has (a product created in the EPOS).
 	RemoveForeign bool
-	// Images maps a product to the HubRise image id it should carry (phase 2); nil leaves every
+	// Images says which HubRise image each product carries (publish_images); nil leaves every
 	// image_ids list as HubRise has it.
-	Images map[uuid.UUID]string
+	Images *PublishImages
 }
 
 // PublishAction is what a publish does with one item.

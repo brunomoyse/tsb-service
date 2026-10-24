@@ -126,3 +126,31 @@ func TestConfigNeverPrintsSecrets(t *testing.T) {
 		assert.Contains(t, out, "client-id")
 	}
 }
+
+func TestLoadConfigImageBaseURL(t *testing.T) {
+	cfg, err := hubrise.LoadConfig(env(validEnv()))
+	require.NoError(t, err)
+	assert.Empty(t, cfg.ImageBaseURL, "the images cannot be published without a bucket")
+
+	m := validEnv()
+	m["AWS_URL"] = "https://aws.example/bucket/"
+	cfg, _ = hubrise.LoadConfig(env(m))
+	assert.Equal(t, "https://aws.example/bucket", cfg.ImageBaseURL, "AWS_URL is the last fallback")
+	m["S3_BUCKET_URL"] = "https://s3.example/bucket"
+	cfg, _ = hubrise.LoadConfig(env(m))
+	assert.Equal(t, "https://s3.example/bucket", cfg.ImageBaseURL, "S3_BUCKET_URL comes first")
+	m["S3_BUCKET_URL"] = "not a url"
+	cfg, err = hubrise.LoadConfig(env(m))
+	require.NoError(t, err, "a bucket setting that is not a URL is not this module's to refuse")
+	assert.Equal(t, "https://aws.example/bucket", cfg.ImageBaseURL)
+
+	m["HUBRISE_IMAGE_BASE_URL"] = " https://cdn.example/media/ "
+	cfg, err = hubrise.LoadConfig(env(m))
+	require.NoError(t, err)
+	assert.Equal(t, "https://cdn.example/media", cfg.ImageBaseURL, "the module's own setting wins")
+
+	m["HUBRISE_IMAGE_BASE_URL"] = "ftp://nope"
+	_, err = hubrise.LoadConfig(env(m))
+	require.Error(t, err, "its own setting is strict")
+	assert.Contains(t, err.Error(), "HUBRISE_IMAGE_BASE_URL")
+}

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	"tsb-service/internal/modules/hubrise/domain"
@@ -275,6 +276,7 @@ func removeTags(o jobj, drop []string) {
 // mergeProductLevel writes the fields of the HubRise product the shop owns.
 func (p *pubPlanner) mergeProductLevel(bp jobj, here []*dProduct, single bool) {
 	first := here[0]
+	p.mergeImages(bp, here)
 	if single {
 		bp["name"] = first.name
 		if first.description != "" {
@@ -440,8 +442,49 @@ func (p *pubPlanner) mergeSku(src jobj, d *dProduct, multi bool, productName str
 	return s
 }
 
+// mergeImages writes the image ids of the products the shop decided on into the image_ids of the
+// HubRise product: the ids of their earlier images go, the ids of anybody else stay, the new ones
+// come last. A product the shop knows nothing about (hidden, image unreadable) keeps its ids.
+func (p *pubPlanner) mergeImages(bp jobj, here []*dProduct) {
+	im := p.in.Images
+	if im == nil {
+		return
+	}
+	decided := map[uuid.UUID]bool{}
+	for _, d := range here {
+		if _, ok := im.Desired[d.local.ID]; ok {
+			decided[d.local.ID] = true
+		}
+	}
+	if len(decided) == 0 {
+		return
+	}
+	ids := make([]any, 0, len(jstrs(bp, "image_ids")))
+	for _, id := range jstrs(bp, "image_ids") {
+		if owner, ok := im.Owned[id]; ok && decided[owner] {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	for _, d := range here {
+		if id := im.Desired[d.local.ID]; id != "" && !slices.Contains(ids, any(id)) {
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		delete(bp, "image_ids")
+		return
+	}
+	bp["image_ids"] = ids
+}
+
 func (p *pubPlanner) newProduct(d *dProduct) jobj {
 	pr := jobj{"ref": d.sku, "name": d.name, "category_ref": d.cat.ref}
+	if p.in.Images != nil {
+		if id := p.in.Images.Desired[d.local.ID]; id != "" {
+			pr["image_ids"] = []any{id}
+		}
+	}
 	if d.description != "" {
 		pr["description"] = d.description
 	}

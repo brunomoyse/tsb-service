@@ -305,6 +305,10 @@ type CatalogOptions struct {
 	Holder string
 	// Audit records the catalog publishes (counts only).
 	Audit application.AuditFunc
+	// ProductImages reads the product images for publish_images; by default the public product
+	// bucket named by the configuration (Config.ImageBaseURL), and without one the images cannot be
+	// published.
+	ProductImages application.ProductImageSource
 }
 
 // Catalog is the catalog side of the integration: the import service and the ownership guard that
@@ -347,6 +351,10 @@ func (m *Module) NewCatalog(push *Push, o CatalogOptions) *Catalog {
 			return c, nil
 		},
 		Notifier: o.Notifier, Audit: o.Audit, Holder: svc.Holder,
+		ImageSource: o.ProductImages, ImageStamps: application.NewImageStamps(),
+	}
+	if publisher.ImageSource == nil && m.Config.ImageBaseURL != "" {
+		publisher.ImageSource = application.HTTPProductImages{BaseURL: m.Config.ImageBaseURL}
 	}
 	svc.Publish = publisher
 	return &Catalog{Service: svc, Guard: &application.Guard{Connections: m.Connections, Links: m.CatalogLinks}, Drift: svc.DriftChecker(), Publisher: publisher}

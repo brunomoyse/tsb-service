@@ -18,6 +18,9 @@ const (
 	EnvAPIBaseURL   = "HUBRISE_API_BASE_URL"
 	EnvOAuthBaseURL = "HUBRISE_OAUTH_BASE_URL"
 	EnvReplicas     = "HUBRISE_REPLICAS"
+	// EnvImageBaseURL is the public base URL of the product images (publish_images reads them there).
+	// It defaults to S3_BUCKET_URL, then AWS_URL.
+	EnvImageBaseURL = "HUBRISE_IMAGE_BASE_URL"
 )
 
 // DefaultReplicas is the number of API replicas assumed when HUBRISE_REPLICAS is not set: production
@@ -41,6 +44,10 @@ type Config struct {
 
 	APIBaseURL   string
 	OAuthBaseURL string
+
+	// ImageBaseURL is where the product images are served from (BaseURL/images/thumbnails/<id>.png);
+	// empty means the images cannot be published.
+	ImageBaseURL string
 
 	// Replicas is how many API replicas share the HubRise rate budget of the connection. The client
 	// limiter of each one is built from the default limits divided by it (HubRise counts the calls
@@ -76,7 +83,25 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 	if cfg.OAuthBaseURL, err = baseURL(getenv, EnvOAuthBaseURL, DefaultOAuthBaseURL); err != nil {
 		return Config{}, err
 	}
+	if cfg.ImageBaseURL, err = imageBaseURL(getenv); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
+}
+
+// imageBaseURL reads HUBRISE_IMAGE_BASE_URL, which must be a valid URL when it is set, and otherwise
+// the public URL of the product bucket the shop already knows (a value that is not a URL there is
+// ignored: it is not this module's setting to refuse).
+func imageBaseURL(getenv func(string) string) (string, error) {
+	if strings.TrimSpace(getenv(EnvImageBaseURL)) != "" {
+		return baseURL(getenv, EnvImageBaseURL, "")
+	}
+	for _, name := range []string{"S3_BUCKET_URL", "AWS_URL"} {
+		if v, err := baseURL(getenv, name, ""); err == nil && v != "" {
+			return v, nil
+		}
+	}
+	return "", nil
 }
 
 // replicaCount reads HUBRISE_REPLICAS (a positive integer, DefaultReplicas when unset).
