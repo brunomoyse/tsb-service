@@ -5,8 +5,9 @@
 #   scripts/smoke.sh [--skip-unset] <check> <base-url> [<check> <base-url> ...]
 #
 # --skip-unset: a check whose URL is empty (a repository variable that is not set) is skipped with
-# a ::warning:: instead of failing. The deploy workflows use it: a missing variable must not roll
-# back a healthy release, it only means the release is not verified.
+# a ::warning:: instead of failing, and so is a URL that is not http(s). The deploy workflows use it:
+# a missing or malformed variable must not roll back a healthy release, it only means the release
+# is not verified.
 #
 # Checks:
 #   api        <API_BASE_URL>   GET <url>/up answers 2xx, and the public GraphQL query
@@ -67,7 +68,11 @@ check_up() {
 
 check_shop() {
   # The query string skips any cached copy of the page.
-  fetch "$1/fr?smoke=${GITHUB_RUN_ID:-$$}" | grep -q '__NUXT_DATA__'
+  # The page is read to the end before grepping: `curl | grep -q` can make curl fail with a write
+  # error (SIGPIPE) once grep has matched and left, which pipefail would report as a failed check.
+  local page
+  page="$(fetch "$1/fr?smoke=${GITHUB_RUN_ID:-$$}")" || return 1
+  grep -q '__NUXT_DATA__' <<<"$page"
 }
 
 check_dashboard() {
@@ -98,7 +103,16 @@ while [ "$#" -gt 0 ]; do
   fi
   case "$url" in
     http://* | https://*) ;;
-    *) echo "smoke: '$url' is not an http(s) URL (is the repository variable set?)" >&2; exit 2 ;;
+    *)
+      # A malformed variable must not roll back a healthy release when the caller asked to skip
+      # unverifiable checks: exit 2 would fail the step exactly like a failed check does.
+      if [ "$skip_unset" -eq 1 ]; then
+        echo "::warning::smoke: '$url' (check '$name') is not an http(s) URL: skipped, not verified"
+        continue
+      fi
+      echo "smoke: '$url' is not an http(s) URL (is the repository variable set?)" >&2
+      exit 2
+      ;;
   esac
 
   passed=0

@@ -326,12 +326,15 @@ jobs:
             if sudo env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm status ygf-apps -n ygf >/dev/null 2>&1; then YGF=1; fi
 
             # 1. Roll back DB migrations first, using the running (current) image.
+            # `bash -c` does not inherit errexit: set it, so one failed down stops the loop and the job.
             sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock bash -c '
+              set -euo pipefail
               for i in $(seq 1 "$1"); do
                 kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=down
               done' _ "${MIGRATIONS_DOWN:-0}"
             if [ "$YGF" = 1 ]; then
               sudo flock -w 600 /var/lock/ygf-apps-helm.lock bash -c '
+                set -euo pipefail
                 for i in $(seq 1 "$1"); do
                   kubectl exec -n ygf deployment/tsb-service -- /app/tsb-migrate -cmd=down
                 done' _ "${MIGRATIONS_DOWN:-0}"
