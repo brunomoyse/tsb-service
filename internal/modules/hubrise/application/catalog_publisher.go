@@ -120,6 +120,25 @@ func settingsOf(conn *domain.Connection) PublishSettings {
 	return s
 }
 
+// MenuChanged records a menu edit: when the dashboard owns the menu, the publisher is marked dirty
+// and the debounced run picks it up. It is one read of the connection and, in PUBLISH mode, one
+// upsert; in any other mode (or without a connection) it does nothing, so a restaurant that does
+// not publish pays for a primary key read and nothing else.
+func (p *CatalogPublisher) MenuChanged(ctx context.Context) error {
+	conn, err := p.Connections.Get(ctx)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if conn.CatalogDirection() != domain.DirectionPublish {
+		return nil
+	}
+	_, err = p.State.MarkDirty(ctx, p.now())
+	return err
+}
+
 // Preview plans a publish against the current HubRise catalog and writes nothing. It costs one read
 // of the catalog (the 10 a minute bucket).
 func (p *CatalogPublisher) Preview(ctx context.Context, removeForeign bool) (*PublishPreview, error) {

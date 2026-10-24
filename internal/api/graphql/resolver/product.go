@@ -171,6 +171,9 @@ func (r *mutationResolver) UpdateProduct(ctx context.Context, id uuid.UUID, inpu
 			removeBg,
 		); err != nil {
 			logging.FromContext(ctx).Error("image upload failed", zap.String("product_id", id.String()), zap.Error(err))
+		} else {
+			// The image is part of what the HubRise catalog publisher writes (no-op without HubRise).
+			r.MenuChanged(ctx, productApplication.MenuProduct, id)
 		}
 	}
 

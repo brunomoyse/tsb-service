@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	orderDomain "tsb-service/internal/modules/order/domain"
+	productApplication "tsb-service/internal/modules/product/application"
 	productDomain "tsb-service/internal/modules/product/domain"
 )
 
@@ -25,6 +26,17 @@ type spyHooks struct {
 	guarded  [][2]*productDomain.Product
 	groups   [][2]*productDomain.ProductChoiceGroup
 	choices  [][2]*productDomain.ProductChoice
+	menu     []menuEdit
+}
+
+type menuEdit struct {
+	kind productApplication.MenuKind
+	id   uuid.UUID
+}
+
+func (s *spyHooks) MenuChanged(_ context.Context, kind productApplication.MenuKind, id uuid.UUID) error {
+	s.menu = append(s.menu, menuEdit{kind, id})
+	return s.err
 }
 
 func (s *spyHooks) OrderReady(_ context.Context, id uuid.UUID) error {
@@ -70,6 +82,7 @@ func TestHubriseHelpersAreNoOpsWithoutHubrise(t *testing.T) {
 		r.OrderReady(ctx, id)
 		r.OrderStatusChanged(ctx, id, orderDomain.OrderStatusConfirmed, uuid.New())
 		r.AvailabilityChanged(ctx, id, false)
+		r.MenuChanged(ctx, productApplication.MenuProduct, id)
 	})
 	assert.NoError(t, r.ProductGuard(ctx, &productDomain.Product{}, &productDomain.Product{}), "a standalone restaurant can edit everything")
 	assert.NoError(t, r.ChoiceGroupGuard(ctx, &productDomain.ProductChoiceGroup{}, nil))
@@ -86,6 +99,7 @@ func TestHubriseHelpersForwardToTheHooks(t *testing.T) {
 	r.OrderReady(ctx, order)
 	r.OrderStatusChanged(ctx, order, orderDomain.OrderStatusPreparing, history)
 	r.AvailabilityChanged(ctx, product, true)
+	r.MenuChanged(ctx, productApplication.MenuChoice, product)
 	require.NoError(t, r.ProductGuard(ctx, current, updated))
 	group, choice := &productDomain.ProductChoiceGroup{ID: uuid.New()}, &productDomain.ProductChoice{ID: uuid.New()}
 	require.NoError(t, r.ChoiceGroupGuard(ctx, nil, group))
@@ -95,6 +109,7 @@ func TestHubriseHelpersForwardToTheHooks(t *testing.T) {
 	assert.Equal(t, []orderDomain.OrderStatus{orderDomain.OrderStatusPreparing}, spy.statuses)
 	assert.Equal(t, []uuid.UUID{history}, spy.history)
 	assert.Equal(t, map[uuid.UUID]bool{product: true}, spy.avail)
+	assert.Equal(t, []menuEdit{{productApplication.MenuChoice, product}}, spy.menu)
 	assert.Equal(t, [][2]*productDomain.Product{{current, updated}}, spy.guarded)
 	assert.Equal(t, [][2]*productDomain.ProductChoiceGroup{{nil, group}}, spy.groups)
 	assert.Equal(t, [][2]*productDomain.ProductChoice{{choice, nil}}, spy.choices)
@@ -112,7 +127,9 @@ func TestHubriseHookFailuresAreLoggedNotReturned(t *testing.T) {
 	r.OrderReady(ctx, uuid.New())
 	r.OrderStatusChanged(ctx, uuid.New(), orderDomain.OrderStatusCanceled, uuid.Nil)
 	r.AvailabilityChanged(ctx, uuid.New(), false)
+	r.MenuChanged(ctx, productApplication.MenuChoiceGroup, uuid.New())
 
+	assert.Equal(t, 1, logs.FilterMessage("hubrise: menu changed hook failed").Len())
 	assert.Equal(t, 1, logs.FilterMessage("hubrise: order ready hook failed").Len())
 	assert.Equal(t, 1, logs.FilterMessage("hubrise: order status hook failed").Len())
 	assert.Equal(t, 1, logs.FilterMessage("hubrise: availability hook failed").Len())
@@ -128,6 +145,7 @@ func TestNoopHubriseHooks(t *testing.T) {
 	assert.NoError(t, h.OrderReady(ctx, uuid.New()))
 	assert.NoError(t, h.OrderStatusChanged(ctx, uuid.New(), orderDomain.OrderStatusPending, uuid.New()))
 	assert.NoError(t, h.AvailabilityChanged(ctx, uuid.New(), true))
+	assert.NoError(t, h.MenuChanged(ctx, productApplication.MenuProduct, uuid.New()))
 	assert.NoError(t, h.ProductGuard(ctx, nil, nil))
 	assert.NoError(t, h.ChoiceGroupGuard(ctx, nil, nil))
 	assert.NoError(t, h.ChoiceGuard(ctx, nil, nil))
@@ -135,8 +153,8 @@ func TestNoopHubriseHooks(t *testing.T) {
 
 // HubriseHooksSet sends every hook to the part of the integration that owns it and to no other.
 func TestHubriseHooksSetRoutesEachHookToItsOwner(t *testing.T) {
-	order, inventory, catalog := &spyHooks{}, &spyHooks{}, &spyHooks{}
-	set := HubriseHooksSet{Order: order, Inventory: inventory, Catalog: catalog}
+	order, inventory, catalog, publish := &spyHooks{}, &spyHooks{}, &spyHooks{}, &spyHooks{}
+	set := HubriseHooksSet{Order: order, Inventory: inventory, Catalog: catalog, Publish: publish}
 	ctx := t.Context()
 	id, history := uuid.New(), uuid.New()
 	product := &productDomain.Product{}
@@ -144,6 +162,7 @@ func TestHubriseHooksSetRoutesEachHookToItsOwner(t *testing.T) {
 	require.NoError(t, set.OrderReady(ctx, id))
 	require.NoError(t, set.OrderStatusChanged(ctx, id, orderDomain.OrderStatusConfirmed, history))
 	require.NoError(t, set.AvailabilityChanged(ctx, id, false))
+	require.NoError(t, set.MenuChanged(ctx, productApplication.MenuProduct, id))
 	require.NoError(t, set.ProductGuard(ctx, product, product))
 	require.NoError(t, set.ChoiceGroupGuard(ctx, nil, &productDomain.ProductChoiceGroup{}))
 	require.NoError(t, set.ChoiceGuard(ctx, &productDomain.ProductChoice{}, nil))
@@ -152,6 +171,10 @@ func TestHubriseHooksSetRoutesEachHookToItsOwner(t *testing.T) {
 	assert.Equal(t, []orderDomain.OrderStatus{orderDomain.OrderStatusConfirmed}, order.statuses)
 	assert.Equal(t, []uuid.UUID{history}, order.history)
 	assert.Equal(t, map[uuid.UUID]bool{id: false}, inventory.avail)
+	assert.Equal(t, []menuEdit{{productApplication.MenuProduct, id}}, publish.menu)
+	assert.Empty(t, order.menu)
+	assert.Empty(t, inventory.menu)
+	assert.Empty(t, catalog.menu)
 	assert.Len(t, catalog.guarded, 1)
 	assert.Len(t, catalog.groups, 1)
 	assert.Len(t, catalog.choices, 1)
@@ -172,9 +195,14 @@ func TestHubriseHooksSetRoutesEachHookToItsOwner(t *testing.T) {
 
 	t.Run("a refusal of the owner comes back", func(t *testing.T) {
 		boom := errors.New("boom")
-		failing := HubriseHooksSet{Order: &spyHooks{err: boom}, Inventory: &spyHooks{err: boom}, Catalog: &spyHooks{err: boom}}
+		failing := HubriseHooksSet{Order: &spyHooks{err: boom}, Inventory: &spyHooks{err: boom}, Catalog: &spyHooks{err: boom}, Publish: &spyHooks{err: boom}}
+		assert.ErrorIs(t, failing.MenuChanged(ctx, productApplication.MenuProduct, id), boom)
 		assert.ErrorIs(t, failing.ProductGuard(ctx, product, product), boom)
 		assert.ErrorIs(t, failing.AvailabilityChanged(ctx, id, true), boom)
 		assert.ErrorIs(t, failing.OrderReady(ctx, id), boom)
+	})
+
+	t.Run("a Set without a publish part ignores menu edits", func(t *testing.T) {
+		assert.NoError(t, HubriseHooksSet{Order: order}.MenuChanged(ctx, productApplication.MenuProduct, id))
 	})
 }

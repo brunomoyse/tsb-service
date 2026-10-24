@@ -730,3 +730,37 @@ func TestForeignItemsAreKeptUnlessRemoveForeign(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, remoteSkus(unmarshalMap(t, e.srv.CatalogData())), "EPOS-ONLY")
 }
+
+func TestMenuChangedMarksTheMenuDirtyOnlyWhenTheDashboardOwnsIt(t *testing.T) {
+	e := newPubEnv(t)
+	ctx := t.Context()
+	before := e.publisherState().ChangeSeq
+
+	require.NoError(t, e.pub.MenuChanged(ctx))
+	st := e.publisherState()
+	assert.Equal(t, before+1, st.ChangeSeq)
+	assert.True(t, st.Dirty())
+
+	for _, off := range []string{`publish_catalog = false`, `publish_catalog = false, sync_catalog = true`} {
+		e.exec(`UPDATE hubrise_catalog_publish SET dirty_since = NULL, change_seq = 100`)
+		e.exec(`UPDATE hubrise_connection SET ` + off)
+		require.NoError(t, e.pub.MenuChanged(ctx))
+		st = e.publisherState()
+		assert.Equal(t, int64(100), st.ChangeSeq, "%s: an import or standalone shop does not publish", off)
+		assert.False(t, st.Dirty())
+	}
+
+	e.exec(`DELETE FROM hubrise_connection`)
+	require.NoError(t, e.pub.MenuChanged(ctx), "no connection at all is fine")
+
+	p := *e.pub
+	p.Connections = pubFaultyConns{ConnectionRepository: e.conns, get: true}
+	assert.ErrorIs(t, p.MenuChanged(ctx), errPubBoom)
+}
+
+func TestMenuChangedFailureToMarkIsReturned(t *testing.T) {
+	e := newPubEnv(t)
+	p := *e.pub
+	p.State = &pubFaultyState{PublishStateRepository: e.pub.State, fail: map[string]bool{"MarkDirty": true}}
+	assert.ErrorIs(t, p.MenuChanged(t.Context()), errPubBoom)
+}

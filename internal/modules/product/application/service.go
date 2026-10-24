@@ -4,14 +4,41 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"sync"
+
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 	"tsb-service/internal/modules/product/domain"
+	"tsb-service/pkg/logging"
 
 	"github.com/google/uuid"
 )
 
+// MenuKind names what a menu edit touched.
+type MenuKind string
+
+const (
+	MenuProduct     MenuKind = "product"
+	MenuChoiceGroup MenuKind = "choice_group"
+	MenuChoice      MenuKind = "choice"
+)
+
+// MenuObserver is told, once, after every successful write of the menu that goes through the
+// ProductService (a product, a choice group or a choice created, updated or deleted). It exists so
+// an integration (the HubRise catalog publisher) can follow the menu without this module knowing
+// about it. It is called on the caller's goroutine after the write, so an implementation must be
+// quick (a row update, never a network call). An error, and a panic, is logged and never fails the
+// write: the menu already changed.
+type MenuObserver interface {
+	MenuChanged(ctx context.Context, kind MenuKind, id uuid.UUID) error
+}
+
 // ProductService defines the application service interface for product operations.
 type ProductService interface {
+	// SetMenuObserver installs the observer of menu edits; nil (the default) removes it. It is meant
+	// to be called once at startup, before the service takes requests.
+	SetMenuObserver(observer MenuObserver)
+
 	CreateProduct(ctx context.Context, categoryID uuid.UUID, price decimal.Decimal, code *string, pieceCount *int, isVisible bool, isAvailable bool, isHalal bool, isVegetarian bool, isSpicy bool, isLunchOnly bool, isDiscountable bool, vatCategory domain.VatCategory, translations []domain.Translation) (*domain.Product, error)
 	GetProduct(ctx context.Context, id uuid.UUID) (*domain.Product, error)
 	GetProducts(ctx context.Context) ([]*domain.Product, error)
@@ -50,7 +77,33 @@ type ProductService interface {
 }
 
 type productService struct {
-	repo domain.ProductRepository
+	repo       domain.ProductRepository
+	observerMu sync.RWMutex
+	observer   MenuObserver
+}
+
+func (s *productService) SetMenuObserver(observer MenuObserver) {
+	s.observerMu.Lock()
+	defer s.observerMu.Unlock()
+	s.observer = observer
+}
+
+// menuChanged tells the observer about a successful write. Nothing the observer does can fail it.
+func (s *productService) menuChanged(ctx context.Context, kind MenuKind, id uuid.UUID) {
+	s.observerMu.RLock()
+	observer := s.observer
+	s.observerMu.RUnlock()
+	if observer == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			logging.FromContext(ctx).Error("menu observer panicked", zap.String("kind", string(kind)), zap.String("id", id.String()), zap.Any("panic", r))
+		}
+	}()
+	if err := observer.MenuChanged(ctx, kind, id); err != nil {
+		logging.FromContext(ctx).Error("menu observer failed", zap.String("kind", string(kind)), zap.String("id", id.String()), zap.Error(err))
+	}
 }
 
 func NewProductService(repo domain.ProductRepository) ProductService {
@@ -93,13 +146,18 @@ func (s *productService) CreateProduct(
 	if err := s.repo.Create(ctx, product); err != nil {
 		return nil, err
 	}
+	s.menuChanged(ctx, MenuProduct, product.ID)
 
 	return product, nil
 }
 
 // UpdateProduct updates an existing product.
 func (s *productService) UpdateProduct(ctx context.Context, product *domain.Product) error {
-	return s.repo.Update(ctx, product)
+	if err := s.repo.Update(ctx, product); err != nil {
+		return err
+	}
+	s.menuChanged(ctx, MenuProduct, product.ID)
+	return nil
 }
 
 // GetProduct retrieves a product by its unique identifier.
@@ -187,15 +245,27 @@ func (s *productService) BatchGetChoicesByIDs(ctx context.Context, choiceIDs []s
 }
 
 func (s *productService) CreateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error {
-	return s.repo.CreateChoiceGroup(ctx, group)
+	if err := s.repo.CreateChoiceGroup(ctx, group); err != nil {
+		return err
+	}
+	s.menuChanged(ctx, MenuChoiceGroup, group.ID)
+	return nil
 }
 
 func (s *productService) UpdateChoiceGroup(ctx context.Context, group *domain.ProductChoiceGroup) error {
-	return s.repo.UpdateChoiceGroup(ctx, group)
+	if err := s.repo.UpdateChoiceGroup(ctx, group); err != nil {
+		return err
+	}
+	s.menuChanged(ctx, MenuChoiceGroup, group.ID)
+	return nil
 }
 
 func (s *productService) DeleteChoiceGroup(ctx context.Context, groupID uuid.UUID) error {
-	return s.repo.DeleteChoiceGroup(ctx, groupID)
+	if err := s.repo.DeleteChoiceGroup(ctx, groupID); err != nil {
+		return err
+	}
+	s.menuChanged(ctx, MenuChoiceGroup, groupID)
+	return nil
 }
 
 func (s *productService) GetChoiceByID(ctx context.Context, choiceID uuid.UUID) (*domain.ProductChoice, error) {
@@ -207,13 +277,25 @@ func (s *productService) BatchGetChoicesByProductIDs(ctx context.Context, produc
 }
 
 func (s *productService) CreateChoice(ctx context.Context, choice *domain.ProductChoice) error {
-	return s.repo.CreateChoice(ctx, choice)
+	if err := s.repo.CreateChoice(ctx, choice); err != nil {
+		return err
+	}
+	s.menuChanged(ctx, MenuChoice, choice.ID)
+	return nil
 }
 
 func (s *productService) UpdateChoice(ctx context.Context, choice *domain.ProductChoice) error {
-	return s.repo.UpdateChoice(ctx, choice)
+	if err := s.repo.UpdateChoice(ctx, choice); err != nil {
+		return err
+	}
+	s.menuChanged(ctx, MenuChoice, choice.ID)
+	return nil
 }
 
 func (s *productService) DeleteChoice(ctx context.Context, choiceID uuid.UUID) error {
-	return s.repo.DeleteChoice(ctx, choiceID)
+	if err := s.repo.DeleteChoice(ctx, choiceID); err != nil {
+		return err
+	}
+	s.menuChanged(ctx, MenuChoice, choiceID)
+	return nil
 }

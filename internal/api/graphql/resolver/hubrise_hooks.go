@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	orderDomain "tsb-service/internal/modules/order/domain"
+	productApplication "tsb-service/internal/modules/product/application"
 	productDomain "tsb-service/internal/modules/product/domain"
 	"tsb-service/pkg/logging"
 	"tsb-service/pkg/utils"
@@ -33,6 +34,11 @@ type HubriseHooks interface {
 	OrderStatusChanged(ctx context.Context, orderID uuid.UUID, newStatus orderDomain.OrderStatus, historyID uuid.UUID) error
 	// AvailabilityChanged says staff made a product available or sold out in the shop.
 	AvailabilityChanged(ctx context.Context, productID uuid.UUID, available bool) error
+	// MenuChanged says a product, a choice group or a choice was written (or its image replaced). Its
+	// signature is the one of productApplication.MenuObserver, so the implementation can be
+	// installed as the observer of the product service, the chokepoint of menu writes. It marks the
+	// catalog publisher dirty when the dashboard owns the menu, and does nothing otherwise.
+	MenuChanged(ctx context.Context, kind productApplication.MenuKind, id uuid.UUID) error
 	// ProductGuard may refuse an edit of a product whose fields HubRise owns.
 	ProductGuard(ctx context.Context, current, updated *productDomain.Product) error
 	// ChoiceGroupGuard may refuse the creation (current is nil), the edit or the deletion (updated is
@@ -52,6 +58,10 @@ func (NoopHubriseHooks) OrderStatusChanged(context.Context, uuid.UUID, orderDoma
 }
 
 func (NoopHubriseHooks) AvailabilityChanged(context.Context, uuid.UUID, bool) error { return nil }
+
+func (NoopHubriseHooks) MenuChanged(context.Context, productApplication.MenuKind, uuid.UUID) error {
+	return nil
+}
 
 func (NoopHubriseHooks) ProductGuard(context.Context, *productDomain.Product, *productDomain.Product) error {
 	return nil
@@ -98,6 +108,19 @@ func (r *Resolver) AvailabilityChanged(ctx context.Context, productID uuid.UUID,
 	if err := r.Hubrise.AvailabilityChanged(ctx, productID, available); err != nil {
 		logging.FromContext(ctx).Error("hubrise: availability hook failed",
 			zap.String("product_id", productID.String()), zap.Bool("available", available), zap.Error(err))
+	}
+}
+
+// MenuChanged tells HubRise a menu item was written, with the same rules as OrderReady. Writes made
+// through the product service already reach the hook through its observer; this is for the changes
+// that bypass it (a product image replaced by the resolver).
+func (r *Resolver) MenuChanged(ctx context.Context, kind productApplication.MenuKind, id uuid.UUID) {
+	if r.Hubrise == nil {
+		return
+	}
+	if err := r.Hubrise.MenuChanged(ctx, kind, id); err != nil {
+		logging.FromContext(ctx).Error("hubrise: menu changed hook failed",
+			zap.String("kind", string(kind)), zap.String("id", id.String()), zap.Error(err))
 	}
 }
 

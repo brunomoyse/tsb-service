@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	orderDomain "tsb-service/internal/modules/order/domain"
+	productApplication "tsb-service/internal/modules/product/application"
 	productDomain "tsb-service/internal/modules/product/domain"
 )
 
@@ -19,6 +20,9 @@ type HubriseHooksSet struct {
 	Order     HubriseHooks
 	Inventory HubriseHooks
 	Catalog   HubriseHooks
+	// Publish follows the menu edits for the catalog publisher. Nil (a Set built before publishing
+	// existed) is the same as NoopHubriseHooks.
+	Publish HubriseHooks
 }
 
 var _ HubriseHooks = HubriseHooksSet{}
@@ -45,4 +49,11 @@ func (s HubriseHooksSet) ChoiceGroupGuard(ctx context.Context, current, updated 
 
 func (s HubriseHooksSet) ChoiceGuard(ctx context.Context, current, updated *productDomain.ProductChoice) error {
 	return s.Catalog.ChoiceGuard(ctx, current, updated)
+}
+
+func (s HubriseHooksSet) MenuChanged(ctx context.Context, kind productApplication.MenuKind, id uuid.UUID) error {
+	if s.Publish == nil {
+		return nil
+	}
+	return s.Publish.MenuChanged(ctx, kind, id)
 }
