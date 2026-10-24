@@ -1,10 +1,19 @@
 name: Tests
 
+# Pull requests and pushes to other branches run this directly. Pushes to main
+# and release tags run it through the "tests" job of action.yml (workflow_call),
+# which every image build waits for, so no untested commit reaches the test
+# server or production.
 on:
   push:
-    branches: ['**']
+    branches-ignore: [main]
   pull_request:
     branches: [main, master]
+  workflow_call:
+
+# A called workflow cannot hold more than its caller grants.
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -96,6 +105,11 @@ jobs:
 
       - name: Build
         run: go build -v -o tsb-service cmd/app/main.go
+
+      # The release and nightly workflows refuse an untested commit through
+      # this script: keep its verdicts honest.
+      - name: Self-test the green-commit gate
+        run: bash .github/scripts/main-green.test.sh
 
       - name: Upload build artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

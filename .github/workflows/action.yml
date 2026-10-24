@@ -23,10 +23,23 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/pili-api
   MCP_IMAGE_NAME: ${{ github.repository_owner }}/pili-mcp
 
-# ── Test (auto on push to main) ──────────────────────────────────────────────
+# ── Tests (every push to main and every release tag) ─────────────────────────
+# The whole of test.yml runs first; every image build below waits for it, so a
+# commit that fails its tests never produces an image, a test deploy or a
+# release. The rollback job does not need it: it ships an old, already-released
+# version.
 
 jobs:
+  tests:
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/test.yml
+
+# ── Test (auto on push to main) ──────────────────────────────────────────────
+
   build_test:
+    needs: tests
     if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
     name: Build Test Image
     runs-on: ubuntu-latest
@@ -41,22 +54,41 @@ jobs:
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.PAT }}" | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ github.actor }} --password-stdin
 
-      - name: Build and Push Multi-Arch Image
+      # The images are pushed under an immutable commit tag first. ":latest" (what the
+      # test server pulls) only moves once they boot. The release build later promotes
+      # this same commit image to ":production" instead of compiling again.
+      - name: Build and Push Multi-Arch Image (commit tag)
         run: |
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} \
             --push \
             .
 
-      - name: Build and Push MCP Image
+      - name: Build and Push MCP Image (commit tag)
         run: |
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --file Dockerfile.mcp \
-            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}:latest \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}:sha-${{ github.sha }} \
             --push \
             .
+
+      - name: Boot smoke test (API against Postgres, MCP)
+        run: |
+          docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}:sha-${{ github.sha }}
+          scripts/ci-smoke-image.sh api ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          scripts/ci-smoke-image.sh mcp ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}:sha-${{ github.sha }}
+
+      - name: Promote to :latest
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          docker buildx imagetools create \
+            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}:latest \
+            ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}:sha-${{ github.sha }}
 
   deploy_test:
     if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
@@ -74,9 +106,12 @@ jobs:
 # ── Production release (tag push v*) ────────────────────────────────────────
 
   build_production:
+    needs: tests
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     name: Build Production Image
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.ref_name }}
 
     steps:
       - name: Checkout Code
@@ -86,28 +121,63 @@ jobs:
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GitHub Container Registry
-        run: echo "${{ secrets.PAT }}" | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ github.actor }} --password-stdin
-
-      - name: Build and Push Production Image
         run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --build-arg APP_VERSION=${{ github.ref_name }} \
-            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:production \
-            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
-            --push \
-            .
+          echo "${{ secrets.PAT }}" | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ github.actor }} --password-stdin
+          echo "API_IMAGE=${DOCKER_REGISTRY}/${IMAGE_NAME}" >> "$GITHUB_ENV"
+          echo "MCP_IMAGE=${DOCKER_REGISTRY}/${MCP_IMAGE_NAME}" >> "$GITHUB_ENV"
 
-      - name: Build and Push Production MCP Image
+      # The API image of a commit that went through main is already built, boot-tested
+      # and running on the test server: ship those very binaries. Only the APP_VERSION
+      # variable (read by Sentry at runtime, never at build time) differs, so it is
+      # added as a one-line layer on top. A tag on a commit main never built falls back
+      # to a build from source. Both paths boot-test the image before it is pushed.
+      - name: Build or promote the API image
         run: |
+          set -euo pipefail
+          src="${API_IMAGE}:sha-${GITHUB_SHA}"
+          if docker buildx imagetools inspect "$src" >/dev/null 2>&1; then
+            echo "Promoting $src"
+            docker pull --platform linux/amd64 "$src"
+            scripts/ci-smoke-image.sh api "$src"
+            # shellcheck disable=SC2016  # ${APP_VERSION} is expanded by Docker, not the shell
+            printf 'FROM %s\nARG APP_VERSION\nENV APP_VERSION=${APP_VERSION}\n' "$src" |
+              docker buildx build \
+                --platform linux/amd64 \
+                --build-arg APP_VERSION="$TAG" \
+                --tag "${API_IMAGE}:production" \
+                --tag "${API_IMAGE}:${TAG}" \
+                --push \
+                -
+          else
+            echo "No main build of ${GITHUB_SHA}: building from source"
+            docker buildx build \
+              --platform linux/amd64 \
+              --build-arg APP_VERSION="$TAG" \
+              --tag "${API_IMAGE}:production" \
+              --tag "${API_IMAGE}:${TAG}" \
+              --load \
+              .
+            scripts/ci-smoke-image.sh api "${API_IMAGE}:production"
+            docker push "${API_IMAGE}:production"
+            docker push "${API_IMAGE}:${TAG}"
+          fi
+
+      # The MCP binary embeds its version at build time (-ldflags), so it cannot be
+      # promoted: it is built again from the tested commit.
+      - name: Build, boot-test and push the MCP image
+        run: |
+          set -euo pipefail
           docker buildx build \
             --platform linux/amd64 \
             --file Dockerfile.mcp \
-            --build-arg APP_VERSION=${{ github.ref_name }} \
-            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}:production \
-            --tag ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}:${{ github.ref_name }} \
-            --push \
+            --build-arg APP_VERSION="$TAG" \
+            --tag "${MCP_IMAGE}:production" \
+            --tag "${MCP_IMAGE}:${TAG}" \
+            --load \
             .
+          scripts/ci-smoke-image.sh mcp "${MCP_IMAGE}:production"
+          docker push "${MCP_IMAGE}:production"
+          docker push "${MCP_IMAGE}:${TAG}"
 
   deploy_production:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
