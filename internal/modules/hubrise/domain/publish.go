@@ -200,3 +200,52 @@ type PublishedItemRepository interface {
 	// Clear forgets every published item (the connection points at another catalog now).
 	Clear(ctx context.Context) error
 }
+
+// Issue codes of the catalog publisher: the warnings and blockers of a plan (domain.Warning carries
+// them). Warnings never stop a publish, blockers do.
+const (
+	// WarnCategoryDescriptionKept: the HubRise category has a plain text description, which is never
+	// replaced; the translations of its name are not written.
+	WarnCategoryDescriptionKept WarningCode = "CATEGORY_DESCRIPTION_KEPT"
+	// WarnNameSplitAmbiguous: the local name of a multi-SKU product does not start with the HubRise
+	// product name, so the whole name became the SKU name.
+	WarnNameSplitAmbiguous WarningCode = "NAME_SPLIT_AMBIGUOUS"
+	// WarnRetainedByDeal: a SKU deleted in the shop is still used by a HubRise deal, so it was kept,
+	// disabled.
+	WarnRetainedByDeal WarningCode = "RETAINED_BY_DEAL"
+	// WarnCategoryInUse: a category that is no longer in the shop is kept because a product still uses it.
+	WarnCategoryInUse WarningCode = "CATEGORY_IN_USE"
+	// WarnNameMissing: a local item has no name in any language; a placeholder name is published.
+	WarnNameMissing WarningCode = "NAME_MISSING"
+	// WarnCategoryDiverges: the locals of one HubRise product disagree on its category or VAT, which
+	// are shared, so the HubRise value is kept.
+	WarnCategoryDiverges WarningCode = "PRODUCT_FIELD_SHARED"
+	// WarnListSplit: a shared option list diverged between SKUs and one SKU got its own list.
+	WarnListSplit WarningCode = "OPTION_LIST_SPLIT"
+	// WarnVatNotExpressible: the VAT category has no tax rate (out_of_scope); only the SKU custom
+	// field carries it.
+	WarnVatNotExpressible WarningCode = "VAT_NOT_EXPRESSIBLE"
+
+	// BlockBaseMissingRef: a HubRise category or option list has no ref, so it cannot be linked.
+	BlockBaseMissingRef WarningCode = "BASE_MISSING_REF"
+	// BlockDuplicateRef: a ref is used twice among items of one kind.
+	BlockDuplicateRef WarningCode = "DUPLICATE_REF"
+	// BlockDanglingRef: an item names a category, option list or SKU that does not exist.
+	BlockDanglingRef WarningCode = "DANGLING_REF"
+	// BlockEmptyProduct: a product has no SKU.
+	BlockEmptyProduct WarningCode = "EMPTY_PRODUCT"
+	// BlockTaxRatePartial: a tax rate sets only some of delivery, collection and eat_in.
+	BlockTaxRatePartial WarningCode = "TAX_RATE_PARTIAL"
+	// BlockSkuNameDuplicate: two SKUs of one product have the same name (one unnamed SKU is allowed).
+	BlockSkuNameDuplicate WarningCode = "SKU_NAME_DUPLICATE"
+	// BlockEmptyOptionList: an option list has no option.
+	BlockEmptyOptionList WarningCode = "EMPTY_OPTION_LIST"
+	// BlockInvalidMoney: an amount is not a HubRise amount.
+	BlockInvalidMoney WarningCode = "INVALID_MONEY"
+	// BlockInvalidBarcode: a barcode is not 8, 12 or 13 digits.
+	BlockInvalidBarcode WarningCode = "INVALID_BARCODE"
+	// BlockOptionLimits: the minimum, maximum or defaults of an option list break the HubRise rules.
+	BlockOptionLimits WarningCode = "OPTION_LIMITS"
+	// BlockInvalidRef: a ref the shop would have to publish is empty or too long.
+	BlockInvalidRef WarningCode = "INVALID_REF"
+)
