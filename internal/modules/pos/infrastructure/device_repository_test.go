@@ -92,3 +92,21 @@ func TestDeviceRepository(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+// Migrations run before the new pods replace the old ones: the device read must ignore a column
+// added by a later release.
+func TestDeviceReadIgnoresAnAddedColumn(t *testing.T) {
+	tdb := testhelpers.SetupTestDatabase(t)
+	repo := NewDeviceRepository(&db.DBPool{Customer: tdb.DB, Admin: tdb.DB})
+	ctx := t.Context()
+	id := uuid.New()
+	_, err := tdb.DB.ExecContext(ctx, `
+		INSERT INTO pos_devices (id, serial_number, device_secret_hash, label) VALUES ($1, 'SN-ADD', 'abcd', 'label')`, id)
+	require.NoError(t, err)
+	_, err = tdb.DB.ExecContext(ctx, `ALTER TABLE pos_devices ADD COLUMN added_by_a_later_release TEXT DEFAULT 'x'`)
+	require.NoError(t, err)
+
+	d, err := repo.FindByID(ctx, id)
+	require.NoError(t, err)
+	assert.Equal(t, "SN-ADD", d.SerialNumber)
+}
