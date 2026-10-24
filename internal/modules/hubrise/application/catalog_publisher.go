@@ -423,9 +423,10 @@ func (p *CatalogPublisher) execute(ctx context.Context, holder string, seq int64
 		}
 	}
 
+	publishedAt := p.now()
 	items := make([]domain.PublishedItem, 0, len(plan.Desired))
 	for _, d := range plan.Desired {
-		items = append(items, domain.PublishedItem{EntityType: d.Entity, HubriseKey: d.Key, HubriseRef: d.Ref, ContentHash: d.Hash})
+		items = append(items, domain.PublishedItem{EntityType: d.Entity, HubriseKey: d.Key, HubriseRef: d.Ref, ContentHash: d.Hash, PublishedAt: publishedAt})
 	}
 	settled = true
 	if err := p.State.Complete(bg, holder, seq, domain.PublishResult{At: p.now(), LocalHash: plan.LocalMenuHash, RemoteHash: remoteHash}, items, ids); err != nil {

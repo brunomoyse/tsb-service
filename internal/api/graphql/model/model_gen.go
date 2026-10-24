@@ -260,10 +260,11 @@ type HubriseCatalogIssue struct {
 }
 
 type HubriseFeatures struct {
-	PushOrders    bool `json:"pushOrders"`
-	SyncStatus    bool `json:"syncStatus"`
-	SyncInventory bool `json:"syncInventory"`
-	SyncCatalog   bool `json:"syncCatalog"`
+	PushOrders     bool `json:"pushOrders"`
+	SyncStatus     bool `json:"syncStatus"`
+	SyncInventory  bool `json:"syncInventory"`
+	SyncCatalog    bool `json:"syncCatalog"`
+	PublishCatalog bool `json:"publishCatalog"`
 }
 
 type HubriseOrderInfo struct {
@@ -288,6 +289,80 @@ type HubriseOutboxItem struct {
 	ParkedAt      *time.Time         `json:"parkedAt,omitempty"`
 }
 
+type HubriseProductPublishInfo struct {
+	State       HubrisePublishState `json:"state"`
+	PublishedAt *time.Time          `json:"publishedAt,omitempty"`
+	Ref         *string             `json:"ref,omitempty"`
+}
+
+type HubrisePublishChange struct {
+	Entity HubriseCatalogEntity `json:"entity"`
+	Action HubrisePublishAction `json:"action"`
+	Key    string               `json:"key"`
+	Ref    string               `json:"ref"`
+	Name   string               `json:"name"`
+	Fields []string             `json:"fields"`
+}
+
+type HubrisePublishCount struct {
+	Entity  HubriseCatalogEntity `json:"entity"`
+	Added   int                  `json:"added"`
+	Updated int                  `json:"updated"`
+	Removed int                  `json:"removed"`
+}
+
+type HubrisePublishForeignItem struct {
+	Entity HubriseCatalogEntity `json:"entity"`
+	Ref    string               `json:"ref"`
+	Name   string               `json:"name"`
+}
+
+type HubrisePublishPreview struct {
+	PlanHash            string                       `json:"planHash"`
+	FirstPublish        bool                         `json:"firstPublish"`
+	Added               int                          `json:"added"`
+	Updated             int                          `json:"updated"`
+	Removed             int                          `json:"removed"`
+	Unchanged           int                          `json:"unchanged"`
+	Foreign             int                          `json:"foreign"`
+	Counts              []*HubrisePublishCount       `json:"counts"`
+	Changes             []*HubrisePublishChange      `json:"changes"`
+	Truncated           bool                         `json:"truncated"`
+	ForeignItems        []*HubrisePublishForeignItem `json:"foreignItems"`
+	Preserved           []string                     `json:"preserved"`
+	Warnings            []*HubriseCatalogIssue       `json:"warnings"`
+	Blockers            []*HubriseCatalogIssue       `json:"blockers"`
+	RemovalsNeedConfirm bool                         `json:"removalsNeedConfirm"`
+	GeneratedAt         time.Time                    `json:"generatedAt"`
+}
+
+type HubrisePublishResult struct {
+	Published bool                  `json:"published"`
+	Queued    bool                  `json:"queued"`
+	Status    *HubrisePublishStatus `json:"status"`
+}
+
+type HubrisePublishStatus struct {
+	Enabled                 bool                     `json:"enabled"`
+	Active                  bool                     `json:"active"`
+	Pending                 bool                     `json:"pending"`
+	PendingSince            *time.Time               `json:"pendingSince,omitempty"`
+	NextPublishAt           *time.Time               `json:"nextPublishAt,omitempty"`
+	Publishing              bool                     `json:"publishing"`
+	LastPublishedAt         *time.Time               `json:"lastPublishedAt,omitempty"`
+	FirstPublishConfirmedAt *time.Time               `json:"firstPublishConfirmedAt,omitempty"`
+	AwaitingFirstPublish    bool                     `json:"awaitingFirstPublish"`
+	LastError               *string                  `json:"lastError,omitempty"`
+	LastErrorCode           *HubrisePublishErrorCode `json:"lastErrorCode,omitempty"`
+	LastErrorAt             *time.Time               `json:"lastErrorAt,omitempty"`
+	ExternalChangeAt        *time.Time               `json:"externalChangeAt,omitempty"`
+	NeedsReconnectForWrite  bool                     `json:"needsReconnectForWrite"`
+	AccountCatalogDetected  bool                     `json:"accountCatalogDetected"`
+	PublishImages           bool                     `json:"publishImages"`
+	PublishedProducts       int                      `json:"publishedProducts"`
+	PendingProducts         int                      `json:"pendingProducts"`
+}
+
 type HubriseSettingsInput struct {
 	Enabled             *bool   `json:"enabled,omitempty"`
 	PushOrders          *bool   `json:"pushOrders,omitempty"`
@@ -298,6 +373,7 @@ type HubriseSettingsInput struct {
 	CatalogAutoImport   *bool   `json:"catalogAutoImport,omitempty"`
 	AutoRefundOnCancel  *bool   `json:"autoRefundOnCancel,omitempty"`
 	ImportImages        *bool   `json:"importImages,omitempty"`
+	PublishImages       *bool   `json:"publishImages,omitempty"`
 	CatalogLanguage     *string `json:"catalogLanguage,omitempty"`
 	VariantRef          *string `json:"variantRef,omitempty"`
 	ChannelName         *string `json:"channelName,omitempty"`
@@ -306,37 +382,39 @@ type HubriseSettingsInput struct {
 }
 
 type HubriseStatus struct {
-	Available              bool             `json:"available"`
-	Connected              bool             `json:"connected"`
-	Enabled                bool             `json:"enabled"`
-	AccountID              *string          `json:"accountId,omitempty"`
-	AccountName            *string          `json:"accountName,omitempty"`
-	LocationID             *string          `json:"locationId,omitempty"`
-	LocationName           *string          `json:"locationName,omitempty"`
-	CatalogID              *string          `json:"catalogId,omitempty"`
-	CatalogName            *string          `json:"catalogName,omitempty"`
-	CustomerListID         *string          `json:"customerListId,omitempty"`
-	CustomerListName       *string          `json:"customerListName,omitempty"`
-	Features               *HubriseFeatures `json:"features"`
-	SyncCustomers          bool             `json:"syncCustomers"`
-	CatalogAutoImport      bool             `json:"catalogAutoImport"`
-	CatalogUpdateAvailable bool             `json:"catalogUpdateAvailable"`
-	CatalogPendingReview   bool             `json:"catalogPendingReview"`
-	AutoRefundOnCancel     bool             `json:"autoRefundOnCancel"`
-	CatalogLanguage        string           `json:"catalogLanguage"`
-	VariantRef             *string          `json:"variantRef,omitempty"`
-	ChannelName            *string          `json:"channelName,omitempty"`
-	DeliveryChargeRef      *string          `json:"deliveryChargeRef,omitempty"`
-	PaymentFeeChargeRef    *string          `json:"paymentFeeChargeRef,omitempty"`
-	ImportImages           bool             `json:"importImages"`
-	LastCatalogSyncAt      *time.Time       `json:"lastCatalogSyncAt,omitempty"`
-	LastEventAt            *time.Time       `json:"lastEventAt,omitempty"`
-	AuthErrorAt            *time.Time       `json:"authErrorAt,omitempty"`
-	LastError              *string          `json:"lastError,omitempty"`
-	RelinkRequired         bool             `json:"relinkRequired"`
-	Backlog                *HubriseBacklog  `json:"backlog"`
-	UnlinkedProducts       int              `json:"unlinkedProducts"`
-	Attention              int              `json:"attention"`
+	Available              bool                    `json:"available"`
+	Connected              bool                    `json:"connected"`
+	Enabled                bool                    `json:"enabled"`
+	AccountID              *string                 `json:"accountId,omitempty"`
+	AccountName            *string                 `json:"accountName,omitempty"`
+	LocationID             *string                 `json:"locationId,omitempty"`
+	LocationName           *string                 `json:"locationName,omitempty"`
+	CatalogID              *string                 `json:"catalogId,omitempty"`
+	CatalogName            *string                 `json:"catalogName,omitempty"`
+	CustomerListID         *string                 `json:"customerListId,omitempty"`
+	CustomerListName       *string                 `json:"customerListName,omitempty"`
+	Features               *HubriseFeatures        `json:"features"`
+	SyncCustomers          bool                    `json:"syncCustomers"`
+	CatalogAutoImport      bool                    `json:"catalogAutoImport"`
+	CatalogUpdateAvailable bool                    `json:"catalogUpdateAvailable"`
+	CatalogPendingReview   bool                    `json:"catalogPendingReview"`
+	AutoRefundOnCancel     bool                    `json:"autoRefundOnCancel"`
+	CatalogDirection       HubriseCatalogDirection `json:"catalogDirection"`
+	Publish                *HubrisePublishStatus   `json:"publish"`
+	CatalogLanguage        string                  `json:"catalogLanguage"`
+	VariantRef             *string                 `json:"variantRef,omitempty"`
+	ChannelName            *string                 `json:"channelName,omitempty"`
+	DeliveryChargeRef      *string                 `json:"deliveryChargeRef,omitempty"`
+	PaymentFeeChargeRef    *string                 `json:"paymentFeeChargeRef,omitempty"`
+	ImportImages           bool                    `json:"importImages"`
+	LastCatalogSyncAt      *time.Time              `json:"lastCatalogSyncAt,omitempty"`
+	LastEventAt            *time.Time              `json:"lastEventAt,omitempty"`
+	AuthErrorAt            *time.Time              `json:"authErrorAt,omitempty"`
+	LastError              *string                 `json:"lastError,omitempty"`
+	RelinkRequired         bool                    `json:"relinkRequired"`
+	Backlog                *HubriseBacklog         `json:"backlog"`
+	UnlinkedProducts       int                     `json:"unlinkedProducts"`
+	Attention              int                     `json:"attention"`
 }
 
 type HubriseSyncResult struct {
@@ -540,28 +618,29 @@ type Payment struct {
 }
 
 type Product struct {
-	Code                *string               `json:"code,omitempty"`
-	CreatedAt           time.Time             `json:"createdAt"`
-	ID                  uuid.UUID             `json:"id"`
-	IsAvailable         bool                  `json:"isAvailable"`
-	IsDiscountable      bool                  `json:"isDiscountable"`
-	IsHalal             bool                  `json:"isHalal"`
-	IsLunchOnly         bool                  `json:"isLunchOnly"`
-	IsSpicy             bool                  `json:"isSpicy"`
-	IsVegetarian        bool                  `json:"isVegetarian"`
-	IsVisible           bool                  `json:"isVisible"`
-	PieceCount          *int                  `json:"pieceCount,omitempty"`
-	Price               string                `json:"price"`
-	Slug                string                `json:"slug"`
-	VatCategory         string                `json:"vatCategory"`
-	Name                string                `json:"name"`
-	Description         *string               `json:"description,omitempty"`
-	Category            *ProductCategory      `json:"category"`
-	Choices             []*ProductChoice      `json:"choices"`
-	ChoiceGroups        []*ProductChoiceGroup `json:"choiceGroups"`
-	Translations        []*Translation        `json:"translations"`
-	HubriseManaged      bool                  `json:"hubriseManaged"`
-	HubriseLockedFields []string              `json:"hubriseLockedFields"`
+	Code                *string                    `json:"code,omitempty"`
+	CreatedAt           time.Time                  `json:"createdAt"`
+	ID                  uuid.UUID                  `json:"id"`
+	IsAvailable         bool                       `json:"isAvailable"`
+	IsDiscountable      bool                       `json:"isDiscountable"`
+	IsHalal             bool                       `json:"isHalal"`
+	IsLunchOnly         bool                       `json:"isLunchOnly"`
+	IsSpicy             bool                       `json:"isSpicy"`
+	IsVegetarian        bool                       `json:"isVegetarian"`
+	IsVisible           bool                       `json:"isVisible"`
+	PieceCount          *int                       `json:"pieceCount,omitempty"`
+	Price               string                     `json:"price"`
+	Slug                string                     `json:"slug"`
+	VatCategory         string                     `json:"vatCategory"`
+	Name                string                     `json:"name"`
+	Description         *string                    `json:"description,omitempty"`
+	Category            *ProductCategory           `json:"category"`
+	Choices             []*ProductChoice           `json:"choices"`
+	ChoiceGroups        []*ProductChoiceGroup      `json:"choiceGroups"`
+	Translations        []*Translation             `json:"translations"`
+	HubriseManaged      bool                       `json:"hubriseManaged"`
+	HubriseLockedFields []string                   `json:"hubriseLockedFields"`
+	HubrisePublish      *HubriseProductPublishInfo `json:"hubrisePublish,omitempty"`
 }
 
 type ProductCategory struct {
@@ -977,6 +1056,63 @@ func (e HubriseCatalogAction) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+type HubriseCatalogDirection string
+
+const (
+	HubriseCatalogDirectionNone    HubriseCatalogDirection = "NONE"
+	HubriseCatalogDirectionImport  HubriseCatalogDirection = "IMPORT"
+	HubriseCatalogDirectionPublish HubriseCatalogDirection = "PUBLISH"
+)
+
+var AllHubriseCatalogDirection = []HubriseCatalogDirection{
+	HubriseCatalogDirectionNone,
+	HubriseCatalogDirectionImport,
+	HubriseCatalogDirectionPublish,
+}
+
+func (e HubriseCatalogDirection) IsValid() bool {
+	switch e {
+	case HubriseCatalogDirectionNone, HubriseCatalogDirectionImport, HubriseCatalogDirectionPublish:
+		return true
+	}
+	return false
+}
+
+func (e HubriseCatalogDirection) String() string {
+	return string(e)
+}
+
+func (e *HubriseCatalogDirection) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HubriseCatalogDirection(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HubriseCatalogDirection", str)
+	}
+	return nil
+}
+
+func (e HubriseCatalogDirection) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *HubriseCatalogDirection) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e HubriseCatalogDirection) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
 type HubriseCatalogEntity string
 
 const (
@@ -1153,6 +1289,187 @@ func (e *HubriseOutboxState) UnmarshalJSON(b []byte) error {
 }
 
 func (e HubriseOutboxState) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type HubrisePublishAction string
+
+const (
+	HubrisePublishActionAdd    HubrisePublishAction = "ADD"
+	HubrisePublishActionUpdate HubrisePublishAction = "UPDATE"
+	HubrisePublishActionRemove HubrisePublishAction = "REMOVE"
+)
+
+var AllHubrisePublishAction = []HubrisePublishAction{
+	HubrisePublishActionAdd,
+	HubrisePublishActionUpdate,
+	HubrisePublishActionRemove,
+}
+
+func (e HubrisePublishAction) IsValid() bool {
+	switch e {
+	case HubrisePublishActionAdd, HubrisePublishActionUpdate, HubrisePublishActionRemove:
+		return true
+	}
+	return false
+}
+
+func (e HubrisePublishAction) String() string {
+	return string(e)
+}
+
+func (e *HubrisePublishAction) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HubrisePublishAction(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HubrisePublishAction", str)
+	}
+	return nil
+}
+
+func (e HubrisePublishAction) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *HubrisePublishAction) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e HubrisePublishAction) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type HubrisePublishErrorCode string
+
+const (
+	HubrisePublishErrorCodeWriteScopeMissing   HubrisePublishErrorCode = "WRITE_SCOPE_MISSING"
+	HubrisePublishErrorCodeAccountCatalog      HubrisePublishErrorCode = "ACCOUNT_CATALOG"
+	HubrisePublishErrorCodeCatalogNotFound     HubrisePublishErrorCode = "CATALOG_NOT_FOUND"
+	HubrisePublishErrorCodeRejected            HubrisePublishErrorCode = "REJECTED"
+	HubrisePublishErrorCodeInvalidMenu         HubrisePublishErrorCode = "INVALID_MENU"
+	HubrisePublishErrorCodeUnavailable         HubrisePublishErrorCode = "UNAVAILABLE"
+	HubrisePublishErrorCodeAuth                HubrisePublishErrorCode = "AUTH"
+	HubrisePublishErrorCodeRemovalsNeedConfirm HubrisePublishErrorCode = "REMOVALS_NEED_CONFIRM"
+)
+
+var AllHubrisePublishErrorCode = []HubrisePublishErrorCode{
+	HubrisePublishErrorCodeWriteScopeMissing,
+	HubrisePublishErrorCodeAccountCatalog,
+	HubrisePublishErrorCodeCatalogNotFound,
+	HubrisePublishErrorCodeRejected,
+	HubrisePublishErrorCodeInvalidMenu,
+	HubrisePublishErrorCodeUnavailable,
+	HubrisePublishErrorCodeAuth,
+	HubrisePublishErrorCodeRemovalsNeedConfirm,
+}
+
+func (e HubrisePublishErrorCode) IsValid() bool {
+	switch e {
+	case HubrisePublishErrorCodeWriteScopeMissing, HubrisePublishErrorCodeAccountCatalog, HubrisePublishErrorCodeCatalogNotFound, HubrisePublishErrorCodeRejected, HubrisePublishErrorCodeInvalidMenu, HubrisePublishErrorCodeUnavailable, HubrisePublishErrorCodeAuth, HubrisePublishErrorCodeRemovalsNeedConfirm:
+		return true
+	}
+	return false
+}
+
+func (e HubrisePublishErrorCode) String() string {
+	return string(e)
+}
+
+func (e *HubrisePublishErrorCode) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HubrisePublishErrorCode(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HubrisePublishErrorCode", str)
+	}
+	return nil
+}
+
+func (e HubrisePublishErrorCode) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *HubrisePublishErrorCode) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e HubrisePublishErrorCode) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type HubrisePublishState string
+
+const (
+	HubrisePublishStatePublished    HubrisePublishState = "PUBLISHED"
+	HubrisePublishStatePending      HubrisePublishState = "PENDING"
+	HubrisePublishStateNotPublished HubrisePublishState = "NOT_PUBLISHED"
+)
+
+var AllHubrisePublishState = []HubrisePublishState{
+	HubrisePublishStatePublished,
+	HubrisePublishStatePending,
+	HubrisePublishStateNotPublished,
+}
+
+func (e HubrisePublishState) IsValid() bool {
+	switch e {
+	case HubrisePublishStatePublished, HubrisePublishStatePending, HubrisePublishStateNotPublished:
+		return true
+	}
+	return false
+}
+
+func (e HubrisePublishState) String() string {
+	return string(e)
+}
+
+func (e *HubrisePublishState) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = HubrisePublishState(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid HubrisePublishState", str)
+	}
+	return nil
+}
+
+func (e HubrisePublishState) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *HubrisePublishState) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e HubrisePublishState) MarshalJSON() ([]byte, error) {
 	var buf bytes.Buffer
 	e.MarshalGQL(&buf)
 	return buf.Bytes(), nil

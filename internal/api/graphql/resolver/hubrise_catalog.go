@@ -3,6 +3,7 @@ package resolver
 import (
 	"context"
 	"errors"
+	"math"
 	"strings"
 
 	"github.com/google/uuid"
@@ -115,7 +116,18 @@ func HubriseError(err error) error {
 	if invalid, ok := errors.AsType[*hubriseDomain.InvalidSettingError](err); ok {
 		return apperr.New(apperr.CodeUserError, invalid.Message).With("field", invalid.Field)
 	}
+	if blocked, ok := errors.AsType[*hubriseDomain.PublishBlockedError](err); ok {
+		codes := make([]string, 0, len(blocked.Blockers))
+		for _, b := range blocked.Blockers {
+			codes = append(codes, string(b.Code))
+		}
+		return apperr.New(apperr.CodeHubrisePublishBlocked, blocked.Error()).With("blockers", codes)
+	}
 	if he, ok := errors.AsType[*pkghubrise.Error](err); ok {
+		if he.Kind == pkghubrise.KindRateLimited {
+			return apperr.New(apperr.CodeHubriseRateLimited, "HubRise's read limit is reached, try again in a moment").
+				With("retryAfterSeconds", int(math.Ceil(he.RetryAfter.Seconds())))
+		}
 		return hubriseUpstream(he)
 	}
 	switch {
@@ -131,6 +143,26 @@ func HubriseError(err error) error {
 		return apperr.New(apperr.CodeHubriseEmptyCatalog, "the HubRise catalog has no product")
 	case errors.Is(err, hubriseDomain.ErrImportInProgress), errors.Is(err, hubriseApplication.ErrInventoryBusy):
 		return apperr.New(apperr.CodeHubriseBusy, "another HubRise synchronization is running, try again in a moment")
+	case errors.Is(err, hubriseDomain.ErrPublishMode):
+		return apperr.New(apperr.CodeHubrisePublishMode, "the dashboard owns the menu, a full import from HubRise is not available")
+	case errors.Is(err, hubriseDomain.ErrDirectionConflict):
+		return apperr.New(apperr.CodeHubriseDirectionConflict, "the dashboard owns the menu: switch the catalog direction before turning catalog sync on")
+	case errors.Is(err, hubriseDomain.ErrReconnectRequired):
+		return apperr.New(apperr.CodeHubriseReconnectRequired, "reconnect HubRise to grant the catalog write permission")
+	case errors.Is(err, hubriseDomain.ErrAccountCatalog):
+		return apperr.New(apperr.CodeHubriseAccountCatalog, err.Error())
+	case errors.Is(err, hubriseDomain.ErrNotPublishMode):
+		return apperr.New(apperr.CodeHubriseNotPublishMode, "the dashboard does not own the menu")
+	case errors.Is(err, hubriseDomain.ErrPreviewStale):
+		return apperr.New(apperr.CodeHubrisePreviewStale, err.Error())
+	case errors.Is(err, hubriseDomain.ErrPublishConfirmRequired):
+		return apperr.New(apperr.CodeHubrisePublishConfirmRequired, err.Error())
+	case errors.Is(err, hubriseDomain.ErrPublishPendingChanges):
+		return apperr.New(apperr.CodeHubrisePublishPendingChanges, err.Error())
+	case errors.Is(err, hubriseDomain.ErrEmptyMenu):
+		return apperr.New(apperr.CodeHubriseEmptyMenu, "the menu has no product, nothing is published")
+	case errors.Is(err, hubriseDomain.ErrPublishBusy):
+		return apperr.New(apperr.CodeHubriseBusy, "a catalog publish is already running, try again in a moment")
 	case errors.Is(err, hubriseDomain.ErrSKULinked):
 		return apperr.New(apperr.CodeHubriseSKULinked, "that HubRise SKU is already linked to another product")
 	}

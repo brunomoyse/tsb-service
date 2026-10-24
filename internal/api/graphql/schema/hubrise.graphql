@@ -13,6 +13,8 @@ type HubriseFeatures {
     syncInventory: Boolean!
     # HubRise is the source of truth of the menu: its price, category, VAT, code and options are locked.
     syncCatalog: Boolean!
+    # True while direction == PUBLISH. Mutually exclusive with syncCatalog.
+    publishCatalog: Boolean!
 }
 
 type HubriseBacklog {
@@ -52,6 +54,10 @@ type HubriseStatus {
     # Cancelling an order in HubRise refunds a paid online order automatically. Off by default.
     autoRefundOnCancel: Boolean!
 
+    # Who owns the menu: nobody (links only), HubRise (IMPORT) or the dashboard (PUBLISH).
+    catalogDirection: HubriseCatalogDirection!
+    # The state of the catalog publisher (all false/empty outside PUBLISH).
+    publish: HubrisePublishStatus!
     # fr, en, nl or zh: the language the HubRise catalog is written in.
     catalogLanguage: String!
     variantRef: String
@@ -120,6 +126,8 @@ input HubriseSettingsInput {
     catalogAutoImport: Boolean
     autoRefundOnCancel: Boolean
     importImages: Boolean
+    # Upload product images with the catalog (max 1 MB each, reuse by private_ref). Off by default.
+    publishImages: Boolean
     catalogLanguage: String
     # The text options: an empty string clears the option.
     variantRef: String
@@ -213,6 +221,10 @@ type HubriseOrderInfo {
 extend type Query {
     hubriseStatus: HubriseStatus! @admin
     hubriseOutbox(state: HubriseOutboxState, first: Int = 50): [HubriseOutboxItem!]! @admin
+
+    # Reads nothing locally that is not already public; fetches the HubRise catalog once (10 per minute bucket).
+    # Errors: NOT_PUBLISH_MODE, NOT_CONNECTED, RATE_LIMITED, UPSTREAM, EMPTY_MENU.
+    previewHubriseCatalogPublish(removeForeign: Boolean = false): HubrisePublishPreview! @admin
 }
 
 extend type Mutation {
@@ -231,4 +243,163 @@ extend type Mutation {
     linkHubriseProduct(productId: ID!, skuRef: String): Boolean! @admin
     # Retries the parked rows: those of the chain of row `id`, or all of them. Returns how many.
     retryHubriseOutbox(id: String): Int! @admin
+
+    # Switches who owns the menu, atomically (syncCatalog and the auto import are turned off for PUBLISH).
+    # To PUBLISH: needs a connected install and catalog.write (RECONNECT_REQUIRED), starts "awaiting first
+    # publish": nothing is written until publishHubriseCatalog is confirmed. Leaving PUBLISH with unpublished
+    # edits needs acknowledgeLocalOverwrite (PUBLISH_PENDING_CHANGES); IMPORT also needs the existing
+    # dry-run preview (PREVIEW_REQUIRED).
+    setHubriseCatalogDirection(direction: HubriseCatalogDirection!, acknowledgeLocalOverwrite: Boolean = false): HubriseStatus! @admin
+    # Publishes now (skips the debounce). The first publish and removals above the threshold need
+    # confirmRemovals and the planHash of the preview the admin saw (PUBLISH_CONFIRM_REQUIRED, PREVIEW_STALE).
+    # removeForeign also removes the HubRise-only items. Errors: NOT_PUBLISH_MODE, NOT_ENABLED, RELINK_REQUIRED,
+    # RECONNECT_REQUIRED, ACCOUNT_CATALOG, PUBLISH_BLOCKED, EMPTY_MENU, RATE_LIMITED, UPSTREAM.
+    publishHubriseCatalog(confirmRemovals: Boolean = false, removeForeign: Boolean = false, planHash: String): HubrisePublishResult! @admin
+    # Clears the "external change detected" warning.
+    acknowledgeHubriseExternalChange: HubriseStatus! @admin
+}
+
+# Who owns the menu. NONE: nobody (links only). IMPORT: HubRise owns it (the existing syncCatalog mode).
+# PUBLISH: the dashboard owns it and every edit is published to HubRise.
+enum HubriseCatalogDirection {
+    NONE
+    IMPORT
+    PUBLISH
+}
+
+enum HubrisePublishErrorCode {
+    # catalog.write was not granted: the admin must reconnect (HubriseStatus.publish.needsReconnectForWrite).
+    WRITE_SCOPE_MISSING
+    # The catalog is account level and the connection holds a location token.
+    ACCOUNT_CATALOG
+    # The catalog id of the connection no longer exists at HubRise.
+    CATALOG_NOT_FOUND
+    # HubRise answered 422: the content was refused (lastError holds the field messages). Waits for a new edit.
+    REJECTED
+    # Our own pre-flight validation found the menu unpublishable (see the preview blockers).
+    INVALID_MENU
+    # HubRise down, slow or rate limited: retried with backoff.
+    UNAVAILABLE
+    # The token itself is refused (revoked, unpaid): the whole integration is paused (authErrorAt).
+    AUTH
+    # The publish would remove a large part of the HubRise menu (at least 5 SKUs and more than 30 % of the
+    # published ones) and waits for publishHubriseCatalog(confirmRemovals: true, planHash).
+    REMOVALS_NEED_CONFIRM
+}
+
+enum HubrisePublishAction {
+    ADD
+    UPDATE
+    REMOVE
+}
+
+enum HubrisePublishState {
+    # HubRise has the current version.
+    PUBLISHED
+    # Edited since the last publish (approximation from update times; the exact answer is the preview).
+    PENDING
+    # Never published.
+    NOT_PUBLISHED
+}
+
+type HubrisePublishStatus {
+    # Equals HubriseStatus.catalogDirection == PUBLISH.
+    enabled: Boolean!
+    # Publishing may run right now: direction PUBLISH, connected, enabled, no auth error, no relink,
+    # write scope present, first publish confirmed, not blocked by a rejection.
+    active: Boolean!
+    # Edits wait to be published.
+    pending: Boolean!
+    pendingSince: DateTime
+    # When the debounced publisher will run (null when nothing is pending or it cannot run).
+    nextPublishAt: DateTime
+    # A publish is running on some replica right now.
+    publishing: Boolean!
+    lastPublishedAt: DateTime
+    # Null until the admin confirmed the first publish after switching to PUBLISH.
+    firstPublishConfirmedAt: DateTime
+    awaitingFirstPublish: Boolean!
+    lastError: String
+    lastErrorCode: HubrisePublishErrorCode
+    lastErrorAt: DateTime
+    # Someone changed the HubRise catalog elsewhere (callback or drift check). It never imports; the next
+    # publish merges around it and overwrites the fields the dashboard owns.
+    externalChangeAt: DateTime
+    # The stored scope has no catalog.write (connections made before publishing existed).
+    needsReconnectForWrite: Boolean!
+    # The catalog looks account level (no location id) or a publish was refused with 401/403 for that reason.
+    accountCatalogDetected: Boolean!
+    # Products and options images are uploaded too (HubriseSettingsInput.publishImages).
+    publishImages: Boolean!
+    publishedProducts: Int!
+    pendingProducts: Int!
+}
+
+type HubrisePublishCount {
+    entity: HubriseCatalogEntity!
+    added: Int!
+    updated: Int!
+    removed: Int!
+}
+
+type HubrisePublishChange {
+    entity: HubriseCatalogEntity!
+    action: HubrisePublishAction!
+    # The HubRise key (ref, SKU ref, "sku|list", "sku|list|option").
+    key: String!
+    ref: String!
+    name: String!
+    # What changes: name, description, price, category, vatCategory, code, visibility, translations, limits,
+    # sortOrder, image...
+    fields: [String!]!
+}
+
+# An item that exists at HubRise, has no link and no local counterpart (for example a product only the EPOS
+# knows). It is kept untouched unless removeForeign is chosen.
+type HubrisePublishForeignItem {
+    entity: HubriseCatalogEntity!
+    ref: String!
+    name: String!
+}
+
+type HubrisePublishPreview {
+    # Identifies this plan. publishHubriseCatalog needs it back for a confirmation.
+    planHash: String!
+    firstPublish: Boolean!
+    added: Int!
+    updated: Int!
+    removed: Int!
+    unchanged: Int!
+    # Items only HubRise has (kept, or removed with removeForeign).
+    foreign: Int!
+    counts: [HubrisePublishCount!]!
+    # Capped at 500 entries, removals first. truncated says whether more exist.
+    changes: [HubrisePublishChange!]!
+    truncated: Boolean!
+    foreignItems: [HubrisePublishForeignItem!]!
+    # Sections of the HubRise catalog that are carried over untouched (deals, discounts, charges, variants), by name with a count.
+    preserved: [String!]!
+    warnings: [HubriseCatalogIssue!]!
+    # Problems that forbid publishing (duplicate refs, option list rules, SKU names...). Empty when publishable.
+    blockers: [HubriseCatalogIssue!]!
+    # Removing this many SKUs (linked ones deleted locally plus foreign ones when removeForeign) needs
+    # confirmRemovals: at least 5 and more than 30 % of the published ones (the import's mass-retire rule).
+    removalsNeedConfirm: Boolean!
+    generatedAt: DateTime!
+}
+
+type HubrisePublishResult {
+    # The catalog was written to HubRise by this call.
+    published: Boolean!
+    # Another replica holds the publish lease: the work was queued and runs within seconds.
+    queued: Boolean!
+    status: HubrisePublishStatus!
+}
+
+# What the dashboard shows about one product in PUBLISH mode. Null when the direction is not PUBLISH.
+type HubriseProductPublishInfo {
+    state: HubrisePublishState!
+    publishedAt: DateTime
+    # The SKU ref the product has (or will have) at HubRise.
+    ref: String
 }

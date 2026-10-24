@@ -173,6 +173,33 @@ const (
 	// CodeHubriseUpstream: HubRise refused or did not answer a call the operation needed. `kind`
 	// in the extensions says how (unauthorized, forbidden, rate_limited, server, timeout...).
 	CodeHubriseUpstream Code = "HUBRISE_UPSTREAM"
+
+	// The dashboard-owned menu (catalog publishing).
+
+	// CodeHubrisePublishMode: a full catalog import was asked while the dashboard owns the menu.
+	CodeHubrisePublishMode Code = "HUBRISE_PUBLISH_MODE"
+	// CodeHubriseDirectionConflict: catalog sync was asked while the dashboard owns the menu.
+	CodeHubriseDirectionConflict Code = "HUBRISE_DIRECTION_CONFLICT"
+	// CodeHubriseReconnectRequired: the stored authorization has no catalog.write; reconnect HubRise.
+	CodeHubriseReconnectRequired Code = "HUBRISE_RECONNECT_REQUIRED"
+	// CodeHubriseAccountCatalog: the catalog belongs to the HubRise account and the connection holds
+	// a location token.
+	CodeHubriseAccountCatalog Code = "HUBRISE_ACCOUNT_CATALOG"
+	// CodeHubriseNotPublishMode: a publish operation was asked while the dashboard does not own the menu.
+	CodeHubriseNotPublishMode Code = "HUBRISE_NOT_PUBLISH_MODE"
+	// CodeHubrisePreviewStale: the plan the admin confirmed is not the current plan; preview again.
+	CodeHubrisePreviewStale Code = "HUBRISE_PREVIEW_STALE"
+	// CodeHubrisePublishConfirmRequired: the first publish, or one that removes a large part of the
+	// HubRise menu, was asked without the confirmation.
+	CodeHubrisePublishConfirmRequired Code = "HUBRISE_PUBLISH_CONFIRM_REQUIRED"
+	// CodeHubrisePublishBlocked: the plan has blockers; `blockers` in the extensions lists their codes.
+	CodeHubrisePublishBlocked Code = "HUBRISE_PUBLISH_BLOCKED"
+	// CodeHubrisePublishPendingChanges: leaving PUBLISH would abandon unpublished edits.
+	CodeHubrisePublishPendingChanges Code = "HUBRISE_PUBLISH_PENDING_CHANGES"
+	// CodeHubriseRateLimited: HubRise's read limit is reached; `retryAfterSeconds` in the extensions.
+	CodeHubriseRateLimited Code = "HUBRISE_RATE_LIMITED"
+	// CodeHubriseEmptyMenu: the local menu has no product, nothing is published.
+	CodeHubriseEmptyMenu Code = "HUBRISE_EMPTY_MENU"
 )
 
 // expected lists the codes that are the customer's / the world's doing rather than ours: they are
@@ -230,6 +257,18 @@ var expected = map[Code]bool{
 	CodeHubriseEmptyCatalog:          true,
 	CodeHubriseBusy:                  true,
 	CodeHubriseSKULinked:             true,
+	// The dashboard-owned menu: steps done out of order, or limits HubRise imposes.
+	CodeHubrisePublishMode:            true,
+	CodeHubriseDirectionConflict:      true,
+	CodeHubriseReconnectRequired:      true,
+	CodeHubriseAccountCatalog:         true,
+	CodeHubriseNotPublishMode:         true,
+	CodeHubrisePreviewStale:           true,
+	CodeHubrisePublishConfirmRequired: true,
+	CodeHubrisePublishBlocked:         true,
+	CodeHubrisePublishPendingChanges:  true,
+	CodeHubriseRateLimited:            true,
+	CodeHubriseEmptyMenu:              true,
 	// HubRise's side failing is not a bug of ours; the message is for the operator, and the resolver
 	// logs the cause itself.
 	CodeHubriseUpstream: true,

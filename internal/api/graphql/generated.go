@@ -197,10 +197,11 @@ type ComplexityRoot struct {
 	}
 
 	HubriseFeatures struct {
-		PushOrders    func(childComplexity int) int
-		SyncCatalog   func(childComplexity int) int
-		SyncInventory func(childComplexity int) int
-		SyncStatus    func(childComplexity int) int
+		PublishCatalog func(childComplexity int) int
+		PushOrders     func(childComplexity int) int
+		SyncCatalog    func(childComplexity int) int
+		SyncInventory  func(childComplexity int) int
+		SyncStatus     func(childComplexity int) int
 	}
 
 	HubriseOrderInfo struct {
@@ -225,6 +226,80 @@ type ComplexityRoot struct {
 		State         func(childComplexity int) int
 	}
 
+	HubriseProductPublishInfo struct {
+		PublishedAt func(childComplexity int) int
+		Ref         func(childComplexity int) int
+		State       func(childComplexity int) int
+	}
+
+	HubrisePublishChange struct {
+		Action func(childComplexity int) int
+		Entity func(childComplexity int) int
+		Fields func(childComplexity int) int
+		Key    func(childComplexity int) int
+		Name   func(childComplexity int) int
+		Ref    func(childComplexity int) int
+	}
+
+	HubrisePublishCount struct {
+		Added   func(childComplexity int) int
+		Entity  func(childComplexity int) int
+		Removed func(childComplexity int) int
+		Updated func(childComplexity int) int
+	}
+
+	HubrisePublishForeignItem struct {
+		Entity func(childComplexity int) int
+		Name   func(childComplexity int) int
+		Ref    func(childComplexity int) int
+	}
+
+	HubrisePublishPreview struct {
+		Added               func(childComplexity int) int
+		Blockers            func(childComplexity int) int
+		Changes             func(childComplexity int) int
+		Counts              func(childComplexity int) int
+		FirstPublish        func(childComplexity int) int
+		Foreign             func(childComplexity int) int
+		ForeignItems        func(childComplexity int) int
+		GeneratedAt         func(childComplexity int) int
+		PlanHash            func(childComplexity int) int
+		Preserved           func(childComplexity int) int
+		RemovalsNeedConfirm func(childComplexity int) int
+		Removed             func(childComplexity int) int
+		Truncated           func(childComplexity int) int
+		Unchanged           func(childComplexity int) int
+		Updated             func(childComplexity int) int
+		Warnings            func(childComplexity int) int
+	}
+
+	HubrisePublishResult struct {
+		Published func(childComplexity int) int
+		Queued    func(childComplexity int) int
+		Status    func(childComplexity int) int
+	}
+
+	HubrisePublishStatus struct {
+		AccountCatalogDetected  func(childComplexity int) int
+		Active                  func(childComplexity int) int
+		AwaitingFirstPublish    func(childComplexity int) int
+		Enabled                 func(childComplexity int) int
+		ExternalChangeAt        func(childComplexity int) int
+		FirstPublishConfirmedAt func(childComplexity int) int
+		LastError               func(childComplexity int) int
+		LastErrorAt             func(childComplexity int) int
+		LastErrorCode           func(childComplexity int) int
+		LastPublishedAt         func(childComplexity int) int
+		NeedsReconnectForWrite  func(childComplexity int) int
+		NextPublishAt           func(childComplexity int) int
+		Pending                 func(childComplexity int) int
+		PendingProducts         func(childComplexity int) int
+		PendingSince            func(childComplexity int) int
+		PublishImages           func(childComplexity int) int
+		PublishedProducts       func(childComplexity int) int
+		Publishing              func(childComplexity int) int
+	}
+
 	HubriseStatus struct {
 		AccountID              func(childComplexity int) int
 		AccountName            func(childComplexity int) int
@@ -234,6 +309,7 @@ type ComplexityRoot struct {
 		Available              func(childComplexity int) int
 		Backlog                func(childComplexity int) int
 		CatalogAutoImport      func(childComplexity int) int
+		CatalogDirection       func(childComplexity int) int
 		CatalogID              func(childComplexity int) int
 		CatalogLanguage        func(childComplexity int) int
 		CatalogName            func(childComplexity int) int
@@ -253,6 +329,7 @@ type ComplexityRoot struct {
 		LocationID             func(childComplexity int) int
 		LocationName           func(childComplexity int) int
 		PaymentFeeChargeRef    func(childComplexity int) int
+		Publish                func(childComplexity int) int
 		RelinkRequired         func(childComplexity int) int
 		SyncCustomers          func(childComplexity int) int
 		UnlinkedProducts       func(childComplexity int) int
@@ -268,42 +345,45 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CreateCoupon              func(childComplexity int, input model.CreateCouponInput) int
-		CreateOrder               func(childComplexity int, input model.CreateOrderInput) int
-		CreateProduct             func(childComplexity int, input model.CreateProductInput) int
-		CreateProductChoice       func(childComplexity int, input model.CreateProductChoiceInput) int
-		CreateProductChoiceGroup  func(childComplexity int, input model.CreateProductChoiceGroupInput) int
-		DeleteMe                  func(childComplexity int) int
-		DeleteProductChoice       func(childComplexity int, id uuid.UUID) int
-		DeleteProductChoiceGroup  func(childComplexity int, id uuid.UUID) int
-		DeleteScheduleOverride    func(childComplexity int, date time.Time) int
-		DisconnectHubrise         func(childComplexity int, forgetLinks *bool) int
-		ForgetHubriseLinks        func(childComplexity int) int
-		LinkHubriseProduct        func(childComplexity int, productID uuid.UUID, skuRef *string) int
-		PreviewHubriseCatalogSync func(childComplexity int, mode model.HubriseSyncMode) int
-		RegisterDeviceToken       func(childComplexity int, deviceToken string, platform string) int
-		RegisterLiveActivityToken func(childComplexity int, orderID uuid.UUID, token string) int
-		RemoveAssistantAccount    func(childComplexity int, id string) int
-		RetryHubriseOutbox        func(childComplexity int, id *string) int
-		StartAssistantLink        func(childComplexity int) int
-		StartHubriseConnection    func(childComplexity int) int
-		SyncHubriseCatalog        func(childComplexity int, mode model.HubriseSyncMode, confirmRetire *bool) int
-		SyncHubriseInventory      func(childComplexity int) int
-		UnregisterDeviceToken     func(childComplexity int, deviceToken string) int
-		UpdateCoupon              func(childComplexity int, id uuid.UUID, input model.UpdateCouponInput) int
-		UpdateHubriseSettings     func(childComplexity int, input model.HubriseSettingsInput) int
-		UpdateMe                  func(childComplexity int, input model.UpdateUserInput) int
-		UpdateMyOrdersLanguage    func(childComplexity int, language string) int
-		UpdateOpeningHours        func(childComplexity int, hours model.OpeningHoursInput) int
-		UpdateOrder               func(childComplexity int, id uuid.UUID, input model.UpdateOrderInput) int
-		UpdateOrderingEnabled     func(childComplexity int, enabled bool) int
-		UpdateOrderingHours       func(childComplexity int, hours model.OpeningHoursInput) int
-		UpdatePaymentStatus       func(childComplexity int, orderID uuid.UUID, status string) int
-		UpdatePreparationMinutes  func(childComplexity int, minutes int) int
-		UpdateProduct             func(childComplexity int, id uuid.UUID, input model.UpdateProductInput) int
-		UpdateProductChoice       func(childComplexity int, id uuid.UUID, input model.UpdateProductChoiceInput) int
-		UpdateProductChoiceGroup  func(childComplexity int, id uuid.UUID, input model.UpdateProductChoiceGroupInput) int
-		UpsertScheduleOverride    func(childComplexity int, input model.ScheduleOverrideInput) int
+		AcknowledgeHubriseExternalChange func(childComplexity int) int
+		CreateCoupon                     func(childComplexity int, input model.CreateCouponInput) int
+		CreateOrder                      func(childComplexity int, input model.CreateOrderInput) int
+		CreateProduct                    func(childComplexity int, input model.CreateProductInput) int
+		CreateProductChoice              func(childComplexity int, input model.CreateProductChoiceInput) int
+		CreateProductChoiceGroup         func(childComplexity int, input model.CreateProductChoiceGroupInput) int
+		DeleteMe                         func(childComplexity int) int
+		DeleteProductChoice              func(childComplexity int, id uuid.UUID) int
+		DeleteProductChoiceGroup         func(childComplexity int, id uuid.UUID) int
+		DeleteScheduleOverride           func(childComplexity int, date time.Time) int
+		DisconnectHubrise                func(childComplexity int, forgetLinks *bool) int
+		ForgetHubriseLinks               func(childComplexity int) int
+		LinkHubriseProduct               func(childComplexity int, productID uuid.UUID, skuRef *string) int
+		PreviewHubriseCatalogSync        func(childComplexity int, mode model.HubriseSyncMode) int
+		PublishHubriseCatalog            func(childComplexity int, confirmRemovals *bool, removeForeign *bool, planHash *string) int
+		RegisterDeviceToken              func(childComplexity int, deviceToken string, platform string) int
+		RegisterLiveActivityToken        func(childComplexity int, orderID uuid.UUID, token string) int
+		RemoveAssistantAccount           func(childComplexity int, id string) int
+		RetryHubriseOutbox               func(childComplexity int, id *string) int
+		SetHubriseCatalogDirection       func(childComplexity int, direction model.HubriseCatalogDirection, acknowledgeLocalOverwrite *bool) int
+		StartAssistantLink               func(childComplexity int) int
+		StartHubriseConnection           func(childComplexity int) int
+		SyncHubriseCatalog               func(childComplexity int, mode model.HubriseSyncMode, confirmRetire *bool) int
+		SyncHubriseInventory             func(childComplexity int) int
+		UnregisterDeviceToken            func(childComplexity int, deviceToken string) int
+		UpdateCoupon                     func(childComplexity int, id uuid.UUID, input model.UpdateCouponInput) int
+		UpdateHubriseSettings            func(childComplexity int, input model.HubriseSettingsInput) int
+		UpdateMe                         func(childComplexity int, input model.UpdateUserInput) int
+		UpdateMyOrdersLanguage           func(childComplexity int, language string) int
+		UpdateOpeningHours               func(childComplexity int, hours model.OpeningHoursInput) int
+		UpdateOrder                      func(childComplexity int, id uuid.UUID, input model.UpdateOrderInput) int
+		UpdateOrderingEnabled            func(childComplexity int, enabled bool) int
+		UpdateOrderingHours              func(childComplexity int, hours model.OpeningHoursInput) int
+		UpdatePaymentStatus              func(childComplexity int, orderID uuid.UUID, status string) int
+		UpdatePreparationMinutes         func(childComplexity int, minutes int) int
+		UpdateProduct                    func(childComplexity int, id uuid.UUID, input model.UpdateProductInput) int
+		UpdateProductChoice              func(childComplexity int, id uuid.UUID, input model.UpdateProductChoiceInput) int
+		UpdateProductChoiceGroup         func(childComplexity int, id uuid.UUID, input model.UpdateProductChoiceGroupInput) int
+		UpsertScheduleOverride           func(childComplexity int, input model.ScheduleOverrideInput) int
 	}
 
 	Order struct {
@@ -475,6 +555,7 @@ type ComplexityRoot struct {
 		Description         func(childComplexity int) int
 		HubriseLockedFields func(childComplexity int) int
 		HubriseManaged      func(childComplexity int) int
+		HubrisePublish      func(childComplexity int) int
 		ID                  func(childComplexity int) int
 		IsAvailable         func(childComplexity int) int
 		IsDiscountable      func(childComplexity int) int
@@ -528,33 +609,34 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		AssistantConnection   func(childComplexity int) int
-		AssistantLink         func(childComplexity int, id string) int
-		AutocompleteAddresses func(childComplexity int, input string, sessionToken string) int
-		Coupon                func(childComplexity int, id uuid.UUID) int
-		Coupons               func(childComplexity int) int
-		CustomerOrders        func(childComplexity int, userID uuid.UUID, first *int, page *int) int
-		CustomerStats         func(childComplexity int, input *model.CustomerStatsInput) int
-		HubriseOutbox         func(childComplexity int, state *model.HubriseOutboxState, first *int) int
-		HubriseStatus         func(childComplexity int) int
-		Me                    func(childComplexity int) int
-		MyOrder               func(childComplexity int, id uuid.UUID) int
-		MyOrderedProducts     func(childComplexity int, first *int) int
-		MyOrders              func(childComplexity int, first *int, page *int) int
-		Order                 func(childComplexity int, id uuid.UUID) int
-		OrderHistory          func(childComplexity int, input *model.OrderHistoryInput) int
-		Orders                func(childComplexity int) int
-		PopularProducts       func(childComplexity int, first *int) int
-		Product               func(childComplexity int, id uuid.UUID) int
-		ProductCategories     func(childComplexity int) int
-		ProductCategory       func(childComplexity int, id uuid.UUID) int
-		ProductCategoryBySlug func(childComplexity int, slug string) int
-		Products              func(childComplexity int) int
-		QuoteOrder            func(childComplexity int, input model.QuoteOrderInput) int
-		ResolveAddress        func(childComplexity int, placeID string, sessionToken string) int
-		RestaurantConfig      func(childComplexity int) int
-		ScheduleOverrides     func(childComplexity int, from time.Time, to time.Time) int
-		ValidateCoupon        func(childComplexity int, code string, orderAmount string) int
+		AssistantConnection          func(childComplexity int) int
+		AssistantLink                func(childComplexity int, id string) int
+		AutocompleteAddresses        func(childComplexity int, input string, sessionToken string) int
+		Coupon                       func(childComplexity int, id uuid.UUID) int
+		Coupons                      func(childComplexity int) int
+		CustomerOrders               func(childComplexity int, userID uuid.UUID, first *int, page *int) int
+		CustomerStats                func(childComplexity int, input *model.CustomerStatsInput) int
+		HubriseOutbox                func(childComplexity int, state *model.HubriseOutboxState, first *int) int
+		HubriseStatus                func(childComplexity int) int
+		Me                           func(childComplexity int) int
+		MyOrder                      func(childComplexity int, id uuid.UUID) int
+		MyOrderedProducts            func(childComplexity int, first *int) int
+		MyOrders                     func(childComplexity int, first *int, page *int) int
+		Order                        func(childComplexity int, id uuid.UUID) int
+		OrderHistory                 func(childComplexity int, input *model.OrderHistoryInput) int
+		Orders                       func(childComplexity int) int
+		PopularProducts              func(childComplexity int, first *int) int
+		PreviewHubriseCatalogPublish func(childComplexity int, removeForeign *bool) int
+		Product                      func(childComplexity int, id uuid.UUID) int
+		ProductCategories            func(childComplexity int) int
+		ProductCategory              func(childComplexity int, id uuid.UUID) int
+		ProductCategoryBySlug        func(childComplexity int, slug string) int
+		Products                     func(childComplexity int) int
+		QuoteOrder                   func(childComplexity int, input model.QuoteOrderInput) int
+		ResolveAddress               func(childComplexity int, placeID string, sessionToken string) int
+		RestaurantConfig             func(childComplexity int) int
+		ScheduleOverrides            func(childComplexity int, from time.Time, to time.Time) int
+		ValidateCoupon               func(childComplexity int, code string, orderAmount string) int
 	}
 
 	RestaurantConfig struct {
@@ -634,6 +716,9 @@ type MutationResolver interface {
 	SyncHubriseInventory(ctx context.Context) (int, error)
 	LinkHubriseProduct(ctx context.Context, productID uuid.UUID, skuRef *string) (bool, error)
 	RetryHubriseOutbox(ctx context.Context, id *string) (int, error)
+	SetHubriseCatalogDirection(ctx context.Context, direction model.HubriseCatalogDirection, acknowledgeLocalOverwrite *bool) (*model.HubriseStatus, error)
+	PublishHubriseCatalog(ctx context.Context, confirmRemovals *bool, removeForeign *bool, planHash *string) (*model.HubrisePublishResult, error)
+	AcknowledgeHubriseExternalChange(ctx context.Context) (*model.HubriseStatus, error)
 	CreateOrder(ctx context.Context, input model.CreateOrderInput) (*model.Order, error)
 	UpdateOrder(ctx context.Context, id uuid.UUID, input model.UpdateOrderInput) (*model.Order, error)
 	RegisterDeviceToken(ctx context.Context, deviceToken string, platform string) (bool, error)
@@ -687,6 +772,7 @@ type ProductResolver interface {
 	Translations(ctx context.Context, obj *model.Product) ([]*model.Translation, error)
 	HubriseManaged(ctx context.Context, obj *model.Product) (bool, error)
 	HubriseLockedFields(ctx context.Context, obj *model.Product) ([]string, error)
+	HubrisePublish(ctx context.Context, obj *model.Product) (*model.HubriseProductPublishInfo, error)
 }
 type ProductCategoryResolver interface {
 	Products(ctx context.Context, obj *model.ProductCategory) ([]*model.Product, error)
@@ -705,6 +791,7 @@ type QueryResolver interface {
 	Coupon(ctx context.Context, id uuid.UUID) (*model.Coupon, error)
 	HubriseStatus(ctx context.Context) (*model.HubriseStatus, error)
 	HubriseOutbox(ctx context.Context, state *model.HubriseOutboxState, first *int) ([]*model.HubriseOutboxItem, error)
+	PreviewHubriseCatalogPublish(ctx context.Context, removeForeign *bool) (*model.HubrisePublishPreview, error)
 	QuoteOrder(ctx context.Context, input model.QuoteOrderInput) (*model.OrderQuote, error)
 	Orders(ctx context.Context) ([]*model.Order, error)
 	Order(ctx context.Context, id uuid.UUID) (*model.Order, error)
@@ -1339,6 +1426,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.HubriseCatalogIssue.Message(childComplexity), true
 
+	case "HubriseFeatures.publishCatalog":
+		if e.ComplexityRoot.HubriseFeatures.PublishCatalog == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubriseFeatures.PublishCatalog(childComplexity), true
 	case "HubriseFeatures.pushOrders":
 		if e.ComplexityRoot.HubriseFeatures.PushOrders == nil {
 			break
@@ -1462,6 +1555,331 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.HubriseOutboxItem.State(childComplexity), true
 
+	case "HubriseProductPublishInfo.publishedAt":
+		if e.ComplexityRoot.HubriseProductPublishInfo.PublishedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubriseProductPublishInfo.PublishedAt(childComplexity), true
+	case "HubriseProductPublishInfo.ref":
+		if e.ComplexityRoot.HubriseProductPublishInfo.Ref == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubriseProductPublishInfo.Ref(childComplexity), true
+	case "HubriseProductPublishInfo.state":
+		if e.ComplexityRoot.HubriseProductPublishInfo.State == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubriseProductPublishInfo.State(childComplexity), true
+
+	case "HubrisePublishChange.action":
+		if e.ComplexityRoot.HubrisePublishChange.Action == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishChange.Action(childComplexity), true
+	case "HubrisePublishChange.entity":
+		if e.ComplexityRoot.HubrisePublishChange.Entity == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishChange.Entity(childComplexity), true
+	case "HubrisePublishChange.fields":
+		if e.ComplexityRoot.HubrisePublishChange.Fields == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishChange.Fields(childComplexity), true
+	case "HubrisePublishChange.key":
+		if e.ComplexityRoot.HubrisePublishChange.Key == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishChange.Key(childComplexity), true
+	case "HubrisePublishChange.name":
+		if e.ComplexityRoot.HubrisePublishChange.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishChange.Name(childComplexity), true
+	case "HubrisePublishChange.ref":
+		if e.ComplexityRoot.HubrisePublishChange.Ref == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishChange.Ref(childComplexity), true
+
+	case "HubrisePublishCount.added":
+		if e.ComplexityRoot.HubrisePublishCount.Added == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishCount.Added(childComplexity), true
+	case "HubrisePublishCount.entity":
+		if e.ComplexityRoot.HubrisePublishCount.Entity == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishCount.Entity(childComplexity), true
+	case "HubrisePublishCount.removed":
+		if e.ComplexityRoot.HubrisePublishCount.Removed == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishCount.Removed(childComplexity), true
+	case "HubrisePublishCount.updated":
+		if e.ComplexityRoot.HubrisePublishCount.Updated == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishCount.Updated(childComplexity), true
+
+	case "HubrisePublishForeignItem.entity":
+		if e.ComplexityRoot.HubrisePublishForeignItem.Entity == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishForeignItem.Entity(childComplexity), true
+	case "HubrisePublishForeignItem.name":
+		if e.ComplexityRoot.HubrisePublishForeignItem.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishForeignItem.Name(childComplexity), true
+	case "HubrisePublishForeignItem.ref":
+		if e.ComplexityRoot.HubrisePublishForeignItem.Ref == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishForeignItem.Ref(childComplexity), true
+
+	case "HubrisePublishPreview.added":
+		if e.ComplexityRoot.HubrisePublishPreview.Added == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.Added(childComplexity), true
+	case "HubrisePublishPreview.blockers":
+		if e.ComplexityRoot.HubrisePublishPreview.Blockers == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.Blockers(childComplexity), true
+	case "HubrisePublishPreview.changes":
+		if e.ComplexityRoot.HubrisePublishPreview.Changes == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.Changes(childComplexity), true
+	case "HubrisePublishPreview.counts":
+		if e.ComplexityRoot.HubrisePublishPreview.Counts == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.Counts(childComplexity), true
+	case "HubrisePublishPreview.firstPublish":
+		if e.ComplexityRoot.HubrisePublishPreview.FirstPublish == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.FirstPublish(childComplexity), true
+	case "HubrisePublishPreview.foreign":
+		if e.ComplexityRoot.HubrisePublishPreview.Foreign == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.Foreign(childComplexity), true
+	case "HubrisePublishPreview.foreignItems":
+		if e.ComplexityRoot.HubrisePublishPreview.ForeignItems == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.ForeignItems(childComplexity), true
+	case "HubrisePublishPreview.generatedAt":
+		if e.ComplexityRoot.HubrisePublishPreview.GeneratedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.GeneratedAt(childComplexity), true
+	case "HubrisePublishPreview.planHash":
+		if e.ComplexityRoot.HubrisePublishPreview.PlanHash == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.PlanHash(childComplexity), true
+	case "HubrisePublishPreview.preserved":
+		if e.ComplexityRoot.HubrisePublishPreview.Preserved == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.Preserved(childComplexity), true
+	case "HubrisePublishPreview.removalsNeedConfirm":
+		if e.ComplexityRoot.HubrisePublishPreview.RemovalsNeedConfirm == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.RemovalsNeedConfirm(childComplexity), true
+	case "HubrisePublishPreview.removed":
+		if e.ComplexityRoot.HubrisePublishPreview.Removed == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.Removed(childComplexity), true
+	case "HubrisePublishPreview.truncated":
+		if e.ComplexityRoot.HubrisePublishPreview.Truncated == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.Truncated(childComplexity), true
+	case "HubrisePublishPreview.unchanged":
+		if e.ComplexityRoot.HubrisePublishPreview.Unchanged == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.Unchanged(childComplexity), true
+	case "HubrisePublishPreview.updated":
+		if e.ComplexityRoot.HubrisePublishPreview.Updated == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.Updated(childComplexity), true
+	case "HubrisePublishPreview.warnings":
+		if e.ComplexityRoot.HubrisePublishPreview.Warnings == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishPreview.Warnings(childComplexity), true
+
+	case "HubrisePublishResult.published":
+		if e.ComplexityRoot.HubrisePublishResult.Published == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishResult.Published(childComplexity), true
+	case "HubrisePublishResult.queued":
+		if e.ComplexityRoot.HubrisePublishResult.Queued == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishResult.Queued(childComplexity), true
+	case "HubrisePublishResult.status":
+		if e.ComplexityRoot.HubrisePublishResult.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishResult.Status(childComplexity), true
+
+	case "HubrisePublishStatus.accountCatalogDetected":
+		if e.ComplexityRoot.HubrisePublishStatus.AccountCatalogDetected == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.AccountCatalogDetected(childComplexity), true
+	case "HubrisePublishStatus.active":
+		if e.ComplexityRoot.HubrisePublishStatus.Active == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.Active(childComplexity), true
+	case "HubrisePublishStatus.awaitingFirstPublish":
+		if e.ComplexityRoot.HubrisePublishStatus.AwaitingFirstPublish == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.AwaitingFirstPublish(childComplexity), true
+	case "HubrisePublishStatus.enabled":
+		if e.ComplexityRoot.HubrisePublishStatus.Enabled == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.Enabled(childComplexity), true
+	case "HubrisePublishStatus.externalChangeAt":
+		if e.ComplexityRoot.HubrisePublishStatus.ExternalChangeAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.ExternalChangeAt(childComplexity), true
+	case "HubrisePublishStatus.firstPublishConfirmedAt":
+		if e.ComplexityRoot.HubrisePublishStatus.FirstPublishConfirmedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.FirstPublishConfirmedAt(childComplexity), true
+	case "HubrisePublishStatus.lastError":
+		if e.ComplexityRoot.HubrisePublishStatus.LastError == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.LastError(childComplexity), true
+	case "HubrisePublishStatus.lastErrorAt":
+		if e.ComplexityRoot.HubrisePublishStatus.LastErrorAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.LastErrorAt(childComplexity), true
+	case "HubrisePublishStatus.lastErrorCode":
+		if e.ComplexityRoot.HubrisePublishStatus.LastErrorCode == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.LastErrorCode(childComplexity), true
+	case "HubrisePublishStatus.lastPublishedAt":
+		if e.ComplexityRoot.HubrisePublishStatus.LastPublishedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.LastPublishedAt(childComplexity), true
+	case "HubrisePublishStatus.needsReconnectForWrite":
+		if e.ComplexityRoot.HubrisePublishStatus.NeedsReconnectForWrite == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.NeedsReconnectForWrite(childComplexity), true
+	case "HubrisePublishStatus.nextPublishAt":
+		if e.ComplexityRoot.HubrisePublishStatus.NextPublishAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.NextPublishAt(childComplexity), true
+	case "HubrisePublishStatus.pending":
+		if e.ComplexityRoot.HubrisePublishStatus.Pending == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.Pending(childComplexity), true
+	case "HubrisePublishStatus.pendingProducts":
+		if e.ComplexityRoot.HubrisePublishStatus.PendingProducts == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.PendingProducts(childComplexity), true
+	case "HubrisePublishStatus.pendingSince":
+		if e.ComplexityRoot.HubrisePublishStatus.PendingSince == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.PendingSince(childComplexity), true
+	case "HubrisePublishStatus.publishImages":
+		if e.ComplexityRoot.HubrisePublishStatus.PublishImages == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.PublishImages(childComplexity), true
+	case "HubrisePublishStatus.publishedProducts":
+		if e.ComplexityRoot.HubrisePublishStatus.PublishedProducts == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.PublishedProducts(childComplexity), true
+	case "HubrisePublishStatus.publishing":
+		if e.ComplexityRoot.HubrisePublishStatus.Publishing == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubrisePublishStatus.Publishing(childComplexity), true
+
 	case "HubriseStatus.accountId":
 		if e.ComplexityRoot.HubriseStatus.AccountID == nil {
 			break
@@ -1510,6 +1928,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.HubriseStatus.CatalogAutoImport(childComplexity), true
+	case "HubriseStatus.catalogDirection":
+		if e.ComplexityRoot.HubriseStatus.CatalogDirection == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubriseStatus.CatalogDirection(childComplexity), true
 	case "HubriseStatus.catalogId":
 		if e.ComplexityRoot.HubriseStatus.CatalogID == nil {
 			break
@@ -1624,6 +2048,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.HubriseStatus.PaymentFeeChargeRef(childComplexity), true
+	case "HubriseStatus.publish":
+		if e.ComplexityRoot.HubriseStatus.Publish == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HubriseStatus.Publish(childComplexity), true
 	case "HubriseStatus.relinkRequired":
 		if e.ComplexityRoot.HubriseStatus.RelinkRequired == nil {
 			break
@@ -1680,6 +2110,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.HubriseSyncResult.PendingReview(childComplexity), true
 
+	case "Mutation.acknowledgeHubriseExternalChange":
+		if e.ComplexityRoot.Mutation.AcknowledgeHubriseExternalChange == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Mutation.AcknowledgeHubriseExternalChange(childComplexity), true
 	case "Mutation.createCoupon":
 		if e.ComplexityRoot.Mutation.CreateCoupon == nil {
 			break
@@ -1813,6 +2249,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.PreviewHubriseCatalogSync(childComplexity, args["mode"].(model.HubriseSyncMode)), true
+	case "Mutation.publishHubriseCatalog":
+		if e.ComplexityRoot.Mutation.PublishHubriseCatalog == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_publishHubriseCatalog_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.PublishHubriseCatalog(childComplexity, args["confirmRemovals"].(*bool), args["removeForeign"].(*bool), args["planHash"].(*string)), true
 	case "Mutation.registerDeviceToken":
 		if e.ComplexityRoot.Mutation.RegisterDeviceToken == nil {
 			break
@@ -1857,6 +2304,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.RetryHubriseOutbox(childComplexity, args["id"].(*string)), true
+	case "Mutation.setHubriseCatalogDirection":
+		if e.ComplexityRoot.Mutation.SetHubriseCatalogDirection == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setHubriseCatalogDirection_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.SetHubriseCatalogDirection(childComplexity, args["direction"].(model.HubriseCatalogDirection), args["acknowledgeLocalOverwrite"].(*bool)), true
 	case "Mutation.startAssistantLink":
 		if e.ComplexityRoot.Mutation.StartAssistantLink == nil {
 			break
@@ -2822,6 +3280,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Product.HubriseManaged(childComplexity), true
+	case "Product.hubrisePublish":
+		if e.ComplexityRoot.Product.HubrisePublish == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Product.HubrisePublish(childComplexity), true
 	case "Product.id":
 		if e.ComplexityRoot.Product.ID == nil {
 			break
@@ -3218,6 +3682,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.PopularProducts(childComplexity, args["first"].(*int)), true
+	case "Query.previewHubriseCatalogPublish":
+		if e.ComplexityRoot.Query.PreviewHubriseCatalogPublish == nil {
+			break
+		}
+
+		args, err := ec.field_Query_previewHubriseCatalogPublish_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.PreviewHubriseCatalogPublish(childComplexity, args["removeForeign"].(*bool)), true
 	case "Query.product":
 		if e.ComplexityRoot.Query.Product == nil {
 			break
@@ -4018,6 +4493,8 @@ func (ec *executionContext) childFields_HubriseFeatures(ctx context.Context, fie
 		return ec.fieldContext_HubriseFeatures_syncInventory(ctx, field)
 	case "syncCatalog":
 		return ec.fieldContext_HubriseFeatures_syncCatalog(ctx, field)
+	case "publishCatalog":
+		return ec.fieldContext_HubriseFeatures_publishCatalog(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type HubriseFeatures", field.Name)
 }
@@ -4066,6 +4543,154 @@ func (ec *executionContext) childFields_HubriseOutboxItem(ctx context.Context, f
 	return nil, fmt.Errorf("no field named %q was found under type HubriseOutboxItem", field.Name)
 }
 
+func (ec *executionContext) childFields_HubriseProductPublishInfo(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "state":
+		return ec.fieldContext_HubriseProductPublishInfo_state(ctx, field)
+	case "publishedAt":
+		return ec.fieldContext_HubriseProductPublishInfo_publishedAt(ctx, field)
+	case "ref":
+		return ec.fieldContext_HubriseProductPublishInfo_ref(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type HubriseProductPublishInfo", field.Name)
+}
+
+func (ec *executionContext) childFields_HubrisePublishChange(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "entity":
+		return ec.fieldContext_HubrisePublishChange_entity(ctx, field)
+	case "action":
+		return ec.fieldContext_HubrisePublishChange_action(ctx, field)
+	case "key":
+		return ec.fieldContext_HubrisePublishChange_key(ctx, field)
+	case "ref":
+		return ec.fieldContext_HubrisePublishChange_ref(ctx, field)
+	case "name":
+		return ec.fieldContext_HubrisePublishChange_name(ctx, field)
+	case "fields":
+		return ec.fieldContext_HubrisePublishChange_fields(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type HubrisePublishChange", field.Name)
+}
+
+func (ec *executionContext) childFields_HubrisePublishCount(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "entity":
+		return ec.fieldContext_HubrisePublishCount_entity(ctx, field)
+	case "added":
+		return ec.fieldContext_HubrisePublishCount_added(ctx, field)
+	case "updated":
+		return ec.fieldContext_HubrisePublishCount_updated(ctx, field)
+	case "removed":
+		return ec.fieldContext_HubrisePublishCount_removed(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type HubrisePublishCount", field.Name)
+}
+
+func (ec *executionContext) childFields_HubrisePublishForeignItem(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "entity":
+		return ec.fieldContext_HubrisePublishForeignItem_entity(ctx, field)
+	case "ref":
+		return ec.fieldContext_HubrisePublishForeignItem_ref(ctx, field)
+	case "name":
+		return ec.fieldContext_HubrisePublishForeignItem_name(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type HubrisePublishForeignItem", field.Name)
+}
+
+func (ec *executionContext) childFields_HubrisePublishPreview(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "planHash":
+		return ec.fieldContext_HubrisePublishPreview_planHash(ctx, field)
+	case "firstPublish":
+		return ec.fieldContext_HubrisePublishPreview_firstPublish(ctx, field)
+	case "added":
+		return ec.fieldContext_HubrisePublishPreview_added(ctx, field)
+	case "updated":
+		return ec.fieldContext_HubrisePublishPreview_updated(ctx, field)
+	case "removed":
+		return ec.fieldContext_HubrisePublishPreview_removed(ctx, field)
+	case "unchanged":
+		return ec.fieldContext_HubrisePublishPreview_unchanged(ctx, field)
+	case "foreign":
+		return ec.fieldContext_HubrisePublishPreview_foreign(ctx, field)
+	case "counts":
+		return ec.fieldContext_HubrisePublishPreview_counts(ctx, field)
+	case "changes":
+		return ec.fieldContext_HubrisePublishPreview_changes(ctx, field)
+	case "truncated":
+		return ec.fieldContext_HubrisePublishPreview_truncated(ctx, field)
+	case "foreignItems":
+		return ec.fieldContext_HubrisePublishPreview_foreignItems(ctx, field)
+	case "preserved":
+		return ec.fieldContext_HubrisePublishPreview_preserved(ctx, field)
+	case "warnings":
+		return ec.fieldContext_HubrisePublishPreview_warnings(ctx, field)
+	case "blockers":
+		return ec.fieldContext_HubrisePublishPreview_blockers(ctx, field)
+	case "removalsNeedConfirm":
+		return ec.fieldContext_HubrisePublishPreview_removalsNeedConfirm(ctx, field)
+	case "generatedAt":
+		return ec.fieldContext_HubrisePublishPreview_generatedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type HubrisePublishPreview", field.Name)
+}
+
+func (ec *executionContext) childFields_HubrisePublishResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "published":
+		return ec.fieldContext_HubrisePublishResult_published(ctx, field)
+	case "queued":
+		return ec.fieldContext_HubrisePublishResult_queued(ctx, field)
+	case "status":
+		return ec.fieldContext_HubrisePublishResult_status(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type HubrisePublishResult", field.Name)
+}
+
+func (ec *executionContext) childFields_HubrisePublishStatus(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "enabled":
+		return ec.fieldContext_HubrisePublishStatus_enabled(ctx, field)
+	case "active":
+		return ec.fieldContext_HubrisePublishStatus_active(ctx, field)
+	case "pending":
+		return ec.fieldContext_HubrisePublishStatus_pending(ctx, field)
+	case "pendingSince":
+		return ec.fieldContext_HubrisePublishStatus_pendingSince(ctx, field)
+	case "nextPublishAt":
+		return ec.fieldContext_HubrisePublishStatus_nextPublishAt(ctx, field)
+	case "publishing":
+		return ec.fieldContext_HubrisePublishStatus_publishing(ctx, field)
+	case "lastPublishedAt":
+		return ec.fieldContext_HubrisePublishStatus_lastPublishedAt(ctx, field)
+	case "firstPublishConfirmedAt":
+		return ec.fieldContext_HubrisePublishStatus_firstPublishConfirmedAt(ctx, field)
+	case "awaitingFirstPublish":
+		return ec.fieldContext_HubrisePublishStatus_awaitingFirstPublish(ctx, field)
+	case "lastError":
+		return ec.fieldContext_HubrisePublishStatus_lastError(ctx, field)
+	case "lastErrorCode":
+		return ec.fieldContext_HubrisePublishStatus_lastErrorCode(ctx, field)
+	case "lastErrorAt":
+		return ec.fieldContext_HubrisePublishStatus_lastErrorAt(ctx, field)
+	case "externalChangeAt":
+		return ec.fieldContext_HubrisePublishStatus_externalChangeAt(ctx, field)
+	case "needsReconnectForWrite":
+		return ec.fieldContext_HubrisePublishStatus_needsReconnectForWrite(ctx, field)
+	case "accountCatalogDetected":
+		return ec.fieldContext_HubrisePublishStatus_accountCatalogDetected(ctx, field)
+	case "publishImages":
+		return ec.fieldContext_HubrisePublishStatus_publishImages(ctx, field)
+	case "publishedProducts":
+		return ec.fieldContext_HubrisePublishStatus_publishedProducts(ctx, field)
+	case "pendingProducts":
+		return ec.fieldContext_HubrisePublishStatus_pendingProducts(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type HubrisePublishStatus", field.Name)
+}
+
 func (ec *executionContext) childFields_HubriseStatus(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "available":
@@ -4102,6 +4727,10 @@ func (ec *executionContext) childFields_HubriseStatus(ctx context.Context, field
 		return ec.fieldContext_HubriseStatus_catalogPendingReview(ctx, field)
 	case "autoRefundOnCancel":
 		return ec.fieldContext_HubriseStatus_autoRefundOnCancel(ctx, field)
+	case "catalogDirection":
+		return ec.fieldContext_HubriseStatus_catalogDirection(ctx, field)
+	case "publish":
+		return ec.fieldContext_HubriseStatus_publish(ctx, field)
 	case "catalogLanguage":
 		return ec.fieldContext_HubriseStatus_catalogLanguage(ctx, field)
 	case "variantRef":
@@ -4516,6 +5145,8 @@ func (ec *executionContext) childFields_Product(ctx context.Context, field graph
 		return ec.fieldContext_Product_hubriseManaged(ctx, field)
 	case "hubriseLockedFields":
 		return ec.fieldContext_Product_hubriseLockedFields(ctx, field)
+	case "hubrisePublish":
+		return ec.fieldContext_Product_hubrisePublish(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Product", field.Name)
 }
@@ -4964,6 +5595,36 @@ func (ec *executionContext) field_Mutation_previewHubriseCatalogSync_args(ctx co
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_publishHubriseCatalog_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "confirmRemovals",
+		func(ctx context.Context, v any) (*bool, error) {
+			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["confirmRemovals"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "removeForeign",
+		func(ctx context.Context, v any) (*bool, error) {
+			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["removeForeign"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "planHash",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["planHash"] = arg2
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_registerDeviceToken_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -5033,6 +5694,28 @@ func (ec *executionContext) field_Mutation_retryHubriseOutbox_args(ctx context.C
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_setHubriseCatalogDirection_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "direction",
+		func(ctx context.Context, v any) (model.HubriseCatalogDirection, error) {
+			return ec.unmarshalNHubriseCatalogDirection2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseCatalogDirection(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["direction"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "acknowledgeLocalOverwrite",
+		func(ctx context.Context, v any) (*bool, error) {
+			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["acknowledgeLocalOverwrite"] = arg1
 	return args, nil
 }
 
@@ -5535,6 +6218,20 @@ func (ec *executionContext) field_Query_popularProducts_args(ctx context.Context
 		return nil, err
 	}
 	args["first"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_previewHubriseCatalogPublish_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "removeForeign",
+		func(ctx context.Context, v any) (*bool, error) {
+			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["removeForeign"] = arg0
 	return args, nil
 }
 
@@ -8042,6 +8739,29 @@ func (ec *executionContext) fieldContext_HubriseFeatures_syncCatalog(_ context.C
 	return graphql.NewScalarFieldContext("HubriseFeatures", field, false, false, "Boolean")
 }
 
+func (ec *executionContext) _HubriseFeatures_publishCatalog(ctx context.Context, field graphql.CollectedField, obj *model.HubriseFeatures) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubriseFeatures_publishCatalog(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PublishCatalog, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubriseFeatures_publishCatalog(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubriseFeatures", field, false, false, "Boolean")
+}
+
 func (ec *executionContext) _HubriseOrderInfo_hubriseOrderId(ctx context.Context, field graphql.CollectedField, obj *model.HubriseOrderInfo) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8408,6 +9128,1279 @@ func (ec *executionContext) _HubriseOutboxItem_parkedAt(ctx context.Context, fie
 }
 func (ec *executionContext) fieldContext_HubriseOutboxItem_parkedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("HubriseOutboxItem", field, false, false, "DateTime")
+}
+
+func (ec *executionContext) _HubriseProductPublishInfo_state(ctx context.Context, field graphql.CollectedField, obj *model.HubriseProductPublishInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubriseProductPublishInfo_state(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.State, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.HubrisePublishState) graphql.Marshaler {
+			return ec.marshalNHubrisePublishState2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishState(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubriseProductPublishInfo_state(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubriseProductPublishInfo", field, false, false, "HubrisePublishState")
+}
+
+func (ec *executionContext) _HubriseProductPublishInfo_publishedAt(ctx context.Context, field graphql.CollectedField, obj *model.HubriseProductPublishInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubriseProductPublishInfo_publishedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PublishedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
+			return ec.marshalODateTime2ᚖtimeᚐTime(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_HubriseProductPublishInfo_publishedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubriseProductPublishInfo", field, false, false, "DateTime")
+}
+
+func (ec *executionContext) _HubriseProductPublishInfo_ref(ctx context.Context, field graphql.CollectedField, obj *model.HubriseProductPublishInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubriseProductPublishInfo_ref(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Ref, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_HubriseProductPublishInfo_ref(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubriseProductPublishInfo", field, false, false, "String")
+}
+
+func (ec *executionContext) _HubrisePublishChange_entity(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishChange) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishChange_entity(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Entity, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.HubriseCatalogEntity) graphql.Marshaler {
+			return ec.marshalNHubriseCatalogEntity2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseCatalogEntity(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishChange_entity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishChange", field, false, false, "HubriseCatalogEntity")
+}
+
+func (ec *executionContext) _HubrisePublishChange_action(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishChange) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishChange_action(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Action, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.HubrisePublishAction) graphql.Marshaler {
+			return ec.marshalNHubrisePublishAction2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishAction(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishChange_action(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishChange", field, false, false, "HubrisePublishAction")
+}
+
+func (ec *executionContext) _HubrisePublishChange_key(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishChange) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishChange_key(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Key, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishChange_key(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishChange", field, false, false, "String")
+}
+
+func (ec *executionContext) _HubrisePublishChange_ref(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishChange) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishChange_ref(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Ref, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishChange_ref(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishChange", field, false, false, "String")
+}
+
+func (ec *executionContext) _HubrisePublishChange_name(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishChange) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishChange_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishChange_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishChange", field, false, false, "String")
+}
+
+func (ec *executionContext) _HubrisePublishChange_fields(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishChange) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishChange_fields(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Fields, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishChange_fields(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishChange", field, false, false, "String")
+}
+
+func (ec *executionContext) _HubrisePublishCount_entity(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishCount) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishCount_entity(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Entity, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.HubriseCatalogEntity) graphql.Marshaler {
+			return ec.marshalNHubriseCatalogEntity2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseCatalogEntity(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishCount_entity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishCount", field, false, false, "HubriseCatalogEntity")
+}
+
+func (ec *executionContext) _HubrisePublishCount_added(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishCount) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishCount_added(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Added, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishCount_added(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishCount", field, false, false, "Int")
+}
+
+func (ec *executionContext) _HubrisePublishCount_updated(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishCount) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishCount_updated(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Updated, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishCount_updated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishCount", field, false, false, "Int")
+}
+
+func (ec *executionContext) _HubrisePublishCount_removed(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishCount) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishCount_removed(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Removed, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishCount_removed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishCount", field, false, false, "Int")
+}
+
+func (ec *executionContext) _HubrisePublishForeignItem_entity(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishForeignItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishForeignItem_entity(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Entity, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.HubriseCatalogEntity) graphql.Marshaler {
+			return ec.marshalNHubriseCatalogEntity2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseCatalogEntity(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishForeignItem_entity(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishForeignItem", field, false, false, "HubriseCatalogEntity")
+}
+
+func (ec *executionContext) _HubrisePublishForeignItem_ref(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishForeignItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishForeignItem_ref(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Ref, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishForeignItem_ref(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishForeignItem", field, false, false, "String")
+}
+
+func (ec *executionContext) _HubrisePublishForeignItem_name(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishForeignItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishForeignItem_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishForeignItem_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishForeignItem", field, false, false, "String")
+}
+
+func (ec *executionContext) _HubrisePublishPreview_planHash(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_planHash(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PlanHash, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_planHash(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishPreview", field, false, false, "String")
+}
+
+func (ec *executionContext) _HubrisePublishPreview_firstPublish(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_firstPublish(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FirstPublish, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_firstPublish(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishPreview", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishPreview_added(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_added(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Added, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_added(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishPreview", field, false, false, "Int")
+}
+
+func (ec *executionContext) _HubrisePublishPreview_updated(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_updated(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Updated, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_updated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishPreview", field, false, false, "Int")
+}
+
+func (ec *executionContext) _HubrisePublishPreview_removed(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_removed(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Removed, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_removed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishPreview", field, false, false, "Int")
+}
+
+func (ec *executionContext) _HubrisePublishPreview_unchanged(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_unchanged(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Unchanged, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_unchanged(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishPreview", field, false, false, "Int")
+}
+
+func (ec *executionContext) _HubrisePublishPreview_foreign(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_foreign(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Foreign, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_foreign(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishPreview", field, false, false, "Int")
+}
+
+func (ec *executionContext) _HubrisePublishPreview_counts(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_counts(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Counts, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.HubrisePublishCount) graphql.Marshaler {
+			return ec.marshalNHubrisePublishCount2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishCountᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_counts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HubrisePublishPreview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HubrisePublishCount(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HubrisePublishPreview_changes(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_changes(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Changes, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.HubrisePublishChange) graphql.Marshaler {
+			return ec.marshalNHubrisePublishChange2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishChangeᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_changes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HubrisePublishPreview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HubrisePublishChange(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HubrisePublishPreview_truncated(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_truncated(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Truncated, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_truncated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishPreview", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishPreview_foreignItems(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_foreignItems(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ForeignItems, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.HubrisePublishForeignItem) graphql.Marshaler {
+			return ec.marshalNHubrisePublishForeignItem2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishForeignItemᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_foreignItems(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HubrisePublishPreview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HubrisePublishForeignItem(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HubrisePublishPreview_preserved(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_preserved(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Preserved, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_preserved(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishPreview", field, false, false, "String")
+}
+
+func (ec *executionContext) _HubrisePublishPreview_warnings(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_warnings(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Warnings, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.HubriseCatalogIssue) graphql.Marshaler {
+			return ec.marshalNHubriseCatalogIssue2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseCatalogIssueᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_warnings(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HubrisePublishPreview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HubriseCatalogIssue(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HubrisePublishPreview_blockers(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_blockers(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Blockers, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.HubriseCatalogIssue) graphql.Marshaler {
+			return ec.marshalNHubriseCatalogIssue2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseCatalogIssueᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_blockers(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HubrisePublishPreview",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HubriseCatalogIssue(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HubrisePublishPreview_removalsNeedConfirm(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_removalsNeedConfirm(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.RemovalsNeedConfirm, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_removalsNeedConfirm(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishPreview", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishPreview_generatedAt(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishPreview) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishPreview_generatedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.GeneratedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNDateTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishPreview_generatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishPreview", field, false, false, "DateTime")
+}
+
+func (ec *executionContext) _HubrisePublishResult_published(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishResult_published(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Published, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishResult_published(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishResult", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishResult_queued(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishResult_queued(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Queued, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishResult_queued(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishResult", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishResult_status(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishResult_status(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.HubrisePublishStatus) graphql.Marshaler {
+			return ec.marshalNHubrisePublishStatus2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishStatus(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishResult_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HubrisePublishResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HubrisePublishStatus(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HubrisePublishStatus_enabled(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_enabled(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Enabled, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_enabled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_active(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_active(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Active, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_active(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_pending(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_pending(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Pending, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_pending(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_pendingSince(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_pendingSince(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PendingSince, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
+			return ec.marshalODateTime2ᚖtimeᚐTime(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_pendingSince(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "DateTime")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_nextPublishAt(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_nextPublishAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.NextPublishAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
+			return ec.marshalODateTime2ᚖtimeᚐTime(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_nextPublishAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "DateTime")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_publishing(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_publishing(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Publishing, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_publishing(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_lastPublishedAt(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_lastPublishedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LastPublishedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
+			return ec.marshalODateTime2ᚖtimeᚐTime(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_lastPublishedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "DateTime")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_firstPublishConfirmedAt(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_firstPublishConfirmedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FirstPublishConfirmedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
+			return ec.marshalODateTime2ᚖtimeᚐTime(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_firstPublishConfirmedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "DateTime")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_awaitingFirstPublish(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_awaitingFirstPublish(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AwaitingFirstPublish, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_awaitingFirstPublish(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_lastError(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_lastError(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LastError, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_lastError(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "String")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_lastErrorCode(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_lastErrorCode(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LastErrorCode, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.HubrisePublishErrorCode) graphql.Marshaler {
+			return ec.marshalOHubrisePublishErrorCode2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishErrorCode(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_lastErrorCode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "HubrisePublishErrorCode")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_lastErrorAt(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_lastErrorAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LastErrorAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
+			return ec.marshalODateTime2ᚖtimeᚐTime(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_lastErrorAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "DateTime")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_externalChangeAt(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_externalChangeAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ExternalChangeAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
+			return ec.marshalODateTime2ᚖtimeᚐTime(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_externalChangeAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "DateTime")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_needsReconnectForWrite(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_needsReconnectForWrite(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.NeedsReconnectForWrite, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_needsReconnectForWrite(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_accountCatalogDetected(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_accountCatalogDetected(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AccountCatalogDetected, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_accountCatalogDetected(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_publishImages(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_publishImages(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PublishImages, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_publishImages(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_publishedProducts(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_publishedProducts(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PublishedProducts, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_publishedProducts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "Int")
+}
+
+func (ec *executionContext) _HubrisePublishStatus_pendingProducts(ctx context.Context, field graphql.CollectedField, obj *model.HubrisePublishStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubrisePublishStatus_pendingProducts(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PendingProducts, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubrisePublishStatus_pendingProducts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubrisePublishStatus", field, false, false, "Int")
 }
 
 func (ec *executionContext) _HubriseStatus_available(ctx context.Context, field graphql.CollectedField, obj *model.HubriseStatus) (ret graphql.Marshaler) {
@@ -8808,6 +10801,61 @@ func (ec *executionContext) _HubriseStatus_autoRefundOnCancel(ctx context.Contex
 }
 func (ec *executionContext) fieldContext_HubriseStatus_autoRefundOnCancel(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("HubriseStatus", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _HubriseStatus_catalogDirection(ctx context.Context, field graphql.CollectedField, obj *model.HubriseStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubriseStatus_catalogDirection(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CatalogDirection, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.HubriseCatalogDirection) graphql.Marshaler {
+			return ec.marshalNHubriseCatalogDirection2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseCatalogDirection(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubriseStatus_catalogDirection(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("HubriseStatus", field, false, false, "HubriseCatalogDirection")
+}
+
+func (ec *executionContext) _HubriseStatus_publish(ctx context.Context, field graphql.CollectedField, obj *model.HubriseStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_HubriseStatus_publish(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Publish, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.HubrisePublishStatus) graphql.Marshaler {
+			return ec.marshalNHubrisePublishStatus2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishStatus(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_HubriseStatus_publish(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HubriseStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HubrisePublishStatus(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _HubriseStatus_catalogLanguage(ctx context.Context, field graphql.CollectedField, obj *model.HubriseStatus) (ret graphql.Marshaler) {
@@ -9927,6 +11975,165 @@ func (ec *executionContext) fieldContext_Mutation_retryHubriseOutbox(ctx context
 	if fc.Args, err = ec.field_Mutation_retryHubriseOutbox_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_setHubriseCatalogDirection(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_setHubriseCatalogDirection(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().SetHubriseCatalogDirection(ctx, fc.Args["direction"].(model.HubriseCatalogDirection), fc.Args["acknowledgeLocalOverwrite"].(*bool))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.HubriseStatus
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.HubriseStatus) graphql.Marshaler {
+			return ec.marshalNHubriseStatus2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseStatus(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_setHubriseCatalogDirection(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HubriseStatus(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_setHubriseCatalogDirection_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_publishHubriseCatalog(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_publishHubriseCatalog(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().PublishHubriseCatalog(ctx, fc.Args["confirmRemovals"].(*bool), fc.Args["removeForeign"].(*bool), fc.Args["planHash"].(*string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.HubrisePublishResult
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.HubrisePublishResult) graphql.Marshaler {
+			return ec.marshalNHubrisePublishResult2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishResult(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_publishHubriseCatalog(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HubrisePublishResult(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_publishHubriseCatalog_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_acknowledgeHubriseExternalChange(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_acknowledgeHubriseExternalChange(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Mutation().AcknowledgeHubriseExternalChange(ctx)
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.HubriseStatus
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.HubriseStatus) graphql.Marshaler {
+			return ec.marshalNHubriseStatus2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseStatus(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_acknowledgeHubriseExternalChange(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HubriseStatus(ctx, field)
+		},
 	}
 	return fc, nil
 }
@@ -14700,6 +16907,51 @@ func (ec *executionContext) fieldContext_Product_hubriseLockedFields(_ context.C
 	return graphql.NewScalarFieldContext("Product", field, true, true, "String")
 }
 
+func (ec *executionContext) _Product_hubrisePublish(ctx context.Context, field graphql.CollectedField, obj *model.Product) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Product_hubrisePublish(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Product().HubrisePublish(ctx, obj)
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.HubriseProductPublishInfo
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, obj, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.HubriseProductPublishInfo) graphql.Marshaler {
+			return ec.marshalOHubriseProductPublishInfo2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseProductPublishInfo(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Product_hubrisePublish(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Product",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HubriseProductPublishInfo(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _ProductCategory_id(ctx context.Context, field graphql.CollectedField, obj *model.ProductCategory) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -15742,6 +17994,63 @@ func (ec *executionContext) fieldContext_Query_hubriseOutbox(ctx context.Context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_hubriseOutbox_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_previewHubriseCatalogPublish(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_previewHubriseCatalogPublish(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().PreviewHubriseCatalogPublish(ctx, fc.Args["removeForeign"].(*bool))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Admin == nil {
+					var zeroVal *model.HubrisePublishPreview
+					return zeroVal, errors.New("directive admin is not implemented")
+				}
+				return ec.Directives.Admin(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *model.HubrisePublishPreview) graphql.Marshaler {
+			return ec.marshalNHubrisePublishPreview2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishPreview(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_previewHubriseCatalogPublish(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_HubrisePublishPreview(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_previewHubriseCatalogPublish_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -19675,7 +21984,7 @@ func (ec *executionContext) unmarshalInputHubriseSettingsInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"enabled", "pushOrders", "syncStatus", "syncInventory", "syncCatalog", "syncCustomers", "catalogAutoImport", "autoRefundOnCancel", "importImages", "catalogLanguage", "variantRef", "channelName", "deliveryChargeRef", "paymentFeeChargeRef"}
+	fieldsInOrder := [...]string{"enabled", "pushOrders", "syncStatus", "syncInventory", "syncCatalog", "syncCustomers", "catalogAutoImport", "autoRefundOnCancel", "importImages", "publishImages", "catalogLanguage", "variantRef", "channelName", "deliveryChargeRef", "paymentFeeChargeRef"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -19745,6 +22054,13 @@ func (ec *executionContext) unmarshalInputHubriseSettingsInput(ctx context.Conte
 				return it, err
 			}
 			it.ImportImages = data
+		case "publishImages":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("publishImages"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PublishImages = data
 		case "catalogLanguage":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("catalogLanguage"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -21771,6 +24087,11 @@ func (ec *executionContext) _HubriseFeatures(ctx context.Context, sel ast.Select
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "publishCatalog":
+			out.Values[i] = ec._HubriseFeatures_publishCatalog(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -21924,6 +24245,467 @@ func (ec *executionContext) _HubriseOutboxItem(ctx context.Context, sel ast.Sele
 	return out
 }
 
+var hubriseProductPublishInfoImplementors = []string{"HubriseProductPublishInfo"}
+
+func (ec *executionContext) _HubriseProductPublishInfo(ctx context.Context, sel ast.SelectionSet, obj *model.HubriseProductPublishInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hubriseProductPublishInfoImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HubriseProductPublishInfo")
+		case "state":
+			out.Values[i] = ec._HubriseProductPublishInfo_state(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "publishedAt":
+			out.Values[i] = ec._HubriseProductPublishInfo_publishedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "ref":
+			out.Values[i] = ec._HubriseProductPublishInfo_ref(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var hubrisePublishChangeImplementors = []string{"HubrisePublishChange"}
+
+func (ec *executionContext) _HubrisePublishChange(ctx context.Context, sel ast.SelectionSet, obj *model.HubrisePublishChange) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hubrisePublishChangeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HubrisePublishChange")
+		case "entity":
+			out.Values[i] = ec._HubrisePublishChange_entity(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "action":
+			out.Values[i] = ec._HubrisePublishChange_action(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "key":
+			out.Values[i] = ec._HubrisePublishChange_key(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "ref":
+			out.Values[i] = ec._HubrisePublishChange_ref(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._HubrisePublishChange_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fields":
+			out.Values[i] = ec._HubrisePublishChange_fields(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var hubrisePublishCountImplementors = []string{"HubrisePublishCount"}
+
+func (ec *executionContext) _HubrisePublishCount(ctx context.Context, sel ast.SelectionSet, obj *model.HubrisePublishCount) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hubrisePublishCountImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HubrisePublishCount")
+		case "entity":
+			out.Values[i] = ec._HubrisePublishCount_entity(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "added":
+			out.Values[i] = ec._HubrisePublishCount_added(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updated":
+			out.Values[i] = ec._HubrisePublishCount_updated(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "removed":
+			out.Values[i] = ec._HubrisePublishCount_removed(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var hubrisePublishForeignItemImplementors = []string{"HubrisePublishForeignItem"}
+
+func (ec *executionContext) _HubrisePublishForeignItem(ctx context.Context, sel ast.SelectionSet, obj *model.HubrisePublishForeignItem) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hubrisePublishForeignItemImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HubrisePublishForeignItem")
+		case "entity":
+			out.Values[i] = ec._HubrisePublishForeignItem_entity(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "ref":
+			out.Values[i] = ec._HubrisePublishForeignItem_ref(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._HubrisePublishForeignItem_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var hubrisePublishPreviewImplementors = []string{"HubrisePublishPreview"}
+
+func (ec *executionContext) _HubrisePublishPreview(ctx context.Context, sel ast.SelectionSet, obj *model.HubrisePublishPreview) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hubrisePublishPreviewImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HubrisePublishPreview")
+		case "planHash":
+			out.Values[i] = ec._HubrisePublishPreview_planHash(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "firstPublish":
+			out.Values[i] = ec._HubrisePublishPreview_firstPublish(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "added":
+			out.Values[i] = ec._HubrisePublishPreview_added(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updated":
+			out.Values[i] = ec._HubrisePublishPreview_updated(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "removed":
+			out.Values[i] = ec._HubrisePublishPreview_removed(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unchanged":
+			out.Values[i] = ec._HubrisePublishPreview_unchanged(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "foreign":
+			out.Values[i] = ec._HubrisePublishPreview_foreign(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "counts":
+			out.Values[i] = ec._HubrisePublishPreview_counts(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "changes":
+			out.Values[i] = ec._HubrisePublishPreview_changes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "truncated":
+			out.Values[i] = ec._HubrisePublishPreview_truncated(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "foreignItems":
+			out.Values[i] = ec._HubrisePublishPreview_foreignItems(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "preserved":
+			out.Values[i] = ec._HubrisePublishPreview_preserved(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "warnings":
+			out.Values[i] = ec._HubrisePublishPreview_warnings(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "blockers":
+			out.Values[i] = ec._HubrisePublishPreview_blockers(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "removalsNeedConfirm":
+			out.Values[i] = ec._HubrisePublishPreview_removalsNeedConfirm(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "generatedAt":
+			out.Values[i] = ec._HubrisePublishPreview_generatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var hubrisePublishResultImplementors = []string{"HubrisePublishResult"}
+
+func (ec *executionContext) _HubrisePublishResult(ctx context.Context, sel ast.SelectionSet, obj *model.HubrisePublishResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hubrisePublishResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HubrisePublishResult")
+		case "published":
+			out.Values[i] = ec._HubrisePublishResult_published(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "queued":
+			out.Values[i] = ec._HubrisePublishResult_queued(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._HubrisePublishResult_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var hubrisePublishStatusImplementors = []string{"HubrisePublishStatus"}
+
+func (ec *executionContext) _HubrisePublishStatus(ctx context.Context, sel ast.SelectionSet, obj *model.HubrisePublishStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hubrisePublishStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HubrisePublishStatus")
+		case "enabled":
+			out.Values[i] = ec._HubrisePublishStatus_enabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "active":
+			out.Values[i] = ec._HubrisePublishStatus_active(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pending":
+			out.Values[i] = ec._HubrisePublishStatus_pending(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pendingSince":
+			out.Values[i] = ec._HubrisePublishStatus_pendingSince(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "nextPublishAt":
+			out.Values[i] = ec._HubrisePublishStatus_nextPublishAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "publishing":
+			out.Values[i] = ec._HubrisePublishStatus_publishing(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastPublishedAt":
+			out.Values[i] = ec._HubrisePublishStatus_lastPublishedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "firstPublishConfirmedAt":
+			out.Values[i] = ec._HubrisePublishStatus_firstPublishConfirmedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "awaitingFirstPublish":
+			out.Values[i] = ec._HubrisePublishStatus_awaitingFirstPublish(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastError":
+			out.Values[i] = ec._HubrisePublishStatus_lastError(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "lastErrorCode":
+			out.Values[i] = ec._HubrisePublishStatus_lastErrorCode(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "lastErrorAt":
+			out.Values[i] = ec._HubrisePublishStatus_lastErrorAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "externalChangeAt":
+			out.Values[i] = ec._HubrisePublishStatus_externalChangeAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "needsReconnectForWrite":
+			out.Values[i] = ec._HubrisePublishStatus_needsReconnectForWrite(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "accountCatalogDetected":
+			out.Values[i] = ec._HubrisePublishStatus_accountCatalogDetected(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "publishImages":
+			out.Values[i] = ec._HubrisePublishStatus_publishImages(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "publishedProducts":
+			out.Values[i] = ec._HubrisePublishStatus_publishedProducts(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pendingProducts":
+			out.Values[i] = ec._HubrisePublishStatus_pendingProducts(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var hubriseStatusImplementors = []string{"HubriseStatus"}
 
 func (ec *executionContext) _HubriseStatus(ctx context.Context, sel ast.SelectionSet, obj *model.HubriseStatus) graphql.Marshaler {
@@ -22017,6 +24799,16 @@ func (ec *executionContext) _HubriseStatus(ctx context.Context, sel ast.Selectio
 			}
 		case "autoRefundOnCancel":
 			out.Values[i] = ec._HubriseStatus_autoRefundOnCancel(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "catalogDirection":
+			out.Values[i] = ec._HubriseStatus_catalogDirection(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "publish":
+			out.Values[i] = ec._HubriseStatus_publish(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -22266,6 +25058,27 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "retryHubriseOutbox":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_retryHubriseOutbox(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "setHubriseCatalogDirection":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_setHubriseCatalogDirection(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "publishHubriseCatalog":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_publishHubriseCatalog(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "acknowledgeHubriseExternalChange":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_acknowledgeHubriseExternalChange(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -23571,6 +26384,12 @@ func (ec *executionContext) _Product(ctx context.Context, sel ast.SelectionSet, 
 				func(ctx context.Context) graphql.Marshaler {
 					return ec._Product_hubriseLockedFields(ctx, field, obj)
 				})
+		case "hubrisePublish":
+			out.ResolveConcurrently(ec.OperationContext, &deferred, i,
+				true, false,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Product_hubrisePublish(ctx, field, obj)
+				})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -23895,6 +26714,12 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				true, true,
 				func(ctx context.Context) graphql.Marshaler {
 					return ec._Query_hubriseOutbox(ctx, field)
+				})
+		case "previewHubriseCatalogPublish":
+			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
+				true, true,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Query_previewHubriseCatalogPublish(ctx, field)
 				})
 		case "quoteOrder":
 			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
@@ -25120,6 +27945,16 @@ func (ec *executionContext) marshalNHubriseCatalogDiff2ᚖtsbᚑserviceᚋintern
 	return ec._HubriseCatalogDiff(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNHubriseCatalogDirection2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseCatalogDirection(ctx context.Context, v any) (model.HubriseCatalogDirection, error) {
+	var res model.HubriseCatalogDirection
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNHubriseCatalogDirection2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseCatalogDirection(ctx context.Context, sel ast.SelectionSet, v model.HubriseCatalogDirection) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNHubriseCatalogEntity2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseCatalogEntity(ctx context.Context, v any) (model.HubriseCatalogEntity, error) {
 	var res model.HubriseCatalogEntity
 	err := res.UnmarshalGQL(v)
@@ -25204,6 +28039,122 @@ func (ec *executionContext) unmarshalNHubriseOutboxState2tsbᚑserviceᚋinterna
 
 func (ec *executionContext) marshalNHubriseOutboxState2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseOutboxState(ctx context.Context, sel ast.SelectionSet, v model.HubriseOutboxState) graphql.Marshaler {
 	return v
+}
+
+func (ec *executionContext) unmarshalNHubrisePublishAction2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishAction(ctx context.Context, v any) (model.HubrisePublishAction, error) {
+	var res model.HubrisePublishAction
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNHubrisePublishAction2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishAction(ctx context.Context, sel ast.SelectionSet, v model.HubrisePublishAction) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNHubrisePublishChange2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishChangeᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.HubrisePublishChange) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNHubrisePublishChange2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishChange(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNHubrisePublishChange2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishChange(ctx context.Context, sel ast.SelectionSet, v *model.HubrisePublishChange) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "HubrisePublishChange!")
+		return graphql.Null
+	}
+	return ec._HubrisePublishChange(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNHubrisePublishCount2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishCountᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.HubrisePublishCount) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNHubrisePublishCount2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishCount(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNHubrisePublishCount2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishCount(ctx context.Context, sel ast.SelectionSet, v *model.HubrisePublishCount) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "HubrisePublishCount!")
+		return graphql.Null
+	}
+	return ec._HubrisePublishCount(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNHubrisePublishForeignItem2ᚕᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishForeignItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.HubrisePublishForeignItem) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNHubrisePublishForeignItem2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishForeignItem(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNHubrisePublishForeignItem2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishForeignItem(ctx context.Context, sel ast.SelectionSet, v *model.HubrisePublishForeignItem) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "HubrisePublishForeignItem!")
+		return graphql.Null
+	}
+	return ec._HubrisePublishForeignItem(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNHubrisePublishPreview2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishPreview(ctx context.Context, sel ast.SelectionSet, v *model.HubrisePublishPreview) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "HubrisePublishPreview!")
+		return graphql.Null
+	}
+	return ec._HubrisePublishPreview(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNHubrisePublishResult2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishResult(ctx context.Context, sel ast.SelectionSet, v *model.HubrisePublishResult) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "HubrisePublishResult!")
+		return graphql.Null
+	}
+	return ec._HubrisePublishResult(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNHubrisePublishState2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishState(ctx context.Context, v any) (model.HubrisePublishState, error) {
+	var res model.HubrisePublishState
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNHubrisePublishState2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishState(ctx context.Context, sel ast.SelectionSet, v model.HubrisePublishState) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNHubrisePublishStatus2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishStatus(ctx context.Context, sel ast.SelectionSet, v *model.HubrisePublishStatus) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "HubrisePublishStatus!")
+		return graphql.Null
+	}
+	return ec._HubrisePublishStatus(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNHubriseSettingsInput2tsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseSettingsInput(ctx context.Context, v any) (model.HubriseSettingsInput, error) {
@@ -26174,6 +29125,29 @@ func (ec *executionContext) unmarshalOHubriseOutboxState2ᚖtsbᚑserviceᚋinte
 }
 
 func (ec *executionContext) marshalOHubriseOutboxState2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseOutboxState(ctx context.Context, sel ast.SelectionSet, v *model.HubriseOutboxState) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
+func (ec *executionContext) marshalOHubriseProductPublishInfo2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubriseProductPublishInfo(ctx context.Context, sel ast.SelectionSet, v *model.HubriseProductPublishInfo) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._HubriseProductPublishInfo(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOHubrisePublishErrorCode2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishErrorCode(ctx context.Context, v any) (*model.HubrisePublishErrorCode, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.HubrisePublishErrorCode)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOHubrisePublishErrorCode2ᚖtsbᚑserviceᚋinternalᚋapiᚋgraphqlᚋmodelᚐHubrisePublishErrorCode(ctx context.Context, sel ast.SelectionSet, v *model.HubrisePublishErrorCode) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}

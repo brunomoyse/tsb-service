@@ -90,8 +90,20 @@ func TestTheRecordedClientDocumentsAreStillValidAgainstTheSchema(t *testing.T) {
 }
 
 func TestClientQueriesAnswerTheSameWithAndWithoutHubRise(t *testing.T) {
+	// The integration with HubRise owning the menu (catalog sync) and with the dashboard owning it
+	// (catalog publishing): neither may change what a client written before it existed sees.
+	t.Run("catalog sync", func(t *testing.T) {
+		replayClientDocuments(t, hubtest.WithFeatures(true, true, true, true, false))
+	})
+	t.Run("catalog publishing", func(t *testing.T) {
+		replayClientDocuments(t, hubtest.WithFeatures(true, true, true, false, false), hubtest.WithPublishCatalog())
+	})
+}
+
+func replayClientDocuments(t *testing.T, seed ...hubtest.SeedOption) {
+	t.Helper()
 	docs := loadCompatDocuments(t)
-	r := newHubriseAdminRig(t, true, hubtest.WithFeatures(true, true, true, true, false))
+	r := newHubriseAdminRig(t, true, seed...)
 	r.Resolver.PublicQueryLimiter = middleware.NewRateLimiter(rate.Every(time.Millisecond), 10000)
 	r.Resolver.CouponValidateLimiter = middleware.NewRateLimiter(rate.Every(time.Millisecond), 10000)
 

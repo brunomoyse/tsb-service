@@ -61,10 +61,12 @@ func toHubriseStatus(st *hubriseApplication.Status, available bool) *model.Hubri
 	out := &model.HubriseStatus{
 		Available: available, CatalogLanguage: hubriseDomain.LanguageFR,
 		Features: &model.HubriseFeatures{}, Backlog: &model.HubriseBacklog{},
+		CatalogDirection: model.HubriseCatalogDirectionNone, Publish: toHubrisePublishStatus(nil),
 	}
 	if st == nil {
 		return out
 	}
+	out.CatalogDirection, out.Publish = toHubriseDirection(st.Direction), toHubrisePublishStatus(st.Publish)
 	out.Backlog = &model.HubriseBacklog{Pending: st.Backlog.Pending, Parked: st.Backlog.Parked}
 	out.UnlinkedProducts, out.Attention = st.UnlinkedProducts, st.Attention
 	c := st.Connection
@@ -78,9 +80,10 @@ func toHubriseStatus(st *hubriseApplication.Status, available bool) *model.Hubri
 	out.CustomerListID, out.CustomerListName = c.CustomerListID, c.CustomerListName
 	out.Features = &model.HubriseFeatures{
 		PushOrders: c.PushOrders, SyncStatus: c.SyncStatus, SyncInventory: c.SyncInventory, SyncCatalog: c.SyncCatalog,
+		PublishCatalog: c.PublishCatalog,
 	}
 	out.SyncCustomers, out.CatalogAutoImport = c.SyncCustomers, c.CatalogAutoImport
-	out.CatalogUpdateAvailable = c.CatalogUpdateAvailableAt != nil
+	out.CatalogUpdateAvailable = c.CatalogUpdateAvailableAt != nil && !c.PublishCatalog
 	out.CatalogPendingReview = c.CatalogPendingReview()
 	out.AutoRefundOnCancel = c.AutoRefundOnCancel
 	out.CatalogLanguage = c.CatalogLanguage
@@ -130,8 +133,9 @@ func (r *Resolver) updateHubriseSettings(ctx context.Context, in model.HubriseSe
 	_, err = admin.UpdateSettings(ctx, hubriseDomain.SettingsPatch{
 		Enabled: in.Enabled, PushOrders: in.PushOrders, SyncStatus: in.SyncStatus, SyncInventory: in.SyncInventory,
 		SyncCatalog: in.SyncCatalog, SyncCustomers: in.SyncCustomers, CatalogAutoImport: in.CatalogAutoImport,
-		AutoRefundOnCancel: in.AutoRefundOnCancel, ImportImages: in.ImportImages, CatalogLanguage: in.CatalogLanguage,
-		VariantRef: in.VariantRef, ChannelName: in.ChannelName,
+		AutoRefundOnCancel: in.AutoRefundOnCancel, ImportImages: in.ImportImages, PublishImages: in.PublishImages,
+		CatalogLanguage: in.CatalogLanguage,
+		VariantRef:      in.VariantRef, ChannelName: in.ChannelName,
 		DeliveryChargeRef: in.DeliveryChargeRef, PaymentFeeChargeRef: in.PaymentFeeChargeRef,
 	})
 	if err != nil {
@@ -313,6 +317,7 @@ func AttachHubriseLoaders(ctx context.Context, r *Resolver) context.Context {
 		return ctx
 	}
 	admin := r.HubriseAdmin
+	ctx = attachPublishLoader(ctx, admin)
 	loader := db.NewTypedLoader[bool](func(ctx context.Context, keys []string) (map[string][]bool, error) {
 		ids := make([]uuid.UUID, 0, len(keys))
 		for _, k := range keys {

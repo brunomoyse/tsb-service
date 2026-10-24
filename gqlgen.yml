@@ -171,6 +171,8 @@ models:
         resolver: true
       hubriseLockedFields:
         resolver: true
+      hubrisePublish:
+        resolver: true
 
   OrderItemSelection:
     fields:

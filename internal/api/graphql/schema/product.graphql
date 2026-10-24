@@ -37,6 +37,9 @@ type Product {
     # The fields of the product the dashboard must not offer for editing while it is managed (price,
     # category, vatCategory, code, choiceGroups); empty otherwise. Admin only.
     hubriseLockedFields: [String!]! @admin
+    # What the dashboard shows about the product in PUBLISH mode (published, edited since, never
+    # published, and the SKU ref it has at HubRise). Null when the direction is not PUBLISH. Admin only.
+    hubrisePublish: HubriseProductPublishInfo @admin
 }
 
 type ProductChoice {

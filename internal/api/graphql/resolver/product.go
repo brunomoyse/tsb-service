@@ -538,6 +538,11 @@ func (r *productResolver) HubriseLockedFields(ctx context.Context, obj *model.Pr
 	return hubriseLockedFields(managed, obj), nil
 }
 
+// HubrisePublish is the resolver for the hubrisePublish field.
+func (r *productResolver) HubrisePublish(ctx context.Context, obj *model.Product) (*model.HubriseProductPublishInfo, error) {
+	return r.hubrisePublishInfo(ctx, obj.ID)
+}
+
 // Products is the resolver for the products field.
 func (r *productCategoryResolver) Products(ctx context.Context, obj *model.ProductCategory) ([]*model.Product, error) {
 	userLang := utils.GetLang(ctx)

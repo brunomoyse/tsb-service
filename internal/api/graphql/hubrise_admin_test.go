@@ -185,9 +185,13 @@ const allOperations = `
 	mutation Inventory { syncHubriseInventory }
 	mutation Link { linkHubriseProduct(productId: "%s", skuRef: "X") }
 	mutation Retry { retryHubriseOutbox }
+	query PreviewPublish { previewHubriseCatalogPublish { planHash } }
+	mutation Direction { setHubriseCatalogDirection(direction: NONE) { available } }
+	mutation Publish { publishHubriseCatalog { published } }
+	mutation Acknowledge { acknowledgeHubriseExternalChange { available } }
 `
 
-// operations are the eleven operations of the HubRise admin API, one document each.
+// operations are the operations of the HubRise admin API, one document each.
 func operations(productID uuid.UUID) map[string]string {
 	out := map[string]string{}
 	for _, block := range strings.Split(strings.TrimSpace(fmt.Sprintf(allOperations, productID)), "\n") {
@@ -994,6 +998,25 @@ func TestHubriseErrorMapping(t *testing.T) {
 	assert.Equal(t, apperr.CodeHubriseSKULinked, code(fmt.Errorf("%w: %q", hubDomain.ErrSKULinked, "S")))
 	assert.Equal(t, apperr.CodeHubriseUpstream, code(&pkghubrise.Error{Kind: pkghubrise.KindServer, Status: 502}))
 	assert.Equal(t, apperr.CodeHubriseUpstream, code(&pkghubrise.Error{Kind: pkghubrise.KindNetwork}), "with no status")
+
+	// The dashboard-owned menu.
+	assert.Equal(t, apperr.CodeHubrisePublishMode, code(hubDomain.ErrPublishMode))
+	assert.Equal(t, apperr.CodeHubriseDirectionConflict, code(hubDomain.ErrDirectionConflict))
+	assert.Equal(t, apperr.CodeHubriseReconnectRequired, code(hubDomain.ErrReconnectRequired))
+	assert.Equal(t, apperr.CodeHubriseAccountCatalog, code(hubDomain.ErrAccountCatalog))
+	assert.Equal(t, apperr.CodeHubriseNotPublishMode, code(hubDomain.ErrNotPublishMode))
+	assert.Equal(t, apperr.CodeHubrisePreviewStale, code(hubDomain.ErrPreviewStale))
+	assert.Equal(t, apperr.CodeHubrisePublishConfirmRequired, code(hubDomain.ErrPublishConfirmRequired))
+	assert.Equal(t, apperr.CodeHubrisePublishPendingChanges, code(hubDomain.ErrPublishPendingChanges))
+	assert.Equal(t, apperr.CodeHubriseEmptyMenu, code(hubDomain.ErrEmptyMenu))
+	assert.Equal(t, apperr.CodeHubriseBusy, code(hubDomain.ErrPublishBusy))
+	blocked := &hubDomain.PublishBlockedError{Blockers: []hubDomain.Warning{{Code: hubDomain.BlockDuplicateRef, Message: "twice"}}}
+	assert.Equal(t, apperr.CodeHubrisePublishBlocked, code(blocked))
+	limited := resolver.HubriseError(&pkghubrise.Error{Kind: pkghubrise.KindRateLimited, RetryAfter: 2500 * time.Millisecond})
+	le, ok := apperr.From(limited)
+	require.True(t, ok)
+	assert.Equal(t, apperr.CodeHubriseRateLimited, le.Code)
+	assert.Equal(t, 3, le.Extensions()["retryAfterSeconds"], "rounded up")
 
 	// Neither the kind nor the status text carries anything but the class of the failure.
 	e, ok := apperr.From(resolver.HubriseError(&pkghubrise.Error{Kind: pkghubrise.KindUnauthorized, Status: 401, Message: "token abc123 revoked"}))
