@@ -4,7 +4,8 @@ name: Nightly dependency release
 # - every night when a security fix is waiting: a Dependabot security update
 #   (its "security" group) or a base image bump (a Dockerfile change: OS and
 #   language runtime fixes that Dependabot never flags as security);
-# - on Tuesdays for everything else Dependabot merged during the week.
+# - on Tuesdays for everything else Dependabot merged during the week, only
+#   once the repository variable WEEKLY_RELEASE is "on" (off until then).
 # It tags the next patch version (which runs the normal release pipeline, and
 # its production smoke test) only when:
 # - every non-Dependabot commit since the latest vX.Y.Z tag only touches CI
@@ -53,6 +54,9 @@ jobs:
       CRON_SUMMER: '0 2 * * *'
       CRON_WINTER: '0 3 * * *'
       MODE: ${{ inputs.mode || '' }}
+      # Tuesday's weekly mode runs only once the owner sets the repository
+      # variable WEEKLY_RELEASE to "on"; a manual run can still ask for it.
+      WEEKLY_RELEASE: ${{ vars.WEEKLY_RELEASE || 'off' }}
       DRY_RUN: ${{ inputs.dry_run || 'false' }}
       # Workflow to start on the new tag when the tag push itself cannot
       # (pushed with GITHUB_TOKEN); empty when the PAT push starts it.
@@ -101,10 +105,10 @@ jobs:
               || echo "::warning::Telegram alert failed: $1"
           }
 
-          # Tuesday (Brussels) ships every Dependabot merge, other nights only
-          # security fixes.
+          # Tuesday (Brussels) ships every Dependabot merge once WEEKLY_RELEASE
+          # is "on", other nights only security fixes.
           if [ -z "$MODE" ]; then
-            if [ "$(TZ=Europe/Brussels date +%u)" = "2" ]; then MODE=weekly; else MODE=security; fi
+            if [ "$WEEKLY_RELEASE" = "on" ] && [ "$(TZ=Europe/Brussels date +%u)" = "2" ]; then MODE=weekly; else MODE=security; fi
           fi
 
           last=$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
@@ -132,7 +136,7 @@ jobs:
           echo "Mode $MODE. Since $last: $deps Dependabot merge(s) ($security security), ${#blockers[@]} other change(s)."
           if [ "$deps" -eq 0 ]; then echo "Nothing to ship."; exit 0; fi
           if [ "$MODE" = "security" ] && [ "$security" -eq 0 ]; then
-            echo "No security fix waiting, the routine updates ship on Tuesday."
+            echo "No security fix waiting, the routine updates ship on a weekly run (WEEKLY_RELEASE=$WEEKLY_RELEASE)."
             exit 0
           fi
           if [ "$MODE" = "security" ]; then kind="security"; else kind="weekly"; fi
