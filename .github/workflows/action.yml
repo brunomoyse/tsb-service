@@ -134,12 +134,21 @@ jobs:
             export SOPS_AGE_KEY_FILE=/opt/tokyosushi/.config/sops/age/keys.txt
             cd /opt/tokyosushi/tsb-infra
             git pull --ff-only
+            # The migrations run inside `helm upgrade`, as the chart's pre-upgrade hook (Job
+            # tsb-migrate, image of this release), before any pod changes: a failed migration
+            # fails the upgrade while the old pods keep serving. Refuse to deploy without it.
+            test -f charts/tokyosushi-apps/templates/tsb-migrate-job.yaml || { echo "tsb-infra has no tsb-migrate hook" >&2; exit 1; }
             # tsb-mcp ships from this repo. --reuse-values ignores new chart
             # defaults, so pin it only once the release really deploys it (after a
             # one-off --reset-then-reuse-values upgrade); otherwise the --set would
             # create a half-defined app and fail the atomic upgrade.
             MCP_SET=""
             if sudo kubectl get deployment tsb-mcp -n tokyosushi >/dev/null 2>&1; then MCP_SET="--set apps.tsb-mcp.image.repository=${MCP_REPO} --set apps.tsb-mcp.image.tag=${TAG}"; fi
+            # A failed hook Job is kept: print its logs before failing the deploy.
+            migrate_logs() {
+              sudo kubectl logs -n "$1" job/tsb-migrate --tail=50 >&2 || true
+              return 1
+            }
             sops -d "secrets/${APP}.secret.enc.yaml" | sudo kubectl apply -n tokyosushi -f -
             sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
               --namespace tokyosushi \
@@ -147,11 +156,10 @@ jobs:
               --set "apps.${APP}.image.repository=${REPO}" \
               --set "apps.${APP}.image.tag=${TAG}" \
               ${MCP_SET} \
-              --atomic --timeout 5m
-            sudo kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=up
+              --atomic --timeout 5m || migrate_logs tokyosushi
             # Yangguofu Malatang Liège (release ygf-apps, namespace ygf) runs the
             # same backend image on its own DB: keep it on the same version and
-            # schema. Skipped until that release exists.
+            # schema (the same hook migrates it). Skipped until that release exists.
             if sudo env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm status ygf-apps -n ygf >/dev/null 2>&1; then
               sops -d "secrets/ygf-${APP}.secret.enc.yaml" | sudo kubectl apply -n ygf -f -
               sudo flock -w 600 /var/lock/ygf-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade ygf-apps ./charts/tokyosushi-apps \
@@ -160,8 +168,7 @@ jobs:
                 --reuse-values \
                 --set "apps.${APP}.image.repository=${REPO}" \
                 --set "apps.${APP}.image.tag=${TAG}" \
-                --atomic --timeout 5m
-              sudo kubectl exec -n ygf deployment/tsb-service -- /app/tsb-migrate -cmd=up
+                --atomic --timeout 5m || migrate_logs ygf
             fi
 
 # ── Rollback (manual trigger) ────────────────────────────────────────────────
@@ -192,7 +199,9 @@ jobs:
             # Same tsb-mcp gate as the deploy job.
             MCP_SET=""
             if sudo kubectl get deployment tsb-mcp -n tokyosushi >/dev/null 2>&1; then MCP_SET="--set apps.tsb-mcp.image.repository=${MCP_REPO} --set apps.tsb-mcp.image.tag=${TAG}"; fi
-            # Roll back DB migrations first (using current container), before swapping image
+            # Roll back DB migrations first (using current container), before swapping image.
+            # The upgrade below then runs the older image's tsb-migrate hook: `up` with nothing
+            # left to apply, a no-op even when MIGRATIONS_DOWN left newer versions in place.
             for i in $(seq 1 "${MIGRATIONS_DOWN:-0}"); do
               sudo kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=down
             done
