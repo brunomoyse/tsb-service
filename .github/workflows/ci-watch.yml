@@ -47,6 +47,16 @@ jobs:
       EVENT: ${{ github.event.workflow_run.event }}
       RUN_URL: ${{ github.event.workflow_run.html_url }}
       TITLE: ${{ github.event.workflow_run.display_title }}
+      # A Dependabot PR is only merged when these checks (one anchored regex per
+      # line, matched against the check run names) are present AND successful,
+      # so an empty or incomplete check list never counts as green.
+      REQUIRED_CHECKS: |
+        ^Run Tests$
+        ^Lint Code$
+        ^Build Application$
+      # Workflow that holds the required checks: a missing check once it has
+      # finished is a configuration problem worth a Telegram note.
+      TEST_WORKFLOW: Tests
     steps:
       - name: Report and merge
         run: |
@@ -118,6 +128,25 @@ jobs:
             # A cancelled run is a superseded one; anything else is a real failure.
             if jq -e '[.[] | select(.__typename == "CheckRun" and .conclusion != null and (.conclusion | IN("SUCCESS", "SKIPPED", "NEUTRAL", "CANCELLED") | not))] | length > 0' checks.json >/dev/null; then
               notify "⚠️ $repo: Dependabot PR #$number is blocked by: $bad. $url"
+            fi
+            exit 0
+          fi
+
+          if [ "$(jq 'length' checks.json)" -eq 0 ]; then
+            echo "PR #$number reports no checks yet: not merging."
+            exit 0
+          fi
+          missing=""
+          while IFS= read -r pattern; do
+            [ -z "$pattern" ] && continue
+            if ! jq -e --arg p "$pattern" '[.[] | select(.__typename == "CheckRun" and (.name | test($p)) and .conclusion == "SUCCESS")] | length > 0' checks.json >/dev/null; then
+              missing="$missing $pattern"
+            fi
+          done <<<"$REQUIRED_CHECKS"
+          if [ -n "$missing" ]; then
+            echo "Required check(s) missing or not successful:$missing"
+            if [ "$WORKFLOW" = "$TEST_WORKFLOW" ]; then
+              notify "⚠️ $repo: Dependabot PR #$number is not merged, required check(s) missing or not successful:$missing. $url"
             fi
             exit 0
           fi

@@ -10,7 +10,8 @@ name: Nightly dependency release
 # - every non-Dependabot commit since the latest vX.Y.Z tag only touches CI
 #   config or docs, so unreleased human work never reaches production by
 #   surprise (a Telegram note says to release it by hand instead),
-# - every workflow run on the main HEAD (tests, test server deploy) passed.
+# - every workflow run on the main HEAD passed and its test jobs ran (the
+#   "Build and Deploy" run carries them, see .github/scripts/main-green.sh).
 # The "CI watch" workflow reports the release result to Telegram.
 
 on:
@@ -143,13 +144,14 @@ jobs:
             exit 0
           fi
 
-          gh run list --commit "$head" --limit 50 --json name,status,conclusion,event \
-            --jq '[.[] | select(.event != "schedule" and .name != "CI watch" and .name != "Nightly dependency release")]' > runs.json
-          if ! jq -e 'length > 0 and all(.status == "completed" and (.conclusion | IN("success", "skipped", "neutral")))' runs.json >/dev/null; then
-            jq -r '.[] | "  \(.name): \(.status) \(.conclusion)"' runs.json
+          # Every CI run on HEAD finished green and the test jobs of the main
+          # build really ran (see .github/scripts/main-green.sh).
+          if ! bash .github/scripts/main-green.sh "$head" > green.log 2>&1; then
+            cat green.log
             notify "⏸️ $repo: $deps dependency update(s) ($kind release) not shipped, main HEAD ${head:0:7} is not fully green yet. $GITHUB_SERVER_URL/$GH_REPO/actions"
             exit 0
           fi
+          cat green.log
 
           IFS=. read -r major minor patch <<<"${last#v}"
           next="v${major}.${minor}.$((patch + 1))"
