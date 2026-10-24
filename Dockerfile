@@ -1,5 +1,5 @@
 # Step 1: Use the official Golang image to create a build stage
-FROM --platform=$BUILDPLATFORM golang:1.27-alpine3.24 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine3.24 AS builder
 
 # Step 2: Set build arguments for cross-compilation
 ARG TARGETOS
@@ -23,7 +23,7 @@ RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-service cmd/app/main.g
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-migrate cmd/migrate/main.go
 
 # Step 7: Use base alpine image to create the final image
-FROM alpine:3.24
+FROM alpine:3.24.3
 
 # Step 8: Create non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

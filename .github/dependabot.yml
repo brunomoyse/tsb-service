@@ -8,13 +8,18 @@ updates:
       time: "12:00"
       timezone: "Europe/Brussels"
     groups:
-      golang-org:
-        patterns:
-          - "golang.org/*"
-      google-cloud:
-        patterns:
-          - "cloud.google.com/*"
-          - "google.golang.org/*"
+      # One weekly PR for every non-major module bump (direct and indirect),
+      # so a single CI run covers them. Majors still get their own PR.
+      go-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    allow:
+      - dependency-type: "all"
+
+  # Base images are pinned to the patch release (golang:X.Y.Z, alpine:X.Y.Z,
+  # distroless by digest) so every upstream security release shows up here.
+  # CI reads the Go version from the Dockerfile, so it follows these bumps.
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -22,3 +27,21 @@ updates:
       day: "friday"
       time: "12:00"
       timezone: "Europe/Brussels"
+    groups:
+      base-images:
+        patterns:
+          - "*"
+
+  # Actions are pinned to commit SHAs; Dependabot bumps the SHA and the
+  # version comment together.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "friday"
+      time: "12:00"
+      timezone: "Europe/Brussels"
+    groups:
+      actions:
+        patterns:
+          - "*"

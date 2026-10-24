@@ -1,5 +1,5 @@
 # tsb-mcp: MCP server for the owner's chat agent (see docs/mcp/README.md).
-FROM --platform=$BUILDPLATFORM golang:1.27-alpine3.24 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine3.24 AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -16,7 +16,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath -ldflags "-s -w -X main.version=${APP_VERSION}" -o /out/tsb-mcp ./cmd/tsb-mcp && \
     mkdir -p /out/data
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 
 WORKDIR /app
 COPY --from=builder /out/tsb-mcp /app/tsb-mcp
