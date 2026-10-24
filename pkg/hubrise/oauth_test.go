@@ -41,6 +41,7 @@ func TestAuthorizeURL(t *testing.T) {
 	assert.NotContains(t, raw, "s3cret")
 	assert.Contains(t, hubrise.DefaultScope, "inventory.write")
 	assert.Contains(t, hubrise.DefaultScope, "customer_list.write")
+	assert.Contains(t, hubrise.DefaultScope, "catalog.write", "the dashboard-owned menu is published with catalog.write")
 
 	noState := o.AuthorizeURL("https://x/cb", "profile", "")
 	assert.NotContains(t, noState, "state=")

@@ -139,6 +139,10 @@ type call struct {
 	// in is marshalled as the JSON body when not nil; out receives the decoded response.
 	in  any
 	out any
+	// raw, when not nil, is sent as the body as is with rawType as its Content-Type (an image
+	// upload); it takes precedence over in.
+	raw     []byte
+	rawType string
 }
 
 func (c *Client) op(cl call) string { return cl.method + " " + cl.path }
@@ -158,7 +162,11 @@ func (c *Client) roundTrip(ctx context.Context, cl call, limit int64) (*response
 	}
 
 	var body io.Reader
-	if cl.in != nil {
+	contentType := "application/json"
+	if cl.raw != nil {
+		body = bytes.NewReader(cl.raw)
+		contentType = cl.rawType
+	} else if cl.in != nil {
 		b, err := json.Marshal(cl.in)
 		if err != nil {
 			return nil, &Error{Kind: KindProtocol, Op: op, Message: "encode request", Err: err}
@@ -170,7 +178,7 @@ func (c *Client) roundTrip(ctx context.Context, cl call, limit int64) (*response
 		return nil, &Error{Kind: KindProtocol, Op: op, Message: "build request", Err: err}
 	}
 	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Type", contentType)
 	}
 
 	resp, err := c.http.Do(req)

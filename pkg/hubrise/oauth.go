@@ -17,8 +17,9 @@ const (
 	DefaultOAuthBaseURL = "https://manager.hubrise.com/oauth2/v1"
 
 	// DefaultScope is what the integration asks for: orders (push and status), the customer list,
-	// the catalog (read only) and the inventory (read and write), all at the location level.
-	DefaultScope = "location[orders.write,customer_list.write,catalog.read,inventory.read,inventory.write]"
+	// the catalog (read, and write for the dashboard-owned menu that is published to HubRise) and the
+	// inventory (read and write), all at the location level.
+	DefaultScope = "location[orders.write,customer_list.write,catalog.read,catalog.write,inventory.read,inventory.write]"
 )
 
 // TokenResponse is what the token endpoint answers: the access token and where it gives access to.
