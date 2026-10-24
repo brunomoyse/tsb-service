@@ -7,8 +7,8 @@ require (
 	github.com/99designs/gqlgen v0.17.95
 	github.com/VictorAvelar/mollie-api-go/v4 v4.16.0
 	github.com/coder/websocket v1.8.15
-	github.com/getsentry/sentry-go v0.49.0
-	github.com/getsentry/sentry-go/gin v0.49.0
+	github.com/getsentry/sentry-go v0.50.0
+	github.com/getsentry/sentry-go/gin v0.50.0
 	github.com/gin-contrib/cors v1.7.9
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-pdf/fpdf v0.9.0
