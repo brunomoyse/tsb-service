@@ -19,8 +19,8 @@ COPY . .
 
 # Step 7: Build the Go app and migration tool with cross-compilation support
 ENV GIN_MODE=release
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-service cmd/app/main.go && \
-    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-migrate cmd/migrate/main.go
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-service ./cmd/app && \
+    GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o tsb-migrate ./cmd/migrate
 
 # Step 7: Use base alpine image to create the final image
 FROM alpine:3.24.3
