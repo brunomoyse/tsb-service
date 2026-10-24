@@ -120,6 +120,7 @@ func Install(o Options) (*Runtime, error) {
 
 	cat := o.Catalog
 	cat.Clients, cat.Holder, cat.Notifier = clients, holder, r
+	cat.Audit = auditFunc(o.Audit)
 	if o.Images != nil {
 		cat.Images = o.Images
 	} else {
@@ -128,7 +129,7 @@ func Install(o Options) (*Runtime, error) {
 	catalog := m.NewCatalog(pushed, cat)
 
 	inv := o.Inventory
-	inv.Clients, inv.Holder, inv.Notifier, inv.Drift = clients, holder, r, catalog.Drift
+	inv.Clients, inv.Holder, inv.Notifier, inv.Drift, inv.Publish = clients, holder, r, catalog.Drift, catalog.Publisher
 	inventory := m.NewInventory(pushed, inv)
 	inventory.Attach(inbound)
 
@@ -146,6 +147,7 @@ func Install(o Options) (*Runtime, error) {
 			Order:     resolver.HubriseOrderHooks{Push: pushed.Pusher},
 			Inventory: resolver.HubriseInventoryHooks{Inventory: inventory.Service},
 			Catalog:   resolver.CatalogGuardHooks{Guard: catalog.Guard},
+			Publish:   resolver.HubrisePublishHooks{Publisher: catalog.Publisher},
 		},
 	}
 	callbackFailures := middleware.NewRateLimiter(failureRate, failureBurst)
@@ -157,6 +159,7 @@ func Install(o Options) (*Runtime, error) {
 	r.Hubrise = rt.Hooks
 	r.HubriseAdmin = admin
 	r.OrderService.SetStatusObserver(rt.Hooks)
+	r.ProductService.SetMenuObserver(rt.Hooks)
 	r.UserService.SetProfileObserver(pushed.Customers)
 	return rt, nil
 }
@@ -183,7 +186,8 @@ func (rt *Runtime) Register(api gin.IRoutes) {
 const restartDelay = 5 * time.Second
 
 // Run runs every background worker until ctx ends and returns when all of them have stopped: the
-// outbox drain, the reconciler, the callback event processor, the callback poller, and the
+// outbox drain, the reconciler, the callback event processor, the callback poller, the catalog
+// publisher (the debounced publish of the dashboard's menu and its local-hash scan), and the
 // inventory side (event processor, 30 minute read, sold-out sweeper, catalog drift check). The
 // singleton jobs take their lease in the database, so every replica runs the same set. The workers
 // run as the system (admin context): the HubRise tables and the shop tables they touch are reached
@@ -200,6 +204,7 @@ func (rt *Runtime) workers() map[string]func(context.Context) {
 		"events":     rt.Sync.Processor.Run,
 		"poller":     rt.Sync.Poller.Run,
 		"inventory":  rt.Inventory.Run,
+		"publisher":  rt.Catalog.Publisher.Run,
 	}
 }
 

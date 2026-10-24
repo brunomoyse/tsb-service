@@ -31,7 +31,8 @@ type PublishStatus struct {
 	LastErrorCode           domain.PublishErrorCode
 	LastErrorAt             *time.Time
 	ExternalChangeAt        *time.Time
-	// NeedsReconnectForWrite says the stored scope has no catalog.write.
+	// NeedsReconnectForWrite says the stored scope has no catalog.write, or HubRise refused the write
+	// for lack of it.
 	NeedsReconnectForWrite bool
 	AccountCatalogDetected bool
 	PublishImages          bool
@@ -53,7 +54,7 @@ func (p *CatalogPublisher) Status(ctx context.Context, conn *domain.Connection) 
 	}
 	now := p.now()
 	out.Enabled = conn.CatalogDirection() == domain.DirectionPublish
-	out.NeedsReconnectForWrite = conn.Connected() && !conn.HasWriteScope()
+	out.NeedsReconnectForWrite = conn.Connected() && (!conn.HasWriteScope() || state.ErrorCode() == domain.PublishWriteScopeMissing)
 	out.PublishImages = conn.PublishImages
 	out.AccountCatalogDetected = state.ErrorCode() == domain.PublishAccountCatalog
 	out.FirstPublishConfirmedAt = state.FirstPublishConfirmedAt

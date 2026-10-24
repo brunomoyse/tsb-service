@@ -17,6 +17,7 @@ import (
 	hubDomain "tsb-service/internal/modules/hubrise/domain"
 	hubtest "tsb-service/internal/modules/hubrise/testhelpers"
 	orderApplication "tsb-service/internal/modules/order/application"
+	productApplication "tsb-service/internal/modules/product/application"
 	userApplication "tsb-service/internal/modules/user/application"
 	"tsb-service/internal/shared/audit"
 )
@@ -37,6 +38,13 @@ type userServiceSpy struct {
 
 func (s *userServiceSpy) SetProfileObserver(o userApplication.ProfileObserver) { s.observer = o }
 
+type productServiceSpy struct {
+	productApplication.ProductService
+	observer productApplication.MenuObserver
+}
+
+func (s *productServiceSpy) SetMenuObserver(o productApplication.MenuObserver) { s.observer = o }
+
 // noImages is an image uploader the caller supplies instead of the file service.
 type noImages struct{}
 
@@ -55,8 +63,13 @@ func testModule(t *testing.T) *hubrise.Module {
 }
 
 func testResolver() (*resolver.Resolver, *orderServiceSpy, *userServiceSpy) {
-	orders, users := &orderServiceSpy{}, &userServiceSpy{}
-	return &resolver.Resolver{OrderService: orders, UserService: users}, orders, users
+	r, orders, users, _ := testResolverWithProducts()
+	return r, orders, users
+}
+
+func testResolverWithProducts() (*resolver.Resolver, *orderServiceSpy, *userServiceSpy, *productServiceSpy) {
+	orders, users, products := &orderServiceSpy{}, &userServiceSpy{}, &productServiceSpy{}
+	return &resolver.Resolver{OrderService: orders, UserService: users, ProductService: products}, orders, users, products
 }
 
 func TestInstallWithoutAModuleDoesNothing(t *testing.T) {
@@ -71,7 +84,7 @@ func TestInstallWithoutAModuleDoesNothing(t *testing.T) {
 }
 
 func TestInstallConnectsTheIntegrationToTheShop(t *testing.T) {
-	r, orders, users := testResolver()
+	r, orders, users, products := testResolverWithProducts()
 	rt, err := Install(Options{
 		Module: testModule(t), Resolver: r, APIBaseURL: "https://shop.example.test/api/v1", DashboardURL: "https://dash.example.test",
 		Audit: audit.NewRecorder(nil),
@@ -85,6 +98,8 @@ func TestInstallConnectsTheIntegrationToTheShop(t *testing.T) {
 	assert.Same(t, rt.Admin, r.HubriseAdmin)
 	assert.Equal(t, rt.Hooks, orders.observer, "the status observer of the order service")
 	assert.Same(t, rt.Push.Customers, users.observer, "the profile observer of the user service")
+	assert.Equal(t, rt.Hooks, products.observer, "the menu observer of the product service")
+	assert.NotNil(t, rt.Catalog.Publisher)
 
 	router := gin.New()
 	rt.Register(router.Group("/api/v1"))
@@ -185,8 +200,8 @@ func TestRunStartsEveryRegisteredWorker(t *testing.T) {
 		assert.NotNil(t, run, name)
 		names = append(names, name)
 	}
-	assert.ElementsMatch(t, []string{"outbox", "reconciler", "events", "poller", "inventory"}, names,
-		"the outbox drain, the reconciler, the callback event processor, the callback poller and the inventory side")
+	assert.ElementsMatch(t, []string{"outbox", "reconciler", "events", "poller", "inventory", "publisher"}, names,
+		"the outbox drain, the reconciler, the callback event processor, the callback poller, the inventory side and the catalog publisher")
 }
 
 func TestRunAllStartsEachWorkerAndWaitsForAllOfThem(t *testing.T) {

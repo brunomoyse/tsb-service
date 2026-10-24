@@ -551,7 +551,7 @@ func (p *CatalogPublisher) failFromRead(ctx context.Context, state *domain.Publi
 func (p *CatalogPublisher) failFromWrite(ctx context.Context, api PublishAPI, state *domain.PublishState, err error, fail failFunc) (*PublishOutcome, error) {
 	switch hubrise.KindOf(err) {
 	case hubrise.KindForbidden:
-		return fail(domain.PublishFailure{Code: domain.PublishWriteScopeMissing, Message: truncate(err.Error(), 500)}, true, err)
+		return fail(domain.PublishFailure{Code: domain.PublishWriteScopeMissing, Message: truncate(err.Error(), 500)}, true, domain.ErrReconnectRequired)
 	case hubrise.KindUnauthorized:
 		if _, perr := api.GetLocation(ctx); perr != nil && (hubrise.KindOf(perr) == hubrise.KindUnauthorized || hubrise.KindOf(perr) == hubrise.KindForbidden) {
 			p.noteAuthError(ctx, perr)

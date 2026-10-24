@@ -508,7 +508,7 @@ func TestErrorsOfTheCatalogWrite(t *testing.T) {
 		e := newPubEnv(t)
 		e.product("M1", "Maki", "8.90")
 		st, err := e.faulty(hubrisetest.Fault{Method: "PUT", Status: 403, Times: 1})
-		assert.ErrorIs(t, err, hubrise.KindForbidden)
+		assert.ErrorIs(t, err, domain.ErrReconnectRequired, "the admin is asked to reconnect")
 		assert.Equal(t, domain.PublishWriteScopeMissing, st.ErrorCode())
 		assert.NotNil(t, st.BlockedAt)
 		assert.Nil(t, e.conn().AuthErrorAt, "no global pause")
