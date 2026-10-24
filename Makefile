@@ -2,7 +2,7 @@
 # itself keeps its commands in CLAUDE.md / README.md.
 
 GOLANGCI_LINT ?= golangci-lint
-MCP_IMAGE     ?= ghcr.io/brunomoyse/tsb-mcp:dev
+MCP_IMAGE     ?= ghcr.io/nuagemagique-dev/pili-mcp:dev
 MCP_ENV       ?= .env.mcp
 
 .PHONY: mcp-build mcp-test mcp-lint mcp-run mcp-run-http mcp-docker

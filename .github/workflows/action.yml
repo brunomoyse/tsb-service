@@ -20,8 +20,8 @@ on:
 
 env:
   DOCKER_REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.actor }}/tsb-service
-  MCP_IMAGE_NAME: ${{ github.actor }}/tsb-mcp
+  IMAGE_NAME: ${{ github.repository_owner }}/pili-api
+  MCP_IMAGE_NAME: ${{ github.repository_owner }}/pili-mcp
 
 # ── Test (auto on push to main) ──────────────────────────────────────────────
 
@@ -122,11 +122,13 @@ jobs:
         env:
           APP: tsb-service
           TAG: ${{ github.ref_name }}
+          REPO: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
+          MCP_REPO: ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}
         with:
           host: ${{ vars.OVH_HOST }}
           username: ${{ vars.OVH_USER }}
           key: ${{ secrets.OVH_SSH_PRIVATE_KEY }}
-          envs: APP,TAG
+          envs: APP,TAG,REPO,MCP_REPO
           script: |
             set -euo pipefail
             export SOPS_AGE_KEY_FILE=/opt/tokyosushi/.config/sops/age/keys.txt
@@ -137,11 +139,12 @@ jobs:
             # one-off --reset-then-reuse-values upgrade); otherwise the --set would
             # create a half-defined app and fail the atomic upgrade.
             MCP_SET=""
-            if sudo kubectl get deployment tsb-mcp -n tokyosushi >/dev/null 2>&1; then MCP_SET="--set apps.tsb-mcp.image.tag=${TAG}"; fi
+            if sudo kubectl get deployment tsb-mcp -n tokyosushi >/dev/null 2>&1; then MCP_SET="--set apps.tsb-mcp.image.repository=${MCP_REPO} --set apps.tsb-mcp.image.tag=${TAG}"; fi
             sops -d "secrets/${APP}.secret.enc.yaml" | sudo kubectl apply -n tokyosushi -f -
             sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
               --namespace tokyosushi \
               --reuse-values \
+              --set "apps.${APP}.image.repository=${REPO}" \
               --set "apps.${APP}.image.tag=${TAG}" \
               ${MCP_SET} \
               --atomic --timeout 5m
@@ -155,6 +158,7 @@ jobs:
                 --namespace ygf \
                 -f ./charts/tokyosushi-apps/values.ygf.yaml \
                 --reuse-values \
+                --set "apps.${APP}.image.repository=${REPO}" \
                 --set "apps.${APP}.image.tag=${TAG}" \
                 --atomic --timeout 5m
               sudo kubectl exec -n ygf deployment/tsb-service -- /app/tsb-migrate -cmd=up
@@ -174,18 +178,20 @@ jobs:
         env:
           APP: tsb-service
           TAG: ${{ inputs.version }}
+          REPO: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
+          MCP_REPO: ${{ env.DOCKER_REGISTRY }}/${{ env.MCP_IMAGE_NAME }}
           MIGRATIONS_DOWN: ${{ inputs.migrations_down }}
         with:
           host: ${{ vars.OVH_HOST }}
           username: ${{ vars.OVH_USER }}
           key: ${{ secrets.OVH_SSH_PRIVATE_KEY }}
-          envs: APP,TAG,MIGRATIONS_DOWN
+          envs: APP,TAG,REPO,MCP_REPO,MIGRATIONS_DOWN
           script: |
             set -euo pipefail
             cd /opt/tokyosushi/tsb-infra
             # Same tsb-mcp gate as the deploy job.
             MCP_SET=""
-            if sudo kubectl get deployment tsb-mcp -n tokyosushi >/dev/null 2>&1; then MCP_SET="--set apps.tsb-mcp.image.tag=${TAG}"; fi
+            if sudo kubectl get deployment tsb-mcp -n tokyosushi >/dev/null 2>&1; then MCP_SET="--set apps.tsb-mcp.image.repository=${MCP_REPO} --set apps.tsb-mcp.image.tag=${TAG}"; fi
             # Roll back DB migrations first (using current container), before swapping image
             for i in $(seq 1 "${MIGRATIONS_DOWN:-0}"); do
               sudo kubectl exec -n tokyosushi deployment/tsb-service -- /app/tsb-migrate -cmd=down
@@ -193,6 +199,7 @@ jobs:
             sudo flock -w 600 /var/lock/tokyosushi-apps-helm.lock env KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install tokyosushi-apps ./charts/tokyosushi-apps \
               --namespace tokyosushi \
               --reuse-values \
+              --set "apps.${APP}.image.repository=${REPO}" \
               --set "apps.${APP}.image.tag=${TAG}" \
               ${MCP_SET} \
               --atomic --timeout 5m

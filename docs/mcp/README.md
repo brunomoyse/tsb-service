@@ -165,7 +165,7 @@ Suggested agent flow:
 
 ## Deployment
 
-- **Image:** `ghcr.io/brunomoyse/tsb-mcp`, built by `.github/workflows/action.yml` next to tsb-service. A push to `main` builds `:latest`. A `v*` tag builds `:production` and `:vX.Y.Z`.
+- **Image:** `ghcr.io/nuagemagique-dev/pili-mcp`, built by `.github/workflows/action.yml` next to tsb-service. A push to `main` builds `:latest`. A `v*` tag builds `:production` and `:vX.Y.Z`.
 - **Helm:** the app is declared in the `tokyosushi-apps` chart of tsb-infra (`apps.tsb-mcp`), with:
   - one replica (SQLite) and the Recreate strategy;
   - a PVC mounted on `/data`;
