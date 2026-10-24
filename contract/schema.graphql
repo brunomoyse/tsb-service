@@ -1,0 +1,782 @@
+directive @admin on FIELD_DEFINITION
+directive @auth on FIELD_DEFINITION
+directive @staff on FIELD_DEFINITION
+type Address {
+  id: String!
+  postcode: String!
+  municipalityName: String!
+  streetName: String!
+  houseNumber: String!
+  boxNumber: String
+  distance: Float!
+  lat: Float
+  lng: Float
+  duration: Int
+}
+type AddressSuggestion {
+  placeId: String!
+  description: String!
+  mainText: String!
+  secondaryText: String!
+}
+type AssistantAccount {
+  id: String!
+  name: String!
+  username: String
+  linkedAt: DateTime!
+}
+type AssistantConnection {
+  enabled: Boolean!
+  state: AssistantConnectionState!
+  botUsername: String
+  accounts: [AssistantAccount!]!
+  maxAccounts: Int!
+  problemSince: DateTime
+}
+enum AssistantConnectionState {
+  READY
+  NO_ACCOUNTS
+  TOKEN_REJECTED
+  CONFLICT
+  UNAVAILABLE
+}
+type AssistantLink {
+  id: String!
+  status: AssistantLinkStatus!
+  url: String!
+  expiresAt: DateTime!
+  account: AssistantAccount
+}
+enum AssistantLinkStatus {
+  WAIT
+  LINKED
+  EXPIRED
+  REFUSED_FULL
+}
+type ChoiceTranslation {
+  locale: String!
+  name: String!
+}
+input ChoiceTranslationInput {
+  locale: String!
+  name: String!
+}
+type Coupon {
+  id: ID!
+  code: String!
+  discountType: String!
+  discountValue: String!
+  minOrderAmount: String
+  maxUses: Int
+  maxUsesPerUser: Int
+  usedCount: Int!
+  isActive: Boolean!
+  """
+  Refused on orders from the website: only the iOS/Android app can redeem it.
+  """
+  appOnly: Boolean!
+  status: CouponStatus!
+  validFrom: DateTime
+  validUntil: DateTime
+  createdAt: DateTime!
+}
+enum CouponStatus {
+  ACTIVE
+  INACTIVE
+  SCHEDULED
+  EXPIRED
+  EXHAUSTED
+}
+type CouponValidation {
+  valid: Boolean!
+  discountAmount: String!
+  """
+  English message, for logs and old clients: show errorCode translated instead.
+  """
+  errorMessage: String
+  """
+  Stable code when valid is false: COUPON_INVALID, COUPON_MIN_ORDER_NOT_MET, COUPON_APP_ONLY or COUPON_RATE_LIMITED.
+  """
+  errorCode: String
+}
+input CreateCouponInput {
+  """
+  Optional. When omitted or blank, the server generates a unique code.
+  """
+  code: String
+  discountType: String!
+  discountValue: String!
+  minOrderAmount: String
+  maxUses: Int
+  maxUsesPerUser: Int
+  isActive: Boolean!
+  """
+  Only the iOS/Android app can redeem it. Defaults to false.
+  """
+  appOnly: Boolean
+  validFrom: DateTime
+  validUntil: DateTime
+}
+input CreateOrderInput {
+  orderType: OrderTypeEnum!
+  isOnlinePayment: Boolean!
+  addressPlaceId: String
+  addressExtra: String
+  orderNote: String
+  orderExtra: [OrderExtraInput!]
+  preferredReadyTime: DateTime
+  items: [CreateOrderItemInput!]!
+  couponCode: String
+  cashPaymentAmount: String
+  paymentRedirectUrl: String
+}
+input CreateOrderItemInput {
+  productId: ID!
+  quantity: Int!
+  choiceId: ID
+  selections: [CreateOrderItemSelectionInput!]
+}
+input CreateOrderItemSelectionInput {
+  groupId: ID!
+  choiceId: ID!
+  quantity: Int!
+}
+input CreateProductChoiceGroupInput {
+  productId: ID!
+  minSelections: Int!
+  maxSelections: Int!
+  sortOrder: Int!
+  translations: [ChoiceTranslationInput!]!
+}
+input CreateProductChoiceInput {
+  productId: ID
+  choiceGroupId: ID
+  priceModifier: String!
+  sortOrder: Int!
+  translations: [ChoiceTranslationInput!]!
+}
+input CreateProductInput {
+  categoryId: ID!
+  code: String
+  image: Upload
+  removeBackground: Boolean
+  isAvailable: Boolean!
+  isDiscountable: Boolean!
+  isHalal: Boolean!
+  isLunchOnly: Boolean!
+  isSpicy: Boolean!
+  isVegetarian: Boolean!
+  isVisible: Boolean!
+  pieceCount: Int
+  price: String!
+  vatCategory: String!
+  translations: [TranslationInput!]!
+}
+type CustomerStats {
+  userId: ID!
+  firstName: String!
+  lastName: String!
+  email: String!
+  phoneNumber: String
+  registeredAt: DateTime!
+  totalOrders: Int!
+  totalAmount: String!
+  averageOrderAmount: String!
+  firstOrderDate: DateTime!
+  lastOrderDate: DateTime!
+  preferredOrderType: OrderTypeEnum!
+  deliveryCount: Int!
+  pickupCount: Int!
+}
+input CustomerStatsInput {
+  startDate: DateTime
+  endDate: DateTime
+  orderType: OrderTypeEnum
+  minOrders: Int
+}
+type CustomerStatsResponse {
+  summary: CustomerStatsSummary!
+  customers: [CustomerStats!]!
+}
+type CustomerStatsSummary {
+  totalCustomers: Int!
+  totalRevenue: String!
+  averageOrderValue: String!
+  totalOrders: Int!
+}
+scalar DateTime
+type DaySchedule {
+  open: String!
+  close: String!
+  dinnerOpen: String
+  dinnerClose: String
+}
+input DayScheduleInput {
+  open: String!
+  close: String!
+  dinnerOpen: String
+  dinnerClose: String
+}
+"""
+One step of the delivery fee grid: an address closer than upToKm (and not closer than the previous
+tier's upToKm) pays fee.
+"""
+type DeliveryFeeTier {
+  upToKm: Float!
+  """
+  Decimal string with cents, e.g. "1.00".
+  """
+  fee: String!
+}
+scalar JSON
+type Mutation {
+  startAssistantLink: AssistantLink! @admin
+  removeAssistantAccount(id: String!): AssistantConnection! @admin
+  createCoupon(input: CreateCouponInput!): Coupon! @staff
+  updateCoupon(id: ID!, input: UpdateCouponInput!): Coupon! @admin
+  createOrder(input: CreateOrderInput!): Order! @auth
+  updateOrder(id: ID!, input: UpdateOrderInput!): Order! @staff
+  registerDeviceToken(deviceToken: String!, platform: String!): Boolean! @auth
+  unregisterDeviceToken(deviceToken: String!): Boolean! @auth
+  registerLiveActivityToken(orderId: ID!, token: String!): Boolean! @auth
+  updateMyOrdersLanguage(language: String!): Int! @auth
+  updatePaymentStatus(orderId: ID!, status: String!): Payment! @staff
+  createProduct(input: CreateProductInput!): Product! @admin
+  updateProduct(id: ID!, input: UpdateProductInput!): Product! @admin
+  createProductChoiceGroup(input: CreateProductChoiceGroupInput!): ProductChoiceGroup! @admin
+  updateProductChoiceGroup(id: ID!, input: UpdateProductChoiceGroupInput!): ProductChoiceGroup! @admin
+  deleteProductChoiceGroup(id: ID!): Boolean! @admin
+  createProductChoice(input: CreateProductChoiceInput!): ProductChoice! @admin
+  updateProductChoice(id: ID!, input: UpdateProductChoiceInput!): ProductChoice! @admin
+  deleteProductChoice(id: ID!): Boolean! @admin
+  updateOrderingEnabled(enabled: Boolean!): RestaurantConfig! @admin
+  updateOpeningHours(hours: OpeningHoursInput!): RestaurantConfig! @admin
+  updateOrderingHours(hours: OpeningHoursInput!): RestaurantConfig! @admin
+  updatePreparationMinutes(minutes: Int!): RestaurantConfig! @admin
+  upsertScheduleOverride(input: ScheduleOverrideInput!): ScheduleOverride! @admin
+  deleteScheduleOverride(date: DateTime!): Boolean! @admin
+  updateMe(input: UpdateUserInput!): User! @auth
+  """
+  Permanently deletes the caller's account in one step (GDPR erasure): removes the Zitadel identity and anonymizes the user record. Returns true on success.
+  """
+  deleteMe: Boolean! @auth
+}
+input OpeningHoursInput {
+  monday: DayScheduleInput
+  tuesday: DayScheduleInput
+  wednesday: DayScheduleInput
+  thursday: DayScheduleInput
+  friday: DayScheduleInput
+  saturday: DayScheduleInput
+  sunday: DayScheduleInput
+}
+type Order {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  status: OrderStatusEnum!
+  type: OrderTypeEnum!
+  isOnlinePayment: Boolean!
+  discountAmount: String!
+  deliveryFee: String
+  transactionFee: String
+  totalPrice: String!
+  preferredReadyTime: DateTime
+  estimatedReadyTime: DateTime
+  addressExtra: String
+  orderNote: String
+  orderExtra: JSON
+  couponCode: String
+  cancellationReason: OrderCancellationReason
+  cashPaymentAmount: String
+  address: Address
+  customer: User
+  payment: Payment
+  items: [OrderItem!]!
+  isManualAddress: Boolean!
+  statusHistory: [OrderStatusHistory!]! @admin
+  displayCustomerName: String!
+  displayAddress: String!
+}
+enum OrderCancellationReason {
+  OUT_OF_STOCK
+  KITCHEN_CLOSED
+  DELIVERY_AREA
+  """
+  The customer placed the same order twice (or re-ordered with a change); the other one stands.
+  """
+  DUPLICATE
+  OTHER
+}
+input OrderExtraInput {
+  name: String!
+  options: [String!]
+}
+input OrderHistoryInput {
+  startDate: DateTime
+  endDate: DateTime
+  status: OrderStatusEnum
+  orderType: OrderTypeEnum
+  search: String
+  first: Int = 20
+  page: Int = 1
+}
+type OrderHistoryResponse {
+  orders: [Order!]!
+  summary: OrderHistorySummary!
+}
+type OrderHistorySummary {
+  totalOrders: Int!
+  totalRevenue: String!
+  averageOrder: String!
+}
+"""
+An order-level problem. code: ORDERING_UNAVAILABLE, ORDERING_CLOSED_TODAY, SLOT_*, ORDER_EMPTY,
+ORDER_TOO_MANY_ITEMS, DELIVERY_MINIMUM_NOT_MET, ADDRESS_REQUIRED, ADDRESS_UNRESOLVABLE,
+DELIVERY_OUT_OF_ZONE, DELIVERY_AREA_EXCLUDED, DELIVERY_UNAVAILABLE or a COUPON_* code.
+"""
+type OrderIssue {
+  code: String!
+  """
+  Euros, for DELIVERY_MINIMUM_NOT_MET and COUPON_MIN_ORDER_NOT_MET.
+  """
+  minimum: String
+}
+type OrderItem {
+  product: Product!
+  productID: ID!
+  unitPrice: String!
+  quantity: Int!
+  totalPrice: String!
+  vatRateApplied: String!
+  choiceId: ID
+  choice: ProductChoice
+  selections: [OrderItemSelection!]!
+}
+type OrderItemSelection {
+  groupId: ID!
+  choiceId: ID!
+  quantity: Int!
+  group: ProductChoiceGroup!
+  choice: ProductChoice!
+}
+"""
+A problem with one line. code: PRODUCT_NOT_FOUND, PRODUCT_UNAVAILABLE, INVALID_QUANTITY,
+SELECTION_INVALID, INVALID_PRICE, LUNCH_SLOT_REQUIRED or PRICE_CHANGED.
+"""
+type OrderLineIssue {
+  code: String!
+  """
+  Today's price of the product, whenever it exists (PRICE_CHANGED, PRODUCT_UNAVAILABLE...).
+  """
+  currentPrice: String
+}
+"""
+The price of a basket right now. Money fields are decimal strings ("12.50"); `total` is what the
+customer would be charged (equal to the createOrder total_price), a multiple of 0,10 EUR and never
+negative. A basket with any `issues` or line issues cannot be ordered as is.
+"""
+type OrderQuote {
+  """
+  In the order of the input items.
+  """
+  lines: [OrderQuoteLine!]!
+  """
+  Σ lineTotal of the lines that could be priced.
+  """
+  subtotal: String!
+  deliveryFee: String!
+  pickupDiscount: String!
+  couponDiscount: String!
+  """
+  The online payment surcharge (0 for cash).
+  """
+  onlineFee: String!
+  total: String!
+  """
+  null when no coupon code was sent.
+  """
+  coupon: OrderQuoteCoupon
+  """
+  Order-level problems; every code is in apperr (codes.go).
+  """
+  issues: [OrderIssue!]!
+}
+type OrderQuoteCoupon {
+  code: String!
+  valid: Boolean!
+  """
+  Why it is not valid: a COUPON_* code, or UNAUTHENTICATED when the caller is not signed in (the coupon was not evaluated).
+  """
+  errorCode: String
+}
+type OrderQuoteLine {
+  productId: ID!
+  quantity: Int!
+  """
+  The selections as priced: the legacy choiceId is folded in, choices that exist carry today's priceModifier.
+  """
+  selections: [OrderQuoteSelection!]!
+  """
+  Today's price of the product itself (without choices); null when the product does not exist.
+  """
+  productPrice: String
+  """
+  lineTotal / quantity rounded to cents (what createOrder stores as unit_price).
+  """
+  unitPrice: String!
+  """
+  base × quantity + Σ choice surcharges (see PriceLine); 0 when the line cannot be priced (missing or sold-out product, bad quantity or selections).
+  """
+  lineTotal: String!
+  issues: [OrderLineIssue!]!
+}
+type OrderQuoteSelection {
+  groupId: ID!
+  choiceId: ID!
+  quantity: Int!
+  priceModifier: String!
+}
+enum OrderStatusEnum {
+  PENDING
+  CONFIRMED
+  PREPARING
+  AWAITING_PICK_UP
+  PICKED_UP
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  FAILED
+}
+type OrderStatusHistory {
+  id: ID!
+  status: OrderStatusEnum!
+  changedAt: DateTime!
+}
+enum OrderTypeEnum {
+  DELIVERY
+  PICKUP
+}
+"""
+The ordering rules the backend enforces when pricing a basket (quoteOrder / createOrder), read-only
+and public. Money is a decimal string with cents ("25.00"); a client should display these values
+instead of duplicating them.
+"""
+type OrderingPolicy {
+  """
+  False for a takeaway-only instance: delivery orders are refused (DELIVERY_UNAVAILABLE).
+  """
+  deliveryEnabled: Boolean!
+  """
+  Minimum basket for delivery (goods only, before the fee), e.g. "25.00".
+  """
+  deliveryMinimum: String!
+  """
+  Addresses at or beyond this distance are out of zone.
+  """
+  deliveryMaxDistanceKm: Float!
+  """
+  Delivery fee by distance, ascending by upToKm; the last upToKm equals deliveryMaxDistanceKm.
+  """
+  deliveryFeeTiers: [DeliveryFeeTier!]!
+  """
+  Postcodes never delivered to, whatever the distance.
+  """
+  excludedPostcodes: [String!]!
+  """
+  Share of the discountable products' total taken off a pickup order (0.10 = 10 %). Which products are discountable is Product.isDiscountable.
+  """
+  pickupDiscountRate: Float!
+  """
+  Minimum pickup basket (goods + delivery fee) for the discount, e.g. "20.00".
+  """
+  pickupDiscountMinimum: String!
+  """
+  Added to the total of an online payment, e.g. "0.30".
+  """
+  onlinePaymentFee: String!
+  """
+  Every total is rounded to a multiple of this amount, e.g. "0.10".
+  """
+  totalRoundingStep: String!
+  """
+  Ready-time slots are generated on, and must be aligned to, this many minutes.
+  """
+  slotIntervalMinutes: Int!
+  """
+  Floor under preparationMinutes when a ready time is validated: max(preparationMinutes, this).
+  """
+  minimumPreparationMinutes: Int!
+}
+type Payment {
+  id: ID!
+  resource: String
+  molliePaymentId: String!
+  status: String!
+  description: String
+  cancelUrl: String
+  webhookUrl: String
+  country_code: String
+  restrictPaymentMethodsToCountry: String
+  profileId: String
+  settlementId: String
+  orderId: ID!
+  isCancelable: Boolean!
+  mode: String
+  locale: String
+  method: String
+  metadata: JSON
+  links: JSON
+  createdAt: DateTime!
+  authorizedAt: DateTime
+  paidAt: DateTime
+  canceledAt: DateTime
+  expiresAt: DateTime
+  expiredAt: DateTime
+  failedAt: DateTime
+  amount: Float
+  amountRefunded: Float
+  amountRemaining: Float
+  amountCaptured: Float
+  amountChargedBack: Float
+  settlementAmount: Float
+}
+type Product {
+  code: String
+  createdAt: DateTime!
+  id: ID!
+  isAvailable: Boolean!
+  isDiscountable: Boolean!
+  isHalal: Boolean!
+  isLunchOnly: Boolean!
+  isSpicy: Boolean!
+  isVegetarian: Boolean!
+  isVisible: Boolean!
+  pieceCount: Int
+  price: String!
+  slug: String!
+  vatCategory: String!
+  name: String!
+  description: String
+  category: ProductCategory!
+  choices: [ProductChoice!]!
+  choiceGroups: [ProductChoiceGroup!]!
+  translations: [Translation!]!
+}
+type ProductCategory {
+  id: ID!
+  order: Int!
+  slug: String!
+  name: String!
+  products: [Product!]!
+  translations: [Translation!]!
+}
+type ProductChoice {
+  id: ID!
+  productId: ID!
+  choiceGroupId: ID!
+  priceModifier: String!
+  sortOrder: Int!
+  name: String!
+  translations: [ChoiceTranslation!]!
+}
+type ProductChoiceGroup {
+  id: ID!
+  productId: ID!
+  minSelections: Int!
+  maxSelections: Int!
+  sortOrder: Int!
+  name: String!
+  translations: [ChoiceTranslation!]!
+  choices: [ProductChoice!]!
+}
+"""
+How often a product was ordered, for the menu's "your favourites" and "most ordered" rows.
+"""
+type ProductOrderCount {
+  productId: ID!
+  """
+  In how many separate orders the product was, however many units each one held.
+  """
+  orderCount: Int!
+}
+type Query {
+  autocompleteAddresses(input: String!, sessionToken: String!): [AddressSuggestion!]!
+  resolveAddress(placeId: String!, sessionToken: String!): Address!
+  assistantConnection: AssistantConnection! @admin
+  assistantLink(id: String!): AssistantLink! @admin
+  validateCoupon(code: String!, orderAmount: String!): CouponValidation! @auth
+  coupons: [Coupon!]! @admin
+  coupon(id: ID!): Coupon! @admin
+  """
+  Public: the basket can be priced before signing in. A coupon is only evaluated when authenticated.
+  """
+  quoteOrder(input: QuoteOrderInput!): OrderQuote!
+  orders: [Order!]! @staff
+  order(id: ID!): Order! @staff
+  customerOrders(userId: ID!, first: Int = 20, page: Int = 1): [Order!]! @admin
+  orderHistory(input: OrderHistoryInput): OrderHistoryResponse! @admin
+  myOrders(first: Int = 5, page: Int = 1): [Order!]! @auth
+  myOrder(id: ID!): Order! @auth
+  """
+  The signed-in customer's products from their delivered or collected orders, most often ordered first. Only products on sale now; `first` is capped at 24.
+  """
+  myOrderedProducts(first: Int = 12): [ProductOrderCount!]! @auth
+  """
+  The products in the most delivered or collected orders over the last 90 days, at most two per category. Only products on sale now; `first` is capped at 24.
+  """
+  popularProducts(first: Int = 8): [ProductOrderCount!]!
+  product(id: ID!): Product!
+  products: [Product!]!
+  productCategory(id: ID!): ProductCategory!
+  productCategories: [ProductCategory!]!
+  productCategoryBySlug(slug: String!): ProductCategory
+  restaurantConfig: RestaurantConfig!
+  scheduleOverrides(from: DateTime!, to: DateTime!): [ScheduleOverride!]! @admin
+  me: User! @auth
+  customerStats(input: CustomerStatsInput): CustomerStatsResponse! @admin
+}
+"""
+Everything createOrder would validate and price, without saving anything: the basket as it would be
+charged right now. Problems are reported instead of failing on the first one.
+"""
+input QuoteOrderInput {
+  orderType: OrderTypeEnum!
+  isOnlinePayment: Boolean!
+  addressPlaceId: String
+  preferredReadyTime: DateTime
+  items: [QuoteOrderItemInput!]!
+  """
+  Only evaluated for an authenticated caller.
+  """
+  couponCode: String
+}
+input QuoteOrderItemInput {
+  productId: ID!
+  quantity: Int!
+  choiceId: ID
+  selections: [CreateOrderItemSelectionInput!]
+  """
+  The line total (decimal string) the client currently displays. When it differs from today's price the line gets a PRICE_CHANGED issue carrying currentPrice.
+  """
+  expectedLineTotal: String
+}
+type RestaurantConfig {
+  orderingEnabled: Boolean!
+  openingHours: JSON!
+  orderingHours: JSON
+  preparationMinutes: Int!
+  isCurrentlyOpen: Boolean!
+  isOrderingCurrentlyOpen: Boolean!
+  availableSlotsToday: [TimeSlot!]!
+  nextOpeningAt: DateTime
+  policy: OrderingPolicy!
+  updatedAt: DateTime!
+}
+type ScheduleOverride {
+  date: DateTime!
+  closed: Boolean!
+  schedule: DaySchedule
+  note: String
+  updatedAt: DateTime!
+}
+input ScheduleOverrideInput {
+  date: DateTime!
+  closed: Boolean!
+  schedule: DayScheduleInput
+  note: String
+}
+type Subscription {
+  assistantConnectionUpdated: AssistantConnection! @admin
+  couponUpdated: Coupon! @admin
+  orderCreated: Order! @staff
+  orderUpdated: Order! @staff
+  myOrderUpdated(orderId: ID!): Order! @auth
+  productUpdated: Product!
+  restaurantConfigUpdated: RestaurantConfig!
+  scheduleOverridesUpdated: [ScheduleOverride!]!
+}
+scalar Time
+type TimeSlot {
+  label: String!
+  value: DateTime!
+  isLunchOnlyAllowed: Boolean!
+}
+type Translation {
+  description: String
+  language: String!
+  name: String!
+}
+input TranslationInput {
+  description: String
+  language: String!
+  name: String!
+}
+input UpdateCouponInput {
+  code: String
+  discountType: String
+  discountValue: String
+  minOrderAmount: String
+  maxUses: Int
+  maxUsesPerUser: Int
+  isActive: Boolean
+  appOnly: Boolean
+  validFrom: DateTime
+  validUntil: DateTime
+}
+input UpdateOrderInput {
+  status: OrderStatusEnum
+  estimatedReadyTime: DateTime
+  cancellationReason: OrderCancellationReason
+}
+input UpdateProductChoiceGroupInput {
+  minSelections: Int
+  maxSelections: Int
+  sortOrder: Int
+  translations: [ChoiceTranslationInput!]
+}
+input UpdateProductChoiceInput {
+  priceModifier: String
+  sortOrder: Int
+  translations: [ChoiceTranslationInput!]
+}
+input UpdateProductInput {
+  categoryID: ID
+  code: String
+  image: Upload
+  removeBackground: Boolean
+  isAvailable: Boolean
+  isDiscountable: Boolean
+  isHalal: Boolean
+  isLunchOnly: Boolean
+  isSpicy: Boolean
+  isVegetarian: Boolean
+  isVisible: Boolean
+  pieceCount: Int
+  price: String
+  vatCategory: String
+  translations: [TranslationInput!]
+}
+input UpdateUserInput {
+  firstName: String
+  lastName: String
+  email: String
+  phoneNumber: String
+  addressPlaceId: String
+  notifyMarketing: Boolean
+  notifyOrderUpdates: Boolean
+}
+scalar Upload
+type User {
+  id: ID!
+  email: String!
+  firstName: String!
+  lastName: String!
+  phoneNumber: String
+  isAdmin: Boolean!
+  notifyMarketing: Boolean!
+  notifyOrderUpdates: Boolean!
+  deletionRequestedAt: DateTime
+  address: Address
+  orders: [Order!]
+}

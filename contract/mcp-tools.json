@@ -1,0 +1,957 @@
+[
+  {
+    "name": "deactivate_coupon",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "coupon_id": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "coupon_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "get_coupon",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "coupon_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "coupon_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "get_customer_stats",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "min_orders": {
+          "type": "integer"
+        },
+        "order_type": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "get_daily_summary",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "get_order",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "order_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "order_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "get_product",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "product_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "product_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "get_restaurant_config",
+    "inputSchema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
+    "name": "get_status",
+    "inputSchema": {
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  {
+    "name": "list_categories",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "list_orders",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "list_schedule_overrides",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_bulk_availability",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "product_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "product_ids",
+        "available"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_choice_change",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "choice_id": {
+          "type": "string"
+        },
+        "group_id": {
+          "type": "string"
+        },
+        "names": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "price_modifier_cents": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "request_context": {
+          "type": "string"
+        },
+        "sort_order": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_choice_deletion",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "choice_id": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "choice_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_choice_group_change",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "group_id": {
+          "type": "string"
+        },
+        "max_selections": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "min_selections": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "names": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "product_id": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        },
+        "sort_order": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_choice_group_deletion",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "group_id": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "group_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_coupon_activation",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "coupon_id": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "coupon_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_coupon_creation",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "amount_off_cents": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "app_only": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "discount_type": {
+          "type": "string"
+        },
+        "max_uses": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "max_uses_per_user": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "min_order_cents": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "percent_off": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "request_context": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": "string"
+        },
+        "valid_until": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "discount_type"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_coupon_update",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "amount_off_cents": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "app_only": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "coupon_id": {
+          "type": "string"
+        },
+        "discount_type": {
+          "type": "string"
+        },
+        "max_uses": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "max_uses_per_user": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "min_order_cents": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "percent_off": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "request_context": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": "string"
+        },
+        "valid_until": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "coupon_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_opening_hours",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "days": {
+          "additionalProperties": {
+            "additionalProperties": false,
+            "properties": {
+              "close": {
+                "type": "string"
+              },
+              "closed": {
+                "type": "boolean"
+              },
+              "dinner_close": {
+                "type": "string"
+              },
+              "dinner_open": {
+                "type": "string"
+              },
+              "open": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "days"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_ordering_hours",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "days": {
+          "additionalProperties": {
+            "additionalProperties": false,
+            "properties": {
+              "close": {
+                "type": "string"
+              },
+              "closed": {
+                "type": "boolean"
+              },
+              "dinner_close": {
+                "type": "string"
+              },
+              "dinner_open": {
+                "type": "string"
+              },
+              "open": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "days"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_price_change",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "new_price_cents": {
+          "type": "integer"
+        },
+        "product_id": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "product_id",
+        "new_price_cents"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_product_creation",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "category_id": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "descriptions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "is_discountable": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "is_halal": {
+          "type": "boolean"
+        },
+        "is_lunch_only": {
+          "type": "boolean"
+        },
+        "is_spicy": {
+          "type": "boolean"
+        },
+        "is_vegetarian": {
+          "type": "boolean"
+        },
+        "names": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "piece_count": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "price_cents": {
+          "type": "integer"
+        },
+        "request_context": {
+          "type": "string"
+        },
+        "vat_category": {
+          "type": "string"
+        },
+        "visible": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        }
+      },
+      "required": [
+        "category_id",
+        "names",
+        "price_cents"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_product_image",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "image_url": {
+          "type": "string"
+        },
+        "product_id": {
+          "type": "string"
+        },
+        "remove_background": {
+          "type": "boolean"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "product_id",
+        "image_url"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_product_update",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "category_id": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "descriptions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "is_discountable": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "is_halal": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "is_lunch_only": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "is_spicy": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "is_vegetarian": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "names": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "piece_count": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "product_id": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "product_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_restaurant_closure",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "reopen_at": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_restaurant_reopening",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_schedule_override",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "close": {
+          "type": "string"
+        },
+        "closed": {
+          "type": "boolean"
+        },
+        "date": {
+          "type": "string"
+        },
+        "dinner_close": {
+          "type": "string"
+        },
+        "dinner_open": {
+          "type": "string"
+        },
+        "end_date": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "open": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "date"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_schedule_override_removal",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "end_date": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "date"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "propose_vat_category_change",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "product_id": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        },
+        "vat_category": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "product_id",
+        "vat_category"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "search_coupons",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "search_products",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "type": "integer"
+        },
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "set_preparation_minutes",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "minutes": {
+          "type": "integer"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "minutes"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "set_product_availability",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "product_id": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "product_id",
+        "available"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "set_product_visibility",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "product_id": {
+          "type": "string"
+        },
+        "request_context": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "product_id",
+        "visible"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "undo_last_change",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "request_context": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  }
+]

@@ -26,3 +26,9 @@ mcp-run-http: mcp-build
 
 mcp-docker:
 	docker build -f Dockerfile.mcp -t $(MCP_IMAGE) .
+
+# Regenerate contract/schema.graphql and contract/mcp-tools.json (docs/contract/README.md).
+contract:
+	go run ./cmd/contract
+
+.PHONY: contract
