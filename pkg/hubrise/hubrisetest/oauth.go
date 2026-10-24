@@ -51,6 +51,9 @@ func (s *Server) oauthAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	code := s.IssueAuthCode()
+	s.mu.Lock()
+	s.codeScopes[code] = q.Get("scope")
+	s.mu.Unlock()
 	if q.Get("redirect_uri") == "urn:ietf:wg:oauth:2.0:oob" {
 		w.Header().Set("Content-Type", "text/plain")
 		_, _ = w.Write([]byte(code))
@@ -84,6 +87,14 @@ func (s *Server) oauthToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	delete(s.codes, code) // one use
+	// The token gets the scope the authorization was asked with (an authorization the control
+	// methods issued without one grants everything).
+	if scope := s.codeScopes[code]; scope != "" {
+		s.clients[Token].scopes = hubrise.ScopePermissions(scope)
+	} else {
+		s.clients[Token].scopes = nil
+	}
+	delete(s.codeScopes, code)
 	// Authorizing the same location again with the same client gives the same token.
 	delete(s.revoked, Token)
 	tok := hubrise.TokenResponse{

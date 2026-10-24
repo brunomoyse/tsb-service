@@ -94,6 +94,8 @@ type client struct {
 	name     string
 	callback *hubrise.Callback
 	events   []hubrise.Event
+	// scopes are the permissions the token was granted ("catalog.write"); nil means all of them.
+	scopes []string
 }
 
 type storedOrder struct {
@@ -104,6 +106,8 @@ type storedOrder struct {
 type image struct {
 	meta hubrise.Image
 	data []byte
+	// attached is true once a catalog PUT referenced the image (it is then never purged).
+	attached bool
 }
 
 // Server is the in-memory HubRise.
@@ -132,6 +136,17 @@ type Server struct {
 	catalog   hubrise.Catalog
 	inventory []hubrise.InventoryEntry
 	images    map[string]image
+	imageSeq  []string
+
+	// rawData is the catalog content as stored after a PUT (or ReplaceCatalogRaw), with the keys the
+	// typed structs do not model. nil until then: the typed catalog is served.
+	rawData json.RawMessage
+	// accountLevel makes the catalog an account catalog: a location token may read it but not
+	// modify it (401).
+	accountLevel bool
+	puts         int
+	// codeScopes remembers the scope each authorization code was asked with.
+	codeScopes map[string]string
 
 	// target overrides what the token endpoint says the authorization gives access to.
 	target *OAuthTarget
@@ -157,16 +172,17 @@ func New(tb testing.TB, opts ...Option) *Server {
 // server). Use New in tests.
 func NewHandler(opts ...Option) *Server {
 	s := &Server{
-		clock:     time.Now,
-		clients:   map[string]*client{},
-		revoked:   map[string]bool{},
-		codes:     map[string]bool{},
-		orders:    map[string]*storedOrder{},
-		customers: map[string]*storedCustomer{},
-		images:    map[string]image{},
-		limits:    DefaultLimits(),
-		windows:   map[string][]time.Time{},
-		heavy:     map[string][]time.Time{},
+		clock:      time.Now,
+		clients:    map[string]*client{},
+		revoked:    map[string]bool{},
+		codes:      map[string]bool{},
+		codeScopes: map[string]string{},
+		orders:     map[string]*storedOrder{},
+		customers:  map[string]*storedCustomer{},
+		images:     map[string]image{},
+		limits:     DefaultLimits(),
+		windows:    map[string][]time.Time{},
+		heavy:      map[string][]time.Time{},
 	}
 	s.clients[Token] = &client{token: Token, name: "tsb-webshop"}
 	s.clients[EPOSToken] = &client{token: EPOSToken, name: "pili-pos"}
@@ -492,7 +508,12 @@ type rawResponse struct {
 type handler func(s *Server, c *client, r *http.Request, body []byte, h http.Header) (status int, out any, err *apiError)
 
 // api wraps a handler with authentication, the content type check and the rate limits.
-func (s *Server) api(h handler, heavy bool) http.HandlerFunc {
+func (s *Server) api(h handler, heavy bool) http.HandlerFunc { return s.apiBody(h, heavy, false) }
+
+// apiRaw is api for an endpoint whose body is not JSON (an image upload).
+func (s *Server) apiRaw(h handler) http.HandlerFunc { return s.apiBody(h, false, true) }
+
+func (s *Server) apiBody(h handler, heavy, rawBody bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		s.mu.Lock()
@@ -504,7 +525,7 @@ func (s *Server) api(h handler, heavy bool) http.HandlerFunc {
 			writeAPIError(w, http.StatusUnauthorized, "The access token is invalid or the connection has been revoked")
 			return
 		}
-		if len(bytes.TrimSpace(body)) > 0 && !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+		if !rawBody && len(bytes.TrimSpace(body)) > 0 && !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 			writeAPIError(w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
 			return
 		}
@@ -594,6 +615,9 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /v1/customer_lists/{list}/customers/{id}/anonymise", s.api(anonymiseCustomer, false))
 	// Catalog and images.
 	m.HandleFunc("GET /v1/catalogs/{id}", s.api(getCatalog, true))
+	m.HandleFunc("PUT /v1/catalogs/{id}", s.api(putCatalog, false))
+	m.HandleFunc("GET /v1/catalogs/{id}/images", s.api(listImages, false))
+	m.HandleFunc("POST /v1/catalogs/{id}/images", s.apiRaw(postImage))
 	m.HandleFunc("GET /v1/catalogs/{id}/images/{image}", s.api(getImage, false))
 	m.HandleFunc("GET /v1/catalogs/{id}/images/{image}/data", s.api(getImageData, false))
 	// Inventory: unscoped, and scoped by catalog (and location).

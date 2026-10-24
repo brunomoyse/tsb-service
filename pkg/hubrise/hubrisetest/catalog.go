@@ -160,17 +160,6 @@ func validateCatalog(d hubrise.CatalogData) *apiError {
 	return errFields(errs)
 }
 
-func getCatalog(s *Server, _ *client, r *http.Request, _ []byte, _ http.Header) (int, any, *apiError) {
-	if r.PathValue("id") != s.catalog.ID {
-		return 0, nil, errStatus(http.StatusNotFound, "catalog not found")
-	}
-	out := s.catalog
-	if r.URL.Query().Get("hide_data") == "true" {
-		out.Data = nil
-	}
-	return http.StatusOK, out, nil
-}
-
 // ---- images ----
 
 func getImage(s *Server, _ *client, r *http.Request, _ []byte, _ http.Header) (int, any, *apiError) {
@@ -203,6 +192,9 @@ func (s *Server) AddImage(id, contentType string, data []byte) hubrise.Image {
 	defer s.mu.Unlock()
 	sum := md5.Sum(data) //nolint:gosec // see import
 	meta := hubrise.Image{ID: id, Type: contentType, Size: len(data), MD5: hex.EncodeToString(sum[:])}
+	if _, known := s.images[id]; !known {
+		s.imageSeq = append(s.imageSeq, id)
+	}
 	s.images[id] = image{meta: meta, data: slices.Clone(data)}
 	return meta
 }
@@ -226,6 +218,7 @@ func (s *Server) ReplaceCatalog(data hubrise.CatalogData) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.catalog.Data = storedCatalog(data)
+	s.rawData = nil
 	s.emit(EPOSToken, "catalog", "update", func(e *hubrise.Event, _ string) { e.CatalogID = s.catalog.ID })
 	return nil
 }

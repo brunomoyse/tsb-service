@@ -234,3 +234,17 @@ func TestOAuthRefusesRedirectsToAnotherHost(t *testing.T) {
 	assert.Equal(t, hubrise.KindRedirect, hubrise.KindOf(err))
 	assert.False(t, hit, "the client credentials must never reach another host")
 }
+
+func TestScopeParsing(t *testing.T) {
+	assert.Equal(t, []string{"orders.write", "catalog.read"}, hubrise.ScopePermissions("location[orders.write, catalog.read]"))
+	assert.Equal(t, []string{"a.b", "c.d"}, hubrise.ScopePermissions("a.b,c.d"))
+	assert.Equal(t, []string{"a.b"}, hubrise.ScopePermissions("account[a.b"))
+	assert.Empty(t, hubrise.ScopePermissions(""))
+	assert.Empty(t, hubrise.ScopePermissions("location[]"))
+
+	assert.True(t, hubrise.ScopeHas(hubrise.DefaultScope, "catalog.write"))
+	assert.False(t, hubrise.ScopeHas("location[orders.write,customer_list.write,catalog.read,inventory.read,inventory.write]", "catalog.write"), "the scope of the first release")
+	assert.True(t, hubrise.ScopeHas("location[catalog.*]", "catalog.write"))
+	assert.False(t, hubrise.ScopeHas("location[catalogs.write]", "catalog.write"))
+	assert.False(t, hubrise.ScopeHas("", "catalog.write"))
+}

@@ -155,3 +155,35 @@ func (o *OAuth) post(ctx context.Context, path string, form url.Values, extra ..
 	}
 	return raw, nil
 }
+
+// ScopePermissions returns the permissions a scope string grants, whatever its level:
+// "location[orders.write,catalog.read]" gives ["orders.write", "catalog.read"]. A string without
+// brackets is read as a comma separated list. Blanks are ignored.
+func ScopePermissions(scope string) []string {
+	inner := scope
+	if open := strings.Index(scope, "["); open >= 0 {
+		inner = scope[open+1:]
+		if end := strings.LastIndex(inner, "]"); end >= 0 {
+			inner = inner[:end]
+		}
+	}
+	var out []string
+	for _, p := range strings.FieldsFunc(inner, func(r rune) bool { return r == ',' || r == ' ' }) {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// ScopeHas reports whether scope grants permission ("catalog.write"): either exactly, or through
+// the wildcard of its resource ("catalog.*").
+func ScopeHas(scope, permission string) bool {
+	resource, _, _ := strings.Cut(permission, ".")
+	for _, p := range ScopePermissions(scope) {
+		if p == permission || p == resource+".*" {
+			return true
+		}
+	}
+	return false
+}
