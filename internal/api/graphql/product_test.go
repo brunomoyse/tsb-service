@@ -557,6 +557,9 @@ func TestCreateProduct(t *testing.T) {
 // TestUpdateProduct tests the updateProduct mutation (admin only)
 func TestUpdateProduct(t *testing.T) {
 	ctx := setupTestContext(t)
+	// An update that touches the image talks to the file service: point FILE_SERVICE_URL at a fake one, so the test needs
+	// no environment (CI used to skip it for that reason).
+	newFileService(t)
 
 	t.Run("Update product as admin", func(t *testing.T) {
 		c := client.New(ctx.Client.Handler())
