@@ -14,8 +14,9 @@ What it does, each part optional and switchable on its own:
 - **Customers**: registered customers are kept in the HubRise customer list.
 - **Inventory**: a product sold out at HubRise cannot be ordered here, and the sold-out toggle of the
   dashboard is sent to HubRise.
-- **Catalog**: the HubRise catalog becomes the menu (products, prices, option lists, categories, menu
-  codes).
+- **Catalog**: either the HubRise catalog becomes the menu (products, prices, option lists, categories,
+  menu codes), or the other way round: the dashboard owns the menu and publishes it to HubRise (see
+  section 9). One direction at a time.
 
 The one rule: **HubRise is an addition and never in the way.** Placing an order, paying and reading the
 menu work the same when HubRise is not configured, switched off, down or refusing. Everything HubRise
@@ -254,3 +255,74 @@ The old token is revoked only after the new connection is stored.
 - **tsb-infra**: the three secrets (and `HUBRISE_REPLICAS` if it is not 2), `API_BASE_URL` with `/api/v1`.
 - **HubRise**: the integration review (a call of about 90 minutes) and the Integration Sheet; contact
   integration@hubrise.com. Test orders are free during development.
+
+## 9. Dashboard-owned menu (the PUBLISH direction)
+
+Decision of 2026-10-24: only the dashboard edits the menu. In this direction every menu edit made in the
+dashboard (or by MCP and the POS, which use the same service) is published to the HubRise catalog, so
+that the EPOS reads it. It is the opposite of the import in section 5 and the two cannot be on together:
+the catalog direction is NONE, IMPORT or PUBLISH. Nothing changes for a shop that does not use it, and
+without HubRise configured no call is ever made. The design is amendment A15 in [PLAN.md](PLAN.md).
+
+**Switching.** Dashboard, HubRise page, catalog direction. The connection needs the `catalog.write`
+permission. Connections made before this feature do not have it: the page offers "Reconnect" (the same
+OAuth round trip, the same location and catalog) and the switch is refused with
+`HUBRISE_RECONNECT_REQUIRED` until then. Switching to PUBLISH turns the import off, removes the
+"managed by HubRise" locks, and writes nothing.
+
+**Preview and first publish.** The first publish never happens by itself. The dashboard shows a preview
+(one read of the HubRise catalog, nothing written): what will be added, changed and removed, what is left
+to HubRise, warnings and blockers. The admin confirms, and only then the catalog is written. A blocker (a
+rule HubRise would answer 422 for, or an empty menu) is listed in the preview and refuses the publish.
+
+**What is kept.** The catalog is read, merged with the local menu, and written back whole (HubRise
+replaces the catalog on every write). Everything the shop does not model survives: deals, discounts,
+price overrides, custom fields, unknown keys, and the products, categories and option lists created at
+HubRise (they are listed as "foreign" and left alone unless the admin asks for them to be removed).
+Products get a stable reference the first time (the product code when it has one), so the EPOS never
+loses a product when a name or a price changes. The product code is written to the SKU custom field
+`code`. A product that is out of stock is not removed from the catalog: availability travels through the
+inventory (section 7), never through the catalog.
+
+**Day to day.** An edit waits 10 seconds for the next ones (at most 2 minutes of continuous edits, and at
+most one publish every 30 seconds), then one read and one write. The state is in the database
+(`hubrise_catalog_publish`): a restart or the other replica loses nothing, and two replicas publish once.
+A safety scan every 5 minutes catches edits made around the application (raw SQL, restores).
+
+**Removals.** A product deleted in the dashboard leaves the HubRise catalog. When a publish would remove
+5 products or more and more than 30 % of what was published, it stops and asks for a confirmation in the
+dashboard (`REMOVALS_NEED_CONFIRM`); it never removes that many silently.
+
+**Edits made at HubRise.** The dashboard wins. A catalog edit made at HubRise raises a warning in the
+dashboard ("changed at HubRise") and is overwritten by the next publish, except for the foreign items
+and fields above. Acknowledge the warning once seen. A catalog deleted at HubRise blocks the publisher
+(`CATALOG_NOT_FOUND`) until the connection is relinked.
+
+**Account catalogs.** A catalog that belongs to the HubRise account instead of the location cannot be
+written with the location token: the first publish is refused (`HUBRISE_ACCOUNT_CATALOG`). Connect with
+an account token or use a location catalog.
+
+**Errors.** The status shows the last error: `WRITE_SCOPE_MISSING` (reconnect), `ACCOUNT_CATALOG`,
+`CATALOG_NOT_FOUND`, `INVALID_MENU` (a blocker), `REJECTED` (HubRise answered 422; the message names the
+fields; the next edit tries again), `UNAVAILABLE` (retried with a growing delay, nothing is dropped).
+A revoked token pauses the whole integration, as everywhere else.
+
+**Images.** Off by default (`publishImages` in the settings). When on, each visible product with a picture
+sends one to the catalog: the picture is read from the public product bucket
+(`<HUBRISE_IMAGE_BASE_URL>/images/thumbnails/<product id>.png`, defaulting to `S3_BUCKET_URL`, then
+`AWS_URL`), kept as is when HubRise accepts it (at most 1 MB), otherwise shrunk to 1200 pixels and
+re-encoded as a JPEG. The picture is uploaded under the reference `tsb-product-<product>-<content hash>`,
+so an unchanged picture is never uploaded twice and a changed one replaces the old on the product (images
+attached at HubRise by someone else stay). At most 50 uploads per publish, the rest follows on the next
+one. A picture that cannot be read or uploaded is a warning (`IMAGE_FAILED`) and the product keeps what
+it had; the catalog is published anyway. With images on, a publish also runs when only a picture changed.
+Unattached images are purged by HubRise after 30 days.
+
+**Rolling back.** Switch the direction to NONE: the publisher stops at once and nothing else changes; the
+HubRise catalog stays as it was last published. To return to the import, switch to IMPORT and run a
+preview, which shows what the HubRise catalog would change in the shop. Switching back to PUBLISH asks
+for a new preview and confirmation.
+
+**Configuration.** No new secret. `HUBRISE_IMAGE_BASE_URL` is optional (images only). The permission
+`catalog.write` is requested at connection time. The migration `20261024190000_add_catalog_publish.sql`
+is additive.
