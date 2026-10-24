@@ -385,3 +385,27 @@ func (e *env) countWhere(t *testing.T, table, where string, args ...any) int {
 	require.NoError(t, e.tdb.DB.GetContext(e.ctx, &n, "SELECT count(*) FROM "+table+" WHERE "+where, args...))
 	return n
 }
+
+// A release's migrations run before its pods replace the old ones, so the running code reads
+// tables that already carry the new columns. Every order read must ignore a column it does not know.
+func TestOrderReadsIgnoreAnAddedColumn(t *testing.T) {
+	e := newEnv(t)
+	saved := e.save(t, e.newOrder(domain.OrderStatusPending, nil))
+	e.exec(t, `ALTER TABLE orders ADD COLUMN added_by_a_later_release TEXT DEFAULT 'x'`)
+
+	got, _, err := e.repo.FindByID(e.ctx, saved.ID)
+	require.NoError(t, err)
+	assert.Equal(t, saved.ID, got.ID)
+
+	page, err := e.repo.FindPaginated(e.ctx, 1, 10, nil)
+	require.NoError(t, err)
+	assert.Len(t, page, 1)
+
+	filtered, _, err := e.repo.FindFiltered(e.ctx, domain.OrderHistoryFilter{Page: 1, Limit: 10})
+	require.NoError(t, err)
+	assert.Len(t, filtered, 1)
+
+	byUser, err := e.repo.FindByUserIDs(e.ctx, []string{e.userID.String()})
+	require.NoError(t, err)
+	assert.Len(t, byUser[e.userID.String()], 1)
+}
