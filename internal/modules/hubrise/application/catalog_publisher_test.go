@@ -641,14 +641,22 @@ func TestAPublishLostToAnotherReplicaIsReported(t *testing.T) {
 	e := newPubEnv(t)
 	e.product("M1", "Maki", "8.90")
 	prev := e.firstPlan()
-	// The lease expires while the PUT is slow and another replica takes it over.
-	e.srv.AddFault(hubrisetest.Fault{Method: "PUT", Times: 1, Delay: 200 * time.Millisecond})
+	// The lease expires while the PUT is slow and another replica takes it over. Wait for the PUT to
+	// be in flight: the publisher renews its lease up to that point, so moving the clock earlier
+	// would only let it renew at the new time.
+	putStarted := make(chan struct{})
+	e.srv.AddFault(hubrisetest.Fault{Method: "PUT", Times: 1, Delay: 500 * time.Millisecond, OnStart: func() { close(putStarted) }})
 	done := make(chan error, 1)
 	go func() {
 		_, err := e.pub.PublishNow(t.Context(), application.PublishRequest{PlanHash: prev})
 		done <- err
 	}()
-	require.Eventually(t, func() bool { return e.publisherState().LeaseHolder != nil }, 5*time.Second, 5*time.Millisecond)
+	select {
+	case <-putStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the publish never reached its PUT")
+	}
+	require.NotNil(t, e.publisherState().LeaseHolder)
 	e.clock.Advance(domain.PublishLeaseTTL + time.Second)
 	_, ok, err := e.state.ClaimNow(t.Context(), "replica-b:x", e.clock.Now())
 	require.NoError(t, err)

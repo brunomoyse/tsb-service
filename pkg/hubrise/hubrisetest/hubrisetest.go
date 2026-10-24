@@ -311,6 +311,9 @@ type Fault struct {
 	// DropAfter processes the request normally, then closes the connection without answering: the
 	// request took effect but the caller never learns it (the case that needs a private_ref lookup).
 	DropAfter bool
+	// OnStart, when set, is called as soon as a matching request arrives, before any Delay or
+	// Timeout: a test can act while the request is in flight.
+	OnStart func()
 }
 
 // AddFault injects a fault.
@@ -373,6 +376,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fault = s.takeFault(r.Method, r.URL.Path)
 	}
 	if fault != nil {
+		if fault.OnStart != nil {
+			fault.OnStart()
+		}
 		if fault.Timeout {
 			<-r.Context().Done()
 			s.record(entry)
