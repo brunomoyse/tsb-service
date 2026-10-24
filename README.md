@@ -78,6 +78,15 @@ go run cmd/migrate/main.go -cmd=down
 go run cmd/migrate/main.go -cmd=create add_new_feature
 ```
 
+In production the migrations of a release run before its pods start (the `tsb-migrate` pre-upgrade
+hook of the tsb-infra chart), so the previous release keeps serving on the new schema for the length
+of the rollout. A migration must therefore leave the previous release working:
+
+- add columns nullable or with a default; drop or rename a column only in a later release than the
+  one that stopped using it;
+- queries list their columns (`db.Columns(domain.X{}, alias)`), never `SELECT *` or `alias.*`
+  (sqlx refuses a column the struct has no field for); `pkg/db` has a test that enforces it.
+
 ## Docker
 
 ```bash
@@ -90,7 +99,9 @@ The image is multi-stage, includes healthchecks, and ships `tsb-migrate` with SQ
 ## Deployment
 
 - Push to `main`: build/test path and latest deployment pipeline.
-- Tag `v*`: production image build and OVH deployment, including migration step.
+- Tag `v*`: production image build and OVH deployment. The migrations run in `helm upgrade`, as the
+  tsb-infra chart's pre-upgrade hook, before the pods roll; a failed migration fails the deploy and
+  leaves the old pods serving.
 - Manual rollback: run workflow with target version and migration rollback count.
 
 ## Pili repositories

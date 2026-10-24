@@ -16,6 +16,12 @@ import (
 	"go.uber.org/zap"
 )
 
+// Column lists of domain.Order, plain and prefixed with the "o" alias (see db.Columns).
+var (
+	orderColumns  = db.Columns(domain.Order{}, "")
+	orderColumnsO = db.Columns(domain.Order{}, "o")
+)
+
 type OrderRepository struct {
 	pool *db.DBPool
 }
@@ -231,7 +237,7 @@ func (r *OrderRepository) HasActiveCouponOrder(ctx context.Context, userID uuid.
 // FindByID retrieves an order by its ID.
 func (r *OrderRepository) FindByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, *[]domain.OrderProductRaw, error) {
 	query := `
-		SELECT *
+		SELECT ` + orderColumns + `
 		FROM orders
 		WHERE id = $1
 		LIMIT 1
@@ -355,12 +361,12 @@ func (r *OrderRepository) FindPaginated(ctx context.Context, page int, limit int
 
 	query := fmt.Sprintf(`
         SELECT
-            o.*
+            %s
         FROM orders o
         %s
         ORDER BY o.created_at DESC
         LIMIT $%d OFFSET $%d
-    `, whereClause, limitPlaceholder, offsetPlaceholder)
+    `, orderColumnsO, whereClause, limitPlaceholder, offsetPlaceholder)
 
 	// Append the limit and offset arguments
 	args = append(args, limit, offset)
@@ -442,13 +448,13 @@ func (r *OrderRepository) FindFiltered(ctx context.Context, filter domain.OrderH
 	// Orders query with pagination
 	offset := (filter.Page - 1) * filter.Limit
 	ordersQuery := fmt.Sprintf(`
-		SELECT o.*
+		SELECT %s
 		FROM orders o
 		LEFT JOIN users u ON o.user_id = u.id
 		%s
 		ORDER BY o.created_at DESC
 		LIMIT $%d OFFSET $%d
-	`, whereClause, idx, idx+1)
+	`, orderColumnsO, whereClause, idx, idx+1)
 
 	orderArgs := append(args, filter.Limit, offset) //nolint:gocritic
 
@@ -576,7 +582,7 @@ func (r *OrderRepository) FindByOrderIDs(ctx context.Context, orderIDs []string)
 func (r *OrderRepository) FindByUserIDs(ctx context.Context, userIDs []string) (map[string][]*domain.Order, error) {
 	// 1) Expand the IN clause
 	query, args, err := sqlx.In(`
-        SELECT *
+        SELECT `+orderColumns+`
         FROM orders
         WHERE user_id IN (?)
         ORDER BY created_at DESC
