@@ -14,6 +14,8 @@ on:
 
 permissions:
   contents: write
+  # Reads the CI results of the commit about to be tagged.
+  actions: read
 
 jobs:
   tag_and_release:
@@ -41,6 +43,14 @@ jobs:
             echo "::error::Tag ${{ inputs.version }} already exists. Bump it or delete it first."
             exit 1
           fi
+
+      # Nothing untested reaches production: main HEAD must have passed the test
+      # jobs and every other CI run. If it is still building, wait and run again.
+      - name: Require a green main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: bash .github/scripts/main-green.sh "$(git rev-parse HEAD)"
 
       - name: Create and push tag
         run: |
